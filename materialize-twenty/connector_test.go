@@ -1566,6 +1566,10 @@ func TestRedact(t *testing.T) {
 	}
 	require.Equal(t, "Provided phone number is invalid <phone>; email <email> and '<email>'; 12 left",
 		redact("Provided phone number is invalid +65 9123 4567; email jane@x.io and 'bob@y'; 12 left", rec))
+	// additionalPhones mapped as a subfield stays raw JSON, and a group's refusal names every record.
+	sub := record{"phones": map[string]any{"additionalPhones": json.RawMessage(`[{"number":"555 010 9999"}]`)}}
+	require.Equal(t, "invalid <phone> and <phone>",
+		redact("invalid 555 010 9999 and +65 9123 4567", sub, rec))
 	require.Len(t, redact(strings.Repeat("x", 400), nil), 300)
 	require.Equal(t, strings.Repeat("x", 299), redact(strings.Repeat("x", 299)+"ü", nil), "never half a character")
 }

@@ -361,7 +361,8 @@ func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartComm
 		if !deleted {
 			if p.rec, err = b.record(key, it.Values, it.RawJSON); err != nil {
 				// An earlier document of the key stays in the chunk, as if each were written in turn.
-				if err := t.reject(b, s, key, err.Error()); err != nil {
+				// The error can quote the value, and the record holding its phone numbers is gone.
+				if err := t.reject(b, s, key, redact(err.Error())); err != nil {
 					return nil, err
 				}
 				continue
@@ -1830,7 +1831,11 @@ func (t *transactor) writeMoves(ctx context.Context, b *binding, groups [][]pend
 			if len(items) == 1 {
 				why[items[0].key] = redact(rej.Error(), items[0].rec)
 			}
-			log.WithFields(log.Fields{"object": b.object, "keys": keys, "reason": redact(rej.Error(), nil)}).
+			recs := make([]record, len(items))
+			for i, p := range items {
+				recs[i] = p.rec
+			}
+			log.WithFields(log.Fields{"object": b.object, "keys": keys, "reason": redact(rej.Error(), recs...)}).
 				Warn("records couldn't take one another's unique values, and keep their own")
 			return nil
 		}
@@ -2250,23 +2255,42 @@ func rejectedFields(rej *rejectedError, rec record) []string {
 
 // redact takes phone numbers and emails out of a rejection before it is logged, since Twenty's
 // messages repeat the values they reject.
-func redact(reason string, rec record) string {
+func redact(reason string, recs ...record) string {
 	mask := func(n any) {
 		// A shorter value isn't a phone number, and could match anything.
 		if number := strings.TrimSpace(fmt.Sprint(n)); n != nil && len(number) >= 5 {
 			reason = strings.ReplaceAll(reason, number, "<phone>")
 		}
 	}
-	for _, v := range rec {
-		obj, _ := v.(map[string]any)
-		if n, ok := obj["primaryPhoneNumber"]; ok {
-			mask(n)
-		}
-		more, _ := obj["additionalPhones"].([]any)
-		for _, p := range more {
-			if p, ok := p.(map[string]any); ok {
-				mask(p["number"])
+	// A phone field mapped whole is decoded, but additionalPhones mapped as a subfield stays raw
+	// JSON, so every shape is walked for the numbers it holds.
+	var walk func(v any, phone bool)
+	walk = func(v any, phone bool) {
+		switch v := v.(type) {
+		case map[string]any:
+			_, primary := v["primaryPhoneNumber"]
+			_, more := v["additionalPhones"]
+			for _, sub := range v {
+				walk(sub, phone || primary || more)
 			}
+		case []any:
+			for _, e := range v {
+				walk(e, phone)
+			}
+		case json.RawMessage:
+			var decoded any
+			if decode(v, &decoded) == nil {
+				walk(decoded, phone)
+			}
+		case string:
+			if phone {
+				mask(v)
+			}
+		}
+	}
+	for _, rec := range recs {
+		for _, v := range rec {
+			walk(v, false)
 		}
 	}
 	reason = email.ReplaceAllString(reason, "<email>")
