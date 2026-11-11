@@ -719,10 +719,10 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 }
 
 // pendingItems lists a state key's pending entries in the order they apply:
-// by layout, and by range key within one, which puts the primary's own
-// first. The first entry names the coalesced job, so that a restart applying
-// the same entries finds that job. The order must therefore be the same in
-// every version that reads these layouts.
+// state-key-first, flat, then range-first, each by range key. The first one
+// without a Query names the coalesced job, so that a restart applying the
+// same entries finds that job. The order must therefore be the same in every
+// version that reads these layouts.
 func (t *transactor) pendingItems(stateKey string) []*checkpointItem {
 	var items []*checkpointItem
 	for _, rk := range slices.Sorted(maps.Keys(t.stateFirst[stateKey])) {
