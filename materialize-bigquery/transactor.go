@@ -76,6 +76,7 @@ type checkpoint = map[string]*checkpointItem  // keyed by bare StateKey
 type rangeCheckpoints = map[string]checkpoint // keyed by "%08x-%08x"
 
 // legacyRangeKey holds entries written before range-scoping (bare StateKey).
+// TODO(#5681): remove after 2026-12-02.
 const legacyRangeKey = ""
 
 var rangeKeyRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{8}$`)
