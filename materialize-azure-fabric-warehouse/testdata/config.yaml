@@ -2,7 +2,7 @@ clientID: d845ffbf-bad9-4955-9edf-2194524c23c3
 clientSecret_sops: ENC[AES256_GCM,data:FgdMN3Fek4f9WnC9hSR46R1BtXg593iecJCWmHXt+DUT8WZ0Q0l1AQ==,iv:0X8iYNIVDL5U0JB96FbQiht570B+qlD0G2i5xkFOrKY=,tag:ePYWuUHVSlqREP8VrZSCkQ==,type:str]
 warehouse: integration_tests
 schema: estuary_test_schema
-connectionString: jc5wrnsaqm5eplfxoiid6tylbe-ygaoe6buyonuzktlb336cfgz4y.datawarehouse.fabric.microsoft.com
+connectionString: jc5wrnsaqm5eplfxoiid6tylbe-cyvkkpyp5xaehmjyf6plc7ainy.datawarehouse.fabric.microsoft.com
 storageAccountName: integrationteststaging
 storageAccountKey_sops: ENC[AES256_GCM,data:O47qJXIYYpYxdn2YeiVoBucHXojIa3/bncqtlH+fHYt29/c+1aYW5erxrSF8Qx8q7bEHHPSzINlV4VovCLpe08o6zJ83z1A5zkcJPJcjkP0EAw8AkCv71A==,iv:em0D1RGQ4Y+9BK0dSLKvKQ5+2JrHLRkHSqo7Mq9Opsg=,tag:P6Nsrs/zXxwz6dZ5YbTMSg==,type:str]
 containerName: tmp
@@ -16,7 +16,7 @@ sops:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2024-02-01T17:08:49Z"
           enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
-    lastmodified: "2026-09-10T08:48:13Z"
-    mac: ENC[AES256_GCM,data:+Za0NhauxaEA79zkNpIxdK0k6/Fs4+yKhiqOJ5vSyoitpywcjc9AZr9PgpbBeqsbyMablz4gxYZasG73cpC7UWJXuEIa/rMLESr9Vzp/bfTRxVsjWi5qxZGqvdAuKKfz5T/SZ0rgBgg9+WVgP0A4c3wVySQFO1meoQK1E/a4+SY=,iv:oik0BJ6VzScThw0OoK1mVzruc2zMWvhllmjHIOiiEhI=,tag:34vhco/oSAUXSMfEqGLmsw==,type:str]
+    lastmodified: "2026-11-11T12:37:40Z"
+    mac: ENC[AES256_GCM,data:OD6Uo8tkX9udKB3eUja4+OX3jzfYDJpsKsqN4eGWHVSkAS49zepfzXR7De0DSWoDiCcyu8rD31T5hwzL3Dlh8pFuyakd/LculKRgzPQd7FnK3X+5glIULfH+Knj1cQpcytaOhxlQcJvVpDFAqZqp4cV1ZYYAgcL6nAPasiC7294=,iv:bJ5QpIxcGcnlt816L5QI9q8RyaO3aLa4kGjSPXbrqX4=,tag:bhFy41LZ+bes3uqQvZuq+A==,type:str]
     encrypted_suffix: _sops
     version: 3.10.2
