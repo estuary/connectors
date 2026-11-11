@@ -1,5 +1,25 @@
 # materialize-snowflake
 
+## 2026-11-09
+
+### Changed
+- Waiting for a newly created Snowpipe pipe to become visible now gives up
+  after 10 minutes instead of waiting indefinitely.
+
+## 2026-11-06
+
+### Changed
+- A transaction's new rows are appended with COPY INTO, and only rows that
+  already exist in the table go through MERGE INTO. Commits that mix updates
+  with new rows are faster. The new rows are written in key order, so later
+  queries can often skip more of the table.
+
+## 2026-11-05
+
+### Changed
+- Updates that follow transactions of only new rows, such as the end of a
+  backfill, may scan less of the destination table.
+
 ## 2026-11-03
 
 ### Added

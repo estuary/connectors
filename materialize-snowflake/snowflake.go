@@ -430,10 +430,15 @@ type binding struct {
 	nullFieldsToStrip []string
 	// Variables accessed by Prepare, Store, and Commit.
 	store struct {
-		stage       *stagedFile
-		mergeInto   string
-		copyInto    string
-		mustMerge   bool
+		// mergeStage holds the round's stores of rows that already exist in
+		// the table, which a MERGE applies.
+		mergeStage *stagedFile
+		// copyStage holds the round's stores of new rows, which a COPY or a
+		// pipe appends.
+		copyStage *stagedFile
+		mergeInto string
+		copyInto  string
+		// mergeBounds bounds the keys of mergeStage's rows.
 		mergeBounds *sql.MergeBoundsBuilder
 		rows        int64
 	}
@@ -508,7 +513,8 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 	}
 
 	b.load.stage = newStagedFile(os.TempDir(), d.uploads)
-	b.store.stage = newStagedFile(os.TempDir(), d.uploads)
+	b.store.mergeStage = newStagedFile(os.TempDir(), d.uploads)
+	b.store.copyStage = newStagedFile(os.TempDir(), d.uploads)
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT {
 		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
@@ -728,6 +734,11 @@ type checkpointItem struct {
 	PipeFiles     []fileRecord
 	Version       string
 	EncryptionKey string
+	// CopyQuery and CopyStagedDir are a COPY INTO of the round's new rows and
+	// its staged files, applied after a Query that MERGEs the round's existing
+	// rows.
+	CopyQuery     string `json:",omitempty"`
+	CopyStagedDir string `json:",omitempty"`
 	// Round and Rows are the transaction round and number of rows staged,
 	// for reporting the commit's row stats when it runs in Acknowledge.
 	Round int
@@ -757,22 +768,26 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		var b = d.bindings[it.Binding]
 
 		// Store requests are ordered by binding, so the previous binding has received all of
-		// its rows and its staged file can be finished now rather than held open until commit.
+		// its rows and its staged files can be finished now rather than held open until commit.
 		if lastBinding != -1 && lastBinding != it.Binding {
-			if last := d.bindings[lastBinding]; !last.streaming && !last.streamingV2 && last.store.stage.started {
-				if err := last.store.stage.finish(); err != nil {
-					return nil, fmt.Errorf("finishing staged file for %s: %w", last.target.Path, err)
+			if last := d.bindings[lastBinding]; !last.streaming && !last.streamingV2 {
+				for _, stage := range []*stagedFile{last.store.mergeStage, last.store.copyStage} {
+					if !stage.started {
+						continue
+					} else if err := stage.finish(); err != nil {
+						return nil, fmt.Errorf("finishing staged file for %s: %w", last.target.Path, err)
+					}
 				}
 			}
 		}
 		lastBinding = it.Binding
 
+		var stage = b.store.copyStage
 		if it.Exists {
-			b.store.mustMerge = true
+			stage = b.store.mergeStage
 		}
-
 		if !b.streaming && !b.streamingV2 {
-			if err := b.store.stage.start(ctx, d.db); err != nil {
+			if err := stage.start(ctx, d.db); err != nil {
 				return nil, err
 			}
 		}
@@ -786,9 +801,9 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			if err := d.snowpipeStreaming.writeRow(ctx, it.Binding, converted); err != nil {
 				return nil, fmt.Errorf("encoding Store to stream for resource %s: %w", b.target.Path, err)
 			}
-		} else if err = b.store.stage.writeRow(append(converted, d.cfg.HardDelete && it.Delete)); err != nil {
+		} else if err = stage.writeRow(append(converted, d.cfg.HardDelete && it.Delete)); err != nil {
 			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
-		} else {
+		} else if it.Exists {
 			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
 		}
 		b.store.rows++
@@ -857,22 +872,18 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 			continue
 		}
 
-		if !b.store.stage.started {
-			continue
-		}
-
-		dir, err := b.store.stage.wait()
-		if err != nil {
-			return nil, err
-		}
-
-		if b.store.mustMerge {
+		var item *checkpointItem
+		if b.store.mergeStage.started {
+			dir, err := b.store.mergeStage.wait()
+			if err != nil {
+				return nil, err
+			}
 			var bounds = b.store.mergeBounds.Build()
 			mergeIntoQuery, err := renderBoundedQueryTemplate(d.templates.mergeInto, b.target, dir, bounds)
 			if err != nil {
 				return nil, fmt.Errorf("mergeInto template: %w", err)
 			}
-			d.cp[b.target.StateKey] = &checkpointItem{
+			item = &checkpointItem{
 				Table:     b.target.Identifier,
 				Query:     mergeIntoQuery,
 				StagedDir: dir,
@@ -880,10 +891,19 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 				Round:     round,
 				Rows:      rows,
 			}
+			d.cp[b.target.StateKey] = item
 			d.commitProfile.SetBounds(idx, bounds)
-			// Reset for next round.
-			b.store.mustMerge = false
-		} else if b.pipeName != "" {
+		}
+
+		if !b.store.copyStage.started {
+			continue
+		}
+		dir, err := b.store.copyStage.wait()
+		if err != nil {
+			return nil, err
+		}
+
+		if b.pipeName != "" && item == nil {
 			// Check to see if a pipe for this version already exists
 			exists, err := d.pipeExists(ctx, b.pipeName)
 			if err != nil {
@@ -903,37 +923,43 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 
 			// Our understanding is that CREATE PIPE is _eventually consistent_, and so we
 			// wait until we can make sure the pipe exists before continuing
-			for !exists {
-				exists, err = d.pipeExists(ctx, b.pipeName)
-				if err != nil {
-					return nil, err
-				}
-				if !exists {
-					time.Sleep(5 * time.Second)
+			if !exists {
+				if err := pipeVisibleRetry.Do(ctx, "waiting for pipe "+b.pipeName, func(ctx context.Context) error {
+					if exists, err := d.pipeExists(ctx, b.pipeName); err != nil {
+						return err
+					} else if !exists {
+						return errPipeNotVisible
+					}
+					return nil
+				}); err != nil {
+					return nil, fmt.Errorf("waiting for created pipe %q: %w", b.pipeName, err)
 				}
 			}
 
 			d.cp[b.target.StateKey] = &checkpointItem{
 				Table:     b.target.Identifier,
 				StagedDir: dir,
-				PipeFiles: b.store.stage.uploaded,
+				PipeFiles: b.store.copyStage.uploaded,
 				PipeName:  b.pipeName,
 				Version:   d.version,
 				Round:     round,
 				Rows:      rows,
 			}
+			continue
+		}
 
+		if copyIntoQuery, err := renderTableAndFileTemplate(b.target, dir, d.templates.copyInto); err != nil {
+			return nil, fmt.Errorf("copyInto template: %w", err)
+		} else if item != nil {
+			item.CopyQuery = copyIntoQuery
+			item.CopyStagedDir = dir
 		} else {
-			if copyIntoQuery, err := renderTableAndFileTemplate(b.target, dir, d.templates.copyInto); err != nil {
-				return nil, fmt.Errorf("copyInto template: %w", err)
-			} else {
-				d.cp[b.target.StateKey] = &checkpointItem{
-					Table:     b.target.Identifier,
-					Query:     copyIntoQuery,
-					StagedDir: dir,
-					Round:     round,
-					Rows:      rows,
-				}
+			d.cp[b.target.StateKey] = &checkpointItem{
+				Table:     b.target.Identifier,
+				Query:     copyIntoQuery,
+				StagedDir: dir,
+				Round:     round,
+				Rows:      rows,
 			}
 		}
 	}
@@ -969,7 +995,7 @@ type pipeRecord struct {
 
 // finished reports the pipe's row stats once all of its files have loaded.
 func (pipe *pipeRecord) finished(be *m.BindingEvents) {
-	stats := m.ExactRowStats(pipe.loaded, 0, 0).WithLoaded(pipe.loaded)
+	stats := m.ExactRowStats(pipe.loaded, 0, 0)
 	if pipe.rows > 0 {
 		stats = stats.WithStaged(pipe.rows)
 	}
@@ -1114,7 +1140,14 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				// retains contexts internally, and groupCtx is cancelled after
 				// group.Wait() returns.
 				if len(item.Query) > 0 {
-					if err := d.runStoreQuery(ctx, item, idx, path); err != nil {
+					if err := d.runStoreQuery(ctx, item, item.Query, item.Rows, idx, path); err != nil {
+						return err
+					}
+				}
+				// The COPY runs after the MERGE so that the MERGE doesn't scan
+				// the rows the COPY appends.
+				if len(item.CopyQuery) > 0 {
+					if err := d.runStoreQuery(ctx, item, item.CopyQuery, 0, idx, path); err != nil {
 						return err
 					}
 				}
@@ -1127,8 +1160,10 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				}
 				d.be.FinishedResourceCommit(path)
 
-				if item.StagedDir != "" {
-					if err := d.deleteFiles(groupCtx, []string{item.StagedDir}); err != nil {
+				for _, dir := range []string{item.StagedDir, item.CopyStagedDir} {
+					if dir == "" {
+						continue
+					} else if err := d.deleteFiles(groupCtx, []string{dir}); err != nil {
 						return fmt.Errorf("cleaning up files: %w", err)
 					}
 				}
@@ -1210,6 +1245,15 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	// even if no results are listed.
 	var minTryTime = time.Now().Add(30 * time.Minute)
 
+	var wait = func() error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(retryDelay):
+			return nil
+		}
+	}
+
 	for len(pipes) > 0 {
 		for pipeName, pipe := range pipes {
 			// if the pipe has no files to begin with, just skip it
@@ -1235,7 +1279,9 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			// reliable. If they are not there, then something is wrong.
 			if len(report.Files) == 0 {
 				if time.Now().Before(maxTryTime) {
-					time.Sleep(retryDelay)
+					if err := wait(); err != nil {
+						return nil, err
+					}
 					continue
 				}
 
@@ -1272,14 +1318,18 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				// If items are still in progress, we continue trying to fetch their results
 				if hasItemsInProgress {
 					maxTryTime = time.Now().Add(1 * time.Minute)
-					time.Sleep(retryDelay)
+					if err := wait(); err != nil {
+						return nil, err
+					}
 					continue
 				}
 
 				if len(pipe.files) > 0 {
 					if time.Now().Before(minTryTime) {
 						maxTryTime = time.Now().Add(1 * time.Minute)
-						time.Sleep(retryDelay)
+						if err := wait(); err != nil {
+							return nil, err
+						}
 						continue
 					}
 					return nil, fmt.Errorf("snowpipe: could not find reports of successful processing for all files of pipe %v", pipe)
@@ -1315,7 +1365,9 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				delete(pipes, pipeName)
 			}
 
-			time.Sleep(retryDelay)
+			if err := wait(); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -1385,14 +1437,15 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
-// runStoreQuery runs a checkpoint item's MERGE INTO or COPY INTO and reports
-// the row counts from its result set. A result that can't be read is logged
-// and skipped; only the query itself can fail the commit.
-func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, binding int, path []string) error {
-	isMerge := strings.HasPrefix(item.Query, "\nMERGE INTO")
+// runStoreQuery runs one of a checkpoint item's MERGE INTO or COPY INTO
+// queries and reports the row counts from its result set, plus staged rows if
+// staged is positive. A result that can't be read is logged and skipped; only
+// the query itself can fail the commit.
+func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, query string, staged int64, binding int, path []string) error {
+	isMerge := strings.HasPrefix(query, "\nMERGE INTO")
 
-	var queryCtx, trace = d.commitProfile.Trace(ctx, binding, boilerplate.StatementKind(item.Query))
-	rows, err := d.db.QueryContext(queryCtx, item.Query)
+	var queryCtx, trace = d.commitProfile.Trace(ctx, binding, boilerplate.StatementKind(query))
+	rows, err := d.db.QueryContext(queryCtx, query)
 	trace.Finish(err)
 	if err != nil {
 		return fmt.Errorf("running ack query: %w", err)
@@ -1403,8 +1456,8 @@ func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, bi
 		log.WithError(err).WithField("table", item.Table).Warn("could not read store query result")
 		return nil
 	}
-	if item.Rows > 0 {
-		stats = stats.WithStaged(item.Rows)
+	if staged > 0 {
+		stats = stats.WithStaged(staged)
 	}
 	d.be.ReportRowStats(item.Round, path, stats)
 	return nil
@@ -1497,7 +1550,7 @@ func scanStoreResult(rows *stdsql.Rows, isMerge bool) (m.RowStats, error) {
 	if isMerge {
 		return m.ExactRowStats(inserted, updated, deleted), nil
 	}
-	return m.ExactRowStats(loaded, 0, 0).WithLoaded(loaded), nil
+	return m.ExactRowStats(loaded, 0, 0), nil
 }
 
 // bindingForStateKey is the index of the binding with the state key, or -1 if

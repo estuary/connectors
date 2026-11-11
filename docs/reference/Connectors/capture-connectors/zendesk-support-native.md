@@ -10,38 +10,41 @@ This connector captures data from Zendesk into Estuary collections.
 
 The following data resources are supported through the Zendesk API:
 
-* [Account attributes](https://developer.zendesk.com/api-reference/ticketing/ticket-management/skill_based_routing/#list-account-attributes)
-* [Audit logs](https://developer.zendesk.com/api-reference/ticketing/account-configuration/audit_logs/#list-audit-logs)
-* [Automations](https://developer.zendesk.com/api-reference/ticketing/business-rules/automations/#list-automations)
-* [Brands](https://developer.zendesk.com/api-reference/ticketing/account-configuration/brands/)
-* [Calls](https://developer.zendesk.com/api-reference/voice/talk-api/incremental_exports/#incremental-calls-export)
-* [Call legs](https://developer.zendesk.com/api-reference/voice/talk-api/incremental_exports/#incremental-call-legs-export)
-* [Custom roles](https://developer.zendesk.com/api-reference/ticketing/account-configuration/custom_roles/)
-* [Group memberships](https://developer.zendesk.com/api-reference/ticketing/groups/group_memberships/)
-* [Groups](https://developer.zendesk.com/api-reference/ticketing/groups/groups/)
-* [Macros](https://developer.zendesk.com/api-reference/ticketing/business-rules/macros/)
-* [Organizations](https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-organization-export)
-* [Organization memberships](https://developer.zendesk.com/api-reference/ticketing/organizations/organization_memberships/)
-* [Posts](https://developer.zendesk.com/api-reference/help_center/help-center-api/posts/#list-posts)
-* [Post comments](https://developer.zendesk.com/api-reference/help_center/help-center-api/post_comments/#list-comments)
-* [Post comment votes](https://developer.zendesk.com/api-reference/help_center/help-center-api/votes/#list-votes)
-* [Post votes](https://developer.zendesk.com/api-reference/help_center/help-center-api/votes/#list-votes)
-* [Satisfaction ratings](https://developer.zendesk.com/api-reference/ticketing/ticket-management/satisfaction_ratings/)
-* [Schedules](https://developer.zendesk.com/api-reference/ticketing/ticket-management/schedules/)
-* [Side conversations](https://developer.zendesk.com/api-reference/ticketing/side_conversation/side_conversation/#list-side-conversations)
-* [SLA policies](https://developer.zendesk.com/api-reference/ticketing/business-rules/sla_policies/)
-* [Tags](https://developer.zendesk.com/api-reference/ticketing/ticket-management/tags/)
-* [Ticket activities](https://developer.zendesk.com/api-reference/ticketing/tickets/activity_stream/#list-activities)
-* [Ticket audits](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_audits/)
-* [Ticket comments](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_comments/)
-* [Ticket fields](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_fields/)
-* [Ticket forms](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_forms/)
-* [Ticket metrics](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_metrics/)
-* [Ticket metric events](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_metric_events/)
-* [Ticket skips](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_skips/)
-* [Tickets](https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-ticket-export-cursor-based)
-* [Topics](https://developer.zendesk.com/api-reference/help_center/help-center-api/topics/#list-topics)
-* [Users](https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-user-export-cursor-based)
+| Resource | Replication Mode |
+| --- | --- |
+| [Account attributes](https://developer.zendesk.com/api-reference/ticketing/ticket-management/skill_based_routing/#list-account-attributes) | Snapshot |
+| [Articles](https://developer.zendesk.com/api-reference/help_center/help-center-api/articles/) | Incremental |
+| [Audit logs](https://developer.zendesk.com/api-reference/ticketing/account-configuration/audit_logs/#list-audit-logs) | Incremental |
+| [Automations](https://developer.zendesk.com/api-reference/ticketing/business-rules/automations/#list-automations) | Incremental |
+| [Brands](https://developer.zendesk.com/api-reference/ticketing/account-configuration/brands/) | Incremental |
+| [Calls](https://developer.zendesk.com/api-reference/voice/talk-api/incremental_exports/#incremental-calls-export) | Incremental |
+| [Call legs](https://developer.zendesk.com/api-reference/voice/talk-api/incremental_exports/#incremental-call-legs-export) | Incremental |
+| [Categories](https://developer.zendesk.com/api-reference/help_center/help-center-api/categories/#list-categories) | Incremental |
+| [Custom roles](https://developer.zendesk.com/api-reference/ticketing/account-configuration/custom_roles/) | Incremental |
+| [Group memberships](https://developer.zendesk.com/api-reference/ticketing/groups/group_memberships/) | Incremental |
+| [Groups](https://developer.zendesk.com/api-reference/ticketing/groups/groups/) | Incremental |
+| [Macros](https://developer.zendesk.com/api-reference/ticketing/business-rules/macros/) | Incremental |
+| [Organizations](https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-organization-export) | Incremental |
+| [Organization memberships](https://developer.zendesk.com/api-reference/ticketing/organizations/organization_memberships/) | Incremental |
+| [Posts](https://developer.zendesk.com/api-reference/help_center/help-center-api/posts/#list-posts) | Incremental |
+| [Post comments](https://developer.zendesk.com/api-reference/help_center/help-center-api/post_comments/#list-comments) | Incremental |
+| [Post votes](https://developer.zendesk.com/api-reference/help_center/help-center-api/votes/#list-votes) | Incremental |
+| [Satisfaction ratings](https://developer.zendesk.com/api-reference/ticketing/ticket-management/satisfaction_ratings/) | Incremental |
+| [Schedules](https://developer.zendesk.com/api-reference/ticketing/ticket-management/schedules/) | Snapshot |
+| [Side conversations](https://developer.zendesk.com/api-reference/ticketing/side_conversation/side_conversation/#list-side-conversations) | Incremental |
+| [SLA policies](https://developer.zendesk.com/api-reference/ticketing/business-rules/sla_policies/) | Snapshot |
+| [Tags](https://developer.zendesk.com/api-reference/ticketing/ticket-management/tags/) | Snapshot |
+| [Ticket activities](https://developer.zendesk.com/api-reference/ticketing/tickets/activity_stream/#list-activities) | Incremental |
+| [Ticket audits](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_audits/) | Incremental |
+| [Ticket comments](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_comments/) | Incremental |
+| [Ticket fields](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_fields/) | Incremental |
+| [Ticket forms](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_forms/) | Incremental |
+| [Ticket metrics](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_metrics/) | Incremental |
+| [Ticket metric events](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_metric_events/) | Incremental |
+| [Ticket skips](https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_skips/) | Incremental |
+| [Tickets](https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-ticket-export-cursor-based) | Incremental |
+| [Topics](https://developer.zendesk.com/api-reference/help_center/help-center-api/topics/#list-topics) | Incremental |
+| [Users](https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-user-export-cursor-based) | Incremental |
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
 

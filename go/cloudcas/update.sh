@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Refreshes the managed-database CA bundles that 'verify_identity' trusts in
+# Refreshes the managed-database CA bundles that source-mysql trusts under
+# 'verify_identity', and source-postgres under 'verify-ca' and 'verify-full', in
 # addition to the system root store. Run from any directory, then review the
 # diff: a removed certificate breaks every server that still chains to it.
 set -euo pipefail

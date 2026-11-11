@@ -10,19 +10,21 @@ This connector captures data from Intercom into Estuary collections.
 
 The following data resources are supported through the Intercom API:
 
-* [Admins](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/admins/listadmins)
-* [Companies](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/companies/scrolloverallcompanies)
-* [Company attributes](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/data-attributes/lisdataattributes)
-* [Company segments](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/companies/listattachedsegmentsforcompanies)
-* [Contacts](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/contacts/searchcontacts)
-* [Contact attributes](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/data-attributes/lisdataattributes)
-* [Conversations](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/conversations/searchconversations)
-* [Conversation attributes](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/data-attributes/lisdataattributes)
-* [Conversation parts](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/conversations/retrieveconversatio)
-* [Segments](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/segments/listsegments)
-* [Tags](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/tags/listtags)
-* [Teams](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/teams/listteams)
-* [Tickets](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/tickets/searchtickets)
+| Resource | Replication Mode |
+| --- | --- |
+| [Admins](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/admins/listadmins) | Snapshot |
+| [Companies](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/companies/scrolloverallcompanies) | Incremental |
+| [Company attributes](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/data-attributes/lisdataattributes) | Snapshot |
+| [Company segments](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/companies/listattachedsegmentsforcompanies) | Incremental |
+| [Contacts](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/contacts/searchcontacts) | Incremental |
+| [Contact attributes](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/data-attributes/lisdataattributes) | Snapshot |
+| [Conversations](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/conversations/searchconversations) | Incremental |
+| [Conversation attributes](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/data-attributes/lisdataattributes) | Snapshot |
+| [Conversation parts](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/conversations/retrieveconversatio) | Incremental |
+| [Segments](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/segments/listsegments) | Incremental |
+| [Tags](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/tags/listtags) | Snapshot |
+| [Teams](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/teams/listteams) | Snapshot |
+| [Tickets](https://developers.intercom.com/docs/references/rest-api/api.intercom.io/tickets/searchtickets) | Incremental |
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
 

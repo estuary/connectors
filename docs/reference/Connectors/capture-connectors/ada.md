@@ -10,12 +10,14 @@ This connector captures data from [Ada](https://www.ada.cx/) into Estuary collec
 
 The following data resources are supported through the Ada API:
 
-* [articles](https://docs.ada.cx/reference/knowledge/articles/list)
-* [conversations](https://docs.ada.cx/data-export-conversation-object/get-conversations)
-* [messages](https://docs.ada.cx/data-export-message-object/get-messages)
-* [sources](https://docs.ada.cx/reference/knowledge/articles/list)
-* [tags](https://docs.ada.cx/reference/knowledge/tags/list)
-* [platform_integrations](https://docs.ada.cx/reference/integrations/get-platform-integrations)
+| Resource | Replication Mode |
+| --- | --- |
+| [articles](https://docs.ada.cx/reference/knowledge/articles/list) | Snapshot |
+| [conversations](https://docs.ada.cx/data-export-conversation-object/get-conversations) | Incremental |
+| [messages](https://docs.ada.cx/data-export-message-object/get-messages) | Incremental |
+| [platform_integrations](https://docs.ada.cx/reference/integrations/get-platform-integrations) | Snapshot |
+| [sources](https://docs.ada.cx/reference/knowledge/articles/list) | Snapshot |
+| [tags](https://docs.ada.cx/reference/knowledge/tags/list) | Snapshot |
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
 

@@ -1,0 +1,143 @@
+info:
+  name: change history
+  type: graphql
+  seq: 3
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query ChangeHistory {
+        orders(first: 25, sortKey: UPDATED_AT) {
+          nodes {
+            name
+            createdAt
+            updatedAt
+            agreements(first: 20) {
+              nodes { __typename happenedAt reason }
+            }
+            refunds { createdAt updatedAt }
+            events(first: 25, sortKey: CREATED_AT, reverse: true) {
+              nodes { __typename createdAt action }
+            }
+          }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Order](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/Order) (`agreements`, `refunds`, `events`)
+
+  **WHY:** a read-only way to ask whether changes made after checkout move an
+  order's `updatedAt`, without seeding or editing the store the capture
+  snapshot reads. Each order's sales agreements (`reason`: ORDER, EDIT,
+  REFUND, RETURN, ...) and events record what changed it and when; if
+  `updatedAt` matches the latest of those, that kind of change bumped it.
+  Event `message` is left out because it can name staff or customers.
+
+  **VERIFIED (2026-10-29):** a refund moves the order's `updatedAt`. On #1002,
+  #1005 and #1006, `updatedAt` equals the REFUND agreement's `happenedAt` to
+  the second, and nothing later touched them. #1007's `updatedAt` equals its
+  latest event (`closed`, 2026-08-18T17:51:40Z), so closing an order moves it
+  too. A shipping refund is a refund (it records a RefundAgreement), so it is
+  covered by the same evidence, though no refund here is known to include
+  shipping.
+
+  **UNOBSERVABLE (without changing the store):** whether an order *edit*
+  (adding or removing a shipping line) moves `updatedAt`. No order in the
+  test store has an EDIT agreement, and seeding one would change data the
+  capture snapshot reads. Supporting evidence: Shopify staff state that all
+  order edits trigger the `orders/updated` webhook
+  (https://community.shopify.dev/t/webhook-orders-edited-vs-orders-updated/2700),
+  and an edit records an agreement just as a refund does. Fallback if that
+  proves wrong: a periodic re-read of recent orders.
+
+  #1003 and #1004 moved on 2026-06-15 with no agreement or event to explain
+  it; something outside this query (tags, notes, metafields) changed them.
+
+examples:
+  - name: 200 - 7 orders, updatedAt vs change history (projection)
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "name": "#1001",
+              "updatedAt": "2025-04-10T17:54:23Z",
+              "agreements": [
+                "2025-04-10T17:42:57Z ORDER"
+              ],
+              "latestEvent": null
+            },
+            {
+              "name": "#1002",
+              "updatedAt": "2025-04-17T11:57:10Z",
+              "agreements": [
+                "2025-04-10T17:53:39Z ORDER",
+                "2025-04-17T11:57:10Z REFUND"
+              ],
+              "latestEvent": null
+            },
+            {
+              "name": "#1005",
+              "updatedAt": "2025-04-17T12:07:45Z",
+              "agreements": [
+                "2025-04-10T17:55:49Z ORDER",
+                "2025-04-17T12:07:45Z REFUND"
+              ],
+              "latestEvent": null
+            },
+            {
+              "name": "#1006",
+              "updatedAt": "2026-06-11T17:26:19Z",
+              "agreements": [
+                "2025-04-24T20:21:03Z ORDER",
+                "2026-06-11T17:26:19Z REFUND"
+              ],
+              "latestEvent": null
+            },
+            {
+              "name": "#1004",
+              "updatedAt": "2026-06-15T13:24:53Z",
+              "agreements": [
+                "2025-04-10T17:55:41Z ORDER"
+              ],
+              "latestEvent": null
+            },
+            {
+              "name": "#1003",
+              "updatedAt": "2026-06-15T13:33:37Z",
+              "agreements": [
+                "2025-04-10T17:55:25Z ORDER"
+              ],
+              "latestEvent": null
+            },
+            {
+              "name": "#1007",
+              "updatedAt": "2026-08-18T17:51:40Z",
+              "agreements": [
+                "2026-06-11T17:33:51Z ORDER",
+                "2026-06-11T17:35:45Z REFUND",
+                "2026-06-11T17:37:41Z REFUND",
+                "2026-06-15T13:21:43Z RETURN"
+              ],
+              "latestEvent": "2026-08-18T17:51:40Z closed"
+            }
+          ]

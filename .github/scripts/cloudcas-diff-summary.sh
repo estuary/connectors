@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Prints a Markdown summary of how the CA bundles in go/mysql/tls/cloudcas/
+# Prints a Markdown summary of how the CA bundles in go/cloudcas/
 # differ from HEAD, one line per certificate added or removed. Used by the
-# mysql-cloud-cas workflow, since a PEM diff is unreadable.
+# cloud-cas workflow, since a PEM diff is unreadable.
 set -euo pipefail
-DIR=go/mysql/tls/cloudcas
+DIR=go/cloudcas
 
 # Reads a PEM bundle on stdin and prints one sorted line per certificate: its
 # subject and SHA-256 fingerprint. The fingerprint matters because a renewed CA

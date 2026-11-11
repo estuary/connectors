@@ -1,0 +1,40 @@
+info:
+  name: H2 - Add Employment Entry (contract change)
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{base_url}}/people/4021630442204562130/employment"
+  body:
+    type: json
+    data: |-
+      {
+        "effectiveDate": "2026-10-15",
+        "contract": "Part time"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://apidocs.hibob.com/reference/post_people-id-employment
+    
+    SEEDING REQUEST — only the user runs this; never the assistant.
+    
+    **WHY:** same employee as `Seeding / H1 - Add Work Entry (department change)`.
+    Adds a second employment entry (Full time -> Part time, effective 2026-10-15)
+    so `Employment History / bare` shows a multi-entry history for the FTE source,
+    with `isCurrent` / `endEffectiveDate` on the old row. The employment table
+    has no restricted columns, so this row is the control for the
+    restricted-history comparison on Work/Lifecycle.
+    **Outcome:** run by the user 2026-11-02. VERIFIED in
+    `Employment History / bare`: new current entry `id=1000020261015`
+    (contract "Part time"); prior entry closed with `endEffectiveDate=2026-10-14`,
+    `isCurrent=false`.
+  type: text/markdown

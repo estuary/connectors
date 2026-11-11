@@ -10,14 +10,16 @@ This connector captures data from Front into Estuary collections.
 
 The following data resources are supported through the Front API:
 
-* [channels](https://dev.frontapp.com/reference/list-channels)
-* [contacts](https://dev.frontapp.com/reference/list-contacts)
-* [conversations](https://dev.frontapp.com/reference/search-conversations)
-* [events](https://dev.frontapp.com/reference/list-events)
-* [inboxes](https://dev.frontapp.com/reference/list-inboxes)
-* [tags](https://dev.frontapp.com/reference/list-tags)
-* [teammates](https://dev.frontapp.com/reference/list-teammates)
-* [teams](https://dev.frontapp.com/reference/list-teams)
+| Resource | Replication Mode |
+| --- | --- |
+| [channels](https://dev.frontapp.com/reference/list-channels) | Snapshot |
+| [contacts](https://dev.frontapp.com/reference/list-contacts) | Incremental |
+| [conversations](https://dev.frontapp.com/reference/search-conversations) | Incremental |
+| [events](https://dev.frontapp.com/reference/list-events) | Incremental |
+| [inboxes](https://dev.frontapp.com/reference/list-inboxes) | Snapshot |
+| [tags](https://dev.frontapp.com/reference/list-tags) | Snapshot |
+| [teammates](https://dev.frontapp.com/reference/list-teammates) | Snapshot |
+| [teams](https://dev.frontapp.com/reference/list-teams) | Snapshot |
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
 

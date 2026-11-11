@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	stdsql "database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -27,12 +28,15 @@ type queryHistory struct {
 	api queryHistoryAPI
 }
 
-func newQueryProfiler(api queryHistoryAPI, bindings []*binding) *boilerplate.QueryProfiler {
+func newQueryProfiler(api queryHistoryAPI, warehouses warehousesAPI, warehouseID string, bindings []*binding, openDB func() (*stdsql.DB, error)) *boilerplate.QueryProfiler {
 	var paths = make([][]string, len(bindings))
+	var identifiers = make([]string, len(bindings))
 	for i, b := range bindings {
 		paths[i] = b.target.Path
+		identifiers[i] = b.target.Identifier
 	}
-	return boilerplate.NewQueryProfiler(&queryHistory{api: api}, profileInterval, reportQueryID, paths)
+	return boilerplate.NewQueryProfiler(&queryHistory{api: api}, profileInterval, reportQueryID, paths,
+		newTableContext(openDB, warehouses, warehouseID, identifiers))
 }
 
 // reportQueryID has the driver report the ID of a query run with the returned

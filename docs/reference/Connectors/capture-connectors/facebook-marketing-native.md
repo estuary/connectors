@@ -10,16 +10,18 @@ This connector captures data from the Facebook Marketing API into Estuary collec
 
 The following data resources are supported:
 
-* [Ads](https://developers.facebook.com/docs/marketing-api/reference/adgroup)
-* [Ad activities](https://developers.facebook.com/docs/marketing-api/reference/ad-activity)
-* [Ad creatives](https://developers.facebook.com/docs/marketing-api/reference/ad-creative)
-* [Ad insights](https://developers.facebook.com/docs/marketing-api/reference/adgroup/insights/)
-* [Ad sets](https://developers.facebook.com/docs/marketing-api/reference/ad-campaign/v19.0)
-* [Business ad accounts](https://developers.facebook.com/docs/marketing-api/reference/business/adaccount/)
-* [Campaigns](https://developers.facebook.com/docs/marketing-api/reference/ad-campaign-group)
-* [Custom Conversions](https://developers.facebook.com/docs/marketing-api/reference/custom-conversion/v19.0)
-* [Images](https://developers.facebook.com/docs/marketing-api/reference/ad-image)
-* [Videos](https://developers.facebook.com/docs/graph-api/reference/video/)
+| Resource | Replication Mode |
+| --- | --- |
+| [Ads](https://developers.facebook.com/docs/marketing-api/reference/adgroup) | Incremental |
+| [Ad activities](https://developers.facebook.com/docs/marketing-api/reference/ad-activity) | Incremental |
+| [Ad creatives](https://developers.facebook.com/docs/marketing-api/reference/ad-creative) | Snapshot |
+| [Ad insights](https://developers.facebook.com/docs/marketing-api/reference/adgroup/insights/) | Incremental |
+| [Ad sets](https://developers.facebook.com/docs/marketing-api/reference/ad-campaign/v19.0) | Incremental |
+| [Business ad accounts](https://developers.facebook.com/docs/marketing-api/reference/business/adaccount/) | Snapshot |
+| [Campaigns](https://developers.facebook.com/docs/marketing-api/reference/ad-campaign-group) | Incremental |
+| [Custom Conversions](https://developers.facebook.com/docs/marketing-api/reference/custom-conversion/v19.0) | Snapshot |
+| [Images](https://developers.facebook.com/docs/marketing-api/reference/ad-image) | Incremental |
+| [Videos](https://developers.facebook.com/docs/graph-api/reference/video/) | Incremental |
 
 By default, each resource associated with your Facebook Business account is mapped to an Estuary collection through a separate binding.
 

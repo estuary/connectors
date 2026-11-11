@@ -36,6 +36,7 @@ members = [
     "source-google-play",
     "source-google-sheets-native",
     "source-greenhouse-native",
+    "source-hibob",
     "source-hubspot",
     "source-hubspot-native",
     "source-impact-native",
@@ -2150,6 +2151,21 @@ requires-dist = [
 name = "source-greenhouse-native"
 version = "0.1.0"
 source = { editable = "source-greenhouse-native" }
+dependencies = [
+    { name = "estuary-cdk" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "pydantic", specifier = ">=2,<3" },
+]
+
+[[package]]
+name = "source-hibob"
+version = "0.1.0"
+source = { editable = "source-hibob" }
 dependencies = [
     { name = "estuary-cdk" },
     { name = "pydantic" },

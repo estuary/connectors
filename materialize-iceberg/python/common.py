@@ -115,6 +115,10 @@ def read_csv_opts(files: list[str], cols: list[NestedField]):
         "inferSchema": False,
         "enforceSchema": False,
         "multiLine": True,
+        # The staged CSV ends every row with "\n". Without an explicit lineSep,
+        # Spark infers the separator from the first line break in the file,
+        # which may be a "\r\n" inside a quoted value.
+        "lineSep": "\n",
         "unescapedQuoteHandling": "RAISE_ERROR",
     }
 

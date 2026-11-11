@@ -496,7 +496,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, round int, 
 		b.updates = 0
 	}
 
-	if err := withRetries(ctx, "store commit", func() error {
+	if err := commitRetry.Do(ctx, "store commit", func(ctx context.Context) error {
 		return d.commitBindings(ctx, commits, fenceUpdate, round)
 	}); err != nil {
 		return err
@@ -575,7 +575,7 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 	} else if rows != 1 {
 		return fmt.Errorf("this instance was fenced off by another")
 	} else if err := txn.Commit(); err != nil {
-		return fmt.Errorf("committing store transaction: %w", err)
+		return fmt.Errorf("committing store transaction: %w", &commitError{err})
 	}
 
 	for idx, b := range bindings {
