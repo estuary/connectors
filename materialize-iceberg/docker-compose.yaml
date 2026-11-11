@@ -15,7 +15,7 @@ services:
       POLARIS_BOOTSTRAP_CREDENTIALS: POLARIS,root,s3cr3t
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: flow
-      AWS_SECRET_ACCESS_KEY: flow
+      AWS_SECRET_ACCESS_KEY: flow_secret
       JAVA_OPTS_APPEND: "-Xms128m -Xmx128m -XX:TieredStopAtLevel=1"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8182/q/health"]
@@ -45,7 +45,7 @@ services:
     entrypoint: ["/bin/sh", "/bootstrap.sh"]
 
   rustfs:
-    image: rustfs/rustfs:1.0.4
+    image: rustfs/rustfs:1.0.5
     networks:
       materialize-iceberg:
     # Host ports are remapped into a 9800+ range so this stack can run
@@ -56,7 +56,7 @@ services:
       - "9801:9001" # Web console
     environment:
       RUSTFS_ACCESS_KEY: flow
-      RUSTFS_SECRET_KEY: flow
+      RUSTFS_SECRET_KEY: flow_secret
       RUSTFS_VOLUMES: /data
       RUSTFS_ADDRESS: :9000
     healthcheck:
@@ -75,7 +75,7 @@ services:
     # No depends_on: curl retries every 100ms on connection failures, allowing
     # parallel boot with rustfs. Downstream services that need the bucket
     # (polaris, spark-daemon) gate on this container exiting 0.
-    image: rustfs/rustfs:1.0.4
+    image: rustfs/rustfs:1.0.5
     networks:
       materialize-iceberg:
     entrypoint: ["/bin/sh", "-c"]
@@ -94,7 +94,7 @@ services:
           # repeat invocations against the same RustFS instance. Either is success.
           status=$$(curl -sS -o /dev/null -w "%{http_code}" \
             --aws-sigv4 "aws:amz:us-east-1:s3" \
-            --user "flow:flow" \
+            --user "flow:flow_secret" \
             -X PUT "http://rustfs:9000/$$bucket" 2>/dev/null || echo "000")
           case "$$status" in
             2*|409)
@@ -198,7 +198,7 @@ services:
       ICEBERG_S3_ENDPOINT: http://rustfs:9000
       ICEBERG_S3_PATH_STYLE: "true"
       ICEBERG_S3_ACCESS_KEY: flow
-      ICEBERG_S3_SECRET_KEY: flow
+      ICEBERG_S3_SECRET_KEY: flow_secret
     volumes:
       - ./python:/opt/jobs:ro
       - ./testdata/.local:/shared:ro
@@ -300,7 +300,7 @@ services:
       ICEBERG_S3_ENDPOINT: http://rustfs:9000
       ICEBERG_S3_PATH_STYLE: "true"
       ICEBERG_S3_ACCESS_KEY: flow
-      ICEBERG_S3_SECRET_KEY: flow
+      ICEBERG_S3_SECRET_KEY: flow_secret
     volumes:
       - ./python:/opt/jobs:ro
       - ./testdata/.local:/shared:ro

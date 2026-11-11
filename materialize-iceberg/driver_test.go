@@ -583,7 +583,7 @@ func runTimestampOverflowRegression(t *testing.T) {
 
 	s3client := s3.New(s3.Options{
 		Region:       "us-east-1",
-		Credentials:  credentials.NewStaticCredentialsProvider("flow", "flow", ""),
+		Credentials:  credentials.NewStaticCredentialsProvider("flow", "flow_secret", ""),
 		BaseEndpoint: aws.String("http://localhost:9800"),
 		UsePathStyle: true,
 	})
@@ -671,7 +671,7 @@ func runDateOverflowRegression(t *testing.T) {
 
 	s3client := s3.New(s3.Options{
 		Region:       "us-east-1",
-		Credentials:  credentials.NewStaticCredentialsProvider("flow", "flow", ""),
+		Credentials:  credentials.NewStaticCredentialsProvider("flow", "flow_secret", ""),
 		BaseEndpoint: aws.String("http://localhost:9800"),
 		UsePathStyle: true,
 	})
