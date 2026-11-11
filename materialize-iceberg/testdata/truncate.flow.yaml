@@ -1,0 +1,219 @@
+collections:
+  tests/truncate:
+    schema:
+      properties:
+        id: {type: integer}
+        _meta: {type: object}
+      required: [id, _meta]
+      type: object
+    key: [/id]
+
+materializations:
+  acmeCo/tests/materialize-iceberg-truncate/rest-local:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: .local/config.rest-local.yaml
+    bindings:
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]
+
+  acmeCo/tests/materialize-iceberg-truncate/rest:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.rest.yaml
+    bindings:
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]
+
+  acmeCo/tests/materialize-iceberg-truncate/rest-deprecated:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.rest-deprecated.yaml
+    bindings:
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]
+
+  acmeCo/tests/materialize-iceberg-truncate/dremio:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.dremio.yaml
+    bindings:
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]
+
+  acmeCo/tests/materialize-iceberg-truncate/glue:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.glue.yaml
+    bindings:
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]
+
+  acmeCo/tests/materialize-iceberg-truncate/glue-deprecated:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.glue-deprecated.yaml
+    bindings:
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]
+
+  acmeCo/tests/materialize-iceberg-truncate/glue-optimized:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.glue-optimized.yaml
+    bindings:
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]
+
+  acmeCo/tests/materialize-iceberg-truncate/glue-catalog-auth:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.glue-catalog-auth.yaml
+    bindings:
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]
+
+  acmeCo/tests/materialize-iceberg-truncate/s3tables:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.s3tables.yaml
+    bindings:
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]
+
+  acmeCo/tests/materialize-iceberg-truncate/s3tables-deprecated:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.s3tables-deprecated.yaml
+    bindings:
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]
+
+  acmeCo/tests/materialize-iceberg-truncate/s3tables-catalog-auth:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.s3tables-catalog-auth.yaml
+    bindings:
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]
