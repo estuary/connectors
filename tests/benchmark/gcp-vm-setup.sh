@@ -57,6 +57,8 @@ if [[ -n "$NVME_NAME" ]]; then
   sudo mkdir -p /etc/docker
   echo '{"data-root": "/mnt/localssd/docker"}' | sudo tee /etc/docker/daemon.json >/dev/null
   sudo systemctl restart docker
+  sudo mkdir -p /mnt/localssd/tmp
+  sudo chown "$USER:" /mnt/localssd/tmp
   echo "    local SSD ($NVME_DEV) mounted at /mnt/localssd, Docker data-root redirected"
 else
   echo "    WARNING: no local NVMe SSD found, using boot disk for Docker"
@@ -75,6 +77,11 @@ sudo tee /etc/profile.d/bench-env.sh >/dev/null <<'PROFILE'
 export PATH="/usr/local/go/bin:$HOME/go/bin:$HOME/connectors/flow-bin:$PATH"
 export GOPATH="$HOME/go"
 PROFILE
+# preview-next writes every document it reads under TMPDIR, so a run whose
+# TMPDIR is on the boot disk is capped by that disk's write throughput.
+if [[ -d /mnt/localssd/tmp ]]; then
+  echo 'export TMPDIR=/mnt/localssd/tmp' | sudo tee -a /etc/profile.d/bench-env.sh >/dev/null
+fi
 grep -qF 'bench-env' ~/.bashrc 2>/dev/null || \
   echo 'source /etc/profile.d/bench-env.sh' >> ~/.bashrc
 
