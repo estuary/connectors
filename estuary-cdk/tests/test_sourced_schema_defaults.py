@@ -1,5 +1,6 @@
 from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.capture.task import (
+    DEFAULT_ARRAY_BOUNDS,
     DEFAULT_NUMERIC_BOUNDS,
     DEFAULT_STRING_BOUNDS,
     with_sourced_schema_defaults,
@@ -9,6 +10,8 @@ STRING_MIN = DEFAULT_STRING_BOUNDS["minLength"]
 STRING_MAX = DEFAULT_STRING_BOUNDS["maxLength"]
 NUMERIC_MIN = DEFAULT_NUMERIC_BOUNDS["minimum"]
 NUMERIC_MAX = DEFAULT_NUMERIC_BOUNDS["maximum"]
+ITEMS_MIN = DEFAULT_ARRAY_BOUNDS["minItems"]
+ITEMS_MAX = DEFAULT_ARRAY_BOUNDS["maxItems"]
 
 
 def test_a_bare_schema_gets_every_default():
@@ -207,6 +210,7 @@ def test_every_nested_location_is_reached():
             "properties": {
                 "nested": {"properties": {"deep": {"type": "string"}}},
                 "list": {"type": "array", "items": {"type": "string"}},
+                "bare_list": {"type": "array"},
                 "bare": {"type": "object"},
                 "either": {"oneOf": [{"type": "string"}, {"type": "integer"}]},
             },
@@ -220,7 +224,15 @@ def test_every_nested_location_is_reached():
     assert nested["required"] == ["deep"]
     assert nested["properties"]["deep"]["maxLength"] == STRING_MAX
 
+    assert out["properties"]["list"]["minItems"] == ITEMS_MIN
+    assert out["properties"]["list"]["maxItems"] == ITEMS_MAX
     assert out["properties"]["list"]["items"]["maxLength"] == STRING_MAX
+    assert out["properties"]["bare_list"] == {
+        "type": "array",
+        "minItems": ITEMS_MIN,
+        "maxItems": ITEMS_MAX,
+        "items": False,
+    }
     assert out["properties"]["bare"] == {"type": "object", "additionalProperties": False}
     assert out["properties"]["either"]["oneOf"][0]["maxLength"] == STRING_MAX
     assert out["properties"]["either"]["oneOf"][1]["maximum"] == NUMERIC_MAX
