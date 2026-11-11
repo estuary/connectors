@@ -995,7 +995,7 @@ type pipeRecord struct {
 
 // finished reports the pipe's row stats once all of its files have loaded.
 func (pipe *pipeRecord) finished(be *m.BindingEvents) {
-	stats := m.ExactRowStats(pipe.loaded, 0, 0).WithLoaded(pipe.loaded)
+	stats := m.ExactRowStats(pipe.loaded, 0, 0)
 	if pipe.rows > 0 {
 		stats = stats.WithStaged(pipe.rows)
 	}
@@ -1550,7 +1550,7 @@ func scanStoreResult(rows *stdsql.Rows, isMerge bool) (m.RowStats, error) {
 	if isMerge {
 		return m.ExactRowStats(inserted, updated, deleted), nil
 	}
-	return m.ExactRowStats(loaded, 0, 0).WithLoaded(loaded), nil
+	return m.ExactRowStats(loaded, 0, 0), nil
 }
 
 // bindingForStateKey is the index of the binding with the state key, or -1 if
