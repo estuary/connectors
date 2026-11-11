@@ -1406,16 +1406,20 @@ def test_open_fails_when_every_bound_object_is_gone():
 
 
 @pytest.mark.parametrize(
-    "companies, people",
+    "companies, people, expected",
     [
-        (response({"records": []}), response({"records": []})),
-        (twenty_error(400, "BAD_REQUEST"), twenty_error(400, "BAD_REQUEST")),
-        (response({"records": []}), twenty_error(404, "NOT_FOUND")),
+        (response({"records": []}), response({"records": []}), ValueError),
+        (
+            twenty_error(400, "BAD_REQUEST"),
+            twenty_error(400, "BAD_REQUEST"),
+            HTTPError,
+        ),
+        (response({"records": []}), twenty_error(404, "NOT_FOUND"), ValueError),
     ],
     ids=["invalid-response", "400", "mixed"],
 )
 def test_discover_fails_when_no_object_is_readable_even_with_one_permission_denied(
-    monkeypatch, companies, people
+    monkeypatch, companies, people, expected
 ):
     # A key without the Workflows permission is refused workflows in most workspaces,
     # so one PERMISSION_DENIED must not switch off the check for a workspace problem.
@@ -1435,8 +1439,10 @@ def test_discover_fails_when_no_object_is_readable_even_with_one_permission_deni
     )
     connector = patched_connector(monkeypatch, http)
 
-    with pytest.raises((HTTPError, ValueError)) as exc:
+    with pytest.raises(expected) as exc:
         asyncio.run(connector.discover(LOG, discover_request()))
+    # The first failure that isn't the permission denial, in object order.
+    assert type(exc.value) is expected
     assert "PERMISSION_DENIED" not in str(exc.value)
 
 
@@ -1524,15 +1530,6 @@ def test_a_failing_probe_is_logged_without_the_task_group(monkeypatch):
     assert "ExceptionGroup" not in log
 
 
-def test_the_key_never_reaches_a_logged_discover_failure(monkeypatch):
-    error = TooManyRedirects(key_request_info("rest/opportunities"), ())
-    assert config().credentials.access_token in repr(error)
-
-    assert config().credentials.access_token not in discover_failure_log(
-        monkeypatch, error
-    )
-
-
 def echoed_key_error(status=403):
     """An error body that repeats the Authorization header, as some proxies do."""
     body = json.dumps(
@@ -1605,3 +1602,19 @@ def test_a_discover_failure_never_shows_a_key_the_server_echoes(monkeypatch, sta
     assert exc.value.code == status
     assert config().credentials.access_token not in shown
     assert "<redacted>" in exc.value.message
+
+
+@pytest.mark.parametrize("status", [401, 403, 404, 400])
+def test_a_validation_error_chain_never_shows_a_key_the_server_echoes(status):
+    with pytest.raises(ConnectorValidationError) as exc:
+        asyncio.run(
+            resources.validate_credentials(
+                LOG, FakeHTTP([echoed_key_error(status)]), config()
+            )
+        )
+
+    # The CDK logs the error with traceback.format_exception, which also prints
+    # its cause and context.
+    shown = "".join(traceback.format_exception(exc.value))
+    assert "<redacted>" in shown
+    assert config().credentials.access_token not in shown

@@ -136,7 +136,8 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
         else:
             msg = f"Encountered error validating API key.\n\n{message}"
 
-        raise ValidationError([msg])
+        # from None: the original error holds the server's unredacted text.
+        raise ValidationError([msg]) from None
     except PydanticValidationError as err:
         raise ValidationError(
             [
@@ -146,13 +147,13 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
                     config,
                 )
             ]
-        ) from err
+        ) from None
     except CONNECTION_ERRORS as err:
         raise ValidationError(
             [
                 f"{_connection_hint(err, config.base_url)}\n\n{_describe_connection_error(err)}"
             ]
-        ) from err
+        ) from None
 
 
 def _permission_denied(err: HTTPError) -> bool:

@@ -48,7 +48,7 @@ To set up the Twenty source connector, you'll need:
 - A Twenty workspace, either Twenty Cloud or self-hosted. The connector is tested with Twenty Cloud and self-hosted Twenty v2.52.
 - An API key, created in Twenty's **Settings** under **API** / **APIs & Webhooks**. The key is shown only once, so copy it when you create it.
 - A role for that key with the **Data Model** settings permission and read access to every object you want to capture. The connector needs Data Model to read the workspace's metadata. Reading workflows also needs the **Workflows** permission.
-- For self-hosted Twenty, your server's base URL.
+- For self-hosted Twenty, your server's base URL. If a proxy in front of the server repeats the API key in its error replies, the connector hides the exact key in its own error messages. Retry logs of server errors and altered copies of the key aren't hidden.
 
 Objects the role can't read are discovered as disabled bindings, with a warning naming each one. So is an object whose test read fails with another error about that object, such as an invalid response. A bad key, a server error or a connection problem fails discovery instead. So does a workspace where no object can be read, unless the role is refused every one. After you give the role access, enable the binding yourself; re-discovery won't enable it. If the role later loses access to an enabled object, the capture fails and restarts on that object. Publishing also fails with an error naming it. Restore access or disable its binding to fix both. Discovery reads one record of each object, five objects at a time.
 
