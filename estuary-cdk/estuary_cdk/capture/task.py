@@ -59,6 +59,7 @@ def serialize_response(message: Response[Any, Any, Any]) -> bytes:
 # (maxLength and maximum grow, minLength and minimum shrink).
 DEFAULT_STRING_BOUNDS = {"minLength": 1, "maxLength": 1}
 DEFAULT_NUMERIC_BOUNDS = {"minimum": 1, "maximum": 1}
+DEFAULT_ARRAY_BOUNDS = {"minItems": 1, "maxItems": 1}
 
 
 def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
@@ -79,6 +80,11 @@ def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
     - `required`, covering every declared property. Inference relaxes this for real
       when a document turns up without the field.
     - length and range bounds, which materializations size columns from.
+    - `items: False` on arrays that declare no items. The union keeps an
+      array's inferred items when the SourcedSchema says `items: false`, but
+      drops them when it says nothing.
+    - item count bounds on arrays. The union keeps an inferred `maxItems` only
+      if the SourcedSchema states one too.
 
     Whatever the connector already declared wins, so one that knows better - a truer
     bound, its own `_meta` - keeps it. The input is left unmodified.
@@ -135,6 +141,8 @@ def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
             out = {**DEFAULT_STRING_BOUNDS, **out}
         if types & {"integer", "number"}:
             out = {**DEFAULT_NUMERIC_BOUNDS, **out}
+        if "array" in types:
+            out = {**DEFAULT_ARRAY_BOUNDS, "items": False, **out}
 
         return out
 
