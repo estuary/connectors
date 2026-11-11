@@ -1,0 +1,169 @@
+sql> CREATE PARTITION FUNCTION [pf_980596] (DATETIME) AS RANGE RIGHT FOR VALUES ('2024-02-01', '2024-03-01')
+sql> CREATE PARTITION SCHEME [ps_980596] AS PARTITION [pf_980596] ALL TO ([PRIMARY])
+sql> CREATE TABLE dbo.PartitionedBackfillDatetime_980596 (a INT NOT NULL, b DATETIME NOT NULL, PRIMARY KEY CLUSTERED (a, b)) ON [ps_980596](b)
+sql> INSERT INTO dbo.PartitionedBackfillDatetime_980596 VALUES
+		(1, '2024-03-05T10:00:00.003'), (2, '2024-01-15T08:30:00.007'), (3, '2024-02-29T23:59:59.997'),
+		(4, '2024-01-31T23:59:59.997'), (5, '2024-02-01T00:00:00'), (6, '2024-03-01T00:00:00'),
+		(7, '2024-01-01T00:00:00.003'), (8, '2024-02-10T12:00:00.333')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/partitionedbackfilldatetime_980596
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/partitionedbackfilldatetime_980596",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDatetime_980596"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 2,
+    "b": "2024-01-15T08:30:00.007Z"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfilldatetime_980596",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDatetime_980596"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 4,
+    "b": "2024-01-31T23:59:59.997Z"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfilldatetime_980596",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDatetime_980596"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 7,
+    "b": "2024-01-01T00:00:00.003Z"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfilldatetime_980596",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDatetime_980596"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 3,
+    "b": "2024-02-29T23:59:59.997Z"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfilldatetime_980596",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDatetime_980596"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 5,
+    "b": "2024-02-01T00:00:00Z"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfilldatetime_980596",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDatetime_980596"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 8,
+    "b": "2024-02-10T12:00:00.333Z"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfilldatetime_980596",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDatetime_980596"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 1,
+    "b": "2024-03-05T10:00:00.003Z"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfilldatetime_980596",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDatetime_980596"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 6,
+    "b": "2024-03-01T00:00:00Z"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FPartitionedBackfillDatetime_980596": {
+      "backfilled": 8,
+      "key_columns": [
+        "a",
+        "b"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
