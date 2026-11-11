@@ -1,6 +1,6 @@
 services:
   storage:
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:1.0.5
     # Both env vars and CLI flags are set because RUSTFS_ACCESS_KEY / RUSTFS_SECRET_KEY
     # have been reported to be ignored in some releases (rustfs/rustfs#375, #1058).
     command: ["--access-key", "test_key", "--secret-key", "test_secret", "/data"]
