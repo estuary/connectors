@@ -7,7 +7,15 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from aiohttp import ClientPayloadError, ClientRequest
+from aiohttp import (
+    ClientConnectorDNSError,
+    ClientPayloadError,
+    ClientRequest,
+    InvalidURL,
+    RequestInfo,
+    TooManyRedirects,
+)
+from multidict import CIMultiDict, CIMultiDictProxy
 from estuary_cdk.capture import common, request
 from estuary_cdk.capture.common import ResourceConfigWithSchedule, ResourceState
 from estuary_cdk.flow import CaptureBinding, ValidationError as ConnectorValidationError
@@ -188,6 +196,41 @@ def frozen_clock(monkeypatch):
     monkeypatch.setattr(api, "now", lambda: NOW)
 
 
+def dns_error():
+    return ClientConnectorDNSError(
+        SimpleNamespace(host="twenty.example.com", port=443, ssl=True),
+        OSError(8, "nodename nor servname provided"),
+    )
+
+
+def redirect_error():
+    """An aiohttp error whose repr() holds the request headers, so the API key."""
+    url = URL(f"{BASE_URL}rest/people")
+    headers = CIMultiDictProxy(
+        CIMultiDict({"Authorization": f"Bearer {config().credentials.access_token}"})
+    )
+    return TooManyRedirects(
+        RequestInfo(url, "GET", headers, url), (), status=302, message="Too many"
+    )
+
+
+class RoutedHTTP(FakeHTTP):
+    """Replies by URL path, tracking how many requests are in flight at once."""
+
+    def __init__(self, routes):
+        super().__init__([])
+        self.routes = routes
+        self.active = self.peak = 0
+
+    async def request(self, log, url, params=None, headers=None, should_retry=None):
+        self.active += 1
+        self.peak = max(self.peak, self.active)
+        await asyncio.sleep(0.001)
+        self.active -= 1
+        self.responses = [self.routes[URL(url).path]]
+        return await super().request(log, url, params, headers, should_retry)
+
+
 @pytest.mark.parametrize(
     "code, message",
     [
@@ -223,16 +266,70 @@ def test_validate_credentials_rejects_non_api_responses(payload):
 
 
 @pytest.mark.parametrize(
-    "error", [ClientPayloadError("connection reset"), TimeoutError("timed out")]
+    "error, hint",
+    [
+        (dns_error(), "Couldn't connect to Twenty at"),
+        (InvalidURL("not a url"), "Couldn't connect to Twenty at"),
+        (ClientPayloadError("connection reset"), "failed. Please try again."),
+        (TimeoutError("timed out"), "failed. Please try again."),
+        (ConnectionResetError("reset by peer"), "failed. Please try again."),
+    ],
 )
-def test_validate_credentials_explains_connection_errors(error):
+def test_validate_credentials_explains_connection_errors(error, hint):
     http = FakeHTTP([error])
 
     with pytest.raises(ConnectorValidationError) as exc:
         asyncio.run(resources.validate_credentials(LOG, http, config()))
 
-    assert f"Couldn't connect to Twenty at {BASE_URL}" in exc.value.errors[0]
-    assert "confirm the base URL" in exc.value.errors[0]
+    assert hint in exc.value.errors[0]
+    assert BASE_URL in exc.value.errors[0]
+    # Only a connect or address error points at the base URL.
+    assert ("confirm the base URL" in exc.value.errors[0]) == (
+        hint.startswith("Couldn't connect")
+    )
+
+
+def test_connection_errors_never_show_the_api_key(monkeypatch):
+    key = config().credentials.access_token
+    assert key in repr(redirect_error())
+
+    with pytest.raises(ConnectorValidationError) as exc:
+        asyncio.run(
+            resources.validate_credentials(LOG, FakeHTTP([redirect_error()]), config())
+        )
+    assert "TooManyRedirects (HTTP 302)" in exc.value.errors[0]
+    assert key not in exc.value.errors[0]
+
+    http = FakeHTTP(
+        [
+            response([object_metadata("people")]),
+            response([object_metadata("people")]),
+            redirect_error(),
+        ]
+    )
+    connector = patched_connector(monkeypatch, http)
+    with pytest.raises(ConnectorValidationError) as exc:
+        asyncio.run(connector.validate(LOG, validation_request("people")))
+    assert exc.value.errors == [
+        "Object 'people': Connection failed while reading it. TooManyRedirects (HTTP 302)"
+    ]
+
+
+def test_validate_reports_a_bad_url_as_a_connection_failure(monkeypatch):
+    # InvalidURL is also a ValueError; it must not read as an invalid API response.
+    http = FakeHTTP(
+        [
+            response([object_metadata("people")]),
+            response([object_metadata("people")]),
+            InvalidURL("not a url"),
+        ]
+    )
+    connector = patched_connector(monkeypatch, http)
+    with pytest.raises(ConnectorValidationError) as exc:
+        asyncio.run(connector.validate(LOG, validation_request("people")))
+    assert exc.value.errors == [
+        "Object 'people': Connection failed while reading it. InvalidURL: not a url"
+    ]
 
 
 def test_validate_credentials_accepts_metadata():
@@ -884,7 +981,7 @@ def test_discover_reports_a_bad_key_before_reading_objects(monkeypatch):
 
 
 @pytest.mark.parametrize("status", [400, 403])
-def test_discover_disables_objects_the_role_cannot_read(monkeypatch, status):
+def test_discover_disables_objects_the_role_cannot_read(monkeypatch, caplog, status):
     http = FakeHTTP(
         [
             response([object_metadata("people")]),
@@ -895,12 +992,17 @@ def test_discover_disables_objects_the_role_cannot_read(monkeypatch, status):
     )
     connector = patched_connector(monkeypatch, http)
 
-    discovered = asyncio.run(connector.discover(LOG, discover_request()))
+    with caplog.at_level(logging.WARNING):
+        discovered = asyncio.run(connector.discover(LOG, discover_request()))
 
     # Left out, an existing binding would be removed when the capture is re-discovered.
     assert [(b.resourceConfig.name, b.disable) for b in discovered.bindings] == [
         ("opportunities", True),
         ("people", False),
+    ]
+    warnings = [r for r in caplog.records if "discovered disabled" in r.getMessage()]
+    assert [w.getMessage() for w in warnings] == [
+        "The API key's role can't read this object. It is discovered disabled."
     ]
     assert not http.responses
 
@@ -908,20 +1010,18 @@ def test_discover_disables_objects_the_role_cannot_read(monkeypatch, status):
 @pytest.mark.parametrize(
     "error, reason",
     [
-        (HTTPError("Not found", 404), "failed with HTTP 404"),
-        (twenty_error(400, "BAD_REQUEST"), "failed with HTTP 400"),
+        (HTTPError("Not found", 404), "failed with HTTP 404: Not found"),
+        (twenty_error(400, "BAD_REQUEST"), "failed with HTTP 400: "),
         # The code only counts in Twenty's error body, not in the URL or message text.
         (
             twenty_error(400, "BAD_REQUEST", url=f"{BASE_URL}/rest/PERMISSION_DENIED"),
-            "failed with HTTP 400",
+            "failed with HTTP 400: ",
         ),
         (
             HTTPError("PERMISSION_DENIED", 400, b"<html>proxy error</html>"),
-            "failed with HTTP 400",
+            "failed with HTTP 400: PERMISSION_DENIED",
         ),
-        (twenty_error(500, "PERMISSION_DENIED"), "failed with HTTP 500"),
         (b"<html>proxy error</html>", "invalid Twenty API response"),
-        (ClientPayloadError("connection reset"), "connection failed"),
     ],
 )
 def test_discover_disables_an_object_whose_read_fails(
@@ -949,24 +1049,127 @@ def test_discover_disables_an_object_whose_read_fails(
     assert len(warnings) == 1
     assert reason in warnings[0].getMessage()
     assert warnings[0].args == {"object": "opportunities"}
+    assert not http.responses
 
 
-def test_object_probes_run_concurrently_up_to_the_limit():
-    active = peak = 0
+@pytest.mark.parametrize(
+    "error",
+    [
+        HTTPError("Unauthorized", 401),
+        twenty_error(500, "PERMISSION_DENIED"),
+        HTTPError("Unavailable", 503),
+        ClientPayloadError("connection reset"),
+        ConnectionResetError("reset by peer"),
+        TimeoutError("timed out"),
+        InvalidURL("not a url"),
+    ],
+)
+def test_discover_fails_on_errors_that_are_not_about_one_object(monkeypatch, error):
+    # Disabling here would turn a bad key or an outage into a workspace of disabled bindings.
+    http = RoutedHTTP(
+        {
+            "/rest/metadata/objects": response(
+                [object_metadata("opportunities"), object_metadata("people")]
+            ),
+            "/rest/opportunities": error,
+            "/rest/people": records_response([], object_name="people"),
+        }
+    )
+    connector = patched_connector(monkeypatch, http)
 
+    with pytest.raises(type(error)) as exc:
+        asyncio.run(connector.discover(LOG, discover_request()))
+
+    assert exc.value is error
+
+
+def test_discover_fails_when_every_object_fails(monkeypatch):
+    http = RoutedHTTP(
+        {
+            "/rest/metadata/objects": response(
+                [object_metadata("opportunities"), object_metadata("people")]
+            ),
+            "/rest/opportunities": HTTPError("Bad request", 400),
+            "/rest/people": HTTPError("Not found", 404),
+        }
+    )
+    connector = patched_connector(monkeypatch, http)
+
+    with pytest.raises(HTTPError, match="Bad request"):
+        asyncio.run(connector.discover(LOG, discover_request()))
+
+
+def test_discover_disables_every_object_a_role_cannot_read(monkeypatch):
+    http = RoutedHTTP(
+        {
+            "/rest/metadata/objects": response(
+                [object_metadata("opportunities"), object_metadata("people")]
+            ),
+            "/rest/opportunities": twenty_error(400, "PERMISSION_DENIED"),
+            "/rest/people": twenty_error(400, "PERMISSION_DENIED"),
+        }
+    )
+    connector = patched_connector(monkeypatch, http)
+
+    discovered = asyncio.run(connector.discover(LOG, discover_request()))
+
+    assert [b.disable for b in discovered.bindings] == [True, True]
+
+
+@pytest.mark.parametrize("step", ["discover", "validate"])
+def test_object_probes_run_concurrently_up_to_the_limit(monkeypatch, step):
+    names = [f"object{i}" for i in range(resources.PROBE_CONCURRENCY + 2)]
+    http = RoutedHTTP(
+        {
+            "/rest/metadata/objects": response([object_metadata(n) for n in names]),
+            **{f"/rest/{n}": records_response([], object_name=n) for n in names},
+        }
+    )
+    connector = patched_connector(monkeypatch, http)
+
+    if step == "discover":
+        asyncio.run(connector.discover(LOG, discover_request()))
+    else:
+        asyncio.run(connector.validate(LOG, validation_request(*names)))
+
+    probed = [
+        r["url"].path
+        for r in http.requests
+        if r["url"].path != "/rest/metadata/objects"
+    ]
+    assert sorted(probed) == sorted(f"/rest/{n}" for n in names)
+    assert http.peak == resources.PROBE_CONCURRENCY
+
+
+def test_bounded_probes_keep_input_order():
     async def probe(name):
-        nonlocal active, peak
-        active += 1
-        peak = max(peak, active)
-        await asyncio.sleep(0)
-        active -= 1
+        # Later names finish first.
+        await asyncio.sleep(0.001 * (10 - int(name)))
         return name
 
-    names = [f"object{i}" for i in range(12)]
-    results = asyncio.run(resources._gather_bounded(names, probe))
+    names = [str(i) for i in range(10)]
+    assert asyncio.run(resources._gather_bounded(names, probe)) == names
 
-    assert results == names
-    assert peak == resources.PROBE_CONCURRENCY
+
+def test_a_failing_probe_raises_itself_and_cancels_the_rest():
+    cancelled = []
+
+    async def probe(name):
+        if name == "bad":
+            raise ValueError("boom")
+        try:
+            await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            cancelled.append(name)
+            raise
+
+    async def run():
+        with pytest.raises(ValueError, match="boom"):
+            await resources._gather_bounded(["a", "bad", "b"], probe)
+        # The other probes are stopped before the error comes back, not left running.
+        return sorted(cancelled)
+
+    assert asyncio.run(run()) == ["a", "b"]
 
 
 @pytest.mark.parametrize(

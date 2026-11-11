@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 from logging import Logger
 
-from aiohttp import ClientError
+from aiohttp import ClientConnectorError, ClientError, ClientResponseError, InvalidURL
 
 from estuary_cdk.capture import Task, common, request
 from estuary_cdk.capture.common import ResourceState
@@ -45,13 +45,39 @@ def _set_token_source(http: HTTPMixin, config: EndpointConfig) -> None:
 async def _gather_bounded[T](
     names: list[str], probe: Callable[[str], Awaitable[T]]
 ) -> list[T]:
+    """Runs probe for each name, a few at a time, and returns results in input order."""
     semaphore = asyncio.Semaphore(PROBE_CONCURRENCY)
 
     async def bounded(name: str) -> T:
         async with semaphore:
             return await probe(name)
 
-    return await asyncio.gather(*(bounded(name) for name in names))
+    try:
+        async with asyncio.TaskGroup() as group:
+            tasks = [group.create_task(bounded(name)) for name in names]
+    except BaseExceptionGroup as errors:
+        # The first failure cancels the other probes; raise it as itself.
+        raise errors.exceptions[0]
+    return [task.result() for task in tasks]
+
+
+# Failures of the connection itself, not of one object. InvalidURL and some
+# connection errors also subclass ValueError, so check these first.
+CONNECTION_ERRORS = (ClientError, TimeoutError, OSError)
+
+
+def _describe_connection_error(err: BaseException) -> str:
+    # Never use repr(): aiohttp's response errors include the request headers,
+    # which hold the API key.
+    if isinstance(err, ClientResponseError):
+        return f"{type(err).__name__} (HTTP {err.status})"
+    return f"{type(err).__name__}: {err}" if str(err) else type(err).__name__
+
+
+def _connection_hint(err: BaseException, base_url: str) -> str:
+    if isinstance(err, (ClientConnectorError, InvalidURL)):
+        return f"Couldn't connect to Twenty at {base_url}. Please confirm the base URL."
+    return f"The connection to Twenty at {base_url} failed. Please try again."
 
 
 async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
@@ -89,10 +115,10 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
                 f"First problem in the metadata response: {err.errors()[0]['loc']}: {err.errors()[0]['msg']}"
             ]
         ) from err
-    except (ClientError, TimeoutError) as err:
+    except CONNECTION_ERRORS as err:
         raise ValidationError(
             [
-                f"Couldn't connect to Twenty at {config.base_url}. Please confirm the base URL.\n\n{err!r}"
+                f"{_connection_hint(err, config.base_url)}\n\n{_describe_connection_error(err)}"
             ]
         ) from err
 
@@ -117,25 +143,44 @@ async def disable_unreadable_resources(
     Discovers objects that can't be read as disabled bindings. Leaving them out
     would make re-discovery remove an existing binding, and adding them enabled would
     fail every auto-discover publish. Validation still names the error of a bound object.
+    Failures that aren't about one object (a bad key, a server or connection error)
+    fail discovery instead, so they can't disable every binding.
     """
 
-    async def probe(name: str) -> str | None:
+    async def probe(name: str) -> HTTPError | ValueError | None:
         try:
             await probe_object(log, http, config.base_url, name)
+        except CONNECTION_ERRORS:
+            raise
         except HTTPError as err:
-            if _permission_denied(err):
-                return "The API key's role can't read this object."
-            return f"Reading this object failed with HTTP {err.code}."
-        except ValueError:
-            return "Reading this object returned an invalid Twenty API response."
-        except ClientError, TimeoutError:
-            return "The connection failed while reading this object."
+            if err.code == 401 or err.code >= 500:
+                raise
+            return err
+        except ValueError as err:
+            return err
         return None
 
-    reasons = await _gather_bounded([r.name for r in resources], probe)
+    failures = await _gather_bounded([r.name for r in resources], probe)
+    if (
+        resources
+        and all(failure is not None for failure in failures)
+        and not any(
+            isinstance(failure, HTTPError) and _permission_denied(failure)
+            for failure in failures
+        )
+    ):
+        # Every object failing for a reason other than access is a workspace problem.
+        raise failures[0]
+
     discovered: list[common.Resource] = []
-    for resource, reason in zip(resources, reasons):
-        if reason is not None:
+    for resource, failure in zip(resources, failures):
+        if failure is not None:
+            if isinstance(failure, HTTPError) and _permission_denied(failure):
+                reason = "The API key's role can't read this object."
+            elif isinstance(failure, HTTPError):
+                reason = f"Reading this object failed with HTTP {failure.code}: {failure.message}"
+            else:
+                reason = f"Reading this object returned an invalid Twenty API response: {failure}"
             log.warning(
                 f"{reason} It is discovered disabled.", {"object": resource.name}
             )
@@ -170,11 +215,11 @@ async def validate_bindings(
             else:
                 reason = f"HTTP {err.code}: {err.message}"
             return f"Object '{name}': {reason}"
+        except CONNECTION_ERRORS as err:
+            # A streamed response can break mid-read; report it with the other objects.
+            return f"Object '{name}': Connection failed while reading it. {_describe_connection_error(err)}"
         except ValueError as err:
             return f"Object '{name}': Invalid Twenty API response. {err}"
-        except (ClientError, TimeoutError) as err:
-            # A streamed response can break mid-read; report it with the other objects.
-            return f"Object '{name}': Connection failed while reading it. {err!r}"
         return None
 
     errors = await _gather_bounded(
