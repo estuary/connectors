@@ -114,9 +114,9 @@ func TestUnmarshalStateRouting(t *testing.T) {
 	})
 }
 
-// A rollback from a version that writes {stateKey: {rangeKey: entry}}: its
+// An upgrade from a version that wrote {rangeKey: {stateKey: entry}}: its
 // entries are held like this version's own, and clear where they were found.
-func TestStateFirstEntriesConvertAndClear(t *testing.T) {
+func TestRangeFirstEntriesConvertAndClear(t *testing.T) {
 	var tr = testTransactor(lowerRangeKey, "a_table.v1", "b_table.v1")
 	tr.skipCleanup = true
 	require.NoError(t, tr.UnmarshalState(json.RawMessage(`{
@@ -136,7 +136,7 @@ func TestStateFirstEntriesConvertAndClear(t *testing.T) {
 	update, err := tr.Acknowledge(context.Background(), nil, nil)
 	require.NoError(t, err)
 	require.JSONEq(t, `{
-		"a_table.v1": null,
+		"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null},
 		"80000000-ffffffff": {"b_table.v1": null}
 	}`, string(update.UpdatedJson))
 	require.Empty(t, tr.cp)
@@ -154,15 +154,15 @@ func TestMergePeerStatePatches(t *testing.T) {
 
 	t.Run("no-op when non-primary", func(t *testing.T) {
 		var tr = testTransactor(upperRangeKey)
-		require.NoError(t, tr.mergePeerStatePatches(patches(`{"00000000-7fffffff": {"a_table.v1": {"Query": "Q", "JobPrefix": "p"}}}`)))
+		require.NoError(t, tr.mergePeerStatePatches(patches(`{"a_table.v1": {"00000000-7fffffff": {"Query": "Q", "JobPrefix": "p"}}}`)))
 		require.Empty(t, tr.peerShardsCheckpoints)
 	})
 
 	t.Run("own contribution is skipped, peers merged", func(t *testing.T) {
 		var tr = testTransactor(lowerRangeKey, "a_table.v1")
 		require.NoError(t, tr.mergePeerStatePatches(patches(
-			`{"00000000-7fffffff": {"a_table.v1": {"Query": "OWN", "JobPrefix": "po"}}}`,
-			`{"80000000-ffffffff": {"a_table.v1": {"Query": "PEER", "JobPrefix": "pp"}}}`,
+			`{"a_table.v1": {"00000000-7fffffff": {"Query": "OWN", "JobPrefix": "po"}}}`,
+			`{"a_table.v1": {"80000000-ffffffff": {"Query": "PEER", "JobPrefix": "pp"}}}`,
 		)))
 		require.Empty(t, tr.cp) // own patch is not folded back
 		require.Len(t, tr.peerShardsCheckpoints, 1)
