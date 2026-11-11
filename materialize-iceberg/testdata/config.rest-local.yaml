@@ -19,7 +19,7 @@ advanced:
 compute:
     compute_type: "Spark Standalone"
     aws_access_key_id: "flow"
-    aws_secret_access_key: "flow"
+    aws_secret_access_key: "flow_secret"
     region: "us-east-1"
     bucket: "warehouse"
     bucket_path: "staging/"
