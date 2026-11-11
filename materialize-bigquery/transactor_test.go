@@ -30,11 +30,10 @@ func TestLoadResultsTableName(t *testing.T) {
 
 func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 	var tr = &transactor{
-		cp:                    make(checkpoint),
-		peerShardsCheckpoints: make(rangeCheckpoints),
-		primaryShard:          rangeKey == fullRangeKey || rangeKey == lowerRangeKey,
-		rangeKey:              rangeKey,
-		be:                    &m.BindingEvents{},
+		cp:           make(checkpoints),
+		primaryShard: rangeKey == fullRangeKey || rangeKey == lowerRangeKey,
+		rangeKey:     rangeKey,
+		be:           &m.BindingEvents{},
 	}
 	for _, sk := range stateKeys {
 		tr.bindings = append(tr.bindings, &binding{target: sql.Table{StateKey: sk}})
@@ -44,8 +43,8 @@ func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 
 func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	tr := testTransactor(fullRangeKey, "a_table.v1", "b_table.v1")
-	tr.cp["a_table.v1"] = &checkpointItem{Query: "MERGE INTO a", JobPrefix: "jp"}
-	tr.cp["b_table.v1"] = &checkpointItem{Query: "MERGE INTO b", JobPrefix: "jp"}
+	tr.cp.add("a_table.v1", fullRangeKey, &checkpointItem{Query: "MERGE INTO a", JobPrefix: "jp"})
+	tr.cp.add("b_table.v1", fullRangeKey, &checkpointItem{Query: "MERGE INTO b", JobPrefix: "jp"})
 
 	// No staged entry's state key is requested: nothing may execute (the nil
 	// client would panic if a query ran) and no state update is returned, so
@@ -53,8 +52,8 @@ func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	state, err := tr.Acknowledge(context.Background(), nil, []string{"c_table.v1"})
 	require.NoError(t, err)
 	require.Nil(t, state)
-	require.NotNil(t, tr.cp["a_table.v1"])
-	require.NotNil(t, tr.cp["b_table.v1"])
+	require.NotNil(t, tr.cp["a_table.v1"][fullRangeKey])
+	require.NotNil(t, tr.cp["b_table.v1"][fullRangeKey])
 }
 
 func TestEntryWithoutTruncationOmitsIt(t *testing.T) {
@@ -81,9 +80,9 @@ func TestUnmarshalStateRouting(t *testing.T) {
 			"a_table.v1": {"Query": "Q1", "JobPrefix": "p1"},
 			"b_table.v1": {"Query": "Q2", "JobPrefix": "p2"}
 		}`)))
-		require.Empty(t, tr.cp)
-		require.Len(t, tr.peerShardsCheckpoints[legacyRangeKey], 2)
-		require.Equal(t, "Q1", tr.peerShardsCheckpoints[legacyRangeKey]["a_table.v1"].Query)
+		require.Len(t, tr.cp, 2)
+		require.Equal(t, "Q1", tr.cp["a_table.v1"][legacyRangeKey].Query)
+		require.Equal(t, "Q2", tr.cp["b_table.v1"][legacyRangeKey].Query)
 	})
 
 	t.Run("single shard routes own range to cp, others to peers", func(t *testing.T) {
@@ -93,24 +92,23 @@ func TestUnmarshalStateRouting(t *testing.T) {
 			"00000000-7fffffff": {"a_table.v1": {"Query": "QL", "JobPrefix": "pl"}},
 			"a_table.v1": {"Query": "Q0", "JobPrefix": "p0"}
 		}`)))
-		require.Equal(t, "OWN", tr.cp["a_table.v1"].Query)
-		require.Equal(t, "QL", tr.peerShardsCheckpoints[lowerRangeKey]["a_table.v1"].Query)
-		require.Equal(t, "Q0", tr.peerShardsCheckpoints[legacyRangeKey]["a_table.v1"].Query)
+		require.Equal(t, "OWN", tr.cp["a_table.v1"][fullRangeKey].Query)
+		require.Equal(t, "QL", tr.cp["a_table.v1"][lowerRangeKey].Query)
+		require.Equal(t, "Q0", tr.cp["a_table.v1"][legacyRangeKey].Query)
 	})
 
 	t.Run("multi-shard primary routes own range to cp", func(t *testing.T) {
 		var tr = testTransactor(lowerRangeKey, "a_table.v1")
 		require.NoError(t, tr.UnmarshalState(mixedState))
-		require.Equal(t, "QL", tr.cp["a_table.v1"].Query)
-		require.Equal(t, "QU", tr.peerShardsCheckpoints[upperRangeKey]["a_table.v1"].Query)
-		require.Equal(t, "Q0", tr.peerShardsCheckpoints[legacyRangeKey]["a_table.v1"].Query)
+		require.Equal(t, "QL", tr.cp["a_table.v1"][lowerRangeKey].Query)
+		require.Equal(t, "QU", tr.cp["a_table.v1"][upperRangeKey].Query)
+		require.Equal(t, "Q0", tr.cp["a_table.v1"][legacyRangeKey].Query)
 	})
 
 	t.Run("non-primary discards everything", func(t *testing.T) {
 		var tr = testTransactor(upperRangeKey, "a_table.v1")
 		require.NoError(t, tr.UnmarshalState(mixedState))
 		require.Empty(t, tr.cp)
-		require.Empty(t, tr.peerShardsCheckpoints)
 	})
 }
 
@@ -128,10 +126,9 @@ func TestRangeFirstEntriesConvertAndClear(t *testing.T) {
 		},
 		"b_table.v1": {}
 	}`)))
-	require.Equal(t, "a-lower", tr.cp["a_table.v1"].JobPrefix)
-	require.Equal(t, "a-upper", tr.peerShardsCheckpoints[upperRangeKey]["a_table.v1"].JobPrefix)
-	require.Equal(t, "b-upper", tr.peerShardsCheckpoints[upperRangeKey]["b_table.v1"].JobPrefix)
-	require.Empty(t, tr.peerShardsCheckpoints[legacyRangeKey])
+	require.Equal(t, "a-lower", tr.cp["a_table.v1"][lowerRangeKey].JobPrefix)
+	require.Equal(t, "a-upper", tr.cp["a_table.v1"][upperRangeKey].JobPrefix)
+	require.Equal(t, "b-upper", tr.cp["b_table.v1"][upperRangeKey].JobPrefix)
 
 	update, err := tr.Acknowledge(context.Background(), nil, nil)
 	require.NoError(t, err)
@@ -139,8 +136,8 @@ func TestRangeFirstEntriesConvertAndClear(t *testing.T) {
 		"a_table.v1": {"00000000-7fffffff": null, "80000000-ffffffff": null},
 		"80000000-ffffffff": {"b_table.v1": null}
 	}`, string(update.UpdatedJson))
-	require.Empty(t, tr.cp)
-	require.Empty(t, tr.peerShardsCheckpoints[upperRangeKey])
+	require.Empty(t, tr.cp["a_table.v1"])
+	require.Empty(t, tr.cp["b_table.v1"])
 }
 
 func TestMergePeerStatePatches(t *testing.T) {
@@ -155,7 +152,7 @@ func TestMergePeerStatePatches(t *testing.T) {
 	t.Run("no-op when non-primary", func(t *testing.T) {
 		var tr = testTransactor(upperRangeKey)
 		require.NoError(t, tr.mergePeerStatePatches(patches(`{"a_table.v1": {"00000000-7fffffff": {"Query": "Q", "JobPrefix": "p"}}}`)))
-		require.Empty(t, tr.peerShardsCheckpoints)
+		require.Empty(t, tr.cp)
 	})
 
 	t.Run("own contribution is skipped, peers merged", func(t *testing.T) {
@@ -164,9 +161,8 @@ func TestMergePeerStatePatches(t *testing.T) {
 			`{"a_table.v1": {"00000000-7fffffff": {"Query": "OWN", "JobPrefix": "po"}}}`,
 			`{"a_table.v1": {"80000000-ffffffff": {"Query": "PEER", "JobPrefix": "pp"}}}`,
 		)))
-		require.Empty(t, tr.cp) // own patch is not folded back
-		require.Len(t, tr.peerShardsCheckpoints, 1)
-		require.Equal(t, "PEER", tr.peerShardsCheckpoints[upperRangeKey]["a_table.v1"].Query)
+		require.Len(t, tr.cp["a_table.v1"], 1) // own patch is not folded back
+		require.Equal(t, "PEER", tr.cp["a_table.v1"][upperRangeKey].Query)
 	})
 
 	t.Run("state reset patch errors", func(t *testing.T) {
