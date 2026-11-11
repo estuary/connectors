@@ -1,5 +1,11 @@
 # materialize-bigquery
 
+## 2026-11-11
+
+### Fixed
+- A materialization no longer fails to start when a selected field matches an
+  existing column whose name differs only in capitalization.
+
 ## 2026-11-02
 
 ### Changed

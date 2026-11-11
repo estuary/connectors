@@ -186,3 +186,19 @@ func TestSchemaForColsStripsPolicyTags(t *testing.T) {
 	require.Equal(t, "birthday", fieldSchemas["birthday"].Name)
 	require.NotNil(t, fieldSchemas["birthday"].PolicyTags)
 }
+
+func TestSchemaForColsMatchesColumnCaseInsensitively(t *testing.T) {
+	makeCol := func(field string) *sql.Column {
+		return &sql.Column{Projection: sql.Projection{Projection: pf.Projection{Field: field}}}
+	}
+
+	fieldSchemas := map[string]*bigquery.FieldSchema{
+		"a_b_foo": {Name: "a_b_foo", Type: bigquery.StringFieldType},
+	}
+
+	got, err := schemaForCols([]*sql.Column{makeCol("a/b/Foo")}, fieldSchemas)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.Equal(t, "c0", got[0].Name)
+	require.Equal(t, bigquery.StringFieldType, got[0].Type)
+}

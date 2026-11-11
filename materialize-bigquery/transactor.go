@@ -222,7 +222,7 @@ func prepareNewTransactor(
 
 			fieldSchemas := make(map[string]*bigquery.FieldSchema)
 			for _, f := range schema {
-				fieldSchemas[f.Name] = f
+				fieldSchemas[strings.ToLower(f.Name)] = f
 			}
 
 			if err = t.addBinding(binding, fieldSchemas, &ep.Dialect); err != nil {
@@ -293,11 +293,14 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 	return nil
 }
 
+// schemaForCols returns the temp/external table schema for cols. fieldSchemas
+// is keyed by lowercased column name, because BigQuery column names are
+// case-insensitive.
 func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSchema) ([]*bigquery.FieldSchema, error) {
 	s := make([]*bigquery.FieldSchema, 0, len(cols))
 
 	for idx, col := range cols {
-		schema, ok := fieldSchemas[translateFlowIdentifier(col.Field)]
+		schema, ok := fieldSchemas[strings.ToLower(translateFlowIdentifier(col.Field))]
 		if !ok {
 			return nil, fmt.Errorf("could not find metadata for field '%s'", col.Field)
 		}
