@@ -1,5 +1,11 @@
 # materialize-google-sheets
 
+## 2026-11-05
+
+### Fixed
+- A Google Sheets server error while writing rows can no longer insert the rows twice.
+- Rate-limited requests now give up after 10 minutes instead of retrying forever.
+
 ## 2026-11-03
 
 ### Changed

@@ -19,6 +19,11 @@ WHEN MATCHED THEN UPDATE SET l.`first-key` = r.`first-key`, l.`second-key` = UNB
 WHEN NOT MATCHED AND r.`flow_document` != '"delete"' THEN INSERT (`first-key`, `second-key`, `third-key`, `first-val`, `second-val`, `third-val`, `fourth-val`, `flow_document`) VALUES (r.`first-key`, UNBASE64(r.`second-key`), r.`third-key`, r.`first-val`, r.`second-val`, UNBASE64(r.`third-val`), r.`fourth-val`, r.`flow_document`)
 --- End merge query ---
 
+--- Begin truncate query ---
+DELETE FROM `estuary`.`foo`.`bar`
+WHERE `flow_published_at` < '2026-09-29T12:00:00.000000Z'
+--- End truncate query ---
+
 --- Begin migrate query ---
 UPDATE `estuary`.`some`.`table`
 SET

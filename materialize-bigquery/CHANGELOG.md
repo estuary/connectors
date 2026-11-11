@@ -1,6 +1,6 @@
 # materialize-bigquery
 
-## 2026-11-10
+## 2026-11-11
 
 ### Changed
 - Load and merge queries on tables with a `TIMESTAMP` key column bound it by
@@ -11,6 +11,10 @@
   gaps between the transaction's keys. Ids that don't increase in byte order,
   such as Klaviyo's, which step from `z` to `A`, no longer widen the scan to
   most of the table when a transaction holds ids from both sides of a step.
+
+### Fixed
+- A materialization no longer fails to start when a selected field matches an
+  existing column whose name differs only in capitalization.
 
 ## 2026-11-02
 

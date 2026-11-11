@@ -248,20 +248,12 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 		var fName = filepath.Base(file)
 		log.WithField("filepath", filepath.Join(f.remoteDir(), fName)).Debug("staged file: uploading")
 
-		ctx = driverctx.NewContextWithStagingInfo(ctx, []string{f.dir})
-
-		// This query fails sometimes even in low load, we retry this query to avoid a full restart
-		var maxAttempts = 3
-		var attempt = 0
-		for {
-			if _, err := db.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s' OVERWRITE`, file, filepath.Join(f.remoteDir(), fName))); err != nil {
-				if attempt < maxAttempts {
-					attempt++
-					continue
-				}
-				return fmt.Errorf("put file: %w", err)
-			}
-			break
+		if err := putRetry.Do(ctx, "staging file", func(ctx context.Context) error {
+			ctx = driverctx.NewContextWithStagingInfo(ctx, []string{f.dir})
+			_, err := db.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s' OVERWRITE`, file, filepath.Join(f.remoteDir(), fName)))
+			return err
+		}); err != nil {
+			return fmt.Errorf("put file: %w", err)
 		}
 
 		log.WithField("filepath", filepath.Join(f.remoteDir(), fName)).Debug("staged file: upload done")

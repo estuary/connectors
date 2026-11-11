@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+
+	"github.com/estuary/connectors/go/cloudcas"
 )
 
 // SSL modes, in increasing order of strictness. The names match the MySQL
@@ -145,7 +147,7 @@ func (s Settings) Config(serverHost string) (*tls.Config, error) {
 	case ModeVerifyCA, ModeVerifyIdentity:
 		var roots = serverCA
 		if roots == nil {
-			roots = defaultRoots()
+			roots = cloudcas.DefaultRoots()
 		}
 		if mode == ModeVerifyIdentity {
 			cfg.ServerName, cfg.RootCAs = serverHost, roots

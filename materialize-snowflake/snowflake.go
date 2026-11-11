@@ -923,13 +923,16 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 
 			// Our understanding is that CREATE PIPE is _eventually consistent_, and so we
 			// wait until we can make sure the pipe exists before continuing
-			for !exists {
-				exists, err = d.pipeExists(ctx, b.pipeName)
-				if err != nil {
-					return nil, err
-				}
-				if !exists {
-					time.Sleep(5 * time.Second)
+			if !exists {
+				if err := pipeVisibleRetry.Do(ctx, "waiting for pipe "+b.pipeName, func(ctx context.Context) error {
+					if exists, err := d.pipeExists(ctx, b.pipeName); err != nil {
+						return err
+					} else if !exists {
+						return errPipeNotVisible
+					}
+					return nil
+				}); err != nil {
+					return nil, fmt.Errorf("waiting for created pipe %q: %w", b.pipeName, err)
 				}
 			}
 
@@ -992,7 +995,7 @@ type pipeRecord struct {
 
 // finished reports the pipe's row stats once all of its files have loaded.
 func (pipe *pipeRecord) finished(be *m.BindingEvents) {
-	stats := m.ExactRowStats(pipe.loaded, 0, 0).WithLoaded(pipe.loaded)
+	stats := m.ExactRowStats(pipe.loaded, 0, 0)
 	if pipe.rows > 0 {
 		stats = stats.WithStaged(pipe.rows)
 	}
@@ -1242,6 +1245,15 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	// even if no results are listed.
 	var minTryTime = time.Now().Add(30 * time.Minute)
 
+	var wait = func() error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(retryDelay):
+			return nil
+		}
+	}
+
 	for len(pipes) > 0 {
 		for pipeName, pipe := range pipes {
 			// if the pipe has no files to begin with, just skip it
@@ -1267,7 +1279,9 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			// reliable. If they are not there, then something is wrong.
 			if len(report.Files) == 0 {
 				if time.Now().Before(maxTryTime) {
-					time.Sleep(retryDelay)
+					if err := wait(); err != nil {
+						return nil, err
+					}
 					continue
 				}
 
@@ -1304,14 +1318,18 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				// If items are still in progress, we continue trying to fetch their results
 				if hasItemsInProgress {
 					maxTryTime = time.Now().Add(1 * time.Minute)
-					time.Sleep(retryDelay)
+					if err := wait(); err != nil {
+						return nil, err
+					}
 					continue
 				}
 
 				if len(pipe.files) > 0 {
 					if time.Now().Before(minTryTime) {
 						maxTryTime = time.Now().Add(1 * time.Minute)
-						time.Sleep(retryDelay)
+						if err := wait(); err != nil {
+							return nil, err
+						}
 						continue
 					}
 					return nil, fmt.Errorf("snowpipe: could not find reports of successful processing for all files of pipe %v", pipe)
@@ -1347,7 +1365,9 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				delete(pipes, pipeName)
 			}
 
-			time.Sleep(retryDelay)
+			if err := wait(); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -1530,7 +1550,7 @@ func scanStoreResult(rows *stdsql.Rows, isMerge bool) (m.RowStats, error) {
 	if isMerge {
 		return m.ExactRowStats(inserted, updated, deleted), nil
 	}
-	return m.ExactRowStats(loaded, 0, 0).WithLoaded(loaded), nil
+	return m.ExactRowStats(loaded, 0, 0), nil
 }
 
 // bindingForStateKey is the index of the binding with the state key, or -1 if

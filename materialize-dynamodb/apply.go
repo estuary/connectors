@@ -12,6 +12,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// tablePollInterval and tableWaitTimeout pace and bound waiting for a created
+// table to become active, or a deleted one to be gone.
+const (
+	tablePollInterval = time.Second
+	tableWaitTimeout  = 30 * time.Second
+)
+
 func createTable(
 	ctx context.Context,
 	client *client,
@@ -37,28 +44,12 @@ func createTable(
 		log.WithField("table", name).Warn("table already exists")
 	}
 
-	// Wait for the table to be in an "active" state.
-	maxAttempts := 30
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		d, err := client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
-			TableName: aws.String(name),
-		})
-		if err != nil {
-			return err
-		}
-
-		if d.Table.TableStatus == types.TableStatusActive {
-			return nil
-		}
-
-		log.WithFields(log.Fields{
-			"table":      name,
-			"lastStatus": d.Table.TableStatus,
-		}).Debug("waiting for table to become ready")
-		time.Sleep(1 * time.Second)
+	if err := dynamodb.NewTableExistsWaiter(client.db, func(o *dynamodb.TableExistsWaiterOptions) {
+		o.MinDelay, o.MaxDelay = tablePollInterval, tablePollInterval
+	}).Wait(ctx, &dynamodb.DescribeTableInput{TableName: aws.String(name)}, tableWaitTimeout); err != nil {
+		return fmt.Errorf("waiting for table %s to become active: %w", name, err)
 	}
-
-	return fmt.Errorf("table %s was created but did not become ready in time", name)
+	return nil
 }
 
 func deleteTable(ctx context.Context, client *client, name string) error {
@@ -68,29 +59,10 @@ func deleteTable(ctx context.Context, client *client, name string) error {
 		return fmt.Errorf("deleting existing table: %w", err)
 	}
 
-	// Wait for the table to be fully deleted.
-	attempts := 30
-	for {
-		if attempts < 0 {
-			return fmt.Errorf("table %s did not finish deleting in time", name)
-		}
-
-		d, err := client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
-			TableName: aws.String(name),
-		})
-		if err != nil {
-			if _, ok := errors.AsType[*types.ResourceNotFoundException](err); ok {
-				return nil
-			}
-			return fmt.Errorf("waiting for table deletion to finish: %w", err)
-		}
-
-		log.WithFields(log.Fields{
-			"table":      name,
-			"lastStatus": d.Table.TableStatus,
-		}).Debug("waiting for table deletion to complete")
-
-		time.Sleep(1 * time.Second)
-		attempts -= 1
+	if err := dynamodb.NewTableNotExistsWaiter(client.db, func(o *dynamodb.TableNotExistsWaiterOptions) {
+		o.MinDelay, o.MaxDelay = tablePollInterval, tablePollInterval
+	}).Wait(ctx, &dynamodb.DescribeTableInput{TableName: aws.String(name)}, tableWaitTimeout); err != nil {
+		return fmt.Errorf("waiting for table %s to finish deleting: %w", name, err)
 	}
+	return nil
 }

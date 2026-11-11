@@ -79,9 +79,6 @@ type RowStats struct {
 	// Staged is the number of rows the connector wrote to its staging area,
 	// when it stages. Checked against the number of documents stored.
 	Staged *int64
-	// Loaded is the number of staged rows the destination loaded, when the
-	// connector can observe it. Checked against Staged.
-	Loaded *int64
 	// Truncated is the number of rows deleted because they were published
 	// before a completed backfill. It is visibility only, never checked.
 	Truncated *int64
@@ -116,12 +113,6 @@ func (s RowStats) WithStaged(n int64) RowStats {
 	return s
 }
 
-// WithLoaded sets the number of staged rows the destination loaded.
-func (s RowStats) WithLoaded(n int64) RowStats {
-	s.Loaded = &n
-	return s
-}
-
 // WithTruncated sets the number of rows a backfill truncation deleted.
 func (s RowStats) WithTruncated(n int64) RowStats {
 	s.Truncated = &n
@@ -135,7 +126,6 @@ func (s RowStats) add(o RowStats) RowStats {
 	s.Deleted += o.Deleted
 	s.Total += o.Total
 	s.Staged = addOptional(s.Staged, o.Staged)
-	s.Loaded = addOptional(s.Loaded, o.Loaded)
 	s.Truncated = addOptional(s.Truncated, o.Truncated)
 	return s
 }
@@ -656,13 +646,6 @@ func (h *healthTracker) evaluate(r *healthRound) {
 		if a.Staged != nil {
 			check("staged", e.stores(), *a.Staged)
 		}
-		if a.Loaded != nil {
-			if a.Staged != nil {
-				check("loadedRows", *a.Staged, *a.Loaded)
-			} else {
-				check("loadedRows", e.stores(), *a.Loaded)
-			}
-		}
 	}
 
 	if r.loaded > r.loadRequests {
@@ -758,9 +741,6 @@ func (h *healthTracker) emit(w *healthWindow, verdict string, extra log.Fields) 
 	}
 	if w.actual.Staged != nil {
 		actual["staged"] = *w.actual.Staged
-	}
-	if w.actual.Loaded != nil {
-		actual["loaded"] = *w.actual.Loaded
 	}
 	if w.actual.Truncated != nil {
 		actual["truncated"] = *w.actual.Truncated
