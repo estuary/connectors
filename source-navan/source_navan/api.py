@@ -20,21 +20,21 @@ async def _fetch_bookings_request(
     log: Logger,
     page: int,
     page_size: int,
-    updated_from: str | None = None,
-    updated_to: str | None = None,
+    updated_from: datetime | None = None,
+    updated_to: datetime | None = None,
 ) -> BookingsResponse:
     url = f"{API_BASE_URL}/bookings"
 
-    params: dict[str, int | str] = {
+    params: dict[str, int] = {
         "page": page,
         "size": page_size,
     }
 
-    if updated_from:
-        params["updatedFrom"] = updated_from
+    if updated_from is not None:
+        params["updatedFrom"] = int(updated_from.timestamp())
 
-    if updated_to:
-        params["updatedTo"] = updated_to
+    if updated_to is not None:
+        params["updatedTo"] = int(updated_to.timestamp())
 
     return BookingsResponse.model_validate_json(
         await http.request(log, url, params=params)
@@ -53,10 +53,9 @@ async def fetch_bookings_page(
     assert isinstance(cutoff, datetime), f"Expected datetime cutoff, got {type(cutoff)}"
 
     page = page_cursor or 0
-    updated_to = dt_to_str(cutoff)
 
     log.debug(
-        f"Fetching bookings page {page} with cutoff: {updated_to})",
+        f"Fetching bookings page {page} with cutoff: {dt_to_str(cutoff)})",
     )
 
     response = await _fetch_bookings_request(
@@ -64,7 +63,7 @@ async def fetch_bookings_page(
         log,
         page=page,
         page_size=DEFAULT_PAGE_SIZE,
-        updated_to=updated_to,
+        updated_to=cutoff,
     )
 
     for booking in response.data:
@@ -95,11 +94,10 @@ async def fetch_bookings_changes(
     last_seen_modified = log_cursor
     cursor_timestamp = log_cursor
 
-    updated_from = dt_to_str(log_cursor)
     updated_to = datetime.now(tz=log_cursor.tzinfo)
 
     log.debug(
-        f"Fetching bookings changes in range {updated_from} to {dt_to_str(updated_to)}",
+        f"Fetching bookings changes in range {dt_to_str(log_cursor)} to {dt_to_str(updated_to)}",
     )
 
     current_page = 0
@@ -111,8 +109,8 @@ async def fetch_bookings_changes(
             log,
             page=current_page,
             page_size=DEFAULT_PAGE_SIZE,
-            updated_from=updated_from,
-            updated_to=dt_to_str(updated_to),
+            updated_from=log_cursor,
+            updated_to=updated_to,
         )
 
         for booking in response.data:
