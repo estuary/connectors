@@ -114,6 +114,35 @@ func TestUnmarshalStateRouting(t *testing.T) {
 	})
 }
 
+// A rollback from a version that writes {stateKey: {rangeKey: entry}}: its
+// entries are held like this version's own, and clear where they were found.
+func TestStateFirstEntriesConvertAndClear(t *testing.T) {
+	var tr = testTransactor(lowerRangeKey, "a_table.v1", "b_table.v1")
+	tr.skipCleanup = true
+	require.NoError(t, tr.UnmarshalState(json.RawMessage(`{
+		"00000000-7fffffff": {},
+		"80000000-ffffffff": {"b_table.v1": {"JobPrefix": "b-upper"}},
+		"a_table.v1": {
+			"00000000-7fffffff": {"JobPrefix": "a-lower"},
+			"80000000-ffffffff": {"JobPrefix": "a-upper"}
+		},
+		"b_table.v1": {}
+	}`)))
+	require.Equal(t, "a-lower", tr.cp["a_table.v1"].JobPrefix)
+	require.Equal(t, "a-upper", tr.peerShardsCheckpoints[upperRangeKey]["a_table.v1"].JobPrefix)
+	require.Equal(t, "b-upper", tr.peerShardsCheckpoints[upperRangeKey]["b_table.v1"].JobPrefix)
+	require.Empty(t, tr.peerShardsCheckpoints[legacyRangeKey])
+
+	update, err := tr.Acknowledge(context.Background(), nil, nil)
+	require.NoError(t, err)
+	require.JSONEq(t, `{
+		"a_table.v1": null,
+		"80000000-ffffffff": {"b_table.v1": null}
+	}`, string(update.UpdatedJson))
+	require.Empty(t, tr.cp)
+	require.Empty(t, tr.peerShardsCheckpoints[upperRangeKey])
+}
+
 func TestMergePeerStatePatches(t *testing.T) {
 	var patches = func(ps ...string) []json.RawMessage {
 		var out []json.RawMessage

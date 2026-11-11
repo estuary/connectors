@@ -48,6 +48,9 @@ type checkpointItem struct {
 	// attributing its commit's row stats. Recovered and peer entries are
 	// reported outside of round pairing, so theirs is left zero.
 	round int
+	// stateFirst marks an entry recovered from {stateKey: {rangeKey: entry}},
+	// the layout a later version writes, which is where it is cleared.
+	stateFirst bool
 }
 
 // mergeBoundLiterals is the serialized form of a key column's sql.MergeBound:
@@ -337,34 +340,75 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 		return nil
 	}
 
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(state, &raw); err != nil {
-		return fmt.Errorf("unmarshaling checkpoint state: %w", err)
+	var checkpoints, err = parseCheckpoints(state)
+	if err != nil {
+		return err
 	}
-
-	for key, val := range raw {
-		if rangeKeyRe.MatchString(key) {
-			var bucket checkpoint
-			if err := json.Unmarshal(val, &bucket); err != nil {
-				return fmt.Errorf("unmarshaling checkpoint range %q: %w", key, err)
-			}
-			if key == t.rangeKey {
-				t.cp = bucket
-			} else {
-				t.peerShardsCheckpoints[key] = bucket
-			}
-			continue
+	for rangeKey, bucket := range checkpoints {
+		if rangeKey == t.rangeKey {
+			t.cp = bucket
+		} else {
+			t.peerShardsCheckpoints[rangeKey] = bucket
 		}
-
-		// A bare StateKey: an entry from before range-scoping was added.
-		var item checkpointItem
-		if err := json.Unmarshal(val, &item); err != nil {
-			return fmt.Errorf("unmarshaling checkpoint entry %q: %w", key, err)
-		}
-		t.legacyBucket()[key] = &item
 	}
 
 	return nil
+}
+
+// parseCheckpoints decodes a recovered checkpoint into the layout this version
+// writes, {rangeKey: {stateKey: entry}}. Entries a later version wrote as
+// {stateKey: {rangeKey: entry}} are converted to it, and entries from before
+// range-scoping are filed under legacyRangeKey.
+func parseCheckpoints(state json.RawMessage) (rangeCheckpoints, error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(state, &raw); err != nil {
+		return nil, fmt.Errorf("unmarshaling checkpoint state: %w", err)
+	}
+
+	var out = make(rangeCheckpoints)
+	var add = func(rangeKey, stateKey string, item *checkpointItem) {
+		if out[rangeKey] == nil {
+			out[rangeKey] = make(checkpoint)
+		}
+		out[rangeKey][stateKey] = item
+	}
+
+	for key, val := range raw {
+		var nested checkpoint
+		var err = json.Unmarshal(val, &nested)
+
+		if rangeKeyRe.MatchString(key) {
+			if err != nil {
+				return nil, fmt.Errorf("unmarshaling checkpoint range %q: %w", key, err)
+			}
+			for stateKey, item := range nested {
+				add(key, stateKey, item)
+			}
+		} else if err == nil && allRangeKeys(nested) {
+			for rangeKey, item := range nested {
+				item.stateFirst = true
+				add(rangeKey, key, item)
+			}
+		} else {
+			// A bare StateKey: an entry from before range-scoping was added.
+			var item checkpointItem
+			if err := json.Unmarshal(val, &item); err != nil {
+				return nil, fmt.Errorf("unmarshaling checkpoint entry %q: %w", key, err)
+			}
+			add(legacyRangeKey, key, &item)
+		}
+	}
+
+	return out, nil
+}
+
+func allRangeKeys(nested checkpoint) bool {
+	for key := range nested {
+		if !rangeKeyRe.MatchString(key) {
+			return false
+		}
+	}
+	return true
 }
 
 func (t *transactor) legacyBucket() checkpoint {
@@ -818,7 +862,7 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 	}
 
 	// Null each executed entry at the JSON path it occupies: nested under
-	// its range key, or top-level for legacyRangeKey.
+	// its range key, or top-level for legacyRangeKey and stateFirst entries.
 	var clear = make(map[string]interface{})
 	for _, d := range drained {
 		if d.rangeKey == legacyRangeKey {
@@ -826,10 +870,14 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 			delete(t.legacyBucket(), d.stateKey)
 			continue
 		}
-		if clear[d.rangeKey] == nil {
-			clear[d.rangeKey] = make(map[string]interface{})
+		if d.item.stateFirst {
+			clear[d.stateKey] = nil
+		} else {
+			if clear[d.rangeKey] == nil {
+				clear[d.rangeKey] = make(map[string]interface{})
+			}
+			clear[d.rangeKey].(map[string]interface{})[d.stateKey] = nil
 		}
-		clear[d.rangeKey].(map[string]interface{})[d.stateKey] = nil
 
 		if d.rangeKey == t.rangeKey {
 			delete(t.cp, d.stateKey)
