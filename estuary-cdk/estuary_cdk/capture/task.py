@@ -74,6 +74,8 @@ def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
     - `type: object` and `additionalProperties: False` on the root and wherever
       properties are declared. The runtime rejects a SourcedSchema that isn't
       closed, and a captured document is always an object.
+    - `additionalProperties: False` on every other object location. Inference
+      adds no properties beneath an open object.
     - `required`, covering every declared property. Inference relaxes this for real
       when a document turns up without the field.
     - length and range bounds, which materializations size columns from.
@@ -123,6 +125,9 @@ def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
 
         declared = out.get("type", [])
         types = {declared} if isinstance(declared, str) else set(declared)
+
+        if "object" in types:
+            out = {"additionalProperties": False, **out}
 
         # Length bounds constrain only string values and range bounds only numeric
         # ones, so a union of both types carries both sets.
