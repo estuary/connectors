@@ -26,7 +26,7 @@ type mergeBoundsBuilder struct {
 	lower []any
 	upper []any
 	// unbounded marks key columns whose observed values can't be ordered,
-	// such as a date-time that doesn't parse.
+	// such as a null or a date-time that doesn't parse.
 	unbounded []bool
 }
 
@@ -53,6 +53,12 @@ func (b *mergeBoundsBuilder) nextKey(key []any) {
 			} else {
 				b.unbounded[idx] = true
 			}
+			continue
+		}
+		if k == nil {
+			b.unbounded[idx] = true
+		}
+		if b.unbounded[idx] {
 			continue
 		}
 		b.lower[idx] = minKey(b.lower[idx], k)
