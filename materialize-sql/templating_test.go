@@ -148,6 +148,32 @@ func TestMergeBoundsBuilder(t *testing.T) {
 				{colC, literaler(int64(1)), literaler(int64(3)), nil},
 			},
 		},
+		{
+			name:       "a null after other values drops its column's bound",
+			keyColumns: []Column{colA, colC},
+			keys: [][]any{
+				{"a", int64(1)},
+				{nil, int64(3)},
+				{"c", int64(2)},
+			},
+			want: []MergeBound{
+				{colA, "", "", nil},
+				{colC, literaler(int64(1)), literaler(int64(3)), nil},
+			},
+		},
+		{
+			name:       "a null before other values drops its column's bound",
+			keyColumns: []Column{colA, colC},
+			keys: [][]any{
+				{"a", nil},
+				{"b", int64(1)},
+				{"c", int64(2)},
+			},
+			want: []MergeBound{
+				{colA, literaler("a"), literaler("c"), nil},
+				{colC, "", "", nil},
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			b := NewMergeBoundsBuilder(tt.keyColumns, literaler)
@@ -155,6 +181,10 @@ func TestMergeBoundsBuilder(t *testing.T) {
 				b.NextKey(store)
 			}
 			require.Equal(t, tt.want, b.Build())
+
+			// The next transaction starts clean.
+			b.NextKey(tt.keys[0])
+			require.Len(t, b.Build(), len(tt.keyColumns))
 		})
 	}
 }
