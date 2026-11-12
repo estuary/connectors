@@ -593,6 +593,9 @@ class ShopifyDocument(BaseDocument):
 class ShopifyGraphQLResource(ShopifyDocument):
     QUERY: ClassVar[str] = ""
     QUERY_ROOT: ClassVar[str] = ""
+    # The object a QUERY_ROOT connection sits under when it isn't a top-level query field
+    # (ex: `shopifyPaymentsAccount` for `payouts`). A null parent reads as no documents.
+    QUERY_ROOT_PARENT: ClassVar[str | None] = None
     FRAGMENTS: ClassVar[list[str]] = []
     NAME: ClassVar[str] = ""
     SORT_KEY: ClassVar[SortKey | None] = None
@@ -850,15 +853,35 @@ def create_response_data_model(
 ) -> type[BaseResponseData[TShopifyGraphQLResource]]:
     """Factory function to create typed GraphQL data field models."""
     query_root = resource_type.QUERY_ROOT
+    parent = resource_type.QUERY_ROOT_PARENT
+
+    if parent:
+        parent_model = type(
+            f"{parent[0].upper()}{parent[1:]}Data",
+            (BaseModel,),
+            {"__annotations__": {query_root: EdgesData[resource_type]}},
+        )
+        annotations = {parent: parent_model | None}
+
+        def get_connection(self) -> EdgesData[TShopifyGraphQLResource] | None:
+            parent_data = getattr(self, parent)
+            return getattr(parent_data, query_root) if parent_data is not None else None
+    else:
+        annotations = {query_root: EdgesData[resource_type]}
+
+        def get_connection(self) -> EdgesData[TShopifyGraphQLResource] | None:
+            return getattr(self, query_root)
 
     def get_edges(self) -> list[Edge[TShopifyGraphQLResource]]:
-        return getattr(self, query_root).edges
+        connection = get_connection(self)
+        return connection.edges if connection is not None else []
 
     def get_page_info(self) -> PageInfo:
-        return getattr(self, query_root).pageInfo
+        connection = get_connection(self)
+        return connection.pageInfo if connection is not None else PageInfo()
 
     class_dict = {
-        "__annotations__": {query_root: EdgesData[resource_type]},
+        "__annotations__": annotations,
         "edges": property(get_edges),
         "page_info": property(get_page_info),
     }
