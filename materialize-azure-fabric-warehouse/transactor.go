@@ -172,8 +172,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("converting Load key: %w", err)
 		} else if err = t.loadFiles.WriteRow(ctx, it.Binding, converted); err != nil {
 			return fmt.Errorf("writing Load key: %w", err)
-		} else {
-			b.load.mergeBounds.NextKey(converted)
+		} else if err := b.load.mergeBounds.NextKey(converted); err != nil {
+			return fmt.Errorf("tracking Load key bounds for resource %s: %w", b.target.Path, err)
 		}
 	}
 	if it.Err() != nil {
@@ -316,8 +316,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		} else if err := t.storeFiles.WriteRow(ctx, it.Binding, append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing row for store: %w", err)
-		} else {
-			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
+		} else if err := b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)]); err != nil {
+			return nil, fmt.Errorf("tracking Store key bounds for resource %s: %w", b.target.Path, err)
 		}
 	}
 	if it.Err() != nil {
