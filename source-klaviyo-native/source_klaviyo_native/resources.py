@@ -17,6 +17,7 @@ from .models import (
     Accounts,
     BaseStream,
     Campaigns,
+    ConnectorState,
     CouponCodes,
     EmailCampaigns,
     EmailCampaignsArchived,
@@ -34,6 +35,7 @@ from .models import (
     SmsCampaigns,
     SmsCampaignsArchived,
 )
+from .sourced_schemas import SOURCED_SCHEMAS
 
 # Klaviyo doesn't use the standard "Bearer" token type in the Authorization
 # header. Instead, it uses "Klaviyo-API-Key" as the token type.
@@ -63,7 +65,7 @@ def full_refresh_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
-    def open(
+    async def open(
             model: type[BaseStream],
             binding: CaptureBinding[ResourceConfig],
             binding_index: int,
@@ -71,6 +73,9 @@ def full_refresh_resources(
             task: Task,
             all_bindings
     ):
+        task.sourced_schema(binding_index, SOURCED_SCHEMAS[model.name])
+        await task.checkpoint(state=ConnectorState())
+
         if issubclass(model, CouponCodes):
             fetch_snapshot = functools.partial(
                 snapshot_coupon_codes,
@@ -110,7 +115,7 @@ def incremental_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
-    def open(
+    async def open(
         model: type[IncrementalStream],
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -118,6 +123,9 @@ def incremental_resources(
         task: Task,
         all_bindings,
     ):
+        task.sourced_schema(binding_index, SOURCED_SCHEMAS[model.name])
+        await task.checkpoint(state=ConnectorState())
+
         common.open_binding(
             binding,
             binding_index,
@@ -165,13 +173,16 @@ def campaigns(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> common.Resource:
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        task.sourced_schema(binding_index, SOURCED_SCHEMAS[Campaigns.name])
+        await task.checkpoint(state=ConnectorState())
+
         common.open_binding(
             binding,
             binding_index,
@@ -261,13 +272,16 @@ def flows(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> common.Resource:
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        task.sourced_schema(binding_index, SOURCED_SCHEMAS[Flows.name])
+        await task.checkpoint(state=ConnectorState())
+
         common.open_binding(
             binding,
             binding_index,
@@ -323,13 +337,16 @@ def events(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> common.Resource:
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        task.sourced_schema(binding_index, SOURCED_SCHEMAS[Events.name])
+        await task.checkpoint(state=ConnectorState())
+
         common.open_binding(
             binding,
             binding_index,
