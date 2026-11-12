@@ -2,7 +2,7 @@ import asyncio
 import time
 from datetime import UTC, datetime, timedelta
 from logging import Logger
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Callable
 
 from estuary_cdk.capture.common import (
     LogCursor,
@@ -87,6 +87,31 @@ async def bulk_fetch_snapshot(
         yield resource
 
 
+async def _paginate_pages[T: ShopifyGraphQLResource](
+    client: ShopifyGraphQLClient,
+    data_model: type[BaseResponseData[T]],
+    build_page_query: Callable[[str | None], str],
+    store: str,
+    log: Logger,
+) -> AsyncGenerator[BaseResponseData[T], None]:
+    """Yield every page of a query, first to last.
+
+    `build_page_query` takes the cursor to read after, which is None for the first page.
+    """
+    after: str | None = None
+    ctx = StoreValidationContext(store=store)
+
+    while True:
+        data = await client.request(build_page_query(after), data_model, log, context=ctx)
+        yield data
+
+        page_info = data.page_info
+        if not page_info.hasNextPage:
+            return
+
+        after = page_info.endCursor
+
+
 async def _paginate_through_resources(
     client: ShopifyGraphQLClient,
     model: type[TShopifyGraphQLResource],
@@ -97,15 +122,13 @@ async def _paginate_through_resources(
     capabilities: StoreCapabilities,
     log: Logger,
 ) -> AsyncGenerator[TShopifyGraphQLResource, None]:
-    after: str | None = None
-    ctx = StoreValidationContext(store=store)
     # Shared across all pages of this fetch so total concurrent nested re-queries stay bounded.
     nested_sem = asyncio.Semaphore(NESTED_CONNECTION_CONCURRENCY)
     # Streams that inline nested connections use a smaller page to keep per-query cost in budget.
     page_size = model.OUTER_PAGE_SIZE or PAGE_SIZE
 
-    while True:
-        query = model.build_query(
+    def build_page_query(after: str | None) -> str:
+        return model.build_query(
             start=start,
             end=end,
             first=page_size,
@@ -113,19 +136,12 @@ async def _paginate_through_resources(
             capabilities=capabilities,
         )
 
-        data = await client.request(query, data_model, log, context=ctx)
-
+    async for data in _paginate_pages(client, data_model, build_page_query, store, log):
         docs = data.nodes
         if model.NESTED_CONNECTIONS:
             await _stitch_nested_connections(client, model, docs, nested_sem, log)
         for doc in docs:
             yield doc
-
-        page_info = data.page_info
-        if not page_info.hasNextPage:
-            return
-
-        after = page_info.endCursor
 
 
 async def _stitch_nested_connections(
