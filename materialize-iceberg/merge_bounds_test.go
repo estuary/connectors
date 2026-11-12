@@ -40,7 +40,6 @@ func TestMergeBoundsDatetimeKeys(t *testing.T) {
 		{"years outside 0000-9999 in UTC", []any{"9999-12-31T23:59:59-14:00", "0000-01-01T00:00:00+01:00"},
 			"'-0001-12-31T23:00:00.000000Z'", "'10000-01-01T13:59:59.000000Z'"},
 		{"an unparseable value drops the bound", []any{"2024-01-01T00:00:00Z", "2016-12-31T23:59:60Z", "2024-01-02T00:00:00Z"}, "", ""},
-		{"a null value drops the bound", []any{"2024-01-01T00:00:00Z", nil}, "", ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			b := newMergeBoundsBuilder(keys)
@@ -57,6 +56,33 @@ func TestMergeBoundsDatetimeKeys(t *testing.T) {
 			got = b.build()
 			require.Equal(t, "'2024-01-01T00:00:00.000000Z'", got[0].LiteralLower)
 			require.Equal(t, "'2024-01-01T00:00:00.000000Z'", got[0].LiteralUpper)
+		})
+	}
+}
+
+func TestMergeBoundsNullKey(t *testing.T) {
+	keys := []realBoilerplate.MappedProjection[mapped]{
+		{Projection: realBoilerplate.Projection{Projection: pf.Projection{Field: "ts"}}, Mapped: mapped{type_: iceberg.TimestampTzType{}, Name: "ts"}},
+		{Projection: realBoilerplate.Projection{Projection: pf.Projection{Field: "id"}}, Mapped: mapped{type_: iceberg.StringType{}, Name: "id"}},
+	}
+
+	for _, tt := range []struct {
+		name string
+		keys [][]any
+		want string
+	}{
+		{"a null date-time after other values", [][]any{{"2024-01-01T00:00:00Z", "a"}, {nil, "b"}}, `key field "ts" is null`},
+		{"a null string as the first value", [][]any{{"2024-01-01T00:00:00Z", nil}}, `key field "id" is null`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			b := newMergeBoundsBuilder(keys)
+			var err error
+			for _, k := range tt.keys {
+				if err = b.nextKey(k); err != nil {
+					break
+				}
+			}
+			require.EqualError(t, err, tt.want)
 		})
 	}
 }

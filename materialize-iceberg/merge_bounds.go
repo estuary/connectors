@@ -26,7 +26,7 @@ type mergeBoundsBuilder struct {
 	lower []any
 	upper []any
 	// unbounded marks key columns whose observed values can't be ordered,
-	// such as a null or a date-time that doesn't parse.
+	// such as a date-time that doesn't parse.
 	unbounded []bool
 }
 
@@ -37,7 +37,15 @@ func newMergeBoundsBuilder(keys []boilerplate.MappedProjection[mapped]) *mergeBo
 	}
 }
 
-func (b *mergeBoundsBuilder) nextKey(key []any) {
+// nextKey updates the observed minimum and maximum key for a transaction. A
+// null key field is an error, because a null has no order among the other
+// values.
+func (b *mergeBoundsBuilder) nextKey(key []any) error {
+	for idx, k := range key {
+		if k == nil {
+			return fmt.Errorf("key field %q is null", b.keys[idx].Field)
+		}
+	}
 	if b.lower == nil {
 		b.lower = append([]any(nil), key...)
 		b.upper = append([]any(nil), key...)
@@ -55,15 +63,11 @@ func (b *mergeBoundsBuilder) nextKey(key []any) {
 			}
 			continue
 		}
-		if k == nil {
-			b.unbounded[idx] = true
-		}
-		if b.unbounded[idx] {
-			continue
-		}
 		b.lower[idx] = minKey(b.lower[idx], k)
 		b.upper[idx] = maxKey(b.upper[idx], k)
 	}
+
+	return nil
 }
 
 func minKey(k1 any, k2 any) any {
