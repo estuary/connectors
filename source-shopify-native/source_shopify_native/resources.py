@@ -34,6 +34,7 @@ from .api import (
     bulk_fetch_snapshot,
     fetch_incremental,
     fetch_incremental_unsorted,
+    fetch_recent_payout_transactions,
     fetch_recent_payouts,
     fetch_snapshot,
 )
@@ -175,6 +176,7 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.SubscriptionContracts,
     gql.Disputes,
     gql.Payouts,
+    gql.BalanceTransactions,
 ]
 
 PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {
@@ -532,7 +534,8 @@ def _build_incremental_resource(
     config: EndpointConfig,
 ) -> Resource:
     """Build the incremental resource for `model`, with one subtask per store in `stores_with_access`.
-    Payouts get a second subtask per store, which refreshes the recent payouts once a day.
+    Payouts and balance transactions get a second subtask per store, which refreshes the
+    recent payouts once a day.
 
     State format is always dictionary-based: {"inc": {"store_id": {...}}}
 
@@ -551,21 +554,21 @@ def _build_incremental_resource(
     )
     legacy_store_id = config._legacy_store or config.stores[0].store
 
-    # Payouts change after the date they're read by, so a second subtask per store reads the
-    # recent payouts again once a day. Captures save state under the subtask's name, so it
-    # can't change.
+    # Payouts and balance transactions change after the date they're read by, so a second
+    # subtask per store reads the recent payouts again once a day. Captures save state under
+    # the subtask's name, so it can't change.
     recent_payouts_subtasks = (
         {store_id: f"{store_id}:recent_payouts" for store_id in stores_with_access}
-        if model == gql.Payouts
+        if model in (gql.Payouts, gql.BalanceTransactions)
         else {}
     )
     assert isinstance(initial_state.inc, dict)
     for store_id, subtask_id in recent_payouts_subtasks.items():
         initial_state.inc[subtask_id] = deepcopy(initial_state.inc[store_id])
 
-    # A blank start_date is reset to 30 days back at every start, which can pass payouts the
-    # capture already holds and still needs to refresh. The refresh honors only a start_date
-    # the config sets.
+    # A blank start_date is reset to 30 days back at every start, which can pass transactions
+    # the capture already holds and still needs to refresh. The refreshes honor only a
+    # start_date the config sets.
     configured_start_date = (
         config.start_date if "start_date" in config.model_fields_set else None
     )
@@ -663,6 +666,7 @@ def _build_incremental_resource(
 
         if recent_payouts_subtasks:
             payout_data_model = create_response_data_model(gql.Payouts)
+            transaction_data_model = create_response_data_model(gql.BalanceTransactions)
 
             for store_id, subtask_id in recent_payouts_subtasks.items():
                 ctx = store_contexts[store_id]
@@ -672,6 +676,16 @@ def _build_incremental_resource(
                         fetch_recent_payouts,
                         ctx.client,
                         payout_data_model,
+                        store_id,
+                        ctx.capabilities,
+                        configured_start_date,
+                    )
+                elif model == gql.BalanceTransactions:
+                    fetch_changes[subtask_id] = functools.partial(
+                        fetch_recent_payout_transactions,
+                        ctx.client,
+                        payout_data_model,
+                        transaction_data_model,
                         store_id,
                         ctx.capabilities,
                         configured_start_date,

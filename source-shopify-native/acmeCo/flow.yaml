@@ -4,6 +4,11 @@ collections:
     key:
     - /_meta/store
     - /id
+  acmeCo/balance_transactions:
+    schema: balance_transactions.schema.yaml
+    key:
+    - /_meta/store
+    - /id
   acmeCo/custom_collection_metafields:
     schema: custom_collection_metafields.schema.yaml
     key:

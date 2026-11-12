@@ -153,6 +153,11 @@ captures:
         schedule: ''
       target: acmeCo/payouts
     - resource:
+        name: balance_transactions
+        interval: PT5M
+        schedule: ''
+      target: acmeCo/balance_transactions
+    - resource:
         name: markets
         interval: PT15M
       target: acmeCo/markets

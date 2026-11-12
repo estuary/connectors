@@ -21,13 +21,14 @@ from source_shopify_native.models import (
 
 from .graphql.client import ShopifyGraphQLClient
 from .graphql.nested_resolver import NESTED_CONNECTION_CONCURRENCY, resolve_document
+from .graphql.payments.balance_transactions import BalanceTransactions
 from .graphql.payments.payouts import Payouts
 from .utils import dt_to_str, str_to_dt
 
 CHECKPOINT_INTERVAL = 1_000
 PAGE_SIZE = 250
-# How stale a payout's status may get. A day was agreed as fresh enough, and it keeps the
-# refresh's cost flat.
+# How stale a payout's status, or a transaction's payout, may get. A day was agreed as fresh
+# enough, and it keeps the refreshes' cost flat.
 RECENT_PAYOUTS_REFRESH_INTERVAL = timedelta(days=1)
 TARGET_FETCH_PAGE_INVOCATION_RUN_TIME = 60 * 5  # 5 minutes
 
@@ -242,6 +243,11 @@ def _recent_payouts_refresh_is_due(last_refresh: datetime, now: datetime) -> boo
     return now - last_refresh >= RECENT_PAYOUTS_REFRESH_INTERVAL
 
 
+def _next_checkpoint(last: datetime) -> datetime:
+    # A cursor must be later than the last one, even if the clock steps back.
+    return max(datetime.now(tz=UTC), last + timedelta(microseconds=1))
+
+
 async def _read_recent_payouts(
     client: ShopifyGraphQLClient,
     data_model: type[BaseResponseData[Payouts]],
@@ -329,6 +335,147 @@ async def fetch_recent_payouts(
 
     log.info(f"[{store}] Refreshed {payout_count} recent payouts.")
     yield now
+
+
+class PayoutTransactionsMismatchError(RuntimeError):
+    """A payout's first page of balance transactions held none of its own."""
+
+
+# A failed payout's money goes into a later payout, and Shopify doesn't say whether a failed
+# or canceled payout keeps its transactions, so holding none of its own may be correct.
+MISMATCH_EXEMPT_PAYOUT_STATUSES = {"FAILED", "CANCELED"}
+# How long after its date a payout's transactions may be missing from the payments_transfer_id
+# search, which may trail writes (no doc says by how long). They're read again on later days.
+MISMATCH_GRACE_PERIOD = timedelta(days=1)
+
+
+async def _read_payout_transactions(
+    client: ShopifyGraphQLClient,
+    data_model: type[BaseResponseData[BalanceTransactions]],
+    store: str,
+    payout: Payouts,
+    log: Logger,
+) -> AsyncGenerator[BalanceTransactions, None]:
+    """Read every balance transaction in `payout`, including any that now belong to another
+    payout.
+
+    Raises PayoutTransactionsMismatchError, before yielding anything, if the first page holds
+    none of the payout's own transactions, an empty page included. Shopify documents neither
+    the filter used here nor the form of associatedPayout ids, so either not matching payouts
+    would show that way. The error names the payout ids the page held, to tell them apart.
+    """
+
+    def build_page_query(after: str | None) -> str:
+        return BalanceTransactions.build_payout_query(
+            payout.legacyResourceId, first=PAGE_SIZE, after=after
+        )
+
+    is_first_page = True
+    async for data in _paginate_pages(client, data_model, build_page_query, store, log):
+        if is_first_page and not any(
+            t.associatedPayout.id == payout.id for t in data.nodes
+        ):
+            held_payout_ids = sorted({str(t.associatedPayout.id) for t in data.nodes})
+            raise PayoutTransactionsMismatchError(
+                f"payout {payout.id} ({payout.status} {payout.transactionType}, issued "
+                f"{payout.issuedAt}): its first page held {len(data.nodes)} transaction(s)"
+                + (f", of payouts {held_payout_ids[:3]}" if held_payout_ids else "")
+            )
+        is_first_page = False
+
+        for transaction in data.nodes:
+            yield transaction
+
+
+async def fetch_recent_payout_transactions(
+    client: ShopifyGraphQLClient,
+    payout_data_model: type[BaseResponseData[Payouts]],
+    transaction_data_model: type[BaseResponseData[BalanceTransactions]],
+    store: str,
+    capabilities: StoreCapabilities,
+    start_date: datetime | None,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[BalanceTransactions | LogCursor, None]:
+    """Once a day, emit the balance transactions in every payout dated within
+    BalanceTransactions.RECENT_PAYOUTS_WINDOW before the refresh fell due (see
+    _read_recent_payouts), so a transaction captured before its payout existed gets its
+    associatedPayout. Each payout's transactions are read on several days, so one read that
+    misses a transaction doesn't leave it without its payout.
+
+    The cursor records when the last refresh checkpointed. It decides when the next one is due
+    and how far back it reads. A refresh that fails partway is tried again a day later, not at
+    once.
+
+    A transaction processed before `start_date` (None when the config leaves it blank) isn't
+    emitted, since the backfill doesn't emit it either.
+
+    A payout whose transactions hold none of its own fails the refresh, once the other payouts
+    are read. A failed or canceled payout is exempt (MISMATCH_EXEMPT_PAYOUT_STATUSES), and so
+    is one dated within MISMATCH_GRACE_PERIOD of now.
+    """
+    assert isinstance(log_cursor, datetime)
+    now = datetime.now(tz=UTC)
+    if not _recent_payouts_refresh_is_due(log_cursor, now):
+        return
+
+    checkpoint = now
+    yield checkpoint
+
+    payout_count = 0
+    transaction_count = 0
+    mismatch_messages: list[str] = []
+
+    async for payout in _read_recent_payouts(
+        client,
+        payout_data_model,
+        store,
+        capabilities,
+        start_date,
+        BalanceTransactions.RECENT_PAYOUTS_WINDOW,
+        log_cursor,
+        now,
+        log,
+    ):
+        payout_count += 1
+        count = 0
+
+        try:
+            async for transaction in _read_payout_transactions(
+                client, transaction_data_model, store, payout, log
+            ):
+                if start_date is not None and transaction.get_cursor_value() < start_date:
+                    continue
+
+                yield transaction
+                transaction_count += 1
+                count += 1
+
+                if count >= CHECKPOINT_INTERVAL:
+                    checkpoint = _next_checkpoint(checkpoint)
+                    yield checkpoint
+                    count = 0
+        except PayoutTransactionsMismatchError as err:
+            is_exempt = payout.status in MISMATCH_EXEMPT_PAYOUT_STATUSES
+            is_within_grace_period = now - payout.get_cursor_value() < MISMATCH_GRACE_PERIOD
+            if not is_exempt and not is_within_grace_period:
+                mismatch_messages.append(str(err))
+
+        checkpoint = _next_checkpoint(checkpoint)
+        yield checkpoint
+
+    log.info(
+        f"[{store}] Refreshed {transaction_count} balance transactions "
+        f"in {payout_count} recent payouts."
+    )
+
+    if mismatch_messages:
+        raise RuntimeError(
+            f"The balance transactions read for {len(mismatch_messages)} payout(s) held none "
+            "of their own. Check that payments_transfer_id matches a payout's legacyResourceId, "
+            f"and that associatedPayout ids take the form of payout ids: "
+            f"{'; '.join(mismatch_messages)}"
+        )
 
 
 async def fetch_incremental(
