@@ -1,5 +1,12 @@
 # materialize-snowflake
 
+## 2026-11-12
+
+### Changed
+- Staged files are uploaded once they reach 64 MB compressed instead of
+  250 MB, so uploads overlap with writing and commits of large transactions
+  start sooner.
+
 ## 2026-11-09
 
 ### Changed
