@@ -1580,14 +1580,20 @@ func (d *transactor) bindingForStateKey(stateKey string) int {
 	return slices.IndexFunc(d.bindings, func(b *binding) bool { return b.target.StateKey == stateKey })
 }
 
-func (d *transactor) deleteFiles(ctx context.Context, files []string) error {
-	for _, f := range files {
-		if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("REMOVE %s", f)); err != nil {
-			return err
-		}
-	}
+// maxConcurrentRemoves bounds the REMOVE statements of deleteFiles in flight
+// at once. REMOVE runs on no warehouse.
+const maxConcurrentRemoves = 16
 
-	return nil
+func (d *transactor) deleteFiles(ctx context.Context, files []string) error {
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(maxConcurrentRemoves)
+	for _, f := range files {
+		group.Go(func() error {
+			_, err := d.db.ExecContext(groupCtx, fmt.Sprintf("REMOVE %s", f))
+			return err
+		})
+	}
+	return group.Wait()
 }
 
 func (d *transactor) dropPipe(ctx context.Context, pipeName string) error {
