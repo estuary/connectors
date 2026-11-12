@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"time"
 
@@ -22,6 +23,42 @@ var requestRetry = retry.Policy{
 	InitialBackoff: 2 * time.Second,
 	MaxBackoff:     5 * time.Second,
 	Jitter:         0.5,
+}
+
+// taskPollRetry polls a background task until it completes, retrying each
+// check that finds it still running as well as transient failures of the
+// check itself. Checks start often so that small tasks return promptly, and
+// back off for tasks that run long. Every retry is logged at debug level,
+// since a running task is routine and its caller logs its progress. Each
+// check has its own deadline so that a hung check is retried rather than
+// stalling the wait.
+var taskPollRetry = retry.Policy{
+	Classify:       classifyTaskPoll,
+	RetryAmbiguous: true,
+	MaxElapsed:     4 * time.Hour,
+	InitialBackoff: 500 * time.Millisecond,
+	MaxBackoff:     10 * time.Second,
+	QuietRetries:   math.MaxInt,
+	AttemptTimeout: time.Minute,
+}
+
+// taskRunningError is a background task that hasn't completed yet, with the
+// progress it reported.
+type taskRunningError struct {
+	taskID  string
+	total   int64
+	deleted int64
+}
+
+func (e *taskRunningError) Error() string {
+	return fmt.Sprintf("task %s is still running", e.taskID)
+}
+
+func classifyTaskPoll(err error) retry.Outcome {
+	if _, ok := errors.AsType[*taskRunningError](err); ok {
+		return retry.Retryable
+	}
+	return classify(err)
 }
 
 // responseError is an error response to a whole request.

@@ -41,3 +41,20 @@ func TestClassify(t *testing.T) {
 		})
 	}
 }
+
+func TestClassifyTaskPoll(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		err  error
+		want retry.Outcome
+	}{
+		{"task running", &taskRunningError{taskID: "node:1"}, retry.Retryable},
+		{"gateway timeout", &responseError{status: http.StatusGatewayTimeout}, retry.Ambiguous},
+		{"task not found", &responseError{status: http.StatusNotFound}, retry.Fatal},
+		{"task failed", errors.New("delete by query task node:1 failed: {}"), retry.Fatal},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, classifyTaskPoll(tt.err))
+		})
+	}
+}
