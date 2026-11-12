@@ -424,7 +424,7 @@ ALTER PUBLICATION flow_publication ADD TABLE public.orders WHERE (region = 'EU')
 
 A row filter used with `UPDATE` or `DELETE` may only reference columns covered by the table's [replica identity](https://www.postgresql.org/docs/current/sql-altertable.html#SQL-ALTERTABLE-REPLICA-IDENTITY).
 
-Publication row filters require PostgreSQL 15 or later. On earlier versions there is no way to restrict which rows reach replication, so rows must be separated on the database side instead, for example by capturing a view or a table that contains only the permitted rows.
+Publication row filters require PostgreSQL 15 or later. On earlier versions there is no way to restrict which rows reach replication, so rows must be separated on the database side instead, for example by capturing a table that contains only the permitted rows.
 
 If RLS is already enabled on a table you capture, note that a policy which admits no rows to the capture user produces an empty or partial backfill with no error. Compare `SELECT count(*)` as the table owner and as the capture user to confirm what the connector can see.
 
@@ -449,7 +449,7 @@ A publication [column list](https://www.postgresql.org/docs/current/logical-repl
 To remove a sensitive field from a capture, use one of the following:
 
 - [Redaction](/features/redaction/) with the `block` strategy, which removes the value in the Estuary runtime before any document is written to disk. This is the supported option in most cases.
-- A database-side view or table containing only the permitted columns, captured in place of the base table. Use this when the value must never leave the source database.
+- A database-side table containing only the permitted columns, captured in place of the base table. Use this when the value must never leave the source database. The connector discovers ordinary and partitioned tables only, so a view cannot be captured.
 
 :::info
 Redaction applies only to documents captured after the rule is in place, and a redacted field does not automatically redact its copy under `_meta/before`. See [Redacting CDC before-images](/features/redaction/#redacting-cdc-before-images).
