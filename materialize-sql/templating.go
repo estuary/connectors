@@ -124,7 +124,7 @@ type MergeBoundsBuilder struct {
 	lower []any
 	upper []any
 	// unbounded marks key columns whose observed values can't be ordered,
-	// such as a null or a date-time that doesn't parse.
+	// such as a date-time that doesn't parse.
 	unbounded []bool
 	// spans are the observed values of each of rangeColumns, as sorted,
 	// disjoint spans.
@@ -165,10 +165,17 @@ func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string, opts
 	return b
 }
 
-// NextKey updates the observed minimum and maximum key for a transaction.
-func (b *MergeBoundsBuilder) NextKey(key []any) {
+// NextKey updates the observed minimum and maximum key for a transaction. A
+// null key field is an error, because a null has no order among the other
+// values.
+func (b *MergeBoundsBuilder) NextKey(key []any) error {
 	if len(key) != len(b.keyColumns) {
 		panic(fmt.Sprintf("application error: %d key fields vs. %d key columns for merge query bounds", len(key), len(b.keyColumns)))
+	}
+	for idx, k := range key {
+		if k == nil {
+			return fmt.Errorf("key field %q is null", b.keyColumns[idx].Field)
+		}
 	}
 
 	if b.lower == nil {
@@ -198,15 +205,11 @@ func (b *MergeBoundsBuilder) NextKey(key []any) {
 			}
 			continue
 		}
-		if k == nil {
-			b.unbounded[idx] = true
-		}
-		if b.unbounded[idx] {
-			continue
-		}
 		b.lower[idx] = minKey(b.lower[idx], k)
 		b.upper[idx] = maxKey(b.upper[idx], k)
 	}
+
+	return nil
 }
 
 func isDatetimeColumn(col Column) bool {
