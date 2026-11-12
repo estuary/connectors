@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import ResourceState
+from estuary_cdk.logger import OBSERVABLE_FIELD
 
 import source_shopify_native.api as api
 from source_shopify_native.api import (
@@ -23,7 +24,7 @@ from source_shopify_native.api import (
     fetch_recent_payout_transactions,
     fetch_recent_payouts,
 )
-from source_shopify_native.graphql.client import ShopifyGraphQLClient
+from source_shopify_native.graphql.client import QueryError, ShopifyGraphQLClient
 from source_shopify_native.graphql.payments.balance_transactions import BalanceTransactions
 from source_shopify_native.graphql.payments.payouts import Payouts
 from source_shopify_native.models import (
@@ -35,6 +36,8 @@ from source_shopify_native.resources import (
     StoreContext,
     _build_incremental_resource,
     _get_available_resources,
+    _warn_if_several_payments_accounts,
+    bound_resources,
 )
 from source_shopify_native.utils import dt_to_str, str_to_dt
 
@@ -42,6 +45,8 @@ START = datetime(2012, 11, 1, tzinfo=UTC)
 END = datetime(2012, 12, 1, tzinfo=UTC)
 STORE = "teststore"
 CAPS = StoreCapabilities(scopes=frozenset())
+ACCOUNT_A = "gid://shopify/ShopifyPaymentsAccount/999005447548973"
+ACCOUNT_B = "gid://shopify/ShopifyPaymentsAccount/999005447548974"
 
 PAYOUT_PAID = {
     "id": "gid://shopify/ShopifyPaymentsPayout/623721858",
@@ -142,6 +147,18 @@ async def _capture(http: MockHTTP, log: Logger) -> list[dict]:
 
 def _a_day_and_a_minute_ago() -> datetime:
     return datetime.now(tz=UTC) - timedelta(days=1, minutes=1)
+
+
+def _business_entities_page(*account_ids: str | None) -> dict:
+    return {
+        "businessEntities": [
+            {
+                "id": f"gid://shopify/BusinessEntity/{n}",
+                "shopifyPaymentsAccount": {"id": account_id} if account_id else None,
+            }
+            for n, account_id in enumerate(account_ids, start=1)
+        ]
+    }
 
 
 async def _refresh_payouts(
@@ -691,3 +708,92 @@ async def test_the_refreshes_ignore_a_blank_start_date(
 
     assert opened["fetch_changes"]["a:recent_payouts"].args[-1] == refresh_start_date
     assert isinstance(opened["fetch_page"]["a"].args[-1], datetime)
+
+
+async def _bind(bound_stream_names: set[str], business_entities: dict) -> tuple[MockHTTP, MagicMock]:
+    """Bind `bound_stream_names` for one store, "a", which can serve both payments streams."""
+    http = MockHTTP([business_entities])
+    store_context = _store_context(
+        ShopifyGraphQLClient(http, "a"),  # type: ignore[arg-type]
+        {Payouts, BalanceTransactions},
+    )
+    log = MagicMock(spec=Logger)
+
+    with patch(
+        "source_shopify_native.resources._initialize_store_contexts",
+        AsyncMock(return_value={"a": store_context}),
+    ):
+        await bound_resources(log, MagicMock(), _config(["a"]), bound_stream_names)
+
+    return http, log
+
+
+PAYMENTS_STREAMS = {Payouts.NAME, BalanceTransactions.NAME}
+
+
+@pytest.mark.parametrize(
+    "account_ids, warns",
+    [
+        pytest.param([ACCOUNT_A], False, id="one entity"),
+        pytest.param([ACCOUNT_A, None], False, id="one of two entities has an account"),
+        pytest.param([ACCOUNT_A, ACCOUNT_B], True, id="two entities have one"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_a_store_warns_when_several_entities_have_a_payments_account(account_ids, warns):
+    """Each entity can have its own account, but the payments streams read only the shop's."""
+    _, log = await _bind(PAYMENTS_STREAMS, _business_entities_page(*account_ids))
+
+    warnings = log.warning.call_args_list
+    if not warns:
+        assert warnings == []
+        return
+
+    assert len(warnings) == 1
+    assert warnings[0].args[0].startswith(
+        "Store 'a': 2 business entities have a Shopify Payments account"
+    )
+    assert warnings[0].kwargs["extra"] == {
+        OBSERVABLE_FIELD: True,
+        "store": "a",
+        "payments_accounts": 2,
+    }
+
+
+@pytest.mark.parametrize(
+    "bound_stream_names",
+    [
+        pytest.param({Payouts.NAME}, id="payouts"),
+        pytest.param({BalanceTransactions.NAME}, id="balance_transactions"),
+        pytest.param(PAYMENTS_STREAMS, id="both"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_each_store_is_checked_once_when_a_payments_stream_is_bound(bound_stream_names):
+    http, log = await _bind(bound_stream_names, _business_entities_page(ACCOUNT_A, ACCOUNT_B))
+
+    assert len(http.queries) == 1
+    assert "businessEntities {" in http.queries[0]
+    assert log.warning.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_no_store_is_checked_without_a_bound_payments_stream():
+    http, _ = await _bind({"disputes"}, _business_entities_page(ACCOUNT_A, ACCOUNT_B))
+
+    assert http.queries == []
+
+
+@pytest.mark.asyncio
+async def test_a_failed_business_entities_check_only_warns(log):
+    """The streams can still be captured without it."""
+    client = MagicMock()
+    client.request = AsyncMock(
+        side_effect=QueryError(
+            "1 error when executing query.", "{ businessEntities }", ["Access denied"]
+        )
+    )
+
+    await _warn_if_several_payments_accounts(log, client, STORE)
+
+    log.warning.assert_called_once()

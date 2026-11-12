@@ -26,6 +26,8 @@ from pydantic import AwareDatetime
 
 import source_shopify_native.graphql as gql
 from .graphql.bulk_job_manager import BulkJobManager
+from .graphql.client import QueryError
+from .graphql.payments.account import BusinessEntities
 
 from .api import (
     backfill_incremental,
@@ -416,6 +418,47 @@ async def _get_shop_plan(
         await http.request(log, url, method="POST", json={"query": ShopDetails.query()})
     )
     return response.data.shop.plan
+
+
+async def _warn_if_several_payments_accounts(
+    log: Logger,
+    client: gql.ShopifyGraphQLClient,
+    store: str,
+) -> None:
+    """Warn if more than one of the store's business entities has a Shopify Payments
+    account. The payments streams read only the shop-level account, and Shopify doesn't say
+    whose that is when there are several.
+
+    Only warns if the check itself fails, since the streams can still be captured.
+    """
+    try:
+        data = await client.request(BusinessEntities.query(), BusinessEntities, log)
+    except QueryError as err:
+        log.warning(
+            f"Store '{store}': couldn't check which business entities have a Shopify "
+            "Payments account, so the payouts and balance_transactions streams can't tell "
+            "whether they miss any.",
+            {"error": err.message, "errors": err.errors},
+        )
+        return
+
+    account_ids = {
+        entity.shopifyPaymentsAccount.id
+        for entity in data.businessEntities
+        if entity.shopifyPaymentsAccount is not None
+    }
+    if len(account_ids) > 1:
+        # Observable so we can find the captures that need each entity's account read.
+        log.warning(
+            f"Store '{store}': {len(account_ids)} business entities have a Shopify Payments "
+            "account, but the payouts and balance_transactions streams read only the "
+            "shop's, so they may miss the others' data.",
+            extra={
+                OBSERVABLE_FIELD: True,
+                "store": store,
+                "payments_accounts": len(account_ids),
+            },
+        )
 
 
 def _plan_allows_pii(plan: ShopDetails.Data.Shop.Plan, log: Logger) -> bool:
@@ -920,5 +963,13 @@ async def bound_resources(
         resources.append(
             _build_resource(model, stores_with_access, store_contexts, config)
         )
+
+    # Once per store, whichever payments streams are bound. Both need the same scopes, so
+    # the stores that can serve payouts are the ones to check.
+    if bound_stream_names & {gql.Payouts.NAME, gql.BalanceTransactions.NAME}:
+        for store_id in _stores_with_access_to(gql.Payouts, store_contexts):
+            await _warn_if_several_payments_accounts(
+                log, store_contexts[store_id].client, store_id
+            )
 
     return resources

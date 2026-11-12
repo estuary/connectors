@@ -1,7 +1,38 @@
+from pydantic import BaseModel
+
 from ...models import ShopifyGraphQLResource
 
 # Streams read through shopifyPaymentsAccount need one of these besides their own scope.
 SHOPIFY_PAYMENTS_ACCOUNT_SCOPES = {"read_shopify_payments_accounts", "read_shopify_payments"}
+
+
+class BusinessEntities(BaseModel, extra="allow"):
+    """The shop's business entities, each with its own Shopify Payments account if it has
+    one. Shopify doesn't say whose account the shop-level shopifyPaymentsAccount is when
+    there are several.
+    """
+
+    class BusinessEntity(BaseModel, extra="forbid"):
+        class ShopifyPaymentsAccount(BaseModel, extra="forbid"):
+            id: str
+
+        id: str
+        shopifyPaymentsAccount: ShopifyPaymentsAccount | None
+
+    businessEntities: list[BusinessEntity]
+
+    @staticmethod
+    def query() -> str:
+        return """
+        {
+            businessEntities {
+                id
+                shopifyPaymentsAccount {
+                    id
+                }
+            }
+        }
+        """
 
 
 def build_account_query(
