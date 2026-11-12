@@ -394,6 +394,67 @@ However, due to the event-driven nature of certain tasks in Estuary, it's still 
 - When you materialize the captured data to another system using a connector that requires [delta updates](/concepts/materialization/#delta-updates)
 - When you perform a [derivation](/concepts/derivations.md) that uses TOASTed values
 
+## Restricting which data the connector reads
+
+The connector reads data by two different mechanisms, and database-side access controls do not apply to both of them equally:
+
+- **Backfill**, the initial scan of an existing table, runs an ordinary `SELECT *` query as the capture user.
+- **Replication**, the ongoing stream of changes, decodes PostgreSQL's write-ahead log (WAL) through a publication.
+
+Any control you apply at the database must account for both. The sections below cover the controls customers most often reach for first.
+
+### Row-level security does not restrict replication
+
+[Row-level security](https://www.postgresql.org/docs/current/ddl-rowsecurity.html) (RLS) policies apply to the backfill query, but **they do not restrict the change events the connector receives through logical replication.** A policy that hides rows from the capture user during backfill will not stop those same rows from being streamed once replication begins.
+
+:::warning
+Do not rely on RLS alone to keep rows out of a capture. The capture will appear to succeed, and the restricted rows will still arrive through replication.
+:::
+
+This holds even when the capture user is not the table owner and holds neither `SUPERUSER` nor `BYPASSRLS`. There is no RLS evaluation on the sending side of PostgreSQL logical replication.
+
+To restrict rows at the database, use **both** mechanisms together:
+
+- An RLS policy, which constrains the backfill.
+- A publication [row filter](https://www.postgresql.org/docs/current/logical-replication-row-filter.html), which constrains replication.
+
+```sql
+ALTER PUBLICATION flow_publication ADD TABLE public.orders WHERE (region = 'EU');
+```
+
+A row filter used with `UPDATE` or `DELETE` may only reference columns covered by the table's [replica identity](https://www.postgresql.org/docs/current/sql-altertable.html#SQL-ALTERTABLE-REPLICA-IDENTITY).
+
+Publication row filters require PostgreSQL 15 or later. On earlier versions there is no way to restrict which rows reach replication, so rows must be separated on the database side instead, for example by capturing a table that contains only the permitted rows.
+
+If RLS is already enabled on a table you capture, note that a policy which admits no rows to the capture user produces an empty or partial backfill with no error. Compare `SELECT count(*)` as the table owner and as the capture user to confirm what the connector can see.
+
+### Column-level privileges are not supported
+
+The backfill query is `SELECT *`, so the capture user needs table-level `SELECT` on every captured table. Granting `SELECT` on a subset of columns instead does not narrow the capture; it fails outright:
+
+```
+ERROR:  permission denied for table customers
+```
+
+Use table-level grants, as shown in the [setup instructions](#setup):
+
+```sql
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO flow_capture;
+```
+
+### Keeping a column out of a capture
+
+A publication [column list](https://www.postgresql.org/docs/current/logical-replication-col-lists.html) (PostgreSQL 15 and later) limits which columns are sent through replication, but it has no effect on the backfill, which still reads every column. PostgreSQL also states that column lists should not be relied on as a security control.
+
+To remove a sensitive field from a capture, use one of the following:
+
+- [Redaction](/features/redaction/) with the `block` strategy, which removes the value in the Estuary runtime before any document is written to disk. This is the supported option in most cases.
+- A database-side table containing only the permitted columns, captured in place of the base table. Use this when the value must never leave the source database. The connector discovers ordinary and partitioned tables only, so a view cannot be captured.
+
+:::info
+Redaction applies only to documents captured after the rule is in place, and a redacted field does not automatically redact its copy under `_meta/before`. See [Redacting CDC before-images](/features/redaction/#redacting-cdc-before-images).
+:::
+
 ## Configuration
 
 You configure connectors either in the Estuary dashboard, or by directly editing the catalog specification file.
