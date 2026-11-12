@@ -13,3 +13,11 @@ fragment _MoneyBagFields on MoneyBag {
     }
 }
 """
+
+
+money_v2_fragment = """
+fragment _MoneyV2Fields on MoneyV2 {
+    amount
+    currencyCode
+}
+"""

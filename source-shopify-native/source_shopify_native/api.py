@@ -21,10 +21,14 @@ from source_shopify_native.models import (
 
 from .graphql.client import ShopifyGraphQLClient
 from .graphql.nested_resolver import NESTED_CONNECTION_CONCURRENCY, resolve_document
+from .graphql.payments.payouts import Payouts
 from .utils import dt_to_str, str_to_dt
 
 CHECKPOINT_INTERVAL = 1_000
 PAGE_SIZE = 250
+# How stale a payout's status may get. A day was agreed as fresh enough, and it keeps the
+# refresh's cost flat.
+RECENT_PAYOUTS_REFRESH_INTERVAL = timedelta(days=1)
 TARGET_FETCH_PAGE_INVOCATION_RUN_TIME = 60 * 5  # 5 minutes
 
 
@@ -232,6 +236,99 @@ async def fetch_incremental_unsorted(
 
     if last_dt != log_cursor:
         yield last_dt
+
+
+def _recent_payouts_refresh_is_due(last_refresh: datetime, now: datetime) -> bool:
+    return now - last_refresh >= RECENT_PAYOUTS_REFRESH_INTERVAL
+
+
+async def _read_recent_payouts(
+    client: ShopifyGraphQLClient,
+    data_model: type[BaseResponseData[Payouts]],
+    store: str,
+    capabilities: StoreCapabilities,
+    start_date: datetime | None,
+    window: timedelta,
+    last_refresh: datetime,
+    now: datetime,
+    log: Logger,
+) -> AsyncGenerator[Payouts, None]:
+    """Read every payout dated from `window` before the refresh fell due through `now`.
+
+            due - window          due    now
+        ──────────────┼───────────────┼──────┼─────▶ issued_at
+                      │               │      │
+        issued_at:>= ─[═══════════════╪══════╪═════▶
+        issued_at:<= ═╪═══════════════╪══════]
+        read ─────────[═══════════════╪══════]
+                      │               │      └─ minutes after due, or days
+                      │               │         after it if the capture
+                      │               │         was down
+                      │               └─ a day after last_refresh
+                      └─ start_date instead, if one is set
+                         and it's later
+
+    Both bounds are inclusive. Measured back from `due`, not from `now`, the window still
+    reaches every payout dated since the last refresh after the capture was down for longer
+    than `window`. `start_date` is None when the config leaves it blank.
+    """
+    due = last_refresh + RECENT_PAYOUTS_REFRESH_INTERVAL
+    start = due - window
+    if start_date is not None:
+        start = max(start_date, start)
+
+    async for payout in _paginate_through_resources(
+        client=client,
+        model=Payouts,
+        data_model=data_model,
+        start=start,
+        end=now,
+        store=store,
+        capabilities=capabilities,
+        log=log,
+    ):
+        yield payout
+
+
+async def fetch_recent_payouts(
+    client: ShopifyGraphQLClient,
+    data_model: type[BaseResponseData[Payouts]],
+    store: str,
+    capabilities: StoreCapabilities,
+    start_date: datetime | None,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[Payouts | LogCursor, None]:
+    """Once a day, emit every payout dated within Payouts.RECENT_PAYOUTS_WINDOW before the
+    refresh fell due (see _read_recent_payouts), so a payout's status changes after its date
+    are captured.
+
+    The cursor records when the last refresh ran. It decides when the next one is due and how
+    far back it reads, and filters nothing. `start_date` is None when the config leaves it
+    blank.
+    """
+    assert isinstance(log_cursor, datetime)
+    now = datetime.now(tz=UTC)
+    if not _recent_payouts_refresh_is_due(log_cursor, now):
+        return
+
+    payout_count = 0
+    async for payout in _read_recent_payouts(
+        client,
+        data_model,
+        store,
+        capabilities,
+        start_date,
+        Payouts.RECENT_PAYOUTS_WINDOW,
+        log_cursor,
+        now,
+        log,
+    ):
+        yield payout
+        payout_count += 1
+
+    log.info(f"[{store}] Refreshed {payout_count} recent payouts.")
+    yield now
 
 
 async def fetch_incremental(

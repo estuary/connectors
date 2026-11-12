@@ -34,6 +34,7 @@ from .api import (
     bulk_fetch_snapshot,
     fetch_incremental,
     fetch_incremental_unsorted,
+    fetch_recent_payouts,
     fetch_snapshot,
 )
 from .models import (
@@ -173,6 +174,7 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.LocationMetafields,
     gql.SubscriptionContracts,
     gql.Disputes,
+    gql.Payouts,
 ]
 
 PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {
@@ -349,46 +351,47 @@ def _migrate_flat_to_dict_state(
 
 
 async def _reconcile_connector_state(
-    store_ids: list[str],
+    subtask_ids: list[str],
     binding: CaptureBinding[ResourceConfig],
     state: ResourceState,
     initial_state: ResourceState,
     task: Task,
     legacy_store_id: str,
 ) -> None:
-    """Reconcile connector state: migrate format if needed and add missing stores.
+    """Reconcile connector state: migrate format if needed and add missing subtasks.
 
     This handles two scenarios:
     1. Migration from flat to dict-based state (legacy single-store captures)
-    2. Adding missing store entries for newly configured stores
+    2. Adding missing subtask entries for newly configured stores
     """
     prev_state = deepcopy(state)
 
     # Step 1: Migrate flat state to dict-based if needed.
     migrated = _migrate_flat_to_dict_state(state, legacy_store_id, task.log)
 
-    # Step 2: Add missing store entries for newly configured stores.
+    # Step 2: Add missing subtask entries for newly configured stores.
     should_checkpoint = migrated
 
     if (
         isinstance(state.inc, dict) and
         isinstance(initial_state.inc, dict)
     ):
-        for store_id in store_ids:
-            # If the store is not in the incremental state dict, that means that this is
+        for subtask_id in subtask_ids:
+            # If the subtask is not in the incremental state dict, that means that this is
             # a new store that needs to be added to the resource state.
-            if store_id not in state.inc:
-                task.log.info(f"Initializing new subtask state for store {store_id}.")
-                state.inc[store_id] = deepcopy(initial_state.inc[store_id])
+            if subtask_id not in state.inc:
+                task.log.info(f"Initializing new subtask state for {subtask_id}.")
+                state.inc[subtask_id] = deepcopy(initial_state.inc[subtask_id])
 
-                # Not all resources use backfills (ex: bulk query resources), so only add
-                # backfill state for this store if this resource uses backfills.
+                # Not all subtasks use backfills (ex: bulk query resources), so only add
+                # backfill state for this subtask if it uses backfills.
                 if (
                     isinstance(state.backfill, dict) and
-                    isinstance(initial_state.backfill, dict)
+                    isinstance(initial_state.backfill, dict) and
+                    subtask_id in initial_state.backfill
                 ):
-                    state.backfill[store_id] = deepcopy(
-                        initial_state.backfill[store_id]
+                    state.backfill[subtask_id] = deepcopy(
+                        initial_state.backfill[subtask_id]
                     )
                 should_checkpoint = True
 
@@ -529,6 +532,7 @@ def _build_incremental_resource(
     config: EndpointConfig,
 ) -> Resource:
     """Build the incremental resource for `model`, with one subtask per store in `stores_with_access`.
+    Payouts get a second subtask per store, which refreshes the recent payouts once a day.
 
     State format is always dictionary-based: {"inc": {"store_id": {...}}}
 
@@ -547,6 +551,25 @@ def _build_incremental_resource(
     )
     legacy_store_id = config._legacy_store or config.stores[0].store
 
+    # Payouts change after the date they're read by, so a second subtask per store reads the
+    # recent payouts again once a day. Captures save state under the subtask's name, so it
+    # can't change.
+    recent_payouts_subtasks = (
+        {store_id: f"{store_id}:recent_payouts" for store_id in stores_with_access}
+        if model == gql.Payouts
+        else {}
+    )
+    assert isinstance(initial_state.inc, dict)
+    for store_id, subtask_id in recent_payouts_subtasks.items():
+        initial_state.inc[subtask_id] = deepcopy(initial_state.inc[store_id])
+
+    # A blank start_date is reset to 30 days back at every start, which can pass payouts the
+    # capture already holds and still needs to refresh. The refresh honors only a start_date
+    # the config sets.
+    configured_start_date = (
+        config.start_date if "start_date" in config.model_fields_set else None
+    )
+
     async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -555,7 +578,7 @@ def _build_incremental_resource(
         _all_bindings,
     ):
         await _reconcile_connector_state(
-            stores_with_access,
+            [*stores_with_access, *recent_payouts_subtasks.values()],
             binding,
             state,
             initial_state,
@@ -637,6 +660,24 @@ def _build_incremental_resource(
                     ctx.capabilities,
                     config.start_date,
                 )
+
+        if recent_payouts_subtasks:
+            payout_data_model = create_response_data_model(gql.Payouts)
+
+            for store_id, subtask_id in recent_payouts_subtasks.items():
+                ctx = store_contexts[store_id]
+
+                if model == gql.Payouts:
+                    fetch_changes[subtask_id] = functools.partial(
+                        fetch_recent_payouts,
+                        ctx.client,
+                        payout_data_model,
+                        store_id,
+                        ctx.capabilities,
+                        configured_start_date,
+                    )
+                else:
+                    raise RuntimeError(f"{model.__name__} has no recent payouts refresh.")
 
         open_binding(
             binding,
