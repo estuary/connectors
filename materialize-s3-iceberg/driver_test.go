@@ -325,6 +325,10 @@ func TestIntegration(t *testing.T) {
 		runVariantDisableFlipTest(t, cfg)
 	})
 
+	t.Run("omit-table-location", func(t *testing.T) {
+		runOmitTableLocationTest(t, cfg)
+	})
+
 	// Migration test is skipped because Iceberg does not support the type
 	// migrations exercised by the test (e.g. long→string).
 	//t.Run("migrate", func(t *testing.T) {
@@ -1201,6 +1205,56 @@ func sopsDecrypt(t *testing.T, raw json.RawMessage) json.RawMessage {
 	require.NoError(t, sopsCmd.Wait())
 
 	return out
+}
+
+// runOmitTableLocationTest verifies that with omit_table_location enabled the
+// table is created without an explicit location, the catalog assigns one, and
+// that location is in the configured bucket so the transactor can write to it.
+func runOmitTableLocationTest(t *testing.T, cfg config) {
+	t.Helper()
+	ctx := context.Background()
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
+	cat.omitLocation = true
+	ensureNamespace(t, cfg)
+
+	// "_flow_test_" naming so leaked tables are swept by the stale-table cleanup.
+	table := fmt.Sprintf("omitloc_flow_test_%d", time.Now().Unix())
+	ident := icebergtable.Identifier{cfg.Namespace, table}
+
+	binding := &pf.MaterializationSpec_Binding{
+		ResourcePath: ident,
+		Collection: pf.CollectionSpec{
+			Name: "acmeCo/tests/omit-location",
+			Projections: []pf.Projection{{
+				Field: "id",
+				Inference: pf.Inference{
+					Types:   []string{"string"},
+					String_: &pf.Inference_String{},
+				},
+			}},
+		},
+		FieldSelection: pf.FieldSelection{Values: []string{"id"}},
+	}
+
+	_, apply, err := cat.CreateResource(ctx, binding, resource{})
+	require.NoError(t, err)
+	require.NoError(t, apply(ctx))
+	t.Cleanup(func() {
+		if err := cat.cat.DropTable(ctx, ident); err != nil {
+			t.Log("failed to drop table", ident, err)
+		}
+	})
+
+	tbl, err := cat.cat.LoadTable(ctx, ident)
+	require.NoError(t, err)
+	loc := tbl.Location()
+	require.NotEmpty(t, loc)
+	require.NotEqual(t,
+		tablePath(cfg.Bucket, cfg.Prefix, cfg.Namespace, table, NestedLocationStyle),
+		loc, "location should be catalog-assigned, not the connector's")
+	require.Equal(t, cfg.Bucket, bucketFromS3Path(loc))
 }
 
 // TestMapTypeIgnoreStringFormatOnNonStringField guards against a regression

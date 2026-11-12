@@ -33,6 +33,7 @@ type catalog struct {
 	cfg           *config
 	locationStyle LocationStyle
 	cat           icebergcatalog.Catalog
+	omitLocation  bool
 }
 
 func newCatalog(ctx context.Context, cfg config, locationStyle LocationStyle) (*catalog, error) {
@@ -396,8 +397,6 @@ func (c *catalog) createNamespace(ctx context.Context, namespace string) error {
 }
 
 func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_Binding, res resource) (string, boilerplate.ActionApplyFn, error) {
-	location := tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)
-
 	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, *c.cfg)
 	if err != nil {
 		return "", nil, err
@@ -452,10 +451,13 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 			props[k] = v
 		}
 
-		if _, err := c.cat.CreateTable(ctx, b.ResourcePath, schema,
-			icebergcatalog.WithLocation(location),
-			icebergcatalog.WithProperties(props),
-		); err != nil {
+		opts := []icebergcatalog.CreateTableOpt{icebergcatalog.WithProperties(props)}
+		if !c.omitLocation {
+			location := tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)
+			opts = append(opts, icebergcatalog.WithLocation(location))
+		}
+
+		if _, err := c.cat.CreateTable(ctx, b.ResourcePath, schema, opts...); err != nil {
 			return fmt.Errorf("creating table %q: %w", fqn, err)
 		}
 

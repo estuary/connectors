@@ -43,6 +43,16 @@ func filePath(catalogTablePath string) (fileKey string, s3Path string) {
 	return
 }
 
+// bucketFromS3Path returns the bucket of an s3:// location, or "" if the location is not an s3:// URI.
+func bucketFromS3Path(location string) string {
+	rest, ok := strings.CutPrefix(location, "s3://")
+	if !ok {
+		return ""
+	}
+	bucket, _, _ := strings.Cut(rest, "/")
+	return bucket
+}
+
 type binding struct {
 	path             []string
 	pqSchema         writer.ParquetSchema

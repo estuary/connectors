@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-12
+
+### Added
+- New `omit_table_location` feature flag. When enabled, tables are created
+  without an explicit storage location and the catalog assigns one. This is
+  required for catalogs that reject explicit locations, such as Snowflake
+  Horizon with Snowflake-managed Iceberg tables. The catalog-assigned location
+  must be in the configured bucket; with the flag enabled, the task fails at
+  startup with an error naming both buckets if it is not.
+
 ## 2026-11-03
 
 ### Changed

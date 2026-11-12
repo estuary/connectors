@@ -43,6 +43,11 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	// When this flag is enabled:
 	//   <base_location>/<namespace>/<table>.<hash>
 	"nested_dot_hash_location_style": common.FlagDisabled,
+
+	// Leave the storage location out of create-table requests and let the
+	// catalog assign it. Needed for catalogs that reject explicit locations,
+	// such as Snowflake Horizon with Snowflake-managed Iceberg tables.
+	"omit_table_location": common.FlagDisabled,
 }
 
 type catalogType string
@@ -383,6 +388,7 @@ func NewMaterializer(ctx context.Context, materializationName string, cfg config
 	if err != nil {
 		return nil, fmt.Errorf("creating iceberg catalog: %w", err)
 	}
+	catalog.omitLocation = featureFlags["omit_table_location"]
 
 	return &materialization{
 		cfg:     cfg,
@@ -596,6 +602,20 @@ func (d *materialization) NewTransactor(
 	for idx := range bindings {
 		b := &bindings[idx]
 		b.catalogTablePath = tableInfos[idx].location
+
+		// Data files are uploaded to the configured bucket, but their paths are
+		// derived from the table's catalog location. With omit_table_location
+		// the catalog assigns that location, and one in another bucket would
+		// commit references to files never written there, so fail before
+		// writing anything. Only checked under the flag so existing tasks are
+		// unaffected.
+		if d.catalog.omitLocation {
+			if got := bucketFromS3Path(b.catalogTablePath); got != d.cfg.Bucket {
+				return nil, fmt.Errorf(
+					"table %q has storage location %q in bucket %q, but data files are written to the configured bucket %q: set Bucket to the bucket of the catalog's storage location",
+					pathToFQN(b.path), b.catalogTablePath, got, d.cfg.Bucket)
+			}
+		}
 
 		// Embed the table's field IDs in written parquet files so they are
 		// self-describing: readers then never consult the table's name mapping
