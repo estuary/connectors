@@ -252,6 +252,9 @@ def _get_available_resources(
         # Skip if none of the qualifying scopes are granted
         if resource.QUALIFYING_SCOPES.isdisjoint(granted_scopes):
             continue
+        # Skip if any further required scope set has none of its scopes granted
+        if any(required.isdisjoint(granted_scopes) for required in resource.ADDITIONAL_REQUIRED_SCOPES):
+            continue
         # Skip PII resources for custom app tokens when plan doesn't allow PII
         if uses_custom_app_token and resource in PII_RESOURCES and not can_access_pii:
             continue

@@ -601,6 +601,9 @@ class ShopifyGraphQLResource(ShopifyDocument):
     SORT_KEY: ClassVar[SortKey | None] = None
     SHOULD_USE_BULK_QUERIES: ClassVar[bool] = True
     QUALIFYING_SCOPES: ClassVar[set[str]] = set()
+    # Further scope sets a store must grant, each satisfied by any one of its scopes (ex: a
+    # connection under shopifyPaymentsAccount also needs access to the account).
+    ADDITIONAL_REQUIRED_SCOPES: ClassVar[list[set[str]]] = []
     # Cron expression driving a periodic re-initialization of this stream's binding.
     BACKFILL_SCHEDULE: ClassVar[str] = ""
     # Some resources are only queryable on Shopify Plus / Advanced plans or
