@@ -440,67 +440,63 @@ func truncateStaleItems(ctx context.Context, client *client, b binding, boundary
 		return deleteWorker(groupCtx, client, b.tableName, batches, &deleted)
 	})
 
-	sendBatch := func(reqs []types.WriteRequest) error {
-		select {
-		case <-groupCtx.Done():
-			return group.Wait()
-		case batches <- reqs:
-			return nil
-		}
-	}
-
-	var exclusiveStartKey map[string]types.AttributeValue
-	for {
-		out, err := client.db.Scan(groupCtx, &dynamodb.ScanInput{
-			TableName:                 aws.String(b.tableName),
-			ConsistentRead:            aws.Bool(true),
-			ProjectionExpression:      aws.String(strings.Join(projExpr, ", ")),
-			FilterExpression:          aws.String("#pub < :boundary"),
-			ExpressionAttributeNames:  exprNames,
-			ExpressionAttributeValues: exprValues,
-			ExclusiveStartKey:         exclusiveStartKey,
-		})
-		if err != nil {
-			return deleted.Load(), fmt.Errorf("scanning table %q: %w", b.tableName, err)
-		}
-
-		var staleKeys []map[string]types.AttributeValue
-		for _, item := range out.Items {
-			if !b.isStale(item, boundary) {
-				continue
-			}
-			key := make(map[string]types.AttributeValue, len(b.keyFields))
-			for _, f := range b.keyFields {
-				key[f] = item[f]
-			}
-			staleKeys = append(staleKeys, key)
-		}
-
-		for i := 0; i < len(staleKeys); i += storeBatchSize {
-			end := min(i+storeBatchSize, len(staleKeys))
-
-			reqs := make([]types.WriteRequest, 0, end-i)
-			for _, key := range staleKeys[i:end] {
-				reqs = append(reqs, types.WriteRequest{DeleteRequest: &types.DeleteRequest{Key: key}})
+	// The scan runs in the group alongside deleteWorker, so whichever fails
+	// first determines the error group.Wait returns, rather than the other
+	// failing with a canceled context. batches is closed only after the last
+	// page, since a failure cancels groupCtx, which stops deleteWorker.
+	group.Go(func() error {
+		var exclusiveStartKey map[string]types.AttributeValue
+		for {
+			out, err := client.db.Scan(groupCtx, &dynamodb.ScanInput{
+				TableName:                 aws.String(b.tableName),
+				ConsistentRead:            aws.Bool(true),
+				ProjectionExpression:      aws.String(strings.Join(projExpr, ", ")),
+				FilterExpression:          aws.String("#pub < :boundary"),
+				ExpressionAttributeNames:  exprNames,
+				ExpressionAttributeValues: exprValues,
+				ExclusiveStartKey:         exclusiveStartKey,
+			})
+			if err != nil {
+				return fmt.Errorf("scanning table %q: %w", b.tableName, err)
 			}
 
-			if err := sendBatch(reqs); err != nil {
-				return deleted.Load(), err
+			var staleKeys []map[string]types.AttributeValue
+			for _, item := range out.Items {
+				if !b.isStale(item, boundary) {
+					continue
+				}
+				key := make(map[string]types.AttributeValue, len(b.keyFields))
+				for _, f := range b.keyFields {
+					key[f] = item[f]
+				}
+				staleKeys = append(staleKeys, key)
 			}
+
+			for i := 0; i < len(staleKeys); i += storeBatchSize {
+				end := min(i+storeBatchSize, len(staleKeys))
+
+				reqs := make([]types.WriteRequest, 0, end-i)
+				for _, key := range staleKeys[i:end] {
+					reqs = append(reqs, types.WriteRequest{DeleteRequest: &types.DeleteRequest{Key: key}})
+				}
+
+				select {
+				case <-groupCtx.Done():
+					return groupCtx.Err()
+				case batches <- reqs:
+				}
+			}
+
+			if out.LastEvaluatedKey == nil {
+				close(batches)
+				return nil
+			}
+			exclusiveStartKey = out.LastEvaluatedKey
 		}
+	})
 
-		if out.LastEvaluatedKey == nil {
-			break
-		}
-		exclusiveStartKey = out.LastEvaluatedKey
-	}
-
-	close(batches)
-	if err := group.Wait(); err != nil {
-		return deleted.Load(), err
-	}
-
-	return deleted.Load(), nil
+	err := group.Wait()
+	return deleted.Load(), err
 }
 
 // deleteWorker issues one BatchWriteItem of DeleteRequests at a time, the
