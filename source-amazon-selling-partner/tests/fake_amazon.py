@@ -88,6 +88,7 @@ class FakeAmazon:
     page_size: int = 2
     rate_header: str | None = None
     expired_tokens: bool = False
+    expire_token_once: bool = False
     # Fail the access-token refresh that precedes this page, as Login with
     # Amazon does when the seller revokes the application.
     refresh_fails_on_page: int | None = None
@@ -217,7 +218,8 @@ class FakeAmazon:
             )
 
         if "paginationToken" in params:
-            if self.expired_tokens:
+            if self.expired_tokens or self.expire_token_once:
+                self.expire_token_once = False
                 raise HTTPError("400 Bad Request: InvalidInput", 400)
             matching = self._pages.pop(params["paginationToken"])
         else:

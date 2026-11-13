@@ -186,7 +186,8 @@ async def _search_orders(
             ):
                 raise PaginationTokenRejected(
                     "Amazon rejected an order search pagination token. Tokens expire 24 hours "
-                    "after the first page of a window; reduce the Window Size so each window "
+                    "after the first page of a window. The connector already tried smaller windows; "
+                    "reduce the Window Size so each window "
                     f"pages through faster.\n\n{err.message}"
                 ) from err
             raise
@@ -219,6 +220,7 @@ async def fetch_orders(
 ) -> AsyncGenerator[Order | LogCursor, None]:
     """
     Captures orders updated since the cursor, one window per invocation.
+    Rejected pagination tokens halve the window, down to a one-hour floor.
 
     ```
           cursor+1s−overlap  cursor+1s        window_end ≤ horizon
@@ -247,23 +249,37 @@ async def fetch_orders(
         return
 
     window_end = min(cursor + window_size, horizon)
-    request_params = {
-        "lastUpdatedAfter": to_iso(cursor + TICK - overlap),
-        "lastUpdatedBefore": to_iso(window_end),
-    }
+    while True:
+        request_params = {
+            "lastUpdatedAfter": to_iso(cursor + TICK - overlap),
+            "lastUpdatedBefore": to_iso(window_end),
+        }
 
-    count = 0
-    async for item in _search_orders(
-        client, marketplace_ids, request_params, Priority.INCREMENTAL, log
-    ):
-        if isinstance(item, Order):
-            count += 1
-            yield item
-        elif item.lastUpdatedBefore is not None and item.lastUpdatedBefore < window_end:
-            raise RuntimeError(
-                f"Amazon searched orders updated only up to {item.lastUpdatedBefore}, "
-                f"not the requested {window_end}."
+        count = 0
+        try:
+            async for item in _search_orders(
+                client, marketplace_ids, request_params, Priority.INCREMENTAL, log
+            ):
+                if isinstance(item, Order):
+                    count += 1
+                    yield item
+                elif item.lastUpdatedBefore is not None and item.lastUpdatedBefore < window_end:
+                    raise RuntimeError(
+                        f"Amazon searched orders updated only up to {item.lastUpdatedBefore}, "
+                        f"not the requested {window_end}."
+                    )
+        except PaginationTokenRejected:
+            smaller_end = floor_to_tick(cursor + (window_end - cursor) / 2)
+            if smaller_end - cursor < timedelta(hours=1):
+                raise
+            log.warning(
+                "shrinking an orders window after Amazon rejected its pagination token",
+                {"window_start": cursor, "window_end": window_end, "new_window_end": smaller_end},
             )
+            # Re-emitting orders is safe: the collection reduces by lastUpdatedTime.
+            window_end = smaller_end
+            continue
+        break
 
     log.debug(
         "fetched orders window",
@@ -285,6 +301,7 @@ async def backfill_orders(
     Captures orders created before the cutoff, as they are now, one window
     of creation time per invocation. The page cursor is the next window's
     start, as an ISO 8601 string.
+    Rejected pagination tokens halve the window, down to a one-hour floor.
 
     ```
                 window_start      window_end ≤ cutoff−1s   cutoff
@@ -330,23 +347,37 @@ async def backfill_orders(
     if wait > 0:
         await asyncio.sleep(wait)
 
-    request_params = {
-        "createdAfter": to_iso(window_start),
-        "createdBefore": to_iso(window_end),
-    }
+    while True:
+        request_params = {
+            "createdAfter": to_iso(window_start),
+            "createdBefore": to_iso(window_end),
+        }
 
-    count = 0
-    async for item in _search_orders(
-        client, marketplace_ids, request_params, Priority.BACKFILL, log
-    ):
-        if isinstance(item, Order):
-            count += 1
-            yield item
-        elif item.createdBefore is not None and item.createdBefore < window_end:
-            raise RuntimeError(
-                f"Amazon searched orders created only up to {item.createdBefore}, "
-                f"not the requested {window_end}."
+        count = 0
+        try:
+            async for item in _search_orders(
+                client, marketplace_ids, request_params, Priority.BACKFILL, log
+            ):
+                if isinstance(item, Order):
+                    count += 1
+                    yield item
+                elif item.createdBefore is not None and item.createdBefore < window_end:
+                    raise RuntimeError(
+                        f"Amazon searched orders created only up to {item.createdBefore}, "
+                        f"not the requested {window_end}."
+                    )
+        except PaginationTokenRejected:
+            smaller_end = floor_to_tick(window_start + (window_end - window_start) / 2)
+            if smaller_end - window_start < timedelta(hours=1):
+                raise
+            log.warning(
+                "shrinking an orders window after Amazon rejected its pagination token",
+                {"window_start": window_start, "window_end": window_end, "new_window_end": smaller_end},
             )
+            # Re-emitting orders is safe: the collection reduces by lastUpdatedTime.
+            window_end = smaller_end
+            continue
+        break
 
     log.debug(
         "backfilled orders window",
