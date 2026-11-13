@@ -4,6 +4,8 @@ import (
 	"context"
 	stdsql "database/sql"
 	"fmt"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // session is a pinned connection that can be replaced, because temporary
@@ -33,9 +35,17 @@ func (s *session) connect(ctx context.Context, setup []string) error {
 	return nil
 }
 
-// begin starts a transaction on the pinned connection. Pass as setup the
-// statements that create the session's temporary tables.
+// begin starts a transaction, first replacing a connection that the server
+// no longer answers on. Pass as setup the statements that create the
+// session's temporary tables. The replacement loses nothing because the
+// temporary tables are empty between transactions.
 func (s *session) begin(ctx context.Context, setup []string) (*stdsql.Tx, error) {
+	if pingErr := s.conn.PingContext(ctx); pingErr != nil {
+		log.WithError(pingErr).Info("reconnecting because the connection to the database was lost")
+		if err := s.connect(ctx, setup); err != nil {
+			return nil, fmt.Errorf("reconnecting after %q: %w", pingErr, err)
+		}
+	}
 	return s.conn.BeginTx(ctx, &stdsql.TxOptions{})
 }
 
