@@ -21,9 +21,12 @@ from source_shopify_native.models import (
 
 from .graphql.client import ShopifyGraphQLClient
 from .graphql.nested_resolver import NESTED_CONNECTION_CONCURRENCY, resolve_document
+from .graphql.payments.payouts import Payouts
 from .utils import dt_to_str, str_to_dt
 
 CHECKPOINT_INTERVAL = 1_000
+# Each payouts read looks back 30 days, so it runs once a day instead of every 5 minutes.
+PAYOUTS_READ_INTERVAL = timedelta(days=1)
 PAGE_SIZE = 250
 TARGET_FETCH_PAGE_INVOCATION_RUN_TIME = 60 * 5  # 5 minutes
 
@@ -216,6 +219,64 @@ async def fetch_incremental_unsorted(
 
     if last_dt != log_cursor:
         yield last_dt
+
+
+async def fetch_payouts(
+    client: ShopifyGraphQLClient,
+    data_model: type[BaseResponseData[Payouts]],
+    store: str,
+    capabilities: StoreCapabilities,
+    start_date: datetime | None,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[Payouts | LogCursor, None]:
+    """Once a day, emit every payout issued since Payouts.STATUS_CHANGE_WINDOW before the last
+    read, so status changes after a payout is issued are captured.
+
+                  cursor − 30 days     cursor        now
+        ──────────────────┼───────────────┼───────────┼──▶ issued_at
+                          │               │           │
+        issued_at:>= ─────[═══════════════╪═══════════╪══▶
+        issued_at:<= ═════╪═══════════════╪═══════════]
+        emitted      ─────[═══════════════╪═══════════]
+                          │               │           │
+                          │               │           └─ a day or more after the
+                          │               │              cursor. Before then, the
+                          │               │              read returns at once
+                          │               └─ when the last read started
+                          └─ a configured start_date
+                             instead, if it's later
+
+    Both bounds are inclusive. The window starts from the cursor rather than from now, so a
+    read after downtime still covers every payout issued since the last read. The cursor is
+    yielded only after everything is read, so a read that fails partway is retried in full.
+    `start_date` is None when the config leaves it blank.
+    """
+    assert isinstance(log_cursor, datetime)
+    now = datetime.now(tz=UTC)
+    if now - log_cursor < PAYOUTS_READ_INTERVAL:
+        return
+
+    start = log_cursor - Payouts.STATUS_CHANGE_WINDOW
+    if start_date is not None:
+        start = max(start, start_date)
+
+    payout_count = 0
+    async for payout in _paginate_through_resources(
+        client=client,
+        model=Payouts,
+        data_model=data_model,
+        start=start,
+        end=now,
+        store=store,
+        capabilities=capabilities,
+        log=log,
+    ):
+        yield payout
+        payout_count += 1
+
+    log.info(f"[{store}] Read {payout_count} payouts issued since {dt_to_str(start)}.")
+    yield now
 
 
 async def fetch_incremental(
