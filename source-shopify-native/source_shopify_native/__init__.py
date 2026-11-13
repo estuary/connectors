@@ -15,6 +15,7 @@ from estuary_cdk.flow import (
 )
 from estuary_cdk.logger import FlowLogger
 
+from .graphql import BalanceTransactions, Payouts
 from .models import (
     ConnectorState,
     EndpointConfig,
@@ -118,6 +119,24 @@ def _validate_config(
                 )
 
 
+def _validate_bindings(
+    bindings: list[request.ValidateBinding[ResourceConfigWithSchedule]],
+) -> None:
+    names = {b.resourceConfig.name for b in bindings}
+
+    # The payouts read fills in each balance transaction's payout id once its payout is
+    # created. Without it, nearly every transaction would keep a null payout id, because the
+    # balance_transactions read captures transactions before their payout exists.
+    if BalanceTransactions.NAME in names and Payouts.NAME not in names:
+        raise ValidationError(
+            [
+                f"The {BalanceTransactions.NAME} binding requires the {Payouts.NAME} binding, "
+                f"which fills in each balance transaction's payout. Please enable "
+                f"{Payouts.NAME} or disable {BalanceTransactions.NAME}."
+            ]
+        )
+
+
 class Connector(
     BaseCaptureConnector[EndpointConfig, ResourceConfigWithSchedule, ConnectorState],
 ):
@@ -148,6 +167,7 @@ class Connector(
     ) -> response.Validated:
         await validate_credentials(log, self, validate.config)
         _validate_config(validate)
+        _validate_bindings(validate.bindings)
 
         resources = await bound_resources(
             log,

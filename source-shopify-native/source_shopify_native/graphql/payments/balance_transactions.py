@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import AwareDatetime
+from pydantic import AwareDatetime, BaseModel, ConfigDict
 
 from ..common import money_v2_fragment
 from ...models import (
@@ -8,6 +8,13 @@ from ...models import (
     StoreCapabilities,
 )
 from ...utils import dt_to_str, str_to_dt
+
+
+class AssociatedPayout(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    # Null until the transaction is assigned to a payout.
+    id: str | None
 
 
 class BalanceTransactions(ShopifyGraphQLResource):
@@ -51,25 +58,20 @@ class BalanceTransactions(ShopifyGraphQLResource):
     """
 
     transactionDate: str
+    associatedPayout: AssociatedPayout
 
     def get_cursor_value(self) -> AwareDatetime:
         return str_to_dt(self.transactionDate)
 
+    # The processed_at read and the payouts stream's per-payout read both write to the
+    # balance_transactions collection, so both queries are built here to select the same fields.
     @staticmethod
-    def build_query(
-        start: datetime,
-        end: datetime,
-        first: int | None = None,
-        after: str | None = None,
-        capabilities: StoreCapabilities | None = None,
-    ) -> str:
-        lower_bound = dt_to_str(start)
-        upper_bound = dt_to_str(end)
+    def _build_query(search: str, first: int | None, after: str | None) -> str:
         return f"""
         {{
             shopifyPaymentsAccount {{
                 balanceTransactions(
-                    query: "processed_at:>='{lower_bound}' AND processed_at:<='{upper_bound}'"
+                    query: "{search}"
                     {f"first: {first}" if first else ""}
                     {f'after: "{after}"' if after else ""}
                 ) {{
@@ -87,3 +89,30 @@ class BalanceTransactions(ShopifyGraphQLResource):
         }}
         {money_v2_fragment}
         """
+
+    @staticmethod
+    def build_query(
+        start: datetime,
+        end: datetime,
+        first: int | None = None,
+        after: str | None = None,
+        capabilities: StoreCapabilities | None = None,
+    ) -> str:
+        lower_bound = dt_to_str(start)
+        upper_bound = dt_to_str(end)
+        return BalanceTransactions._build_query(
+            f"processed_at:>='{lower_bound}' AND processed_at:<='{upper_bound}'", first, after
+        )
+
+    # Shopify's filter calls a payout a transfer, and Shopify doesn't say what
+    # payments_transfer_id matches. We pass the payout's legacyResourceId, but no development
+    # store has payouts to confirm it.
+    @staticmethod
+    def build_payout_query(
+        payout_legacy_resource_id: str,
+        first: int | None = None,
+        after: str | None = None,
+    ) -> str:
+        return BalanceTransactions._build_query(
+            f"payments_transfer_id:{payout_legacy_resource_id}", first, after
+        )

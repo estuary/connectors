@@ -97,9 +97,11 @@ This connector submits and processes the results of [bulk query operations](http
 
 The limit of 5 applies to each app on each store, so bulk queries submitted through a different app don't compete with the connector. If another system submits bulk queries through the same app as the connector, lower `/advanced/max_concurrent_bulk_ops` to leave slots free for it. The connector can't count that system's queries, so keep its usage within the slots you leave free, or the connector's bulk queries will be rejected. When a capture starts, it cancels bulk queries still running from its previous session and leaves other systems' bulk queries running. It recognises its own by a `# Estuary Flow Managed Bulk Query` comment it adds to each one.
 
-### Payouts
+### Payouts and Balance Transactions
 
 Shopify doesn't record when a payout last changed, so once a day the connector re-reads every payout issued in the last 30 days to capture status changes. New payouts can take up to a day to appear.
+
+A balance transaction is usually captured before it's part of a payout, so its `associatedPayout` starts out empty. The daily payouts read fills it in after the payout is created, so the `balance_transactions` binding requires the `payouts` binding to be enabled.
 
 ## Configuration
 

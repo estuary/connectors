@@ -5,6 +5,7 @@ from logging import Logger
 from typing import Any, AsyncGenerator
 
 from estuary_cdk.capture.common import (
+    AssociatedDocument,
     LogCursor,
     PageCursor,
 )
@@ -21,6 +22,7 @@ from source_shopify_native.models import (
 
 from .graphql.client import ShopifyGraphQLClient
 from .graphql.nested_resolver import NESTED_CONNECTION_CONCURRENCY, resolve_document
+from .graphql.payments.balance_transactions import BalanceTransactions
 from .graphql.payments.payouts import Payouts
 from .utils import dt_to_str, str_to_dt
 
@@ -221,36 +223,109 @@ async def fetch_incremental_unsorted(
         yield last_dt
 
 
+class PayoutTransactionsMismatchError(RuntimeError):
+    """A payout's first page of balance transactions held none of its own."""
+
+
+# A failed payout's money goes into a later payout. Shopify doesn't say whether a failed or
+# canceled payout keeps its transactions, so one that holds none of its own may be correct.
+MISMATCH_EXEMPT_PAYOUT_STATUSES = {"FAILED", "CANCELED"}
+# The payments_transfer_id search may lag behind writes, and no doc says by how long. A payout
+# issued within this period may not show its transactions yet, and they're read again later.
+MISMATCH_GRACE_PERIOD = timedelta(days=1)
+
+
+async def _read_payout_transactions(
+    client: ShopifyGraphQLClient,
+    data_model: type[BaseResponseData[BalanceTransactions]],
+    store: str,
+    payout: Payouts,
+    log: Logger,
+) -> AsyncGenerator[BalanceTransactions, None]:
+    """Read every balance transaction the payments_transfer_id filter returns for `payout`,
+    including any that now belong to another payout.
+
+    Raises PayoutTransactionsMismatchError before yielding anything if the first page holds
+    none of the payout's own transactions, including an empty first page. Shopify doesn't say
+    what this filter matches or what form associatedPayout ids take, so we can't assume either
+    matches the payout.
+    """
+    ctx = StoreValidationContext(store=store)
+    after: str | None = None
+    is_first_page = True
+
+    while True:
+        query = BalanceTransactions.build_payout_query(
+            payout.legacyResourceId, first=PAGE_SIZE, after=after
+        )
+        data = await client.request(query, data_model, log, context=ctx)
+
+        if is_first_page and not any(t.associatedPayout.id == payout.id for t in data.nodes):
+            held_payout_ids = sorted({str(t.associatedPayout.id) for t in data.nodes})
+            raise PayoutTransactionsMismatchError(
+                f"The balance transactions read for payout {payout.id} ({payout.status} "
+                f"{payout.transactionType}, issued {payout.issuedAt}) held none of its own. Its "
+                f"first page held {len(data.nodes)} transaction(s)"
+                + (f", of payouts {held_payout_ids[:3]}" if held_payout_ids else "")
+                + ". Check that payments_transfer_id matches a payout's legacyResourceId, and "
+                "that associatedPayout ids take the form of payout ids."
+            )
+        is_first_page = False
+
+        for transaction in data.nodes:
+            yield transaction
+
+        if not data.page_info.hasNextPage:
+            return
+        after = data.page_info.endCursor
+
+
 async def fetch_payouts(
     client: ShopifyGraphQLClient,
-    data_model: type[BaseResponseData[Payouts]],
+    payout_data_model: type[BaseResponseData[Payouts]],
+    transaction_data_model: type[BaseResponseData[BalanceTransactions]],
     store: str,
     capabilities: StoreCapabilities,
     start_date: datetime | None,
+    balance_transactions_binding: int | None,
     log: Logger,
     log_cursor: LogCursor,
-) -> AsyncGenerator[Payouts | LogCursor, None]:
+) -> AsyncGenerator[Payouts | AssociatedDocument[BalanceTransactions] | LogCursor, None]:
     """Once a day, emit every payout issued since Payouts.STATUS_CHANGE_WINDOW before the last
-    read, so status changes after a payout is issued are captured.
+    read, so status changes after a payout is issued are captured. For each payout issued since
+    Payouts.TRANSACTIONS_WINDOW before the last read, also emit its balance transactions to
+    `balance_transactions_binding`. That fills in associatedPayout on transactions the
+    balance_transactions stream captured before their payout existed.
 
-                  cursor − 30 days     cursor        now
-        ──────────────────┼───────────────┼───────────┼──▶ issued_at
-                          │               │           │
-        issued_at:>= ─────[═══════════════╪═══════════╪══▶
-        issued_at:<= ═════╪═══════════════╪═══════════]
-        emitted      ─────[═══════════════╪═══════════]
-                          │               │           │
-                          │               │           └─ a day or more after the
-                          │               │              cursor. Before then, the
-                          │               │              read returns at once
-                          │               └─ when the last read started
-                          └─ a configured start_date
-                             instead, if it's later
+                 cursor − 30d cursor − 7d  cursor     now
+        ───────────────┼───────────┼──────────┼────────┼──▶ issued_at
+                       │           │          │        │
+        issued_at:>= ──[═══════════╪══════════╪════════╪══▶
+        issued_at:<= ══╪═══════════╪══════════╪════════]
+        payouts      ──[═══════════╪══════════╪════════]
+        transactions ──┼───────────[══════════╪════════]
+                       │           │          │        │
+                       │           │          │        └─ a day or more after
+                       │           │          │           the cursor. Before
+                       │           │          │           then, it returns
+                       │           │          └─ when the last read started
+                       │           └─ payouts issued from here
+                       │              on also have their
+                       │              transactions read
+                       └─ a configured start_date
+                          instead, if it's later
 
-    Both bounds are inclusive. The window starts from the cursor rather than from now, so a
+    Both bounds are inclusive. The windows start from the cursor rather than from now, so a
     read after downtime still covers every payout issued since the last read. The cursor is
     yielded only after everything is read, so a read that fails partway is retried in full.
-    `start_date` is None when the config leaves it blank.
+
+    `start_date` is None when the config leaves it blank. A transaction processed before it
+    isn't emitted, since the balance_transactions backfill doesn't emit it either.
+    `balance_transactions_binding` is None when that binding isn't enabled.
+
+    Raises PayoutTransactionsMismatchError if a payout's transactions hold none of its own,
+    unless the payout is failed or canceled (MISMATCH_EXEMPT_PAYOUT_STATUSES) or was issued
+    within MISMATCH_GRACE_PERIOD of now.
     """
     assert isinstance(log_cursor, datetime)
     now = datetime.now(tz=UTC)
@@ -260,12 +335,14 @@ async def fetch_payouts(
     start = log_cursor - Payouts.STATUS_CHANGE_WINDOW
     if start_date is not None:
         start = max(start, start_date)
+    transactions_start = log_cursor - Payouts.TRANSACTIONS_WINDOW
 
     payout_count = 0
+    transaction_count = 0
     async for payout in _paginate_through_resources(
         client=client,
         model=Payouts,
-        data_model=data_model,
+        data_model=payout_data_model,
         start=start,
         end=now,
         store=store,
@@ -275,7 +352,32 @@ async def fetch_payouts(
         yield payout
         payout_count += 1
 
-    log.info(f"[{store}] Read {payout_count} payouts issued since {dt_to_str(start)}.")
+        if (
+            balance_transactions_binding is None
+            or payout.get_cursor_value() < transactions_start
+        ):
+            continue
+
+        try:
+            async for transaction in _read_payout_transactions(
+                client, transaction_data_model, store, payout, log
+            ):
+                if start_date is not None and transaction.get_cursor_value() < start_date:
+                    continue
+
+                yield AssociatedDocument(doc=transaction, binding=balance_transactions_binding)
+                transaction_count += 1
+        except PayoutTransactionsMismatchError:
+            is_exempt = payout.status in MISMATCH_EXEMPT_PAYOUT_STATUSES
+            is_within_grace_period = now - payout.get_cursor_value() < MISMATCH_GRACE_PERIOD
+            if not is_exempt and not is_within_grace_period:
+                raise
+
+    log.info(
+        f"[{store}] Read {payout_count} payouts issued since {dt_to_str(start)}, and "
+        f"{transaction_count} balance transactions in the ones issued since "
+        f"{dt_to_str(transactions_start)}."
+    )
     yield now
 
 
