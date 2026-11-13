@@ -271,6 +271,20 @@ async def test_listing_with_every_row_ragged_fails():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("good, ragged, fails", [
+    (990, 10, False), (989, 11, True), (1989, 11, False), (89, 11, True),
+    (1980, 20, False), (1979, 21, True),
+])
+async def test_listing_ragged_row_limit(good, ragged, fails):
+    body = b"asin1\tseller-sku\tstatus\n" + b"a\tSKU\tActive\n" * good + b"short\n" * ragged
+    if fails:
+        with pytest.raises(RuntimeError, match=f"has {ragged} of {good + ragged} row"):
+            await read_document(body, None)
+    else:
+        assert len(await read_document(body, None)) == good
+
+
+@pytest.mark.asyncio
 async def test_listing_encoding_and_ragged_rows_share_one_warning(caplog):
     body = b"asin1\tseller-sku\tstatus\na\tSKU-\x80\tActive\nshort\nlong\trow\twith\textra\n"
     with caplog.at_level(logging.WARNING):

@@ -57,6 +57,12 @@ CHARSET_SUPERSETS = {
 # unverified.
 DEFAULT_ENCODING = "utf-8-sig"
 
+# All Listings rows with the wrong width are skipped, up to this many, or
+# this share of data rows if larger. More suggests the file, not a few
+# rows, is malformed.
+MAX_SKIPPED_LISTING_ROWS = 10
+MAX_SKIPPED_LISTING_SHARE = 0.01
+
 # How long a requested report is waited on before the capture fails. The
 # restart that follows waits on the same report again if it asks for a
 # request that report made (see request_report).
@@ -622,7 +628,8 @@ async def read_report(
     rather than reading as empty, short or garbled. A document with no data
     rows is logged, as a warning unless `empty_is_routine`. All Listings
     documents without a charset are spooled to disk to try UTF-8, cp1252,
-    then latin-1. All Listings rows with a different width are skipped.
+    then latin-1. All Listings rows with a different width are skipped, up to
+    MAX_SKIPPED_LISTING_ROWS or MAX_SKIPPED_LISTING_SHARE of data rows.
     """
     document, headers, stream = await _download_document(
         client, _done_document_id(report), priority, log
@@ -691,6 +698,14 @@ async def read_report(
             raise RuntimeError(
                 f"Report {report.reportId} ({report.reportType}) has no row matching "
                 f"its header's width; {skipped} row(s) skipped."
+            )
+        if is_listing and skipped > max(
+            MAX_SKIPPED_LISTING_ROWS, MAX_SKIPPED_LISTING_SHARE * (count + skipped)
+        ):
+            raise RuntimeError(
+                f"Report {report.reportId} ({report.reportType}) has {skipped} of "
+                f"{count + skipped} row(s) not matching its header's width, over the "
+                f"limit of {MAX_SKIPPED_LISTING_ROWS} or {MAX_SKIPPED_LISTING_SHARE:.0%}."
             )
         if is_listing and ((fallback and encoding != DEFAULT_ENCODING) or skipped):
             log.warning(
