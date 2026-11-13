@@ -1,5 +1,12 @@
 # materialize-sqlserver
 
+## 2026-11-13
+
+### Fixed
+- The materialization now reconnects when the database closes an idle
+  connection, instead of failing with "driver: bad connection". This mostly
+  affected low-volume tasks on Azure SQL.
+
 ## 2026-11-03
 
 ### Changed
