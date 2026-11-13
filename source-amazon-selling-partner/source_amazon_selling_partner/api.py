@@ -33,7 +33,7 @@ from .reports import (
     ReportMismatch,
     ReportRequest,
     ReportRoleMissing,
-    _reused,
+    reuse_matching_report,
     list_reports,
     read_json_report,
     read_report,
@@ -1314,13 +1314,13 @@ async def fetch_catalog_items(
             report_options={"preferredReportDocumentLocale": "en_US"},
             earliest_created=earliest_created,
         )
-        report = await _reused(client, request, Priority.INCREMENTAL, log)
+        report = await reuse_matching_report(client, request, Priority.INCREMENTAL, log)
         if report is None and previous_time > completed_bucket:
             previous_request = ReportRequest(
                 CatalogItem.REPORT_TYPE, (marketplace_id,), previous_time, previous_time,
                 earliest_created=earliest_created,
             )
-            report = await _reused(client, previous_request, Priority.INCREMENTAL, log)
+            report = await reuse_matching_report(client, previous_request, Priority.INCREMENTAL, log)
         if report is None or report.processingStatus == ProcessingStatus.CANCELLED:
             report = await request_report(client, request, Priority.INCREMENTAL, log)
         listings: dict[str, tuple[set[str], str | None]] = {}

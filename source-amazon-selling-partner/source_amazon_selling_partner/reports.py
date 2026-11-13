@@ -400,7 +400,7 @@ async def _fatal_error(
     )
 
 
-async def _reused(
+async def reuse_matching_report(
     client: SPAPIClient,
     request: ReportRequest,
     priority: Priority,
@@ -444,7 +444,7 @@ async def request_report(
     created_ids: set[str] = set()
     seen_cancelled: set[str] = set()
     retry_after_cancel = False
-    report = await _reused(client, request, priority, log)
+    report = await reuse_matching_report(client, request, priority, log)
     while report is None or report.processingStatus == ProcessingStatus.CANCELLED:
         if report is not None:
             # A reused report that ends before the request does covers only
@@ -455,7 +455,7 @@ async def request_report(
             retry_after_cancel = True
             # Look for a reusable report again: Amazon may have cancelled this
             # one as too soon because a report of the same request was in flight.
-            report = await _reused(
+            report = await reuse_matching_report(
                 client, request, priority, log, frozenset(seen_cancelled)
             )
             continue
