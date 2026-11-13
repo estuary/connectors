@@ -38,7 +38,7 @@ async def test_finished_windows_log_progress_at_info(monkeypatch, caplog, stream
         else:
             await collect(api.fetch_orders_sweep(client, MARKETPLACES, timedelta(days=2), size, LOG, start))
             message = "swept orders window"
-            bounds = [(start, start + size), (start + size, start + size * 2)]
+            bounds = [(start + api.TICK, start + size), (start + size + api.TICK, start + size * 2)]
     records = [r for r in caplog.records if r.levelno == logging.INFO]
     assert [r.msg for r in records] == [message] * len(bounds)
     elapsed = [record.args["elapsed_seconds"] for record in records]
@@ -82,18 +82,23 @@ async def test_incremental_window_progress_stays_at_debug(monkeypatch, caplog, s
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("stream", ["orders", "finance"])
-async def test_backfill_progress_includes_freshness_wait_and_actual_window_size(monkeypatch, caplog, stream):
+async def test_backfill_progress_excludes_freshness_wait_and_has_actual_window_size(monkeypatch, caplog, stream):
     start = NOW - timedelta(hours=1)
     fake = FakeAmazon(now=NOW, orders=[])
     time = FakeTime()
+    waited = []
 
     async def sleep(seconds):
         await time.sleep(seconds)
         fake.now += timedelta(seconds=seconds)
 
+    async def freshness_wait(seconds):
+        waited.append(seconds)
+        await sleep(seconds)
+
     monkeypatch.setattr(api, "now", lambda: fake.now)
     monkeypatch.setattr(api, "monotonic", time.clock)
-    monkeypatch.setattr(api.asyncio, "sleep", sleep)
+    monkeypatch.setattr(api.asyncio, "sleep", freshness_wait)
     client = SPAPIClient(http=fake, base_url="https://fake", clock=time.clock, sleep=sleep)
     with caplog.at_level(logging.INFO, logger=LOG.name):
         if stream == "orders":
@@ -105,5 +110,25 @@ async def test_backfill_progress_includes_freshness_wait_and_actual_window_size(
     records = [r for r in caplog.records if r.levelno == logging.INFO]
     assert len(records) == 1
     assert records[0].args["window_seconds"] == 3600
-    assert records[0].args["elapsed_seconds"] == time.t
-    assert time.t >= wait
+    assert sum(waited) >= wait
+    assert records[0].args["elapsed_seconds"] == pytest.approx(time.t - sum(waited))
+
+
+@pytest.mark.asyncio
+async def test_backfill_progress_times_only_the_attempt_that_finished(monkeypatch, caplog):
+    start = NOW - timedelta(days=3)
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[order(str(i), start + timedelta(minutes=i), start + timedelta(minutes=i)) for i in range(1, 4)],
+        expire_token_once=True,
+    )
+    time = FakeTime()
+    monkeypatch.setattr(api, "now", lambda: fake.now)
+    monkeypatch.setattr(api, "monotonic", time.clock)
+    client = SPAPIClient(http=fake, base_url="https://fake", clock=time.clock, sleep=time.sleep)
+    with caplog.at_level(logging.INFO, logger=LOG.name):
+        await collect(api.backfill_orders(client, MARKETPLACES, start, timedelta(days=2), LOG, None, NOW - timedelta(hours=1)))
+    records = [r for r in caplog.records if r.msg == "backfilled orders window"]
+    assert len(records) == 1
+    assert records[0].args["window_seconds"] == timedelta(days=1).total_seconds()
+    assert 0 < records[0].args["elapsed_seconds"] < time.t

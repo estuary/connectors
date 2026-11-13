@@ -275,8 +275,9 @@ async def _orders_updated_window(
     log: Logger,
 ) -> AsyncGenerator[Order | datetime, None]:
     """Read a complete updated-time window, shrinking rejected token windows."""
-    started = monotonic()
     while True:
+        # Time only the attempt that finished, so a rejected one doesn't skew the rate.
+        started = monotonic()
         request_params = {
             "lastUpdatedAfter": to_iso(cursor + TICK - overlap),
             "lastUpdatedBefore": to_iso(window_end),
@@ -319,7 +320,8 @@ async def _orders_updated_window(
         log.info(
             "swept orders window",
             {
-                "window_start": cursor,
+                # The cursor is an exclusive bound; log the first instant read.
+                "window_start": cursor + TICK - overlap,
                 "window_end": window_end,
                 "count": count,
                 "window_seconds": (window_end - cursor).total_seconds(),
@@ -438,7 +440,6 @@ async def backfill_orders(
 
     window_end = min(window_start + current_size - TICK, last_tick)
     shrunk = False
-    started = monotonic()
 
     # A cutoff from the last few minutes is too recent for searchOrders' upper
     # bound. Wait it out instead of narrowing the window. The wait can't be
@@ -448,6 +449,7 @@ async def backfill_orders(
         await asyncio.sleep(wait)
 
     while True:
+        started = monotonic()
         request_params = {
             "createdAfter": to_iso(window_start),
             "createdBefore": to_iso(window_end),
@@ -701,7 +703,6 @@ async def backfill_financial_transactions(
         return
 
     window_end = min(window_start + min(window_size, MAX_TRANSACTIONS_WINDOW), cutoff)
-    started = monotonic()
 
     # A window ending near the cutoff is read no sooner than the realtime pass
     # would read it, so transactions landing minutes after their postedDate
@@ -713,6 +714,7 @@ async def backfill_financial_transactions(
         await asyncio.sleep(wait)
 
     while True:
+        started = monotonic()
         count = 0
         try:
             async for transaction in _transactions_window(
