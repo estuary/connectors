@@ -25,7 +25,7 @@ Discovery reads metadata for every table your NetSuite role can access, not only
 
 ## Sync modes and data loading
 
-Each table binding uses one of three sync modes. The connector picks a mode automatically during discovery based on the cursor and key columns it finds for each table; you can override the choice in the binding configuration.
+Each table binding uses one of four sync modes. The connector picks a mode during discovery from the cursor and key columns it finds for each table. You can change the mode in the binding configuration.
 
 ### Incremental
 
@@ -39,11 +39,21 @@ During incremental sync, the connector queries only for rows modified since the 
 
 Tables that have a `page_cursor` but no `log_cursor` are loaded by **paginated backfill** — the connector reads the entire table in ordered pages using the [`page_cursor`](#bindings). To re-read the table on a recurring basis, set a [`schedule`](#setting-a-schedule) cron expression. `TransactionAccountingLine` defaults to this mode with no schedule, because the `transaction` binding's [association](#table-associations) reloads its rows when a transaction changes. An edit to an accounting line that does not change its transaction's `lastmodifieddate` is not captured unless you set a `schedule` on `TransactionAccountingLine`.
 
+### Single-shot backfill
+
+Tables with a primary key but no usable cursor are loaded by **single-shot backfill**. The connector reads the whole table in one unpaged query instead of paging through it. Discovery turns on [`snapshot_backfill`](#bindings), which the UI calls Single-shot Backfill. It also sets a daily [`schedule`](#setting-a-schedule) to reload the table. Each reload replaces documents by primary key. A single-shot backfill does not detect deletions, and it does not load [associations](#table-associations).
+
+You can also turn on Single-shot Backfill for a table that has cursors, for example when paging on the `page_cursor` makes NetSuite queries time out. The connector then ignores the `page_cursor`. With a `log_cursor`, incremental sync continues after the load. Without one, the connector requires a `schedule`, because the table would otherwise load once and never update.
+
+The connector rejects Single-shot Backfill on a collection keyed only by `/_meta/row_id`. Each reload assigns new row IDs, so it would add another copy of the table instead of replacing it.
+
 ### Snapshot
 
-Tables with no usable page cursor are loaded by **snapshot** — the connector executes a single query that returns the entire table, then diffs the result against the previous run's row set to detect deletions. Snapshots run on the binding's [`interval`](#bindings) (rather than on a cron `schedule`) and use `/_meta/row_id` as the collection key. Set [`snapshot_backfill: true`](#bindings) to force this mode for a binding that would otherwise default to paginated backfill.
+Tables with no primary key and no usable cursor are loaded by **snapshot**. The connector runs a single query that returns the entire table, then compares the result with the previous run's rows to detect deletions. Snapshots run on the binding's [`interval`](#bindings) and use `/_meta/row_id` as the collection key.
 
-Do **not** combine `snapshot_backfill` with a cron `schedule` — snapshots manage their own cadence via `interval`, and pairing them with `schedule` will break delete emission.
+A binding uses snapshot mode when it has no `log_cursor`, no `page_cursor`, and Single-shot Backfill off. The connector rejects a snapshot binding whose collection key includes any field other than `/_meta/row_id`. The deletion events a snapshot emits can't fill in those fields. To fix such a binding, set a `log_cursor` or a `page_cursor`. With only a `page_cursor`, also set a `schedule`, or the table loads once and never updates. If the table has no usable cursor, turn on Single-shot Backfill and set a `schedule`.
+
+Don't set a `schedule` on a snapshot. Snapshots run on their `interval` instead.
 
 :::tip Switching from full refresh to incremental
 If a table has a `lastmodifieddate` column (or similar date-time field) that isn't currently configured as the `log_cursor`, you can add it to enable incremental sync. After updating the binding, trigger a backfill to re-read the table from the new cursor's starting point.
@@ -230,7 +240,7 @@ Keep [**Automatically keep schemas up to date**](../../../concepts/captures.md#a
 | `/concurrency`                              | Concurrency             | Maximum number of concurrent connections to use for backfilling. Cannot be greater than `/advanced/connection_limit`.                 | int                                                                                                                              | `1`                         |
 | `/query_limit`                              | Query Limit             | Maximum number of rows to fetch in a query. Will be divided between all connections if `/concurrency` > 1                             | int                                                                                                                              | `100000`                         |
 | `/select_columns`         | Manually Selected Columns     | Override the columns to load from the table. If empty, all columns will be loaded. Ideally this should only be set when loading specific columns is necessary, as it won't automatically update when new columns are added or removed. | string array | `[]`  |
-| `/snapshot_backfill`     | Single-shot Backfill           | Attempt to backfill using a single-shot query to load all rows. Useful when no good page cursor exists, and the table is of reasonable size. Incremental updates are still possible if a log cursor is defined. | boolean | `false` |
+| `/snapshot_backfill`     | Single-shot Backfill           | Run the backfill as one unpaged query instead of paging through the table. Use it when no column works as a Backfill Cursor, or when paging on the Backfill Cursor makes NetSuite queries time out. The table must be small enough to read in one query. The connector ignores any Backfill Cursor. Requires an Incremental Cursor, a schedule, or both. See [Single-shot backfill](#single-shot-backfill). | boolean | `false` |
 
 ##### Table Associations
 
@@ -326,6 +336,6 @@ Long-text (CLOB) values are captured up to 160,000 characters. On tables with ma
 
 ## Setting a Schedule
 
-The `schedule` field accepts a cron expression that triggers a periodic re-backfill of the binding. It applies only to **paginated backfill** bindings (those with a key and `page_cursor` but no `log_cursor`). Newly discovered paginated bindings default to `0 0 * * *` (daily at midnight UTC), unless another binding loads them through an association.
+The `schedule` field accepts a cron expression that triggers a periodic re-backfill of the binding. It applies to **paginated backfill** and **single-shot backfill** bindings without a `log_cursor`. Newly discovered bindings of both kinds default to `0 0 * * *` (daily at midnight UTC), except paginated tables that another binding loads through an association. A paginated backfill without a `schedule` loads the table once and never updates it, so set one unless an association keeps the table current. A single-shot backfill without a `log_cursor` must have a `schedule`.
 
 Incremental and snapshot bindings should not use `schedule` — incremental bindings keep up via `log_cursor`, and snapshots manage their own cadence via `interval`. See [Sync modes and data loading](#sync-modes-and-data-loading) for details.
