@@ -1,0 +1,135 @@
+opencollection: 1.0.0
+
+info:
+  name: Amazon Selling Partner
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Login with Amazon (LWA) credentials come from the connector's
+        // sops-encrypted config.yaml, as resources.py's TokenSource uses them:
+        // credentials.{client_id,client_secret,refresh_token} are exchanged for
+        // a short-lived access token on every SP-API request. Neither the
+        // credentials nor the token are persisted to a var or env file.
+        // Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env Amazon --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        //
+        // At pre-request time req.getUrl() returns the raw template, so an
+        // SP-API request still reads "{{base_url}}". The pre-signed document
+        // URL in `Reports / download` must not carry the token.
+        const LWA_TOKEN_URL = 'https://api.amazon.com/auth/o2/token';
+        const url = req.getUrl();
+        const isSpApi = url.includes('{{base_url}}');
+        if (isSpApi) {
+          const { execFileSync } = require('child_process');
+          const path = require('path');
+          const configured = bru.getEnvVar('config_path');
+          if (!configured) throw new Error('config_path env var is not set');
+          // Resolve relative to the collection root, not the process cwd.
+          const configPath = path.isAbsolute(configured)
+            ? configured
+            : path.resolve(bru.cwd(), configured);
+          const decrypted = execFileSync(
+            'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+          );
+          // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the
+          // platform strips it at runtime, sops itself does not); accept both.
+          const creds = JSON.parse(decrypted)?.credentials;
+          const clientId = creds?.client_id ?? creds?.client_id_sops;
+          const clientSecret = creds?.client_secret ?? creds?.client_secret_sops;
+          const refreshToken = creds?.refresh_token ?? creds?.refresh_token_sops;
+          if (!clientId || !clientSecret || !refreshToken) {
+            throw new Error('credentials.{client_id,client_secret,refresh_token} missing from decrypted config');
+          }
+          const form =
+            'grant_type=refresh_token' +
+            `&refresh_token=${encodeURIComponent(refreshToken)}` +
+            `&client_id=${encodeURIComponent(clientId)}` +
+            `&client_secret=${encodeURIComponent(clientSecret)}`;
+          const resp = await bru.sendRequest({
+            method: 'POST',
+            url: LWA_TOKEN_URL,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            data: form,
+          });
+          const token = resp?.data?.access_token;
+          if (!token) throw new Error(`LWA token exchange failed (HTTP ${resp?.status})`);
+          req.setHeader('x-amz-access-token', token);
+        }
+    - type: after-response
+      code: |-
+        // Redact a report document's pre-signed `url` so saved examples are
+        // safe to commit. Request-level after-response scripts run first, so
+        // `Reports / document` can still capture the URL into a runtime var
+        // for `Reports / download`. Only JSON object/array bodies are walked.
+        const REDACTED_FIELDS = ['url'];
+        function redact(v) {
+          if (Array.isArray(v)) return v.map(redact);
+          if (v && typeof v === 'object') {
+            const o = {};
+            for (const k of Object.keys(v)) {
+              o[k] = REDACTED_FIELDS.includes(k) && v[k] !== null ? 'REDACTED' : redact(v[k]);
+            }
+            return o;
+          }
+          return v;
+        }
+        const body = res.getBody();
+        if (body && typeof body === 'object') res.setBody(redact(body));
+
+docs:
+  content: |-
+    Requests for every Amazon endpoint the connector calls, to check what
+    Amazon returns before connector code relies on it. Paths, parameters and
+    usage plans follow Amazon's model files (orders 2026-01-01, finances
+    2024-06-19, sellers v1, reports 2021-06-30). None has been run yet: the
+    connector has no `config.yaml` with real credentials, so every claim below
+    is DOCUMENTED or PENDING.
+
+    Run from this directory:
+    `bru run "<Folder>/<request>.yml" --env Amazon --sandbox developer`.
+    `environments/Amazon.yml` points at North America; change `base_url` to
+    `https://sellingpartnerapi-eu.amazon.com` or
+    `https://sellingpartnerapi-fe.amazon.com` for the other regions, and
+    `marketplace_id` to one the account participates in. Everything under
+    `Seeding/` requests a report and is run by a person, never by an
+    assistant.
+
+    ## API constraints (account-wide)
+
+    - **Usage plans, per operation (DOCUMENTED 2026-11-10):** a token bucket
+      per selling partner and application; the rate is requests per second.
+      The `x-amzn-RateLimit-Limit` response header gives the account's rate:
+      https://developer-docs.amazon.com/sp-api/docs/usage-plans-and-rate-limits
+      - searchOrders 0.0056/s, burst 20
+      - listTransactions 0.5/s, burst 10
+      - getMarketplaceParticipations 0.016/s, burst 15
+      - getReports 0.0222/s, burst 10
+      - createReport 0.0167/s, burst 15
+      - getReport 2/s, burst 15
+      - getReportDocument 0.0167/s, burst 15
+    - **Throttling (DOCUMENTED 2026-11-10):** a request over the plan gets
+      HTTP 429.
+    - **Access token (DOCUMENTED 2026-11-10):** a form-encoded POST of
+      `grant_type=refresh_token`, `refresh_token`, `client_id` and
+      `client_secret` to https://api.amazon.com/auth/o2/token returns
+      `access_token`, `token_type` (`bearer`) and `expires_in` in seconds.
+      Every SP-API request carries the access token in `x-amz-access-token`,
+      not `Authorization`. The collection's before-request script makes the
+      exchange, so the credentials never go on a visible request.
+
+    ## Docs conventions
+
+    Request docs follow the `bruno-probe-endpoint` skill's conventions. Find
+    open items with `grep -rl '\*\*PENDING' . | grep -v opencollection.yml`.
+
+    ### Per-endpoint limitations
+
+    - `Orders / search`: a pagination token expires 24 hours after the
+      window's first page.
+    - `Finances / transactions`: a window longer than 180 days returns no
+      transactions.
+    - `Reports / list`: reports are kept for at most 90 days; order reports
+      (all_orders) for 30 days, per Amazon's order report catalog page.

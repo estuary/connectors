@@ -124,6 +124,7 @@ Integrations with streaming systems, queue services, and webhooks.
 #### Commerce and payments
 
 - [Alpaca](./alpaca.md)
+- [Amazon Selling Partner](./amazon-selling-partner.md)
 - [Braintree](./braintree.md)
 - [Chargebee](./chargebee-native.md)
 - [Commercetools](./commercetools.md)

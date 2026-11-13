@@ -1,0 +1,684 @@
+[
+  {
+    "recommendedName": "all_orders",
+    "resourceConfig": {
+      "name": "all_orders",
+      "interval": "P1D"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "One order item line of a report of orders by last update. Each report's\nversion of a line is kept; the rows of an order's newest report are its\ncurrent lines.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "reportId": {
+          "title": "Reportid",
+          "type": "string"
+        },
+        "reportDocumentId": {
+          "title": "Reportdocumentid",
+          "type": "string"
+        },
+        "reportCreatedTime": {
+          "format": "date-time",
+          "title": "Reportcreatedtime",
+          "type": "string"
+        },
+        "dataStartTime": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Datastarttime"
+        },
+        "dataEndTime": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dataendtime"
+        },
+        "marketplaceIds": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Marketplaceids"
+        },
+        "rowNumber": {
+          "title": "Rownumber",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "reportId",
+        "reportDocumentId",
+        "reportCreatedTime",
+        "dataStartTime",
+        "dataEndTime",
+        "marketplaceIds",
+        "rowNumber"
+      ],
+      "title": "AllOrdersRow",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/reportId",
+      "/rowNumber"
+    ],
+    "resourcePath": [
+      "all_orders"
+    ]
+  },
+  {
+    "recommendedName": "catalog_items",
+    "resourceConfig": {
+      "name": "catalog_items",
+      "interval": "P1D"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "A listed ASIN's catalog summary in one marketplace.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "asin": {
+          "title": "Asin",
+          "type": "string"
+        },
+        "marketplaceId": {
+          "title": "Marketplaceid",
+          "type": "string"
+        },
+        "listingStatus": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Listingstatus"
+        },
+        "sellerSkus": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sellerskus",
+          "type": "array"
+        },
+        "refreshedAt": {
+          "format": "date-time",
+          "title": "Refreshedat",
+          "type": "string"
+        }
+      },
+      "required": [
+        "asin",
+        "marketplaceId",
+        "sellerSkus",
+        "refreshedAt"
+      ],
+      "title": "CatalogItem",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/asin",
+      "/marketplaceId"
+    ],
+    "resourcePath": [
+      "catalog_items"
+    ]
+  },
+  {
+    "recommendedName": "financial_transactions",
+    "resourceConfig": {
+      "name": "financial_transactions",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "transactionId": {
+          "title": "Transactionid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "transactionId"
+      ],
+      "title": "FinancialTransaction",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/transactionId"
+    ],
+    "resourcePath": [
+      "financial_transactions"
+    ]
+  },
+  {
+    "recommendedName": "orders",
+    "resourceConfig": {
+      "name": "orders",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "else": {
+        "reduce": {
+          "key": [
+            "/lastUpdatedTime"
+          ],
+          "strategy": "maximize"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "orderId": {
+          "title": "Orderid",
+          "type": "string"
+        },
+        "createdTime": {
+          "format": "date-time",
+          "title": "Createdtime",
+          "type": "string"
+        },
+        "lastUpdatedTime": {
+          "format": "date-time",
+          "title": "Lastupdatedtime",
+          "type": "string"
+        }
+      },
+      "required": [
+        "orderId",
+        "createdTime",
+        "lastUpdatedTime"
+      ],
+      "title": "Order",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/orderId"
+    ],
+    "resourcePath": [
+      "orders"
+    ]
+  },
+  {
+    "recommendedName": "sales_and_traffic_by_date",
+    "resourceConfig": {
+      "name": "sales_and_traffic_by_date",
+      "interval": "P1D"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "One day of a marketplace's catalog-wide sales and traffic totals: an\nentry of a Sales and Traffic report's salesAndTrafficByDate section,\nwith the marketplace and report it was read from. A day read from\nseveral reports keeps the copy from the newest report.",
+      "else": {
+        "reduce": {
+          "key": [
+            "/reportCreatedTime"
+          ],
+          "strategy": "maximize"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "marketplaceId": {
+          "title": "Marketplaceid",
+          "type": "string"
+        },
+        "date": {
+          "title": "Date",
+          "type": "string"
+        },
+        "reportId": {
+          "title": "Reportid",
+          "type": "string"
+        },
+        "reportCreatedTime": {
+          "format": "date-time",
+          "title": "Reportcreatedtime",
+          "type": "string"
+        }
+      },
+      "required": [
+        "marketplaceId",
+        "date",
+        "reportId",
+        "reportCreatedTime"
+      ],
+      "title": "SalesAndTrafficByDate",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/marketplaceId",
+      "/date"
+    ],
+    "disable": true,
+    "resourcePath": [
+      "sales_and_traffic_by_date"
+    ]
+  },
+  {
+    "recommendedName": "settlement_reports",
+    "resourceConfig": {
+      "name": "settlement_reports",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "reportId": {
+          "title": "Reportid",
+          "type": "string"
+        },
+        "reportDocumentId": {
+          "title": "Reportdocumentid",
+          "type": "string"
+        },
+        "reportCreatedTime": {
+          "format": "date-time",
+          "title": "Reportcreatedtime",
+          "type": "string"
+        },
+        "dataStartTime": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Datastarttime"
+        },
+        "dataEndTime": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dataendtime"
+        },
+        "marketplaceIds": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Marketplaceids"
+        },
+        "rowNumber": {
+          "title": "Rownumber",
+          "type": "integer"
+        },
+        "summaryRow": {
+          "title": "Summaryrow",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "reportId",
+        "reportDocumentId",
+        "reportCreatedTime",
+        "dataStartTime",
+        "dataEndTime",
+        "marketplaceIds",
+        "rowNumber",
+        "summaryRow"
+      ],
+      "title": "SettlementReportRow",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/reportId",
+      "/rowNumber"
+    ],
+    "resourcePath": [
+      "settlement_reports"
+    ]
+  }
+]

@@ -1,0 +1,49 @@
+info:
+  name: report
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/reports/2021-06-30/reports/{{report_id}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('report_id')) {
+          throw new Error('report_id is not set: run `Reports / list` or `Seeding / A1 - create report` first in the same run');
+        }
+    - type: after-response
+      code: |-
+        // Only a DONE report has a document; clear any id an earlier request
+        // left, so `Reports / document` fails until this report is DONE.
+        bru.setVar('report_document_id', res.getBody()?.reportDocumentId || '');
+        bru.setVar('report_document_url', '');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://developer-docs.amazon.com/sp-api/reference/getreport
+
+    **WHY:** how the connector waits on a report it requested
+    (`reports._wait_for`): it polls until `processingStatus` is DONE,
+    CANCELLED or FATAL, and fails if the report's type, marketplaces or data
+    range differ from what was requested. Run `Reports / list` or
+    `Seeding / A1 - create report` first in a fresh session.
+
+    **DOCUMENTED (2026-11-10):** a DONE report carries `reportDocumentId`;
+    Amazon cancels a report automatically when there is no data to return.
+
+    **PENDING:** whether a FATAL report carries a diagnostic document's id in
+    `reportDocumentId` (the connector quotes it if so); that
+    `marketplaceIds`, `dataStartTime` and `dataEndTime` are listed as sent,
+    to the second (reuse after a restart depends on it); and
+    whether a report of an empty range is CANCELLED or DONE with no rows.
+  type: text/markdown

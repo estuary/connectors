@@ -1,0 +1,156 @@
+{
+  "orders": [
+    {
+      "orderId": "171-2345678-9012345",
+      "orderAliases": [
+        {
+          "aliasId": "BR-BIZ-ORDER-2024-001",
+          "aliasType": "SELLER_ORDER_ID"
+        }
+      ],
+      "createdTime": "2024-12-22T15:30:00Z",
+      "lastUpdatedTime": "2024-12-23T10:00:00Z",
+      "programs": [
+        "AMAZON_BUSINESS",
+        "DELIVERY_BY_AMAZON"
+      ],
+      "salesChannel": {
+        "channelName": "AMAZON",
+        "marketplaceId": "A2Q3Y263D00KWC",
+        "marketplaceName": "Amazon.com.br"
+      },
+      "buyer": {
+        "buyerName": "Carlos Oliveira",
+        "buyerEmail": "buyer-email@marketplace.amazon.com.br",
+        "buyerCompanyName": "Oliveira Tecnologia Ltda",
+        "buyerPurchaseOrderNumber": "PO-BR-2024-5678"
+      },
+      "recipient": {
+        "deliveryAddress": {
+          "name": "Carlos Oliveira",
+          "companyName": "Oliveira Tecnologia Ltda",
+          "addressLine1": "Avenida Paulista, 1000",
+          "addressLine2": "Sala 301",
+          "city": "S\u00e3o Paulo",
+          "stateOrRegion": "SP",
+          "postalCode": "01310-100",
+          "countryCode": "BR",
+          "phone": "+55 11 91234-5678",
+          "extendedFields": {
+            "streetName": "Avenida Paulista",
+            "streetNumber": "1000",
+            "complement": "Sala 301",
+            "neighborhood": "Bela Vista"
+          },
+          "addressType": "COMMERCIAL"
+        }
+      },
+      "proceeds": {
+        "grandTotal": {
+          "amount": "1599.90",
+          "currencyCode": "BRL"
+        }
+      },
+      "tax": {
+        "taxRegistrations": [
+          {
+            "entityType": "BUYER",
+            "legalName": "Oliveira Tecnologia Ltda",
+            "taxRegistrationType": "VAT",
+            "taxRegistrationNumber": "1234567890"
+          },
+          {
+            "entityType": "MARKETPLACE",
+            "taxRegistrationType": "CNPJ",
+            "taxRegistrationNumber": "15436940"
+          },
+          {
+            "entityType": "MERCHANT",
+            "legalName": "TechStore"
+          }
+        ],
+        "taxInvoicing": {
+          "invoiceStatus": "PROCESSING"
+        }
+      },
+      "payment": {
+        "paymentExecutions": [
+          {
+            "paymentMethod": "CreditCard",
+            "paymentAmount": {
+              "amount": "1599.90",
+              "currencyCode": "BRL"
+            },
+            "acquirerId": "01.027.058/0001-91",
+            "cardBrand": "Visa",
+            "authorizationCode": "123456"
+          }
+        ]
+      },
+      "fulfillment": {
+        "fulfillmentStatus": "UNSHIPPED",
+        "fulfilledBy": "MERCHANT",
+        "fulfillmentServiceLevel": "STANDARD",
+        "shipByWindow": {
+          "earliestDateTime": "2024-12-23T00:00:00Z",
+          "latestDateTime": "2024-12-24T23:59:59Z"
+        },
+        "deliverByWindow": {
+          "earliestDateTime": "2024-12-26T00:00:00Z",
+          "latestDateTime": "2024-12-30T23:59:59Z"
+        },
+        "promiseCalculationInputs": {
+          "transitTime": {
+            "details": {
+              "carrier": "Correios",
+              "shippingService": "SEDEX"
+            },
+            "dataSource": "THIRD_PARTY_INTEGRATOR"
+          }
+        }
+      },
+      "orderItems": [
+        {
+          "orderItemId": "17123456789012",
+          "quantityOrdered": 1,
+          "product": {
+            "asin": "B09B8V1LZ3",
+            "title": "Notebook Dell Inspiron 15 3000",
+            "sellerSku": "DELL-I15-BR-001",
+            "condition": {
+              "conditionType": "NEW",
+              "conditionSubtype": "NEW"
+            },
+            "price": {
+              "unitPrice": {
+                "amount": "1599.90",
+                "currencyCode": "BRL"
+              },
+              "priceDesignation": "BUSINESS_PRICE"
+            }
+          },
+          "proceeds": {
+            "proceedsTotal": {
+              "amount": "1599.90",
+              "currencyCode": "BRL"
+            },
+            "breakdowns": [
+              {
+                "type": "ITEM",
+                "subtotal": {
+                  "amount": "1599.90",
+                  "currencyCode": "BRL"
+                }
+              }
+            ]
+          },
+          "fulfillment": {
+            "quantityFulfilled": 0,
+            "quantityUnfulfilled": 1
+          }
+        }
+      ]
+    }
+  ],
+  "createdBefore": "2024-12-22T16:00:00Z"
+}

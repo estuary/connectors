@@ -1,0 +1,170 @@
+{
+  "orders": [
+    {
+      "orderId": "202-7654321-1098765",
+      "orderAliases": [
+        {
+          "aliasId": "UK-CONSUMER-ORDER-2024-002",
+          "aliasType": "SELLER_ORDER_ID"
+        }
+      ],
+      "createdTime": "2024-12-24T14:20:00Z",
+      "lastUpdatedTime": "2024-12-24T18:45:00Z",
+      "programs": [
+        "PRIME"
+      ],
+      "salesChannel": {
+        "channelName": "AMAZON",
+        "marketplaceId": "A1F83G8C2ARO7P",
+        "marketplaceName": "Amazon.co.uk"
+      },
+      "buyer": {
+        "buyerName": "Sarah Thompson",
+        "buyerEmail": "buyer-email@marketplace.amazon.co.uk"
+      },
+      "recipient": {
+        "deliveryAddress": {
+          "name": "Sarah Thompson",
+          "addressLine1": "45 Oak Avenue",
+          "addressLine2": "Flat 2A",
+          "addressLine3": "",
+          "city": "London",
+          "districtOrCounty": "Greater London",
+          "stateOrRegion": "England",
+          "municipality": "",
+          "postalCode": "SW1A 1AA",
+          "countryCode": "GB",
+          "phone": "+44 20 7946 0958",
+          "addressType": "RESIDENTIAL"
+        }
+      },
+      "proceeds": {
+        "grandTotal": {
+          "amount": "34.99",
+          "currencyCode": "GBP"
+        }
+      },
+      "fulfillment": {
+        "fulfillmentStatus": "SHIPPED",
+        "fulfilledBy": "MERCHANT",
+        "fulfillmentServiceLevel": "STANDARD",
+        "shipByWindow": {
+          "earliestDateTime": "2024-12-24T00:00:00Z",
+          "latestDateTime": "2024-12-25T23:59:59Z"
+        },
+        "deliverByWindow": {
+          "earliestDateTime": "2024-12-26T00:00:00Z",
+          "latestDateTime": "2024-12-28T23:59:59Z"
+        }
+      },
+      "orderItems": [
+        {
+          "orderItemId": "20276543210987",
+          "quantityOrdered": 1,
+          "measurement": {
+            "unit": "COUNT",
+            "value": 1
+          },
+          "product": {
+            "asin": "B08C1W5N87",
+            "title": "Amazon Echo Dot (4th Generation) | Smart speaker with Alexa | Charcoal",
+            "sellerSku": "ECHO-DOT-4-UK-CHARCOAL-SINGLE",
+            "condition": {
+              "conditionType": "NEW",
+              "conditionSubtype": "NEW",
+              "conditionNote": ""
+            },
+            "price": {
+              "unitPrice": {
+                "amount": "34.99",
+                "currencyCode": "GBP"
+              }
+            }
+          },
+          "proceeds": {
+            "proceedsTotal": {
+              "amount": "34.99",
+              "currencyCode": "GBP"
+            },
+            "breakdowns": [
+              {
+                "type": "ITEM",
+                "subtotal": {
+                  "amount": "34.99",
+                  "currencyCode": "GBP"
+                }
+              }
+            ]
+          },
+          "fulfillment": {
+            "quantityFulfilled": 1,
+            "quantityUnfulfilled": 0,
+            "picking": {
+              "substitutionPreference": {
+                "substitutionType": "CUSTOMER_PREFERENCE",
+                "substitutionOptions": [
+                  {
+                    "asin": "B08C1W5N88",
+                    "quantityOrdered": 1,
+                    "sellerSku": "ECHO-DOT-4-UK-WHITE-SINGLE",
+                    "title": "Amazon Echo Dot (4th Generation) | Smart speaker with Alexa | Glacier White",
+                    "measurement": {
+                      "unit": "COUNT",
+                      "value": 1
+                    }
+                  },
+                  {
+                    "asin": "B08C1W5N89",
+                    "quantityOrdered": 1,
+                    "sellerSku": "ECHO-DOT-4-UK-BLUE-SINGLE",
+                    "title": "Amazon Echo Dot (4th Generation) | Smart speaker with Alexa | Twilight Blue",
+                    "measurement": {
+                      "unit": "COUNT",
+                      "value": 1
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "packages": [
+        {
+          "packageReferenceId": "UK-PKG-CONSUMER-2024-002",
+          "createdTime": "2024-12-24T19:00:00Z",
+          "packageStatus": {
+            "status": "IN_TRANSIT",
+            "detailedStatus": "OUT_FOR_DELIVERY"
+          },
+          "carrier": "DPD",
+          "shipTime": "2024-12-25T14:00:00Z",
+          "shippingService": "DPD Next Day Delivery",
+          "trackingNumber": "15501234567890123456",
+          "shipFromAddress": {
+            "name": "SmartHome Electronics Warehouse",
+            "addressLine1": "Unit 7, Technology Park",
+            "addressLine2": "Innovation Drive",
+            "addressLine3": "",
+            "city": "Reading",
+            "districtOrCounty": "Berkshire",
+            "stateOrRegion": "England",
+            "municipality": "",
+            "postalCode": "RG6 1AZ",
+            "countryCode": "GB"
+          },
+          "packageItems": [
+            {
+              "orderItemId": "20276543210987",
+              "quantity": 1,
+              "transparencyCodes": [
+                "T98765ZYXWV43210UK"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "createdBefore": "2024-12-24T15:00:00Z"
+}

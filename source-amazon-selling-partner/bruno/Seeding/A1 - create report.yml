@@ -1,0 +1,61 @@
+info:
+  name: A1 - create report
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/reports/2021-06-30/reports"
+  auth: inherit
+  body:
+    type: json
+    data: |-
+      {
+        "reportType": "GET_FLAT_FILE_ALL_ORDERS_DATA_BY_LAST_UPDATE_GENERAL",
+        "marketplaceIds": ["{{marketplace_id}}"],
+        "dataStartTime": "2026-10-01T00:00:00Z",
+        "dataEndTime": "2026-10-02T00:00:00Z"
+      }
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 202) {
+          bru.setVar('report_id', res.getBody().reportId);
+          // Drop any document an earlier `Reports / list` picked.
+          bru.setVar('report_document_id', '');
+          bru.setVar('report_document_url', '');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://developer-docs.amazon.com/sp-api/reference/createreport
+
+    **ONLY THE USER RUNS THIS, never the assistant.** It requests a report,
+    spending createReport's budget.
+
+    **WHY:** the request `all_orders` makes for each window
+    (`reports.create_report`); `sales_and_traffic_by_date` makes the same
+    with `GET_SALES_AND_TRAFFIC_REPORT`, one marketplace and
+    `reportOptions` `{"dateGranularity": "DAY", "asinGranularity": "CHILD"}`.
+    Captures `report_id` for `Reports / report`.
+
+    **DOCUMENTED (2026-11-10):** at most 25 `marketplaceIds`, and the
+    document holds data for all of them unless the report type says
+    otherwise; HTTP 202 with the new `reportId`.
+
+    **PENDING:** what Amazon does with an order report range of 30 days or
+    more (the connector asks for at most 29) or one older than two years;
+    whether `dataStartTime` and `dataEndTime` are inclusive (the
+    connector overlaps windows by an hour either way); that one report covers
+    every marketplace it names; that each order report row carries an
+    `order-item-id`; and that a second CANCELLED report of the same range
+    means the range has no data. Outcome: not yet run.
+  type: text/markdown
