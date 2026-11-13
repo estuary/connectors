@@ -385,6 +385,30 @@ async def test_created_report_missing_echo_still_rejects_a_different_start(monke
 
 
 @pytest.mark.asyncio
+async def test_created_report_missing_echo_still_rejects_different_marketplaces(monkeypatch):
+    request = request_for(HORIZON - DAY, HORIZON)
+    fake = FakeAmazon(now=NOW, orders=[])
+    get_report = reports.get_report
+
+    async def changed_echo(*args):
+        report = await get_report(*args)
+        return report.model_copy(update={
+            "marketplaceIds": [MARKETPLACES[0]],
+            "dataStartTime": None,
+            "dataEndTime": None,
+        })
+
+    monkeypatch.setattr(reports, "get_report", changed_echo)
+    client, _ = client_with(fake)
+
+    with pytest.raises(ReportMismatch, match="requested-1"):
+        await request_report(client, request, Priority.INCREMENTAL, LOG)
+
+    assert len(fake.create_requests) == 1
+    assert fake.get_report_requests == ["requested-1"]
+
+
+@pytest.mark.asyncio
 async def test_created_report_missing_end_still_counts_cancellations(monkeypatch):
     request = request_for(HORIZON - DAY, HORIZON)
     fake = FakeAmazon(now=NOW, orders=[], lifecycles=[["CANCELLED"], ["CANCELLED"]])

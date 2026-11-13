@@ -301,6 +301,46 @@ async def test_rejected_tokens_shrink_orders_window_until_floor(backfill: bool, 
 
 
 @pytest.mark.asyncio
+async def test_backfill_rejected_token_in_final_window_resumes_to_cutoff():
+    cutoff = NOW - timedelta(hours=1)
+    start = cutoff - timedelta(hours=4)
+    smaller_end = start + timedelta(hours=2) - api.TICK
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[
+            order("1", start + timedelta(minutes=1), start),
+            order("2", start + timedelta(minutes=2), start),
+            order("3", smaller_end, start),
+            order("rest-start", smaller_end + api.TICK, start),
+            order("rest-end", cutoff - api.TICK, start),
+            order("at-cutoff", cutoff, cutoff),
+        ],
+        expire_token_once=True,
+    )
+    client = client_for(fake)
+    window_size = timedelta(days=1)
+
+    out = await collect(backfill_orders(client, MARKETPLACES, start, window_size, LOG, None, cutoff))
+
+    assert [o.orderId for o in out if isinstance(o, Order)] == ["1", "2", "1", "2", "3"]
+    assert [o for o in out if not isinstance(o, Order)] == [api.to_iso(smaller_end + api.TICK)]
+    assert len(fake.requests) == 4
+    assert fake.requests[0]["createdBefore"] == api.to_iso(cutoff - api.TICK)
+    assert "paginationToken" in fake.requests[1]
+    assert "paginationToken" not in fake.requests[2]
+    assert fake.requests[2]["createdAfter"] == api.to_iso(start)
+    assert fake.requests[2]["createdBefore"] == api.to_iso(smaller_end)
+
+    rest = await collect(backfill_orders(client, MARKETPLACES, start, window_size, LOG, out[-1], cutoff))
+
+    assert [o.orderId for o in rest if isinstance(o, Order)] == ["rest-start", "rest-end"]
+    assert [o for o in rest if not isinstance(o, Order)] == []
+    assert len(fake.requests) == 5
+    assert fake.requests[4]["createdAfter"] == api.to_iso(smaller_end + api.TICK)
+    assert fake.requests[4]["createdBefore"] == api.to_iso(cutoff - api.TICK)
+
+
+@pytest.mark.asyncio
 async def test_expired_pagination_token_raises_clear_error():
     cursor = NOW - timedelta(hours=1)
     fake = FakeAmazon(
