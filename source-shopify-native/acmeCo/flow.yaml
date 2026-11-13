@@ -104,6 +104,11 @@ collections:
     key:
     - /_meta/store
     - /id
+  acmeCo/payouts:
+    schema: payouts.schema.yaml
+    key:
+    - /_meta/store
+    - /id
   acmeCo/price_list_prices:
     schema: price_list_prices.schema.yaml
     key:

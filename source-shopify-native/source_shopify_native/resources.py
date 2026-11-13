@@ -35,6 +35,7 @@ from .api import (
     bulk_fetch_snapshot,
     fetch_incremental,
     fetch_incremental_unsorted,
+    fetch_payouts,
     fetch_snapshot,
     snapshot_price_list_prices,
 )
@@ -178,6 +179,7 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.LocationMetafields,
     gql.SubscriptionContracts,
     gql.Disputes,
+    gql.Payouts,
 ]
 
 PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {
@@ -587,6 +589,11 @@ def _build_incremental_resource(
         stores_with_access, config.start_date, use_backfill
     )
     legacy_store_id = config._legacy_store or config.stores[0].store
+    # A blank start_date defaults to 30 days before each start, which can cut into the window a
+    # payouts read looks back over. So those reads only honor a start_date the config sets.
+    configured_start_date = (
+        config.start_date if "start_date" in config.model_fields_set else None
+    )
 
     async def open(
         binding: CaptureBinding[ResourceConfig],
@@ -657,6 +664,24 @@ def _build_incremental_resource(
                     ctx.capabilities,
                     datetime.fromtimestamp(0, tz=UTC),
                     build_query=build_query,
+                )
+            elif model is gql.Payouts:
+                fetch_changes[store_id] = functools.partial(
+                    fetch_payouts,
+                    ctx.client,
+                    create_response_data_model(gql.Payouts),
+                    store_id,
+                    ctx.capabilities,
+                    configured_start_date,
+                )
+                fetch_page[store_id] = functools.partial(
+                    backfill_incremental_unsorted,
+                    ctx.client,
+                    model,
+                    data_model,
+                    store_id,
+                    ctx.capabilities,
+                    config.start_date,
                 )
             elif model.SHOULD_USE_BULK_QUERIES:
                 fetch_changes[store_id] = functools.partial(
