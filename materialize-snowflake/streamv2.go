@@ -783,14 +783,18 @@ func streamV2ValidateCommittedToken(channelName, table string, committedToken *s
 		routed = sv2ChannelCheckpointItem.Routed
 	}
 
+	// A checkpoint item is written only after Snowflake commits its channel through
+	// Routed, so the table holds every document through Routed even once the
+	// channel and its token are gone.
 	if committedToken == nil {
 		if routed > 0 {
-			return 0, fmt.Errorf(
-				"channel %q reports no committed offset token while this task's checkpoint records offset %d for it: Snowflake has lost this channel's committed offset token, so this shard cannot identify which of its documents Snowflake still holds. Backfill this binding",
-				channelName, routed,
-			)
+			log.WithFields(log.Fields{
+				"table":   table,
+				"channel": channelName,
+				"routed":  routed,
+			}).Warn("snowpipe streaming v2: Snowflake no longer holds this channel's offset token, as it does once a channel goes 30 days without ingestion, so the channel resumes from the checkpoint's offset. A transaction interrupted before its checkpoint may be appended again")
 		}
-		return 0, nil
+		return routed, nil
 	}
 
 	committedOffset, appendedBy, ok := streamV2ParseOffsetToken(*committedToken)
