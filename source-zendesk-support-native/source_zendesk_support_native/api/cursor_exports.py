@@ -202,6 +202,12 @@ async def backfill_incremental_cursor_export_resources(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
+    # A binding that switched back from the keyset sweep resumes from a plain
+    # epoch page.
+    if page is not None and is_timestamp(page):
+        start_date = s_to_dt(int(page))
+        page = None
+
     generator = _fetch_incremental_cursor_export_resources(
         http, subdomain, name, start_date, page, log
     )
