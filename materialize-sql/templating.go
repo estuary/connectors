@@ -57,8 +57,8 @@ func MustParseTemplate(dialect Dialect, name, body string, extraFuncs ...templat
 			}
 			return chunks
 		},
+		"BoundOn": func(alias string, bound MergeBound) BoundOn { return BoundOn{Alias: alias, Bound: bound} },
 	}
-	funcs["BoundOn"] = func(alias string, bound MergeBound) BoundOn { return BoundOn{Alias: alias, Bound: bound} }
 	for _, extra := range extraFuncs {
 		for k, v := range extra {
 			funcs[k] = v
