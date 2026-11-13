@@ -2,10 +2,12 @@ package connector
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/smithy-go"
 	"github.com/estuary/connectors/go/common"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -49,6 +51,23 @@ func TestFlushFeatureFlags(t *testing.T) {
 		require.NoError(t, tr.Flush(t.Context(), map[int]time.Time{0: boundary}))
 		require.Equal(t, map[int]time.Time{}, tr.truncations)
 	})
+}
+
+func TestIsAccessDenied(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "nil", err: nil, want: false},
+		{name: "access denied", err: fmt.Errorf("scanning: %w", &smithy.GenericAPIError{Code: "AccessDeniedException"}), want: true},
+		{name: "other api error", err: &smithy.GenericAPIError{Code: "ValidationException"}, want: false},
+		{name: "not an api error", err: errors.New("boom"), want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, isAccessDenied(tc.err))
+		})
+	}
 }
 
 func TestPublishedAtField(t *testing.T) {

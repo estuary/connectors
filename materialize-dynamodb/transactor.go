@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -12,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/smithy-go"
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -274,7 +276,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	for binding, boundary := range t.truncations {
 		b := t.bindings[binding]
 		deleted, err := truncateStaleItems(ctx, t.client, b, boundary)
-		if err != nil {
+		if isAccessDenied(err) {
+			t.be.Warn(b.tableName, fmt.Sprintf("Items published before the backfill of table %s were not deleted because the credentials lack the permissions to do so: %s.", b.tableName, err))
+			continue
+		} else if err != nil {
 			return nil, fmt.Errorf("truncating table %q after backfill: %w", b.tableName, err)
 		}
 		log.WithFields(log.Fields{
@@ -290,6 +295,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 }
 
 func (t *transactor) Destroy() {}
+
+// isAccessDenied reports whether err is DynamoDB rejecting a request because
+// the credentials lack the permission for it.
+func isAccessDenied(err error) bool {
+	apiErr, ok := errors.AsType[smithy.APIError](err)
+	return ok && apiErr.ErrorCode() == "AccessDeniedException"
+}
 
 func (t *transactor) loadWorker(ctx context.Context, loaded func(i int, doc json.RawMessage) error, batches <-chan map[string]types.KeysAndAttributes) error {
 	for {
