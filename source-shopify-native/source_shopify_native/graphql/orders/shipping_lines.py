@@ -37,7 +37,7 @@ class OrderShippingLines(ShopifyGraphQLResource):
     # Could run in bulk, but pages to leave the store's five bulk query slots to the streams
     # that need them.
     SHOULD_USE_BULK_QUERIES = False
-    QUALIFYING_SCOPES = {"read_orders", "read_marketplace_orders", "read_quick_sale"}
+    QUALIFYING_SCOPES = [{"read_orders", "read_marketplace_orders", "read_quick_sale"}]
     QUERY = """
     # {{ shippingLines }}
     """

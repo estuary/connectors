@@ -15,7 +15,7 @@ class AbandonedCheckouts(ShopifyGraphQLResource):
     # staff permission in Shopify admin. The staff permission cannot be verified
     # programmatically - only the OAuth scope can be checked.
     # See: https://shopify.dev/docs/api/admin-graphql/latest/objects/AbandonedCheckout
-    QUALIFYING_SCOPES = {"read_orders"}
+    QUALIFYING_SCOPES = [{"read_orders"}]
     QUERY = """
     id
     abandonedCheckoutUrl

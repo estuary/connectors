@@ -33,7 +33,7 @@ class PriceLists(ShopifyGraphQLResource):
     NAME = "price_lists"
     QUERY_ROOT = "priceLists"
     SHOULD_USE_BULK_QUERIES = False
-    QUALIFYING_SCOPES = {"read_products"}
+    QUALIFYING_SCOPES = [{"read_products"}]
     QUERY = """
     id
     name
@@ -102,7 +102,7 @@ class PriceListPrices(ShopifyGraphQLResource):
     QUERY_ROOT = "priceList"
     CONNECTION_PATH = ["prices"]
     SHOULD_USE_BULK_QUERIES = False
-    QUALIFYING_SCOPES = {"read_products"}
+    QUALIFYING_SCOPES = [{"read_products"}]
     # A snapshot reads one price per variant per price list, and a change to any price re-emits
     # them all, so it runs once a day by default.
     SNAPSHOT_INTERVAL = timedelta(days=1)

@@ -16,7 +16,7 @@ class OrderReturns(ShopifyGraphQLResource):
     NAME = "order_returns"
     QUERY_ROOT = "orders"
     SORT_KEY = SortKey.UPDATED_AT
-    QUALIFYING_SCOPES = {"read_returns", "read_marketplace_returns"}
+    QUALIFYING_SCOPES = [{"read_returns", "read_marketplace_returns"}]
     QUERY = """
     returns {
         edges {

@@ -12,7 +12,7 @@ class ProductMetafields(MetafieldsResource):
     PARENT_ID_KEY = "gid://shopify/Product/"
     QUERY_ROOT = "products"
     SORT_KEY = SortKey.UPDATED_AT
-    QUALIFYING_SCOPES = {"read_products"}
+    QUALIFYING_SCOPES = [{"read_products"}]
 
     @staticmethod
     def build_query(
@@ -43,7 +43,7 @@ class ProductVariantMetafields(MetafieldsResource):
     PARENT_ID_KEY = "gid://shopify/ProductVariant/"
     QUERY_ROOT = "products"
     SORT_KEY = SortKey.UPDATED_AT
-    QUALIFYING_SCOPES = {"read_products"}
+    QUALIFYING_SCOPES = [{"read_products"}]
     QUERY = """
     variants {
         edges {
