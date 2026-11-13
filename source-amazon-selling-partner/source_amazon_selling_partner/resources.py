@@ -351,7 +351,12 @@ def settlement_reports(
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff - TICK),
             backfill=ResourceState.Backfill(
-                next_page=None,
+                # Saved as a watermark just before start_date, so a restart
+                # before the first checkpoint keeps the original start even
+                # when start_date is the default that moves forward daily.
+                next_page=(
+                    floor_to_tick(config.start_date) - timedelta(microseconds=1)
+                ).isoformat(),
                 cutoff=cutoff,
             ),
         ),

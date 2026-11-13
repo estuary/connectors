@@ -826,19 +826,22 @@ async def test_backfill_from_the_initial_state_skips_reports_just_before_start_d
 async def test_initial_backfill_includes_start_once_across_resume(fraction: int):
     start = (NOW - 10 * DAY).replace(microsecond=fraction)
     fake = fake_with(
-        ("before", start - timedelta(microseconds=1), 1),
+        ("before", api.floor_to_tick(start) - timedelta(microseconds=1), 1),
         ("at-start-a", start, 1),
         ("at-start-b", start, 1),
         ("after", start + DAY, 1),
     )
     for entry, created in zip(fake.reports, (
-        start - timedelta(microseconds=1), start, start, start + DAY,
+        api.floor_to_tick(start) - timedelta(microseconds=1), start, start, start + DAY,
     ), strict=True):
         entry["createdTime"] = created.isoformat()
     client = client_for(fake)
     config = make_config(["ATVPDKIKX0DER"], start_date=start.isoformat())
     state = resources.settlement_reports(LOG, client, config).initial_state
-    assert state.backfill.next_page is None
+    # The start is saved, so a restart can't move it with a later default.
+    assert state.backfill.next_page == (
+        api.floor_to_tick(start) - timedelta(microseconds=1)
+    ).isoformat()
     out = []
     async for item in backfill_settlement_reports(
         client, RecentReports(), start, LOG, state.backfill.next_page,

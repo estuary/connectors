@@ -934,11 +934,11 @@ async def backfill_settlement_reports(
     createdUntil ════╪═════════╪══════════╪════════════]        │
     emitted ─────────┼─────────┼──────────[════════════]        │
                      │         │          │            │        └─ inc starts
-                     │         │          └─ since on the first call;
-                     │         │             first report after watermark
-                     │         └─ every report through here was read
-                     └─ start_date, retention floor if later, or
-                        the watermark floored to the second
+                     │         │          └─ first report after watermark
+                     │         └─ every report through here was read;
+                     │            initially just before start_date
+                     └─ the watermark floored to the second, or the
+                        retention floor if later
     ```
 
     Listing bounds are inclusive here; a resume watermark is exclusive.
