@@ -884,7 +884,7 @@ def incremental_keyset_paginated_resources_with_deletions(
         return common.Resource(
             name=name,
             key=["/id"],
-            model=TimestampedResource,
+            model=ZendeskResource,
             open=functools.partial(open, name, response_model, fetch_deletions, margin),
             initial_state=ResourceState(
                 inc={
@@ -1058,7 +1058,7 @@ def incremental_cursor_export_resources(
             common.Resource(
             name=name,
             key=["/id"],
-            model=TimestampedResource,
+            model=ZendeskResource,
             open=functools.partial(open, name),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=initial_state),
