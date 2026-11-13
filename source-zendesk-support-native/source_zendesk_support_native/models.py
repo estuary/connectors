@@ -352,6 +352,10 @@ class OrganizationsListResponse(IncrementalKeysetPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="organizations")
 
 
+class UsersListResponse(IncrementalKeysetPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="users")
+
+
 # Resources read by sweeping a list endpoint in ascending updated_at order.
 # Tuples contain the name, path, and response model for each resource.
 INCREMENTAL_KEYSET_PAGINATED_RESOURCES: list[tuple[str, str, type[IncrementalKeysetPaginatedResponse]]] = [
