@@ -6,10 +6,12 @@ for Amazon to finish them, and streams a DONE report's document as rows.
 import codecs
 import csv
 import zlib
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from email.message import Message
 from logging import Logger
+from tempfile import TemporaryFile
 from typing import Any, AsyncGenerator, AsyncIterator
 
 from estuary_cdk.http import Headers, HTTPError
@@ -572,6 +574,35 @@ def _done_document_id(report: Report) -> str:
     return report.reportDocumentId
 
 
+@asynccontextmanager
+async def _listing_document(
+    stream: AsyncIterator[bytes],
+) -> AsyncGenerator[tuple[str, AsyncGenerator[bytes, None]], None]:
+    # Validate before yielding rows so a late decode failure cannot replay rows.
+    decoders = {name: codecs.getincrementaldecoder(name)() for name in (DEFAULT_ENCODING, "cp1252")}
+    with TemporaryFile() as buffered:
+        async for chunk in stream:
+            buffered.write(chunk)
+            for name, decoder in list(decoders.items()):
+                try:
+                    decoder.decode(chunk)
+                except UnicodeDecodeError:
+                    del decoders[name]
+        for name, decoder in list(decoders.items()):
+            try:
+                decoder.decode(b"", final=True)
+            except UnicodeDecodeError:
+                del decoders[name]
+        encoding = next(iter(decoders), "latin-1")
+        buffered.seek(0)
+
+        async def chunks() -> AsyncGenerator[bytes, None]:
+            while chunk := buffered.read(64 * 1024):
+                yield chunk
+
+        yield encoding, chunks()
+
+
 async def read_report(
     client: SPAPIClient,
     report: Report,
@@ -583,13 +614,15 @@ async def read_report(
     """
     Yields each data row of a DONE report's flat-file document, in file
     order, as its column values exactly as the file holds them, alongside the
-    document's metadata. The document is streamed and never stored whole.
+    document's metadata. The document is never held whole in memory.
 
     The document is decoded with the charset its Content-Type names, or as
     UTF-8 if it names none. A report without a document, or a document that
     can't be fetched, ends early or isn't text in that encoding, fails
     rather than reading as empty, short or garbled. A document with no data
-    rows is logged, as a warning unless `empty_is_routine`.
+    rows is logged, as a warning unless `empty_is_routine`. All Listings
+    documents without a charset are spooled to disk to try UTF-8, cp1252,
+    then latin-1. All Listings rows with a different width are skipped.
     """
     document, headers, stream = await _download_document(
         client, _done_document_id(report), priority, log
@@ -600,56 +633,76 @@ async def read_report(
         "report_type": report.reportType,
         "content_type": headers.get("Content-Type"),
     }
-    encoding = charset_encoding(headers.get("Content-Type"))
-    if encoding is None:
-        log.warning("report document names no charset, reading it as UTF-8", log_fields)
-        encoding = DEFAULT_ENCODING
+    async with AsyncExitStack() as stack:
+        encoding = charset_encoding(headers.get("Content-Type"))
+        is_listing = report.reportType == "GET_MERCHANT_LISTINGS_ALL_DATA"
+        fallback = is_listing and encoding is None
+        if fallback:
+            encoding, stream = await stack.enter_async_context(_listing_document(stream))
+        elif encoding is None:
+            log.warning("report document names no charset, reading it as UTF-8", log_fields)
+            encoding = DEFAULT_ENCODING
+        skipped = 0
 
-    # Flat files are tab-separated without quoting: a quote is an ordinary
-    # character, and fields never hold tabs or line breaks.
-    config = CSVConfig(
-        delimiter="\t", quoting=csv.QUOTE_NONE, lineterminator="\n", encoding=encoding
-    )
+        # Flat files are tab-separated without quoting: a quote is an ordinary
+        # character, and fields never hold tabs or line breaks.
+        config = CSVConfig(
+            delimiter="\t", quoting=csv.QUOTE_NONE, lineterminator="\n", encoding=encoding
+        )
 
-    async def rows() -> AsyncGenerator[dict[str, str], None]:
-        if not required_columns:
-            async for row in IncrementalCSVProcessor(stream, config=config):
-                yield row
-            return
-        processor = IncrementalCSVRowProcessor(stream, config=config)
-        columns = await anext(processor, [])
-        if not set(required_columns).issubset(columns):
-            raise RuntimeError(
-                f"Report {report.reportId} ({report.reportType}) is missing required "
-                f"column(s) {required_columns}; columns seen: {columns}. "
-                "The report may have cached localized headers despite the requested en_US locale."
-            )
-        async for cells in processor:
-            if len(cells) != len(columns):
+        async def rows() -> AsyncGenerator[dict[str, str], None]:
+            nonlocal skipped
+            if not required_columns and not is_listing:
+                async for row in IncrementalCSVProcessor(stream, config=config):
+                    yield row
+                return
+            processor = IncrementalCSVRowProcessor(stream, config=config)
+            columns = await anext(processor, [])
+            if not set(required_columns).issubset(columns):
                 raise RuntimeError(
-                    f"Report {report.reportId} row has {len(cells)} columns; "
-                    f"expected {len(columns)}"
+                    f"Report {report.reportId} ({report.reportType}) is missing required "
+                    f"column(s) {required_columns}; columns seen: {columns}. "
+                    "The report may have cached localized headers despite the requested en_US locale."
                 )
-            yield dict(zip(columns, cells, strict=True))
+            async for cells in processor:
+                if len(cells) != len(columns):
+                    if is_listing:
+                        skipped += 1
+                        continue
+                    raise RuntimeError(
+                        f"Report {report.reportId} row has {len(cells)} columns; "
+                        f"expected {len(columns)}"
+                    )
+                yield dict(zip(columns, cells, strict=True))
 
-    count = 0
-    try:
-        async for row in rows():
-            count += 1
-            yield document, row
-    except UnicodeDecodeError as err:
-        raise ReportEncodingError(
-            f"report document {document.reportDocumentId} of report {report.reportId} "
-            f"({report.reportType}) isn't {encoding} text. Its Content-Type is "
-            f"{headers.get('Content-Type')!r}. {err}"
-        ) from err
+        count = 0
+        try:
+            async for row in rows():
+                count += 1
+                yield document, row
+        except UnicodeDecodeError as err:
+            raise ReportEncodingError(
+                f"report document {document.reportDocumentId} of report {report.reportId} "
+                f"({report.reportType}) isn't {encoding} text. Its Content-Type is "
+                f"{headers.get('Content-Type')!r}. {err}"
+            ) from err
 
-    if count == 0 and empty_is_routine:
-        log.debug("report document has no data rows", log_fields)
-    elif count == 0:
-        log.warning("report document has no data rows", log_fields)
-    else:
-        log.info("read report document", {**log_fields, "rows": count, "encoding": encoding})
+        if is_listing and skipped and count == 0:
+            raise RuntimeError(
+                f"Report {report.reportId} ({report.reportType}) has no row matching "
+                f"its header's width; {skipped} row(s) skipped."
+            )
+        if is_listing and (encoding != DEFAULT_ENCODING or skipped):
+            log.warning(
+                "read All Listings report with fallback or skipped rows",
+                {"rows_skipped": skipped, "encoding": encoding},
+            )
+        elif count == 0 and empty_is_routine:
+            log.debug("report document has no data rows", log_fields)
+        elif count == 0:
+            log.warning("report document has no data rows", log_fields)
+        else:
+            log.info("read report document", {**log_fields, "rows": count, "encoding": encoding})
 
 
 async def _as_utf8(

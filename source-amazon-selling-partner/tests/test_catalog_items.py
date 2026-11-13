@@ -5,13 +5,15 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from estuary_cdk.incremental_csv_processor import CSVProcessingError
 
 from source_amazon_selling_partner import api, reports
 from source_amazon_selling_partner.api import fetch_catalog_items
-from source_amazon_selling_partner.models import CatalogItem
-from source_amazon_selling_partner.reports import ReportFailed, ReportRoleMissing
+from source_amazon_selling_partner.client import Priority
+from source_amazon_selling_partner.models import CatalogItem, Report, SettlementReportRow
+from source_amazon_selling_partner.reports import ReportEncodingError, ReportFailed, ReportRoleMissing
 
-from .fake_amazon import FakeAmazon, FakeDocument
+from .fake_amazon import FakeAmazon, FakeDocument, report
 from .test_orders import NOW, client_for, collect
 
 LOG = logging.getLogger("test")
@@ -203,12 +205,109 @@ async def test_blank_seller_sku_is_not_emitted():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("row, count", [("a\tSKU-a", 2), ("a\tSKU-a\tActive\textra", 4)])
-async def test_listing_row_length_must_match_header(row, count):
-    fake = fixture([])
-    fake.listings[MARKETS[0]] = "asin1\tseller-sku\tstatus\n" + row + "\n"
-    with pytest.raises(RuntimeError, match=f"row has {count} columns; expected 3"):
-        await refresh(fake)
+async def test_listing_ragged_rows_are_skipped_once_per_report(caplog):
+    fake = fixture(["a", "b"])
+    fake.listings[MARKETS[0]] = (
+        "asin1\tseller-sku\tstatus\n"
+        "a\tSKU-a\tActive\n"
+        "private-short\tprivate-sku\n"
+        "private-long\tprivate-sku\tActive\tprivate-extra\n"
+        "b\tSKU-b\tActive\n"
+    )
+    with caplog.at_level(logging.WARNING):
+        out = await refresh(fake)
+    assert [doc.asin for doc in out[:-1]] == ["a", "b"]
+    assert out[-1] == NOW
+    assert len(caplog.records) == 1
+    assert caplog.records[0].args == {"rows_skipped": 2, "encoding": "utf-8-sig"}
+    assert "private" not in caplog.text
+
+
+async def read_document(body, content_type, report_type=CatalogItem.REPORT_TYPE, required_columns=()):
+    fake = FakeAmazon(now=NOW, orders=[])
+    metadata = Report.model_validate(report("r1", NOW, report_type=report_type))
+    fake.documents["doc-r1"] = FakeDocument(body, content_type=content_type)
+    fake.download_chunk_size = 3
+    return await collect(reports.read_report(
+        client_for(fake), metadata, Priority.BACKFILL, LOG, required_columns=required_columns,
+    ))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("content_type", [None, "text/plain"])
+@pytest.mark.parametrize(
+    "suffix, expected, encoding",
+    [
+        (b"price \x80 and l\x92article", "price € and l’article", "cp1252"),
+        (b"undefined \x81", "undefined \x81", "latin-1"),
+        ("商品".encode(), "商品", "utf-8-sig"),
+        (b"truncated \xe2\x82", "truncated â‚", "cp1252"),
+    ],
+)
+async def test_listing_without_charset_selects_encoding(suffix, expected, encoding, content_type, caplog):
+    body = b"asin1\tseller-sku\tstatus\titem-name\na\tSKU-a\tActive\tplain\n"
+    body += b"b\tSKU-b\tActive\t" + suffix
+    with caplog.at_level(logging.WARNING):
+        out = await read_document(body, content_type)
+    assert [row["item-name"] for _, row in out] == ["plain", expected]
+    if encoding == "utf-8-sig":
+        # A clean UTF-8 document is routine and logs no warning.
+        assert caplog.records == []
+    else:
+        assert len(caplog.records) == 1
+        assert caplog.records[0].args == {"rows_skipped": 0, "encoding": encoding}
+
+
+@pytest.mark.asyncio
+async def test_listing_with_every_row_ragged_fails():
+    with pytest.raises(RuntimeError, match="no row matching its header's width; 2 row"):
+        await read_document(b"asin1\tseller-sku\tstatus\nshort\nlong\trow\twith\textra\n", None)
+
+
+@pytest.mark.asyncio
+async def test_listing_encoding_and_ragged_rows_share_one_warning(caplog):
+    body = b"asin1\tseller-sku\tstatus\na\tSKU-\x80\tActive\nshort\nlong\trow\twith\textra\n"
+    with caplog.at_level(logging.WARNING):
+        out = await read_document(body, None)
+    assert [row["seller-sku"] for _, row in out] == ["SKU-€"]
+    assert len(caplog.records) == 1
+    assert caplog.records[0].args == {"rows_skipped": 2, "encoding": "cp1252"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "content_type, value",
+    [("text/plain; charset=UTF-8", b"\x80"), ("text/plain; charset=cp1252", b"\x81")],
+)
+async def test_listing_declared_charset_stays_strict(content_type, value):
+    with pytest.raises(ReportEncodingError):
+        await read_document(b"asin1\tseller-sku\tstatus\na\t" + value + b"\tActive\n", content_type)
+
+
+@pytest.mark.asyncio
+async def test_listing_declared_charset_is_honored():
+    out = await read_document(
+        "asin1\tseller-sku\tstatus\na\tSKU-é\tActive\n".encode("utf-16"),
+        "text/plain; charset=UTF-16",
+    )
+    assert out[0][1]["seller-sku"] == "SKU-é"
+
+
+@pytest.mark.asyncio
+async def test_other_report_without_charset_stays_strict_on_bytes():
+    with pytest.raises(ReportEncodingError):
+        await read_document(b"one\ttwo\na\t\x80\n", None, SettlementReportRow.REPORT_TYPE)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("row", [b"short\n", b"long\trow\textra\n"])
+@pytest.mark.parametrize("required_columns", [(), ("one",)])
+async def test_other_report_stays_strict_on_ragged_rows(row, required_columns):
+    with pytest.raises((CSVProcessingError, RuntimeError), match="columns"):
+        await read_document(
+            b"one\ttwo\n" + row, "text/plain; charset=UTF-8",
+            SettlementReportRow.REPORT_TYPE, required_columns,
+        )
 
 
 @pytest.mark.asyncio
