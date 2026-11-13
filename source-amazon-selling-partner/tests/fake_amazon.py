@@ -134,6 +134,13 @@ class FakeAmazon:
     # The salesAndTrafficByDate entries of each marketplace, which Sales and
     # Traffic reports are made from.
     sales_and_traffic: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    # The tab-separated listings report for each marketplace.
+    listings: dict[str, str] = field(default_factory=dict)
+    # The catalog items returned for each marketplace.
+    catalog_items: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    catalog_requests: list[dict[str, Any]] = field(default_factory=list)
+    catalog_forbidden: bool = False
+    catalog_page_size: int = 20
     # Whether the application and seller have the Brand Analytics role, which
     # createReport for Sales and Traffic needs.
     brand_analytics: bool = True
@@ -171,6 +178,26 @@ class FakeAmazon:
             return self._get_reports(params)
         if DOCUMENTS_PATH in url:
             return self._get_report_document(url.rsplit("/", 1)[1], params)
+
+        if url.endswith("/catalog/2022-04-01/items"):
+            self.catalog_requests.append(params)
+            if self.catalog_forbidden:
+                raise HTTPError("403: Access denied", 403)
+            assert params["identifiersType"] == "ASIN"
+            assert params["includedData"] == "summaries"
+            assert params["pageSize"] == 20
+            marketplace = params["marketplaceIds"]
+            assert "," not in marketplace
+            identifiers = params["identifiers"].split(",")
+            assert len(identifiers) <= 20
+            assert all(identifier.strip() for identifier in identifiers)
+            items = [i for i in self.catalog_items.get(marketplace, []) if i["asin"] in identifiers]
+            offset = int(params.get("pageToken", 0))
+            page = items[offset:offset + self.catalog_page_size]
+            pagination = {}
+            if offset + len(page) < len(items):
+                pagination["nextToken"] = str(offset + len(page))
+            return self._respond({"numberOfResults": len(items), "items": page, "pagination": pagination})
 
         self.requests.append(params)
 
@@ -441,6 +468,11 @@ class FakeAmazon:
                 compressed=True,
                 content_type="application/json",
             )
+            report["reportDocumentId"] = document_id
+        elif report["processingStatus"] == "DONE" and report["reportType"] == "GET_MERCHANT_LISTINGS_ALL_DATA":
+            (marketplace,) = report["marketplaceIds"]
+            text = self.listings.get(marketplace, "asin1\tseller-sku\tstatus\n")
+            self.documents[document_id] = FakeDocument(("\ufeff" + text).encode())
             report["reportDocumentId"] = document_id
         elif report["processingStatus"] == "DONE":
             lo, hi = parse(report["dataStartTime"]), parse(report["dataEndTime"])

@@ -415,3 +415,52 @@ class SalesAndTrafficSpecification(BaseModel, extra="allow"):
     # Amazon ignores the time of day of a requested range.
     dataStartTime: date
     dataEndTime: date
+
+
+class CatalogItem(BaseDocument, extra="allow"):
+    """A listed ASIN's catalog summary in one marketplace."""
+
+    PATH: ClassVar[str] = "/catalog/2022-04-01/items"
+    PAGE_SIZE: ClassVar[int] = 20
+    REPORT_TYPE: ClassVar[str] = "GET_MERCHANT_LISTINGS_ALL_DATA"
+
+    asin: str
+    marketplaceId: str
+    brand: str | None = None
+    color: str | None = None
+    itemClassification: str | None = None
+    itemName: str | None = None
+    manufacturer: str | None = None
+    modelNumber: str | None = None
+    partNumber: str | None = None
+    size: str | None = None
+    style: str | None = None
+    websiteDisplayGroup: str | None = None
+    websiteDisplayGroupName: str | None = None
+    releaseDate: str | None = None
+    browseClassification: dict[str, Any] | None = None
+    packageQuantity: int | None = None
+    adultProduct: bool | None = None
+    autographed: bool | None = None
+    contributors: list[dict[str, Any]] | None = None
+    memorabilia: bool | None = None
+    tradeInEligible: bool | None = None
+    listingStatus: str | None = None
+    sellerSkus: list[str]
+    refreshedAt: AwareDatetime
+
+
+class CatalogSummary(BaseModel, extra="allow"):
+    marketplaceId: str
+
+
+class SearchCatalogItemsResponse(BaseModel, extra="allow"):
+    class Item(BaseModel, extra="allow"):
+        asin: str
+        summaries: list[CatalogSummary] = []
+
+    class Pagination(BaseModel, extra="allow"):
+        nextToken: str | None = None
+
+    items: list[Item] = []
+    pagination: Pagination | None = None

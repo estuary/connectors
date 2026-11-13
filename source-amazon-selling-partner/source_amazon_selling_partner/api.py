@@ -12,6 +12,8 @@ from .client import Operation, Priority, SPAPIClient
 from .models import (
     LWA_TOKEN_URL,
     AllOrdersRow,
+    CatalogItem,
+    SearchCatalogItemsResponse,
     FinancialTransaction,
     ListTransactionsResponse,
     MarketplaceParticipationsResponse,
@@ -29,6 +31,7 @@ from .reports import (
     RecentReports,
     ReportMismatch,
     ReportRequest,
+    ReportRoleMissing,
     list_reports,
     read_json_report,
     read_report,
@@ -1222,3 +1225,131 @@ async def fetch_marketplace_participations(
     )
     chunks = [chunk async for chunk in body()]
     return MarketplaceParticipationsResponse.model_validate_json(b"".join(chunks))
+
+
+async def fetch_catalog_items(
+    client: SPAPIClient,
+    marketplace_ids: list[str],
+    interval: timedelta,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[CatalogItem | LogCursor, None]:
+    """Re-emit all listed ASIN summaries after each binding interval.
+
+    The cursor is the start of the last completed refresh. It advances only
+    after all marketplaces finish, so an interrupted refresh is retried.
+    A failure in any marketplace fails the refresh, and the next attempt redoes
+    every marketplace, reusing reports requested in the same interval bucket.
+    """
+    assert isinstance(log_cursor, datetime)
+    started = now()
+    if started - log_cursor < interval:
+        return
+    # Stable bucket times let restarts reuse reports already requested.
+    epoch = datetime(1970, 1, 1, tzinfo=UTC)
+    report_time = (epoch + ((started - epoch) // interval) * interval).replace(
+        microsecond=0
+    )
+    for marketplace_id in marketplace_ids:
+        request = ReportRequest(
+            CatalogItem.REPORT_TYPE,
+            (marketplace_id,),
+            report_time,
+            report_time,
+            report_options={"preferredReportDocumentLocale": "en_US"},
+        )
+        report = await request_report(client, request, Priority.INCREMENTAL, log)
+        listings: dict[str, tuple[set[str], str | None]] = {}
+        # Amazon cancels reports with no data. Treat two cancellations as no listings
+        # so empty marketplaces can finish without spending quota on every invocation.
+        if report is not None:
+            async for _, row in read_report(
+                client,
+                report,
+                Priority.INCREMENTAL,
+                log,
+                required_columns=("asin1", "seller-sku", "status"),
+            ):
+                asin = row["asin1"].strip()
+                if not asin:
+                    continue
+                # SKUs may have different statuses. Prefer Active, otherwise
+                # keep the first nonblank status in report order.
+                skus, status = listings.setdefault(asin, (set(), None))
+                if sku := row["seller-sku"].strip():
+                    skus.add(sku)
+                row_status = row["status"].strip() or None
+                listings[asin] = (
+                    skus,
+                    row_status if row_status == "Active" or status is None else status,
+                )
+        asins = sorted(listings)
+        returned: set[str] = set()
+        for offset in range(0, len(asins), CatalogItem.PAGE_SIZE):
+            batch = asins[offset:offset + CatalogItem.PAGE_SIZE]
+            params: dict[str, Any] = {
+                "identifiers": ",".join(batch),
+                "identifiersType": "ASIN",
+                "marketplaceIds": marketplace_id,
+                "includedData": "summaries",
+                "pageSize": CatalogItem.PAGE_SIZE,
+            }
+            while True:
+                try:
+                    _, body = await client.get(
+                        log,
+                        Operation.SEARCH_CATALOG_ITEMS,
+                        CatalogItem.PATH,
+                        params,
+                        Priority.INCREMENTAL,
+                    )
+                except HTTPError as err:
+                    if err.code != 403:
+                        raise
+                    raise ReportRoleMissing(
+                        "Amazon refused searchCatalogItems (HTTP 403): the likely cause is "
+                        "that the application or selling account lacks the Product Listing role. "
+                        "Grant the role, or disable the catalog_items binding.\n\n"
+                        f"{err.message}"
+                    ) from err
+                page = SearchCatalogItemsResponse.model_validate_json(
+                    b"".join([chunk async for chunk in body()])
+                )
+                for item in page.items:
+                    if item.asin not in batch or item.asin in returned:
+                        continue
+                    summary = next(
+                        (s for s in item.summaries if s.marketplaceId == marketplace_id),
+                        None,
+                    )
+                    if summary is None:
+                        continue
+                    returned.add(item.asin)
+                    skus, status = listings[item.asin]
+                    yield CatalogItem.model_validate({
+                        **summary.model_dump(),
+                        "asin": item.asin,
+                        "marketplaceId": marketplace_id,
+                        "listingStatus": status,
+                        "sellerSkus": sorted(skus),
+                        "refreshedAt": started,
+                    })
+                if not page.pagination or not page.pagination.nextToken:
+                    break
+                params["pageToken"] = page.pagination.nextToken
+        missing = set(asins) - returned
+        for asin in sorted(missing):
+            log.debug(
+                "catalog ASIN not returned",
+                {"asin": asin, "marketplace_id": marketplace_id},
+            )
+        log.info(
+            "refreshed catalog items",
+            {
+                "marketplace_id": marketplace_id,
+                "listed_asins": len(asins),
+                "emitted_asins": len(returned),
+                "missing_asins": len(missing),
+            },
+        )
+    yield started

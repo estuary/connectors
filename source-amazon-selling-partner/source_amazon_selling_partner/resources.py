@@ -22,6 +22,7 @@ from .api import (
     backfill_settlement_reports,
     ceil_to_tick,
     fetch_all_orders,
+    fetch_catalog_items,
     fetch_financial_transactions,
     fetch_marketplace_participations,
     fetch_orders,
@@ -34,6 +35,7 @@ from .client import SPAPIClient
 from .models import (
     OAUTH2_SPEC,
     AllOrdersRow,
+    CatalogItem,
     ConnectorState,
     EndpointConfig,
     FinancialTransaction,
@@ -45,6 +47,8 @@ from .models import (
     lwa_credentials,
 )
 from .reports import REPORT_MARKETPLACE_LIMIT, RecentReports
+
+CATALOG_INITIAL_CURSOR = datetime(1970, 1, 1, tzinfo=UTC)
 
 ACCESS_TOKEN_HEADER = "x-amz-access-token"
 
@@ -378,6 +382,42 @@ def all_orders(log: Logger, client: SPAPIClient, config: EndpointConfig) -> Reso
     )
 
 
+def catalog_items(log: Logger, client: SPAPIClient, config: EndpointConfig) -> Resource:
+    def open(
+        binding: CaptureBinding[OrdersResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings: list[tuple[CaptureBinding[OrdersResourceConfig], Resource]],
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_catalog_items,
+                client,
+                config.marketplace_ids,
+                binding.resourceConfig.interval,
+            ),
+        )
+
+    return Resource(
+        name="catalog_items",
+        key=["/asin", "/marketplaceId"],
+        model=CatalogItem,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=CATALOG_INITIAL_CURSOR),
+        ),
+        initial_config=OrdersResourceConfig(
+            name="catalog_items", interval=timedelta(days=1)
+        ),
+        schema_inference=True,
+    )
+
+
 def sales_and_traffic_by_date(
     log: Logger, client: SPAPIClient, config: EndpointConfig
 ) -> Resource:
@@ -473,4 +513,5 @@ async def all_resources(
         settlement_reports(log, client, config),
         all_orders(log, client, config),
         sales_and_traffic_by_date(log, client, config),
+        catalog_items(log, client, config),
     ]

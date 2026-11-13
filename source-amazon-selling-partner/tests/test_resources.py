@@ -71,18 +71,23 @@ async def test_every_resource_opens_and_its_fetch_functions_run(monkeypatch: pyt
         "settlement_reports",
         "all_orders",
         "sales_and_traffic_by_date",
+        "catalog_items",
     ]
 
     for resource in all_resources:
         recorded: dict = {}
         monkeypatch.setattr(resources, "open_binding", lambda *args, _recorded=recorded, **kwargs: _recorded.update(kwargs))
-        opened = resource.open(None, 0, resource.initial_state, None, [])  # type: ignore[arg-type,misc]
+        opened = resource.open(type("Binding", (), {"resourceConfig": resource.initial_config})(), 0, resource.initial_state, None, [])  # type: ignore[arg-type,misc]
         if inspect.isawaitable(opened):
             await opened
 
         state = resource.initial_state
-        backfilled = await collect(recorded["fetch_page"](LOG, None, state.backfill.cutoff))
-        assert backfilled, resource.name
+        if "fetch_page" in recorded:
+            backfilled = await collect(recorded["fetch_page"](LOG, None, state.backfill.cutoff))
+            assert backfilled, resource.name
+        else:
+            assert resource.name == "catalog_items"
+            assert state.backfill is None
 
         fetch_changes = recorded["fetch_changes"]
         if isinstance(fetch_changes, dict):

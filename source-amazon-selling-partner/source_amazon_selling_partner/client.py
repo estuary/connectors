@@ -10,6 +10,7 @@ from estuary_cdk.http import BodyGeneratorFunction, Headers, HTTPError, HTTPSess
 
 
 class Operation(StrEnum):
+    SEARCH_CATALOG_ITEMS = "searchCatalogItems"
     SEARCH_ORDERS = "searchOrders"
     GET_MARKETPLACE_PARTICIPATIONS = "getMarketplaceParticipations"
     LIST_TRANSACTIONS = "listTransactions"
@@ -33,6 +34,7 @@ class OperationLimit:
 # Amazon's default usage plans. A selling account can be granted more, which
 # Amazon reports per response in the `x-amzn-RateLimit-Limit` header.
 DEFAULT_LIMITS: dict[Operation, OperationLimit] = {
+    Operation.SEARCH_CATALOG_ITEMS: OperationLimit(rate=2, burst=2),
     Operation.SEARCH_ORDERS: OperationLimit(rate=0.0056, burst=20),
     Operation.GET_MARKETPLACE_PARTICIPATIONS: OperationLimit(rate=0.016, burst=15),
     Operation.LIST_TRANSACTIONS: OperationLimit(rate=0.5, burst=10),

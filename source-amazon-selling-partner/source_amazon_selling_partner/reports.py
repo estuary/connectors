@@ -13,7 +13,11 @@ from logging import Logger
 from typing import Any, AsyncGenerator, AsyncIterator
 
 from estuary_cdk.http import Headers, HTTPError
-from estuary_cdk.incremental_csv_processor import CSVConfig, IncrementalCSVProcessor
+from estuary_cdk.incremental_csv_processor import (
+    CSVConfig,
+    IncrementalCSVProcessor,
+    IncrementalCSVRowProcessor,
+)
 from pydantic import ValidationError
 
 from .client import Operation, Priority, SPAPIClient
@@ -92,7 +96,10 @@ DIAGNOSTIC_LIMIT = 2000
 # Roles a report type needs beyond the Reports API's own. Amazon refuses
 # createReport for such a type, with a 403, to an application or selling
 # account without the role.
-REPORT_TYPE_ROLES = {"GET_SALES_AND_TRAFFIC_REPORT": "Brand Analytics"}
+REPORT_TYPE_ROLES = {
+    "GET_SALES_AND_TRAFFIC_REPORT": "Brand Analytics",
+    "GET_MERCHANT_LISTINGS_ALL_DATA": "Product Listing",
+}
 
 
 def now() -> datetime:
@@ -528,6 +535,7 @@ async def read_report(
     priority: Priority,
     log: Logger,
     empty_is_routine: bool = False,
+    required_columns: tuple[str, ...] = (),
 ) -> AsyncGenerator[tuple[ReportDocument, dict[str, str]], None]:
     """
     Yields each data row of a DONE report's flat-file document, in file
@@ -560,9 +568,30 @@ async def read_report(
         delimiter="\t", quoting=csv.QUOTE_NONE, lineterminator="\n", encoding=encoding
     )
 
+    async def rows() -> AsyncGenerator[dict[str, str], None]:
+        if not required_columns:
+            async for row in IncrementalCSVProcessor(stream, config=config):
+                yield row
+            return
+        processor = IncrementalCSVRowProcessor(stream, config=config)
+        columns = await anext(processor, [])
+        if not set(required_columns).issubset(columns):
+            raise RuntimeError(
+                f"Report {report.reportId} ({report.reportType}) is missing required "
+                f"column(s) {required_columns}; columns seen: {columns}. "
+                "The report may have cached localized headers despite the requested en_US locale."
+            )
+        async for cells in processor:
+            if len(cells) != len(columns):
+                raise RuntimeError(
+                    f"Report {report.reportId} row has {len(cells)} columns; "
+                    f"expected {len(columns)}"
+                )
+            yield dict(zip(columns, cells, strict=True))
+
     count = 0
     try:
-        async for row in IncrementalCSVProcessor(stream, config=config):
+        async for row in rows():
             count += 1
             yield document, row
     except UnicodeDecodeError as err:

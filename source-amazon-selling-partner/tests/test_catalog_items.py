@@ -1,0 +1,270 @@
+import copy
+import json
+import logging
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import pytest
+
+from source_amazon_selling_partner import api, reports
+from source_amazon_selling_partner.api import fetch_catalog_items
+from source_amazon_selling_partner.models import CatalogItem
+from source_amazon_selling_partner.reports import ReportRoleMissing
+
+from .fake_amazon import FakeAmazon
+from .test_orders import NOW, client_for, collect
+
+LOG = logging.getLogger("test")
+DAY = timedelta(days=1)
+MARKETS = ["ATVPDKIKX0DER", "A2EUQ1WTGCTBG2"]
+EXAMPLE = json.loads((Path(__file__).parent / "sandbox_examples/get_catalog_item.json").read_text())
+
+
+@pytest.fixture(autouse=True)
+def freeze(monkeypatch):
+    monkeypatch.setattr(api, "now", lambda: NOW)
+    monkeypatch.setattr(reports, "now", lambda: NOW)
+
+
+def fixture(asins, markets=MARKETS[:1]):
+    fake = FakeAmazon(now=NOW, orders=[])
+    for market in markets:
+        fake.listings[market] = "asin1\tseller-sku\tstatus\n" + "".join(f"{a}\tSKU-{a}\tActive\n" for a in asins)
+        fake.catalog_items[market] = []
+        for asin in dict.fromkeys(asins):
+            item = {"asin": asin, "summaries": copy.deepcopy(EXAMPLE["summaries"])}
+            item["summaries"][0]["marketplaceId"] = market
+            fake.catalog_items[market].append(item)
+    return fake
+
+
+async def refresh(fake, markets=MARKETS[:1], cursor=NOW - DAY, interval=DAY):
+    return await collect(fetch_catalog_items(client_for(fake), markets, interval, LOG, cursor))
+
+
+@pytest.mark.asyncio
+async def test_refresh_summary_skus_status_and_cursor():
+    asin = EXAMPLE["asin"]
+    fake = fixture([asin])
+    fake.listings[MARKETS[0]] += f"{asin}\tAAA\tInactive\n{asin}\tAAA\tActive\n"
+    fake.catalog_items[MARKETS[0]][0]["summaries"].insert(0, {"marketplaceId": MARKETS[1], "brand": "wrong"})
+    fake.catalog_items[MARKETS[0]][0]["summaries"][1]["futureField"] = {"value": 1}
+    doc, cursor = await refresh(fake)
+    assert isinstance(doc, CatalogItem)
+    assert doc.asin == asin and doc.marketplaceId == MARKETS[0]
+    for key, value in EXAMPLE["summaries"][0].items():
+        assert doc.model_dump()[key] == value
+    assert doc.model_extra["futureField"] == {"value": 1}
+    assert doc.sellerSkus == ["AAA", f"SKU-{asin}"]
+    assert doc.listingStatus == "Active"
+    assert doc.refreshedAt == cursor == NOW
+    assert fake.create_requests[0]["reportOptions"] == {"preferredReportDocumentLocale": "en_US"}
+
+
+@pytest.mark.asyncio
+async def test_batches_dedupes_and_pages():
+    asins = [f"B{i:09}" for i in range(45)]
+    fake = fixture(asins + asins)
+    fake.catalog_page_size = 7
+    out = await refresh(fake)
+    assert sorted(d.asin for d in out[:-1]) == asins
+    first_pages = [r for r in fake.catalog_requests if "pageToken" not in r]
+    assert [len(r["identifiers"].split(",")) for r in first_pages] == [20, 20, 5]
+    assert out[-1] == NOW
+
+
+@pytest.mark.asyncio
+async def test_blank_and_missing_asins_are_skipped(caplog):
+    fake = fixture(["present", "missing"])
+    fake.listings[MARKETS[0]] += "\tblank-sku\tActive\n"
+    fake.catalog_items[MARKETS[0]].pop()
+    with caplog.at_level(logging.DEBUG):
+        out = await refresh(fake)
+    assert [d.asin for d in out[:-1]] == ["present"]
+    assert all(
+        identifier.strip()
+        for request in fake.catalog_requests
+        for identifier in request["identifiers"].split(",")
+    )
+    assert "catalog ASIN not returned" in caplog.text
+    assert sum(r.message == "refreshed catalog items" for r in caplog.records) == 1
+
+
+@pytest.mark.asyncio
+async def test_marketplaces_have_separate_reports_and_lookups():
+    fake = fixture([EXAMPLE["asin"]], MARKETS)
+    out = await refresh(fake, MARKETS)
+    assert [(d.asin, d.marketplaceId) for d in out[:-1]] == [(EXAMPLE["asin"], m) for m in MARKETS]
+    assert [r["marketplaceIds"] for r in fake.create_requests] == [[m] for m in MARKETS]
+    assert [r["marketplaceIds"] for r in fake.catalog_requests] == MARKETS
+
+
+@pytest.mark.asyncio
+async def test_interval_gates_all_work():
+    fake = fixture(["a"])
+    assert await refresh(fake, cursor=NOW - timedelta(hours=23)) == []
+    assert fake.create_requests == fake.catalog_requests == fake.report_requests == []
+    assert await refresh(fake, cursor=NOW - timedelta(hours=2), interval=timedelta(hours=1))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("text", ["artikel\tstatus\na\tActive\n", "artikel\tstatus\n", ""])
+async def test_missing_asin_column_names_report_and_columns(text):
+    fake = fixture([])
+    fake.listings[MARKETS[0]] = text
+    with pytest.raises(RuntimeError, match="GET_MERCHANT_LISTINGS_ALL_DATA.*asin1.*columns seen"):
+        await refresh(fake)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("report_forbidden", [False, True])
+async def test_403_names_product_listing_role(report_forbidden):
+    fake = fixture(["a"])
+    if report_forbidden:
+        fake.forbidden_report_types.add(CatalogItem.REPORT_TYPE)
+    else:
+        fake.catalog_forbidden = True
+    with pytest.raises(ReportRoleMissing, match="Product Listing role") as exc:
+        await refresh(fake)
+    if not report_forbidden:
+        assert "likely cause" in str(exc.value)
+        assert "403: Access denied" in str(exc.value)
+
+
+@pytest.mark.asyncio
+async def test_wrong_marketplace_summary_is_skipped():
+    fake = fixture(["a"])
+    fake.catalog_items[MARKETS[0]][0]["summaries"][0]["marketplaceId"] = MARKETS[1]
+    assert await refresh(fake) == [NOW]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("interval", [DAY, timedelta(hours=7)])
+async def test_restart_reuses_requested_report(monkeypatch, interval):
+    fake = fixture(["a"])
+    with monkeypatch.context() as interrupted:
+        def fail_poll(*args):
+            raise RuntimeError("refresh interrupted after createReport")
+
+        interrupted.setattr(fake, "_get_report", fail_poll)
+        with pytest.raises(RuntimeError, match="refresh interrupted"):
+            await refresh(fake, interval=interval)
+    assert len(fake.create_requests) == 1
+    epoch = datetime(1970, 1, 1, tzinfo=UTC)
+    bucket = epoch + ((NOW - epoch) // interval) * interval
+    request = fake.create_requests[0]
+    assert datetime.fromisoformat(request["dataStartTime"]) == bucket
+    assert request["dataStartTime"] == request["dataEndTime"]
+
+    restarted = NOW + timedelta(minutes=3, microseconds=123456)
+    fake.now = restarted
+    monkeypatch.setattr(api, "now", lambda: restarted)
+    monkeypatch.setattr(reports, "now", lambda: restarted)
+    doc, cursor = await refresh(fake, interval=interval)
+    assert doc.asin == "a"
+    assert doc.refreshedAt == cursor == restarted
+    assert [r["marketplaceIds"] for r in fake.create_requests] == [[MARKETS[0]]]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("column", ["seller-sku", "status"])
+async def test_missing_listing_column_fails(column):
+    fake = fixture([])
+    columns = [c for c in ("asin1", "seller-sku", "status") if c != column]
+    fake.listings[MARKETS[0]] = "\t".join(columns) + "\n"
+    with pytest.raises(
+        RuntimeError,
+        match=f"GET_MERCHANT_LISTINGS_ALL_DATA.*{column}.*columns seen.*localized headers",
+    ):
+        await refresh(fake)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "statuses, expected",
+    [(["Inactive", "Active"], "Active"), (["", "Inactive", "Incomplete"], "Inactive")],
+)
+async def test_status_prefers_active_otherwise_first_nonblank(statuses, expected):
+    fake = fixture(["a"])
+    fake.listings[MARKETS[0]] = "asin1\tseller-sku\tstatus\n" + "".join(
+        f"a\tSKU-{i}\t{status}\n" for i, status in enumerate(statuses)
+    )
+    doc, cursor = await refresh(fake)
+    assert doc.listingStatus == expected
+    assert cursor == NOW
+
+
+@pytest.mark.asyncio
+async def test_blank_seller_sku_is_not_emitted():
+    fake = fixture(["a"])
+    fake.listings[MARKETS[0]] += "a\t\tActive\n"
+    doc, _ = await refresh(fake)
+    assert doc.sellerSkus == ["SKU-a"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("row, count", [("a\tSKU-a", 2), ("a\tSKU-a\tActive\textra", 4)])
+async def test_listing_row_length_must_match_header(row, count):
+    fake = fixture([])
+    fake.listings[MARKETS[0]] = "asin1\tseller-sku\tstatus\n" + row + "\n"
+    with pytest.raises(RuntimeError, match=f"row has {count} columns; expected 3"):
+        await refresh(fake)
+
+
+@pytest.mark.asyncio
+async def test_item_without_summaries_is_missing(caplog):
+    fake = fixture(["a", "b"])
+    fake.catalog_items[MARKETS[0]][0] = {"asin": "a"}
+    with caplog.at_level(logging.INFO):
+        out = await refresh(fake)
+    assert [doc.asin for doc in out[:-1]] == ["b"]
+    assert out[-1] == NOW
+    summary = next(r for r in caplog.records if r.message == "refreshed catalog items")
+    assert summary.args["missing_asins"] == 1
+
+
+@pytest.mark.asyncio
+async def test_response_filters_unrequested_and_repeated_items(monkeypatch):
+    fake = fixture(["a", "b"])
+    fake.catalog_page_size = 1
+    respond = fake._respond
+    repeated = copy.deepcopy(fake.catalog_items[MARKETS[0]][0])
+    extra = {**repeated, "asin": "unrequested"}
+
+    def respond_with_extra_items(body):
+        if "items" in body:
+            body["items"].append(extra)
+            if len(fake.catalog_requests) > 1:
+                body["items"].append(repeated)
+        return respond(body)
+
+    monkeypatch.setattr(fake, "_respond", respond_with_extra_items)
+    out = await refresh(fake)
+    assert [doc.asin for doc in out[:-1]] == ["a", "b"]
+    assert len(fake.catalog_requests) == 2
+    assert out[-1] == NOW
+
+
+@pytest.mark.asyncio
+async def test_response_without_items_is_empty(monkeypatch):
+    fake = fixture(["a"])
+    respond = fake._respond
+
+    def respond_without_items(body):
+        if "items" in body:
+            body.pop("items")
+        return respond(body)
+
+    monkeypatch.setattr(fake, "_respond", respond_without_items)
+    assert await refresh(fake) == [NOW]
+
+
+@pytest.mark.asyncio
+async def test_twice_cancelled_report_completes_empty_refresh():
+    fake = fixture([])
+    fake.default_lifecycle = ["CANCELLED"]
+    assert await refresh(fake) == [NOW]
+    assert len(fake.create_requests) == 2
+    assert fake.catalog_requests == []
+    assert await refresh(fake, cursor=NOW) == []
+    assert len(fake.create_requests) == 2
