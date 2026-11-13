@@ -588,22 +588,61 @@ func fullLayoutCheckpoint(task string, layout []streamV2Range) streamV2Checkpoin
 	return cp
 }
 
-// TestStreamV2LostChannelRejected pins the reading of a channel that reports no
-// committed offset token while the checkpoint records documents appended to it:
-// the account of what Snowflake holds is gone, so the binding is rejected.
-func TestStreamV2LostChannelRejected(t *testing.T) {
-	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
-	const task = "test/topologyLost"
-
+// TestStreamV2LostTokenResumes covers channels that report no committed offset
+// token while the checkpoint records documents routed to them, as Snowflake leaves
+// a channel it expired after 30 days without ingestion. The shard resumes each
+// such channel from its routed offset, its next commit writes a token beyond that
+// offset, and a later session validates that token as usual. Expiring every
+// channel stands for a task disabled past the expiry.
+func TestStreamV2LostTokenResumes(t *testing.T) {
+	var ctx = context.Background()
 	quarters, err := streamV2TargetLayout(0, math.MaxUint32, streamV2ChannelsPerShard)
 	require.NoError(t, err)
 
-	var prior = fullLayoutCheckpoint(task, quarters)
-	prior[quarters[1]].Routed = 5
-	var m = newTopologyManager(t, task, 0, math.MaxUint32, prior)
+	// storeRound stores one row to each channel and returns the flushed checkpoint.
+	var storeRound = func(m *streamV2Manager, salt string) streamV2Checkpoint {
+		var keys []string
+		for _, q := range quarters {
+			keys = append(keys, keysHashingTo(q, 1, salt)...)
+		}
+		storeKeys(t, m, keys)
+		entries, err := m.flush(ctx)
+		require.NoError(t, err)
+		return mergeCheckpoints(entries)
+	}
 
-	err = testWriteRow(context.Background(), m, 0, []any{"any", "v"})
-	require.ErrorContains(t, err, "reports no committed offset token while this task's checkpoint records")
+	for _, tt := range []struct {
+		name    string
+		expired []int
+	}{
+		{name: "one channel", expired: []int{1}},
+		{name: "every channel", expired: []int{0, 1, 2, 3}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
+			const task = "test/topologyLostToken"
+
+			var first = newTopologyManager(t, task, 0, math.MaxUint32, nil)
+			var prior = storeRound(first, "first")
+			for _, i := range tt.expired {
+				require.NoError(t, first.client.DropChannel(ctx, "DB", "SCH", "TBL", prior[quarters[i]].ChannelName))
+			}
+
+			var second = newTopologyManager(t, task, 0, math.MaxUint32, prior)
+			prior = storeRound(second, "second")
+			var tokens = fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE"))
+			for _, q := range quarters {
+				require.Equal(t, int64(2), prior[q].Routed)
+				require.Equal(t, streamV2FormatOffsetToken(2, q), tokens[prior[q].ChannelName])
+			}
+
+			var third = newTopologyManager(t, task, 0, math.MaxUint32, prior)
+			prior = storeRound(third, "third")
+			for _, q := range quarters {
+				require.Equal(t, int64(3), prior[q].Routed)
+			}
+		})
+	}
 }
 
 // TestStreamV2ForeignTokenRejected pins the unconditional key range guard at the
