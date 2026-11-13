@@ -496,6 +496,28 @@ class CatalogItem(BaseDocument, extra="allow"):
 
     asin: str
     marketplaceId: str
+    # Amazon's summary fields are declared, though only copied through, so
+    # destination tables get a column for each from the first publish, even
+    # for rare ones like autographed that schema inference may never see.
+    brand: str | None = None
+    color: str | None = None
+    itemClassification: str | None = None
+    itemName: str | None = None
+    manufacturer: str | None = None
+    modelNumber: str | None = None
+    partNumber: str | None = None
+    size: str | None = None
+    style: str | None = None
+    websiteDisplayGroup: str | None = None
+    websiteDisplayGroupName: str | None = None
+    releaseDate: str | None = None
+    browseClassification: dict[str, Any] | None = None
+    packageQuantity: int | None = None
+    adultProduct: bool | None = None
+    autographed: bool | None = None
+    contributors: list[dict[str, Any]] | None = None
+    memorabilia: bool | None = None
+    tradeInEligible: bool | None = None
     listingStatus: str | None = None
     sellerSkus: list[str]
     refreshedAt: AwareDatetime
