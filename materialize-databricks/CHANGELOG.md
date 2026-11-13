@@ -1,11 +1,5 @@
 # Changelog
 
-## 2026-11-11
-### Changed
-- Date-time key ranges are now split at gaps measured the same way as other
-  key ranges, so when two gaps are equal in width, the split may differ from
-  before.
-
 ## 2026-11-07
 ### Added
 - The first slow query of each table in a run also logs, on its query
