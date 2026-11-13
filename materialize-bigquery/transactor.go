@@ -415,7 +415,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Build the queries of all documents across all bindings that were requested.
-	var subqueries []string
+	var subqueries []loadSubquery
 	// This is the map of external table references we will populate.
 	var edcTableDefs = make(map[string]bigquery.ExternalData)
 	var externalData = make(map[string][]string)
@@ -432,13 +432,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				loadTemplate = t.templates.loadQueryNoFlowDocument
 			}
 
-			if loadQuery, err := renderQueryTemplate(b.target, loadTemplate, b.loadMergeBounds.Build(), t.objAndArrayAsJson); err != nil {
-				return fmt.Errorf("rendering load query template: %w", err)
-			} else {
-				subqueries = append(subqueries, loadQuery)
-				edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
-				externalData[b.tempTableName] = uris
-			}
+			subqueries = append(subqueries, loadSubquery{table: b.target, tpl: loadTemplate, bounds: b.loadMergeBounds.Build()})
+			edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
+			externalData[b.tempTableName] = uris
 		}
 	}
 
@@ -447,7 +443,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Build the query across all tables.
-	queryStr := strings.Join(subqueries, "\nUNION ALL\n") + ";"
+	queryStr, err := renderLoadQuery(subqueries, maxLoadQueryLength, t.objAndArrayAsJson)
+	if err != nil {
+		return fmt.Errorf("rendering load query template: %w", err)
+	}
 	query := t.client.newQuery(queryStr)
 	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
 
@@ -872,6 +871,47 @@ func timestampLiteral(ts time.Time) string {
 
 func (t *transactor) Destroy() {
 	_ = t.client.bigqueryClient.Close()
+}
+
+// maxLoadQueryLength is the longest load query, in bytes, which keeps the
+// split ranges of its merge bounds. BigQuery rejects a query whose text is
+// longer than 1,024,000 characters.
+const maxLoadQueryLength = 1_000_000
+
+// loadSubquery is one binding's part of a load query.
+type loadSubquery struct {
+	table  sql.Table
+	tpl    *template.Template
+	bounds []sql.MergeBound
+}
+
+// renderLoadQuery renders the UNION ALL of subqueries. A query longer than
+// limit is rendered with each merge bound as its one enclosing range, which
+// takes less text than its split ranges.
+func renderLoadQuery(subqueries []loadSubquery, limit int, objAndArrayAsJson bool) (string, error) {
+	var render = func(split bool) (string, error) {
+		var parts = make([]string, 0, len(subqueries))
+		for _, sq := range subqueries {
+			var bounds = sq.bounds
+			if !split {
+				bounds = slices.Clone(bounds)
+				for i := range bounds {
+					bounds[i].Ranges = nil
+				}
+			}
+			var part, err = renderQueryTemplate(sq.table, sq.tpl, bounds, objAndArrayAsJson)
+			if err != nil {
+				return "", err
+			}
+			parts = append(parts, part)
+		}
+		return strings.Join(parts, "\nUNION ALL\n") + ";", nil
+	}
+
+	if query, err := render(true); err != nil || len(query) <= limit {
+		return query, err
+	}
+	return render(false)
 }
 
 // combineBounds unions the per-key-column merge bounds of coalesced checkpoint

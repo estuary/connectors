@@ -237,3 +237,42 @@ func TestStringKeyRanges(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, query, fmt.Sprintf("l.id = r.c0 AND ((l.id >= '%s' AND l.id <= '%s') OR ", slices.Min(recent), slices.Max(recent)))
 }
+
+// TestLoadQueryLengthLimit renders a load query of two bindings whose string
+// key bounds split, under a limit its split ranges fit and one they exceed.
+func TestLoadQueryLengthLimit(t *testing.T) {
+	var subqueries []loadSubquery
+	for _, name := range []string{"first", "second"} {
+		var shape = sql.TableShape{
+			Path:     sql.TablePath{"project", "dataset", name},
+			Keys:     []sql.Projection{{Projection: pf.Projection{Field: "id", Ptr: "/id", Inference: pf.Inference{Types: []string{"string"}, Exists: pf.Inference_MUST}}}},
+			Document: &sql.Projection{Projection: pf.Projection{Field: "flow_document", Ptr: "", Inference: pf.Inference{Types: []string{"object"}}}},
+		}
+		table, err := sql.ResolveTable(shape, testDialect)
+		require.NoError(t, err)
+
+		var b = newMergeBoundsBuilder(table, testDialect.Literal)
+		for _, k := range []string{"aaa", "zzz"} {
+			b.NextKey([]any{k})
+		}
+		subqueries = append(subqueries, loadSubquery{table: table, tpl: renderTemplates(testDialect).loadQuery, bounds: b.Build()})
+		require.Len(t, subqueries[len(subqueries)-1].bounds[0].Ranges, 2)
+	}
+
+	const single = "l.id = r.c0 AND l.id >= 'aaa' AND l.id <= 'zzz'"
+	const split = "l.id = r.c0 AND ((l.id >= 'aaa' AND l.id <= 'aaa') OR (l.id >= 'zzz' AND l.id <= 'zzz'))"
+
+	long, err := renderLoadQuery(subqueries, maxLoadQueryLength, false)
+	require.NoError(t, err)
+	require.Equal(t, 2, strings.Count(long, split))
+	require.Equal(t, 1, strings.Count(long, "\nUNION ALL\n"))
+
+	short, err := renderLoadQuery(subqueries, len(long)-1, false)
+	require.NoError(t, err)
+	require.Equal(t, 2, strings.Count(short, single))
+	require.NotContains(t, short, " OR ")
+	require.Less(t, len(short), len(long))
+
+	// The limit leaves the bounds of the subqueries as they were.
+	require.Len(t, subqueries[0].bounds[0].Ranges, 2)
+}
