@@ -1,7 +1,6 @@
 package connector
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/hex"
@@ -11,6 +10,7 @@ import (
 	"slices"
 	"time"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -46,57 +46,6 @@ type stateItem struct {
 // objects is every S3 object the transaction staged.
 func (e *stateItem) objects() []string {
 	return slices.Concat(e.StoreFiles, e.DeleteFiles)
-}
-
-// connectorState is staged transactions by binding state key, then by the
-// staging shard's key range.
-type connectorState map[string]map[string]*stateItem
-
-func (p connectorState) add(stateKey, rangeKey string, e *stateItem) {
-	if p[stateKey] == nil {
-		p[stateKey] = make(map[string]*stateItem)
-	}
-	p[stateKey][rangeKey] = e
-}
-
-// hasRange reports whether any state key has an entry staged under rangeKey.
-func (p connectorState) hasRange(rangeKey string) bool {
-	for _, bucket := range p {
-		if _, ok := bucket[rangeKey]; ok {
-			return true
-		}
-	}
-	return false
-}
-
-// entryCount is the total number of entries across every state key.
-func (p connectorState) entryCount() int {
-	var n int
-	for _, bucket := range p {
-		n += len(bucket)
-	}
-	return n
-}
-
-func rangeKeyOf(keyBegin, keyEnd uint32) string {
-	return fmt.Sprintf("%08x-%08x", keyBegin, keyEnd)
-}
-
-// parseState decodes a state document or a StartedCommit patch of the same
-// shape.
-func parseState(raw json.RawMessage) (connectorState, error) {
-	var state = make(connectorState)
-	if len(bytes.TrimSpace(raw)) == 0 {
-		return state, nil
-	}
-
-	var dec = json.NewDecoder(bytes.NewReader(raw))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(&state); err != nil {
-		return nil, fmt.Errorf("parsing connector state: %w", err)
-	}
-
-	return state, nil
 }
 
 // checkpointTokensMap is what the checkpoints row holds once a task has
@@ -283,7 +232,7 @@ func (s *checkpointsTable) write(ctx context.Context, txn pgx.Tx, applied checkp
 		rowsAffected = res.RowsAffected()
 	}
 	if rowsAffected > 1 {
-		return fmt.Errorf("checkpoints table has %d rows for materialization %q and key range %s", rowsAffected, s.materialization, rangeKeyOf(s.keyBegin, s.keyEnd))
+		return fmt.Errorf("checkpoints table has %d rows for materialization %q and key range %s", rowsAffected, s.materialization, boilerplate.RangeKey(s.keyBegin, s.keyEnd))
 	} else if rowsAffected == 1 {
 		return nil
 	}
