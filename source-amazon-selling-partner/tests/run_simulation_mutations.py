@@ -52,6 +52,8 @@ def main() -> None:
          "    return\n    covered = log_cursor\n"),
         ("M9", API, "backfill_orders", "            current_size = window_end + TICK - window_start\n",
          "            current_size = max(current_size, window_end + TICK - window_start)\n"),
+        ("M10", API, "fetch_orders_sweep", "                covered = item\n",
+         "                covered = item + TICK\n"),
     ]
     survived = []
     for name, path, function, old, new in mutations:
@@ -66,7 +68,7 @@ def main() -> None:
             path.write_bytes(changed.encode())
             try:
                 result = subprocess.run(
-                    [sys.executable, "-m", "pytest", "-q", "tests/test_simulation.py", "tests/test_orders.py"],
+                    [sys.executable, "-m", "pytest", "-q", "tests/test_simulation.py", "tests/test_orders.py", "tests/test_orders_sweep.py"],
                     cwd=ROOT, capture_output=True, text=True, timeout=5,
                 )
             except subprocess.TimeoutExpired:

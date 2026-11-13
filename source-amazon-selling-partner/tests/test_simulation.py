@@ -8,7 +8,7 @@ scenario assumption (Amazon's behavior here is not yet verified).
 Mutation audit: from this connector directory run
     PATH=$PWD/../.venv/bin:$PATH python tests/run_simulation_mutations.py
 The helper snapshots bytes, applies each mutation alone, runs this file and
-the orders regressions, and restores in finally; API edits are temporary. Verified M1--M9 all KILLED:
+the orders regressions, and restores in finally; API edits are temporary. Verified M1--M10 all KILLED:
 M1 orders checkpoint + configured overlap (10m) + 1h: completed-window oracle.
 M2 finance backfill shrink assignment removed: repeated slow window budget.
 M3 orders backfill checkpoint uses original end: completed-window oracle.
@@ -18,6 +18,7 @@ M6 runner commits pending docs on crash: rollback oracle.
 M7 orders cursor drops window size: sparse-history request budget.
 M8 daily orders sweep never reads its due range: late-indexed coverage.
 M9 rejection retains a grown orders window: carried-size regression.
+M10 sweep advances an extra tick at a window seam: boundary-order coverage.
 A skip inside the orders overlap may legitimately be absorbed on the next
 poll. Final keyed-state equality permits duplicates but rejects missing keys
 and stale versions. M6 is a harness negative control: keeping rolled-back docs
@@ -400,7 +401,6 @@ async def test_daily_sweep_recovers_late_indexed_orders(monkeypatch):
             else:
                 cursor = item
     assert seen == []
-    main_cursor = cursor
     clock.advance(2 * DAY)
     amazon.now = clock.now()
     covered = at - DAY
@@ -415,7 +415,12 @@ async def test_daily_sweep_recovers_late_indexed_orders(monkeypatch):
             covered = item
     assert committed == ["late"]
     assert covered == api.floor_to_tick(clock.now() - 2 * DAY)
-    assert cursor == main_cursor
+    before = len(amazon.requests)
+    incremental = [item async for item in api.fetch_orders(
+        client, MARKETPLACES, DAY, timedelta(minutes=10), LOG, cursor
+    )]
+    assert amazon.requests[before]["lastUpdatedAfter"] == api.to_iso(cursor + api.TICK - timedelta(minutes=10))
+    assert incremental[-1] == cursor + DAY
     # Coverage suppresses another run until a full day is due.
     saved = covered
     assert [item async for item in api.fetch_orders_sweep(client, MARKETPLACES, 2 * DAY, DAY, LOG, saved)] == []

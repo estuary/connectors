@@ -75,6 +75,26 @@ async def test_sweep_emits_orders_indexed_up_to_lookback_late(monkeypatch, delay
 
 
 @pytest.mark.asyncio
+async def test_sweep_includes_window_seams_and_range_end(monkeypatch):
+    end = NOW - LOOKBACK
+    covered = end - timedelta(days=2)
+    seam = covered + timedelta(days=1)
+    fake = FakeAmazon(now=NOW, orders=[
+        order("seam", covered, seam),
+        order("after-seam", covered, seam + api.TICK),
+        order("end", covered, end),
+    ])
+    monkeypatch.setattr(api, "now", lambda: fake.now)
+    out = await collect(api.fetch_orders_sweep(
+        client_for(fake), MARKETPLACES, LOOKBACK, timedelta(days=1), LOG, covered
+    ))
+    assert [o.orderId for o in out if isinstance(o, Order)] == ["seam", "after-seam", "end"]
+    assert [item for item in out if isinstance(item, datetime)] == [seam, end]
+    assert fake.requests[1]["lastUpdatedAfter"] == api.to_iso(seam + api.TICK)
+    assert fake.requests[-1]["lastUpdatedBefore"] == api.to_iso(end)
+
+
+@pytest.mark.asyncio
 async def test_restart_resumes_after_last_complete_window(monkeypatch):
     start = NOW - LOOKBACK - timedelta(days=3)
     fake = FakeAmazon(now=NOW, orders=[
