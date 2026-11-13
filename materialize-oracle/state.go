@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // stateItem is the rows one shard staged for one binding in one transaction,
@@ -33,6 +35,18 @@ func (s connectorState) add(stateKey, rangeKey string, e *stateItem) {
 		s[stateKey] = make(map[string]*stateItem)
 	}
 	s[stateKey][rangeKey] = e
+}
+
+// newToken returns a UUIDv7, whose text sorts by the time it was made.
+func newToken() string {
+	return uuid.Must(uuid.NewV7()).String()
+}
+
+// tokenBefore returns text that sorts after every token made before ts, and
+// before every token made from ts on.
+func tokenBefore(ts time.Time) string {
+	var ms = uint64(ts.UnixMilli())
+	return fmt.Sprintf("%08x-%04x-0000-0000-000000000000", ms>>16, ms&0xffff)
 }
 
 func rangeKeyOf(keyBegin, keyEnd uint32) string {

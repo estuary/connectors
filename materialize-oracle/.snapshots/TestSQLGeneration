@@ -58,7 +58,7 @@ DELETE FROM flow_stage_key_value WHERE flow_token IN (:1, :2)
 --- End key_value clear stage ---
 
 --- Begin key_value prune stage ---
-DELETE FROM flow_stage_key_value WHERE flow_token NOT IN (:1)
+DELETE FROM flow_stage_key_value WHERE flow_token < :1 AND flow_token NOT IN (:2)
 --- End key_value prune stage ---
 
 --- Begin key_value load ---
@@ -88,7 +88,7 @@ DELETE FROM flow_stage_delta_updates WHERE flow_token IN (:1, :2)
 --- End delta_updates clear stage ---
 
 --- Begin delta_updates prune stage ---
-DELETE FROM flow_stage_delta_updates WHERE flow_token NOT IN (:1)
+DELETE FROM flow_stage_delta_updates WHERE flow_token < :1 AND flow_token NOT IN (:2)
 --- End delta_updates prune stage ---
 
 

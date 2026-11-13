@@ -291,13 +291,78 @@ func TestIntegration(t *testing.T) {
 		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 
+	// An entry's staged rows are applied once. Applying it again finds them
+	// gone, which is an error unless the entry was recovered from the state.
+	t.Run("apply-staged", func(t *testing.T) {
+		var ctx = context.Background()
+		var db = testConfig().openDB()
+		defer db.Close()
+
+		var name = fmt.Sprintf("apply_staged_%d", time.Now().UnixNano())
+		var table = sql.Table{
+			Identifier: name,
+			Path:       []string{name},
+			StateKey:   "state-key",
+			Keys:       []sql.Column{{Identifier: "id", MappedType: sql.MappedType{BareDDL: "NUMBER(38,0)"}}},
+			Values:     []sql.Column{{Identifier: "val", MappedType: sql.MappedType{BareDDL: "VARCHAR2(10 CHAR)"}}},
+		}
+		var stage = newOracleDialect("FLOW").Identifier(stagePath(table.Path)...)
+		_, err := db.ExecContext(ctx, "CREATE TABLE "+name+" (id NUMBER(38,0) PRIMARY KEY, val VARCHAR2(10 CHAR))")
+		require.NoError(t, err)
+		defer db.ExecContext(ctx, "DROP TABLE "+name+" PURGE")
+		_, err = db.ExecContext(ctx, createStageSQL(&table, stage))
+		require.NoError(t, err)
+		defer db.ExecContext(ctx, "DROP TABLE "+stage+" PURGE")
+		_, err = db.ExecContext(ctx, "INSERT INTO "+name+" VALUES (1, 'old')")
+		require.NoError(t, err)
+
+		var entry = &stateItem{Token: newToken(), Inserts: 1, Updates: 1}
+		for _, row := range [][]any{{opUpdate, 1, "new"}, {opInsert, 2, "two"}} {
+			_, err := db.ExecContext(ctx, "INSERT INTO "+stage+" (flow_token, flow_op, id, val) VALUES (:1, :2, :3, :4)", append([]any{entry.Token}, row...)...)
+			require.NoError(t, err)
+		}
+
+		conn, err := db.Conn(ctx)
+		require.NoError(t, err)
+		defer conn.Close()
+		var b = &binding{target: table, stage: stage}
+		var tr = &transactor{
+			db:        db,
+			storeConn: conn,
+			bindings:  []*binding{b},
+			be:        m.NewBindingEvents(),
+			rangeKey:  rangeKeyOf(0, math.MaxUint32),
+			primary:   true,
+			recovered: make(map[string]bool),
+		}
+		apply := func() error {
+			return tr.apply(ctx, map[*binding]map[string]*stateItem{b: {tr.rangeKey: entry}})
+		}
+		rows := func() [][]any {
+			_, got, err := sql.SnapshotTestTableQuery(ctx, db, name, "SELECT id, val FROM "+name)
+			require.NoError(t, err)
+			sql.SortRows(got)
+			return got
+		}
+
+		require.NoError(t, apply())
+		var want = rows()
+		require.Len(t, want, 2)
+		require.Equal(t, "new", want[0][1])
+
+		require.ErrorContains(t, apply(), "holds 0 of the 2 rows")
+		tr.recovered[entry.Token] = true
+		require.NoError(t, apply())
+		require.Equal(t, want, rows())
+	})
+
 	t.Run("apply-drain", func(t *testing.T) {
 		testutil.RunTestAllTasks(t, "testdata/apply.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
 			var ctx = context.Background()
 			var tableName = fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
 			var res = makeResourceFn(tableName, false).WithDefaults(cfg)
 			var dialect = newOracleDialect("FLOW")
-			const token = "drain-token"
+			var token = newToken()
 
 			seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
 				var b = appliedSpec.Bindings[0]

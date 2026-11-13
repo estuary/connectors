@@ -29,7 +29,6 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/invopop/jsonschema"
-	"github.com/google/uuid"
 	go_ora "github.com/sijms/go-ora/v2"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
@@ -376,6 +375,9 @@ type transactor struct {
 	primary bool
 	// The primary's staged transactions not yet applied, from every shard.
 	state connectorState
+	// The tokens of the entries of the state read at Open, which a previous
+	// instance may have applied already.
+	recovered map[string]bool
 
 	truncateAfterBackfill bool
 	// truncations maps a binding index to the boundary of a completed
@@ -444,7 +446,14 @@ func newTransactor(
 	if t.primary {
 		if t.state, err = parseState(open.StateJson); err != nil {
 			return nil, err
-		} else if err := t.prepareStages(ctx); err != nil {
+		}
+		t.recovered = make(map[string]bool)
+		for _, bucket := range t.state {
+			for _, e := range bucket {
+				t.recovered[e.Token] = true
+			}
+		}
+		if err := t.prepareStages(ctx); err != nil {
 			return nil, err
 		}
 	}
@@ -452,21 +461,24 @@ func newTransactor(
 	return t, nil
 }
 
-// prepareStages creates the stage tables that don't exist, and deletes the
-// rows staged by transactions that aren't pending: those of a Store that
-// failed before its transaction committed, and of a binding's state key from
-// before a backfill. The other shards stage no rows until every shard has
-// opened.
+// Staged rows this old that no pending entry has are abandoned: those of a
+// zombie's Store, of a crash between staging a transaction and recording it,
+// and of a binding's state key from before a backfill. A younger row may be
+// pending in a newer state than this instance has, if it's a zombie.
+const abandonedAge = 24 * time.Hour
+
+// prepareStages creates the stage tables that don't exist, and deletes their
+// abandoned rows.
 func (t *transactor) prepareStages(ctx context.Context) error {
 	for _, b := range t.bindings {
 		if _, err := t.db.ExecContext(ctx, b.createStageSQL); err != nil {
 			return fmt.Errorf("creating stage table %s: %w", b.stage, err)
 		}
-		var tokens []any
+		var args = []any{tokenBefore(time.Now().Add(-abandonedAge))}
 		for _, e := range t.state[b.target.StateKey] {
-			tokens = append(tokens, e.Token)
+			args = append(args, e.Token)
 		}
-		res, err := t.db.ExecContext(ctx, pruneStageSQL(b.stage, len(tokens)), tokens...)
+		res, err := t.db.ExecContext(ctx, pruneStageSQL(b.stage, len(args)-1), args...)
 		if err != nil {
 			return fmt.Errorf("deleting abandoned rows of stage table %s: %w", b.stage, err)
 		} else if n, err := res.RowsAffected(); err != nil {
@@ -781,22 +793,22 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var lastBinding = -1
 	var batch *storeBatch
 
-	// Staged rows do nothing until they are applied, so each batch commits on
-	// its own. The rows of a Store that fails are deleted at the next Open.
+	// The rows are staged in one transaction, so that a Store which fails
+	// leaves none behind. Its undo is small, since it only inserts.
+	txn, err := t.storeConn.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("DB.BeginTx: %w", err)
+	}
+	var defuser = sql.NewTxDefuser(txn)
+	defer defuser.MaybeRollback()
+
 	flush := func() error {
 		if batch == nil || batch.rows == 0 {
 			return nil
 		}
 		var b = t.bindings[lastBinding]
-		txn, err := t.storeConn.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("DB.BeginTx: %w", err)
-		}
-		defer txn.Rollback()
 		if _, err := insertRows(ctx, txn, b.insertSQL, batch.columns, b.lobStart); err != nil {
 			return fmt.Errorf("staging rows of %s: %w", b.target.Identifier, err)
-		} else if err := txn.Commit(); err != nil {
-			return fmt.Errorf("committing staged rows of %s: %w", b.target.Identifier, err)
 		}
 		batch = newStoreBatch(b)
 		return nil
@@ -812,7 +824,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 		var b = t.bindings[it.Binding]
 		if b.staged == nil {
-			b.staged = &stateItem{Token: uuid.NewString(), Round: round}
+			b.staged = &stateItem{Token: newToken(), Round: round}
 		}
 
 		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
@@ -857,7 +869,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, err
 	}
 
+	defuser.Defuse()
 	return func(context.Context, *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		defer txn.Rollback()
+		if err := txn.Commit(); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("committing staged rows: %w", err))
+		}
+
 		// The primary records its own entries here: Acknowledge skips their
 		// echo in the state patches.
 		var update = make(connectorState)
@@ -866,7 +884,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			b.staged = nil
 			if boundary, ok := truncations[i]; ok {
 				if e == nil {
-					e = &stateItem{Token: uuid.NewString(), Round: round}
+					e = &stateItem{Token: newToken(), Round: round}
 				}
 				e.TruncateBefore = &boundary
 			}
@@ -941,7 +959,8 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 // applying an entry whose rows are gone does nothing, and one entry can be
 // applied any number of times. Each binding's stage table is locked first,
 // which makes any other instance applying the same entries wait, then find
-// the rows gone.
+// the rows gone. Rows are missing only for entries recovered from Open's
+// state; otherwise they were deleted by something else, which is an error.
 func (t *transactor) apply(ctx context.Context, pending map[*binding]map[string]*stateItem) error {
 	txn, err := t.storeConn.BeginTx(ctx, nil)
 	if err != nil {
@@ -974,8 +993,10 @@ func (t *transactor) apply(ctx context.Context, pending map[*binding]map[string]
 		var tokens []any
 		var staged stateItem
 		var round, hasRound = 0, false
+		var allRecovered = true
 		for rk, e := range entries {
 			tokens = append(tokens, e.Token)
+			allRecovered = allRecovered && t.recovered[e.Token]
 			staged.Inserts += e.Inserts
 			staged.Updates += e.Updates
 			staged.Deletes += e.Deletes
@@ -1008,8 +1029,13 @@ func (t *transactor) apply(ctx context.Context, pending map[*binding]map[string]
 					return fmt.Errorf("inserting rows of %s: %w", b.target.Identifier, err)
 				}
 			}
-			if _, err := exec(clearStageSQL(b.stage, len(tokens)), tokens...); err != nil {
+			// All of the entries' rows are found, or none of them because a
+			// previous instance applied the recovered entries.
+			var want = staged.Inserts + staged.Updates + staged.Deletes
+			if cleared, err := exec(clearStageSQL(b.stage, len(tokens)), tokens...); err != nil {
 				return fmt.Errorf("deleting applied rows of stage table %s: %w", b.stage, err)
+			} else if cleared != want && !(cleared == 0 && allRecovered) {
+				return fmt.Errorf("stage table %s holds %d of the %d rows staged for %s", b.stage, cleared, want, b.target.Identifier)
 			}
 			stats = m.ExactRowStats(inserted-replaced, replaced, deleted)
 		}

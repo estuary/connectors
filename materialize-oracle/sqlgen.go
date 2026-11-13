@@ -476,13 +476,18 @@ func clearStageSQL(stage string, tokens int) string {
 	return fmt.Sprintf("DELETE FROM %s WHERE %s IN (%s)", stage, stageTokenColumn, tokenBinds(tokens))
 }
 
-// pruneStageSQL deletes the rows staged by any transaction but those of the
-// bound tokens.
-func pruneStageSQL(stage string, tokens int) string {
-	if tokens == 0 {
-		return "DELETE FROM " + stage
+// pruneStageSQL deletes the rows of tokens that sort before the token bound as
+// :1, other than the n tokens bound after it.
+func pruneStageSQL(stage string, n int) string {
+	var query = fmt.Sprintf("DELETE FROM %s WHERE %s < :1", stage, stageTokenColumn)
+	if n > 0 {
+		var binds = make([]string, n)
+		for i := range binds {
+			binds[i] = fmt.Sprintf(":%d", i+2)
+		}
+		query += fmt.Sprintf(" AND %s NOT IN (%s)", stageTokenColumn, strings.Join(binds, ", "))
 	}
-	return fmt.Sprintf("DELETE FROM %s WHERE %s NOT IN (%s)", stage, stageTokenColumn, tokenBinds(tokens))
+	return query
 }
 
 // keyKind is how a key column is sent to JSON_TABLE and compared to the
