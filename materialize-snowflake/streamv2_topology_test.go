@@ -645,6 +645,46 @@ func TestStreamV2LostTokenResumes(t *testing.T) {
 	}
 }
 
+// TestStreamV2LostTokenReplaysAnInterruptedTransaction pins the cost of resuming
+// a channel without a token. A transaction that Snowflake committed but the
+// runtime never checkpointed is replayed from the checkpoint's routed offset once
+// the channel's token is gone, so the table holds its rows twice.
+func TestStreamV2LostTokenReplaysAnInterruptedTransaction(t *testing.T) {
+	var ctx = context.Background()
+	var statePath = filepath.Join(t.TempDir(), "channels.json")
+	t.Setenv("FAKE_SNOWPIPE_STATE", statePath)
+	const task = "test/topologyReplayed"
+
+	var first = singleChannelLayout(newTopologyManager(t, task, 0, math.MaxUint32, nil))
+	storeKeys(t, first, []string{"a", "b"})
+	entries, err := first.flush(ctx)
+	require.NoError(t, err)
+	var prior = mergeCheckpoints(entries)
+
+	// The interrupted transaction commits in Snowflake, and its checkpoint is lost.
+	var interrupted = singleChannelLayout(newTopologyManager(t, task, 0, math.MaxUint32, prior))
+	storeKeys(t, interrupted, []string{"c", "d"})
+	_, err = interrupted.flush(ctx)
+	require.NoError(t, err)
+
+	var name = prior[fullKeyRange].ChannelName
+	require.NoError(t, interrupted.client.DropChannel(ctx, "DB", "SCH", "TBL", name))
+
+	var replay = singleChannelLayout(newTopologyManager(t, task, 0, math.MaxUint32, prior))
+	storeKeys(t, replay, []string{"c", "d"})
+	require.Equal(t, int64(2), replay.bindings[0].activeChannels[0].progress.committed)
+	entries, err = replay.flush(ctx)
+	require.NoError(t, err)
+
+	require.Equal(t, int64(4), mergeCheckpoints(entries)[fullKeyRange].Routed)
+	require.Equal(t, streamV2FormatOffsetToken(4, fullKeyRange), fakeCommittedTokens(t, statePath)[name])
+	raw, err := os.ReadFile(statePath)
+	require.NoError(t, err)
+	var state fakeSnowpipeState
+	require.NoError(t, json.Unmarshal(raw, &state))
+	require.Equal(t, []string{"a", "b", "c", "d", "c", "d"}, state.Rows)
+}
+
 // TestStreamV2ForeignTokenRejected pins the unconditional key range guard at the
 // seam where it matters: a channel whose committed offset token names a range
 // other than the channel's own key range was written by something this write
