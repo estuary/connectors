@@ -73,7 +73,8 @@ Schema inference fills in other fields.
 - `catalog_items` gets ASINs from the All Listings Report (`GET_MERCHANT_LISTINGS_ALL_DATA`) for each marketplace.
   It looks up catalog summaries with `searchCatalogItems` and includes seller SKUs, listing status and refresh time.
   It refreshes daily by default, and its interval must be at least three hours.
-  ASINs no longer in the All Listings Report, and ASINs the catalog lookup does not return, are not captured.
+  ASINs the catalog lookup does not return are not captured.
+  An ASIN that drops out of the All Listings Report is not deleted: its document keeps the values from its last refresh.
 - Sandbox mode skips the marketplace participation check after testing credentials.
   If a configured marketplace is missing from the account's participation list, the connection test shows:
 
