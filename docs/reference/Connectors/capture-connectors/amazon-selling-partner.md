@@ -61,6 +61,9 @@ Schema inference fills in other fields.
   Late reads the same time again after 72 hours to catch late postings.
   Lookback reads it again after the configured delay to catch released deferred transactions.
   Changes after that final pass are not captured.
+- A daily orders sweep reads each order update once more, after it is Orders Lookback old.
+  It catches orders Amazon makes searchable later than the incremental overlap.
+  It runs at backfill priority when at least a day of updates is due.
 - The first orders backfill request waits about six minutes at the default rate.
   The rate bucket starts with one token and needs three for backfill, leaving two reserved for incremental requests.
   At 0.0056 tokens per second, two tokens take about 357 seconds to refill.
@@ -154,6 +157,7 @@ The values and sample below provide configuration details for this connector.
 | `/start_date`                                      | Start Date                       | UTC date and time for historical capture. If omitted, UTC midnight 30 days before each stream first starts backfilling. Catalog refreshes do not use it.          | string  | 30 days ago      |
 | `/advanced/window_size`                            | Window Size                      | Date window size for orders and financial transactions. ISO 8601 duration from `PT1H` to `P30D`, inclusive.                                        | string  | P1D              |
 | `/advanced/overlap`                                | Incremental Overlap              | How far incremental order requests reach back to catch late search results. ISO 8601 duration from zero (`PT0S`) to `PT1H`, inclusive.                   | string  | PT10M            |
+| `/advanced/orders_lookback`                        | Orders Lookback                  | How old each order update must be before the daily orders sweep reads it again, to catch orders Amazon makes searchable late. ISO 8601 duration of at least `PT1H`. | string  | PT48H            |
 | `/advanced/financial_transactions_lookback`        | Financial Transactions Lookback  | Delay before the final financial transaction read, to catch released deferred transactions. ISO 8601 duration from `P4D` to `P180D`, inclusive.           | string  | P90D             |
 | `/advanced/sandbox`                                | Use Sandbox                      | Send requests to Amazon's SP-API sandbox, which returns fixed example responses. For testing only.                                           | boolean | `false`          |
 
