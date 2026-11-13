@@ -1,0 +1,109 @@
+import logging
+from datetime import timedelta
+
+import pytest
+
+from source_amazon_selling_partner import api
+from source_amazon_selling_partner.client import SPAPIClient
+
+from .fake_amazon import FakeAmazon, order, transaction
+from .test_orders import LOG, MARKETPLACES, NOW, FakeTime, collect
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream", ["orders", "finance", "sweep"])
+@pytest.mark.parametrize("count", [0, 3])
+async def test_finished_windows_log_progress_at_info(monkeypatch, caplog, stream, count):
+    start = NOW - timedelta(days=4)
+    size = timedelta(days=1)
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[order(str(i), start + timedelta(minutes=i + 1), start + timedelta(minutes=i + 1))
+                for i in range(count)],
+        transactions=[transaction(str(i), start + timedelta(minutes=i + 1)) for i in range(count)],
+    )
+    time = FakeTime()
+    monkeypatch.setattr(api, "now", lambda: fake.now)
+    monkeypatch.setattr(api, "monotonic", time.clock)
+    client = SPAPIClient(http=fake, base_url="https://fake", clock=time.clock, sleep=time.sleep)
+    with caplog.at_level(logging.INFO, logger=LOG.name):
+        if stream == "orders":
+            await collect(api.backfill_orders(client, MARKETPLACES, start, size, LOG, None, start + size))
+            message = "backfilled orders window"
+            bounds = [(start, start + size - api.TICK)]
+        elif stream == "finance":
+            await collect(api.backfill_financial_transactions(client, start, size, LOG, None, start + size))
+            message = "backfilled financial transactions window"
+            bounds = [(start, start + size)]
+        else:
+            await collect(api.fetch_orders_sweep(client, MARKETPLACES, timedelta(days=2), size, LOG, start))
+            message = "swept orders window"
+            bounds = [(start, start + size), (start + size, start + size * 2)]
+    records = [r for r in caplog.records if r.levelno == logging.INFO]
+    assert [r.msg for r in records] == [message] * len(bounds)
+    elapsed = [record.args["elapsed_seconds"] for record in records]
+    assert all(seconds >= 0 for seconds in elapsed)
+    assert sum(elapsed) == pytest.approx(time.t)
+    for i, (record, (window_start, window_end)) in enumerate(zip(records, bounds)):
+        assert record.args == {
+            "window_start": window_start,
+            "window_end": window_end,
+            "count": count if i == 0 else 0,
+            "window_seconds": size.total_seconds(),
+            "elapsed_seconds": elapsed[i],
+        }
+    if count:
+        assert time.t > 0  # Paging waits for rate-limit tokens.
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream", ["orders", "finance"])
+async def test_incremental_window_progress_stays_at_debug(monkeypatch, caplog, stream):
+    monkeypatch.setattr(api, "now", lambda: NOW)
+    fake = FakeAmazon(now=NOW, orders=[])
+    time = FakeTime()
+    client = SPAPIClient(http=fake, base_url="https://fake", clock=time.clock, sleep=time.sleep)
+    with caplog.at_level(logging.DEBUG, logger=LOG.name):
+        if stream == "orders":
+            await collect(api.fetch_orders(
+                client, MARKETPLACES, timedelta(days=1), timedelta(), LOG, NOW - timedelta(days=2)
+            ))
+            message = "fetched orders window"
+        else:
+            await collect(api.fetch_financial_transactions(
+                client, timedelta(hours=1), timedelta(days=1), LOG, NOW - timedelta(days=2)
+            ))
+            message = "fetched financial transactions window"
+    records = [r for r in caplog.records if r.msg == message]
+    assert len(records) == 1
+    assert records[0].levelno == logging.DEBUG
+    assert not [r for r in caplog.records if r.levelno == logging.INFO]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream", ["orders", "finance"])
+async def test_backfill_progress_includes_freshness_wait_and_actual_window_size(monkeypatch, caplog, stream):
+    start = NOW - timedelta(hours=1)
+    fake = FakeAmazon(now=NOW, orders=[])
+    time = FakeTime()
+
+    async def sleep(seconds):
+        await time.sleep(seconds)
+        fake.now += timedelta(seconds=seconds)
+
+    monkeypatch.setattr(api, "now", lambda: fake.now)
+    monkeypatch.setattr(api, "monotonic", time.clock)
+    monkeypatch.setattr(api.asyncio, "sleep", sleep)
+    client = SPAPIClient(http=fake, base_url="https://fake", clock=time.clock, sleep=sleep)
+    with caplog.at_level(logging.INFO, logger=LOG.name):
+        if stream == "orders":
+            await collect(api.backfill_orders(client, MARKETPLACES, start, timedelta(days=1), LOG, None, NOW))
+            wait = (api.SEARCH_LAG - api.TICK).total_seconds()
+        else:
+            await collect(api.backfill_financial_transactions(client, start, timedelta(days=1), LOG, None, NOW))
+            wait = api.TRANSACTIONS_REALTIME_LAG.total_seconds()
+    records = [r for r in caplog.records if r.levelno == logging.INFO]
+    assert len(records) == 1
+    assert records[0].args["window_seconds"] == 3600
+    assert records[0].args["elapsed_seconds"] == time.t
+    assert time.t >= wait

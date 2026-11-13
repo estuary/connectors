@@ -1,6 +1,7 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
 from logging import Logger
+from time import monotonic
 from typing import Any, AsyncGenerator, Iterable, cast
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
@@ -274,6 +275,7 @@ async def _orders_updated_window(
     log: Logger,
 ) -> AsyncGenerator[Order | datetime, None]:
     """Read a complete updated-time window, shrinking rejected token windows."""
+    started = monotonic()
     while True:
         request_params = {
             "lastUpdatedAfter": to_iso(cursor + TICK - overlap),
@@ -308,10 +310,22 @@ async def _orders_updated_window(
             continue
         break
 
-    log.debug(
-        "fetched orders window",
-        {"window_start": cursor, "window_end": window_end, "count": count},
-    )
+    if priority == Priority.INCREMENTAL:
+        log.debug(
+            "fetched orders window",
+            {"window_start": cursor, "window_end": window_end, "count": count},
+        )
+    else:
+        log.info(
+            "swept orders window",
+            {
+                "window_start": cursor,
+                "window_end": window_end,
+                "count": count,
+                "window_seconds": (window_end - cursor).total_seconds(),
+                "elapsed_seconds": monotonic() - started,
+            },
+        )
     yield window_end
 
 
@@ -424,6 +438,7 @@ async def backfill_orders(
 
     window_end = min(window_start + current_size - TICK, last_tick)
     shrunk = False
+    started = monotonic()
 
     # A cutoff from the last few minutes is too recent for searchOrders' upper
     # bound. Wait it out instead of narrowing the window. The wait can't be
@@ -468,9 +483,15 @@ async def backfill_orders(
             continue
         break
 
-    log.debug(
+    log.info(
         "backfilled orders window",
-        {"window_start": window_start, "window_end": window_end, "count": count},
+        {
+            "window_start": window_start,
+            "window_end": window_end,
+            "count": count,
+            "window_seconds": (window_end + TICK - window_start).total_seconds(),
+            "elapsed_seconds": monotonic() - started,
+        },
     )
 
     if window_end < last_tick:
@@ -547,10 +568,11 @@ async def _transactions_window(
         count += 1
         yield transaction
 
-    log.debug(
-        "fetched financial transactions window",
-        {"window_start": window_start, "window_end": window_end, "count": count},
-    )
+    if priority == Priority.INCREMENTAL:
+        log.debug(
+            "fetched financial transactions window",
+            {"window_start": window_start, "window_end": window_end, "count": count},
+        )
 
 
 async def fetch_financial_transactions(
@@ -679,6 +701,7 @@ async def backfill_financial_transactions(
         return
 
     window_end = min(window_start + min(window_size, MAX_TRANSACTIONS_WINDOW), cutoff)
+    started = monotonic()
 
     # A window ending near the cutoff is read no sooner than the realtime pass
     # would read it, so transactions landing minutes after their postedDate
@@ -690,10 +713,12 @@ async def backfill_financial_transactions(
         await asyncio.sleep(wait)
 
     while True:
+        count = 0
         try:
             async for transaction in _transactions_window(
                 client, window_start, window_end, Priority.BACKFILL, log
             ):
+                count += 1
                 yield transaction
         except PaginationTokenRejected:
             if window_end - window_start <= timedelta(hours=1):
@@ -709,6 +734,17 @@ async def backfill_financial_transactions(
             window_end = smaller_end
             continue
         break
+
+    log.info(
+        "backfilled financial transactions window",
+        {
+            "window_start": window_start,
+            "window_end": window_end,
+            "count": count,
+            "window_seconds": (window_end - window_start).total_seconds(),
+            "elapsed_seconds": monotonic() - started,
+        },
+    )
 
     if window_end < cutoff:
         yield to_iso(window_end)
