@@ -789,15 +789,15 @@ func streamV2ValidateCommittedToken(channelName, table string, committedToken *s
 	}
 
 	// A checkpoint item is written only after Snowflake commits its channel through
-	// Routed, so the table holds every document through Routed even once the
-	// channel and its token are gone.
+	// Routed, so a table that was not replaced holds every document through Routed
+	// even once the channel and its token are gone.
 	if committedToken == nil {
 		if routed > 0 {
 			log.WithFields(log.Fields{
 				"table":   table,
 				"channel": channelName,
 				"routed":  routed,
-			}).Warn("snowpipe streaming v2: Snowflake no longer holds this channel's offset token, as it does once a channel goes 30 days without ingestion, so the channel resumes from the checkpoint's offset. A transaction interrupted before its checkpoint may be appended again")
+			}).Warn("snowpipe streaming v2: Snowflake reports no offset token for this channel, so the channel resumes from the checkpoint's offset. Snowflake deletes a channel and its token after 30 days without ingestion. If the table was instead replaced outside Estuary, it lacks the rows written before it was replaced, and the binding needs a backfill. A transaction interrupted before its checkpoint may be appended again")
 		}
 		return routed, nil
 	}
