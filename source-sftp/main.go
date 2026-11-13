@@ -77,7 +77,7 @@ type advancedConfig struct {
 	// Although possibly less useful here than for the cloud storage connectors, this advanced
 	// configuration may have some utility for cases where new files are added in lexically newer
 	// directories. For example, if `a/` has been processed and a new directory `b/` is added, a
-	// connector configured with ascendingKeys will able able to skip the full directory listing of
+	// connector configured with ascendingKeys will be able to skip the full directory listing of
 	// `a/` when completing the sweep that processes `b/` (and for all subsequent sweeps).
 	AscendingKeys bool `json:"ascendingKeys,omitempty" jsonschema:"title=Ascending Keys" jsonschema_extras:"nonsensitive=true"`
 }

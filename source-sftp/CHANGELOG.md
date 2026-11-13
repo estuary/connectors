@@ -1,5 +1,11 @@
 # source-sftp
 
+## 2026-11-13
+
+### Added
+
+- XML files can now be captured. Select the `XML` format in the parser settings, or leave it on automatic detection to parse files with a `.xml` extension. Each file's root element becomes one document by default. Set `Record Path` to emit each repeated element, such as `/Orders/Order`, as its own document.
+
 ## 2026-10-01
 
 ### Changed
