@@ -1,0 +1,20 @@
+credentials:
+    credentials_title: Login with Amazon
+    client_id_sops: ENC[AES256_GCM,data:/THHwxgtu/dZXoP1W85S8q20xi0sNn800xhLFJfyzbDcl8K+/9prvb4epSSO6F5XneetHSneoDdKXfs4tQ==,iv:GnQEuosDdpEH8eWyCzYhbfiB1lRi105LpKCsFthDhn8=,tag:KUvxTDBT1x5PdDK/JwXvpA==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:hgnC1A1Vk9b/yy9CuT1HrMIHYzQEP4A7qlRLaYQXAAW0JPUToUiUD/DVq5MPsLIC/2tYpRWwgJda3TNcPdclWK5N8FBlDJK6+CKQNwhSa+Y=,iv:7Xu3EM5SQmZwRk5tziMvGZgZS/0lqJQR0rkXTJq4M9s=,tag:zqMuatQoXpAVo0Fuvr/GyA==,type:str]
+    refresh_token_sops: ENC[AES256_GCM,data:zhxkinEkfIuQb+AlD5Ii/I7UOKQo2Mguq+XItnU1HagniUT4S57CuLwxsCiFRMSUQ3xvf0XXCTijZgL4oVH5IQxZOAsuFiBQJBCLvUhh79aWnoHTakk6whMT8hYHxE9Q6QmwA5mulj2hnwlpgO70q1KSLGAOTQDPLy3bhCQfEKTurxZSy5N5TFUIGojx6ZHmHU8O1iBsElH0bJtUSkoKlm3FKlru0/Nz3iVczkl6IBqye463iyfP30gvdY1vZP0kgJ3AapE5flpbtNC5rT3adlT5nllcZfgJZHQx6zxOVFOovjZC7HEk8bTrKy9klZco1CFbWknmM+14LqQITBWrhSZq5Ur01n7gk+J4qSx3rdw6r75nbE9XfhHt2K5DbObmbilIyFLJLAq2k6bf77/4ARVaLbfL2evBA1kiVInmtTc0U2ytOyDMfk3nlIY=,iv:Olg97GhehzAn0wuwIXtIuSBe3ouNul2xdhptw3PQJOg=,tag:m2hFOsk+gOZ5Fo7ev6WScg==,type:str]
+region: North America
+marketplace_ids:
+    - ATVPDKIKX0DER
+start_date: "2026-01-01T00:00:00Z"
+advanced:
+    sandbox: true
+sops:
+    encrypted_suffix: _sops
+    gcp_kms:
+        - created_at: "2026-11-10T23:56:50Z"
+          enc: CiUAdmEdwqgYmqMdv/ws6OBLuWxmHfTyruhp9u0HzQRdFi/CprabEkgAvE+nk7ll5z7Odf2CRi6bih1Zy2qiI13M/u6VvZnFYoDi7V4atVv0iSsgMax4dcbr5MI96aPVo0+Spv0FtDG0LWcFUbooMNQ=
+          resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+    lastmodified: "2026-11-10T23:56:50Z"
+    mac: ENC[AES256_GCM,data:DyECv6D7wGaEBVVEuZjZIqDzr7aLEiYwEgV7kQsAqDo413H1va+O/2+4PKn8BQKHvqe759BIrJaJbq692KX2mK+tBD5E9jXEDyo27pftFy/AZLdLZWc80wF1z9RA9VFN77rAPoxAfPDl0fWZVMj9Bp0J3Buz/oc50sWj6ocxTWc=,iv:Uin3QL2lIMIh+41L68qBlbAlbkSrTjMGAXbKKl0ZBpI=,tag:Ceve59V5axY0pdhgNLBQiQ==,type:str]
+    version: 3.13.3
