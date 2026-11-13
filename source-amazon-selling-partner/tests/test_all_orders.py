@@ -286,6 +286,78 @@ async def test_never_reuses_a_cancelled_or_aborted_report_or_another_request():
     assert len(fake.create_requests) == 1
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("missing", [
+    ["marketplaceIds"], ["dataStartTime"], ["dataEndTime"],
+    ["marketplaceIds", "dataStartTime", "dataEndTime"],
+])
+@pytest.mark.parametrize("reuse_candidate", [False, True])
+async def test_created_report_with_missing_echo_proceeds_once_warned(monkeypatch, caplog, missing, reuse_candidate):
+    request = ReportRequest("GET_MERCHANT_LISTINGS_ALL_DATA", (MARKETPLACES[0],), NOW, NOW)
+    fake = FakeAmazon(now=NOW, orders=[])
+    if reuse_candidate:
+        earlier = requested("earlier", request, "DONE", NOW - timedelta(minutes=1))
+        for name in missing:
+            earlier.pop(name)
+        fake.reports.append(earlier)
+    get_report = reports.get_report
+
+    async def without_echo(*args):
+        report = await get_report(*args)
+        return report.model_copy(update={name: None for name in missing})
+
+    monkeypatch.setattr(reports, "get_report", without_echo)
+    client, _ = client_with(fake)
+
+    report = await request_report(client, request, Priority.INCREMENTAL, LOG)
+
+    assert report is not None and report.reportId == "requested-1"
+    assert len(fake.create_requests) == 1
+    assert fake.get_report_requests == ["requested-1", "requested-1"]
+    [warning] = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert warning.message == "created report omits request fields; trusting its reportId"
+    assert warning.args == {"report_id": "requested-1", "missing_fields": missing}
+
+
+@pytest.mark.asyncio
+async def test_created_report_missing_echo_still_rejects_a_different_start(monkeypatch):
+    request = request_for(HORIZON - DAY, HORIZON)
+    fake = FakeAmazon(now=NOW, orders=[])
+    get_report = reports.get_report
+
+    async def changed_echo(*args):
+        report = await get_report(*args)
+        update: dict[str, Any] = {"marketplaceIds": None}
+        if len(fake.get_report_requests) == 2:
+            update["dataStartTime"] = request.data_start + timedelta(seconds=1)
+        return report.model_copy(update=update)
+
+    monkeypatch.setattr(reports, "get_report", changed_echo)
+    client, _ = client_with(fake)
+
+    with pytest.raises(ReportMismatch, match="requested-1"):
+        await request_report(client, request, Priority.INCREMENTAL, LOG)
+
+    assert fake.get_report_requests == ["requested-1", "requested-1"]
+
+
+@pytest.mark.asyncio
+async def test_created_report_missing_end_still_counts_cancellations(monkeypatch):
+    request = request_for(HORIZON - DAY, HORIZON)
+    fake = FakeAmazon(now=NOW, orders=[], lifecycles=[["CANCELLED"], ["CANCELLED"]])
+    get_report = reports.get_report
+
+    async def without_end(*args):
+        report = await get_report(*args)
+        return report.model_copy(update={"dataEndTime": None})
+
+    monkeypatch.setattr(reports, "get_report", without_end)
+    client, _ = client_with(fake)
+
+    assert await request_report(client, request, Priority.INCREMENTAL, LOG) is None
+    assert len(fake.create_requests) == 2
+
+
 class StaleListing(FakeAmazon):
     """Lists report "stale" as in progress, while getReport says it is cancelled."""
 

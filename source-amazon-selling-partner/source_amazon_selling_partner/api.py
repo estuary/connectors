@@ -1304,9 +1304,8 @@ async def fetch_catalog_items(
     # match and the previous_time > completed_bucket guard below.
     earliest_created -= RETENTION_MARGIN
     for marketplace_id in marketplace_ids:
-        # Matching relies on Amazon echoing the sent dataStartTime/dataEndTime
-        # for this snapshot report, unverified until the first live run. A
-        # mismatch fails loudly with ReportMismatch.
+        # Reuse relies on Amazon echoing the sent dataStartTime/dataEndTime
+        # for this snapshot report, unverified until the first live run.
         request = ReportRequest(
             CatalogItem.REPORT_TYPE,
             (marketplace_id,),

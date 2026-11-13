@@ -168,18 +168,24 @@ class ReportRequest:
             body["reportOptions"] = dict(self.report_options)
         return body
 
-    def made(self, report: Report) -> bool:
+    def made(self, report: Report, *, allow_missing: bool = False) -> bool:
         """
         Whether `report`, of this request's type, was requested with this
         request's arguments.
         """
         # That Amazon lists a report's marketplaceIds, dataStartTime and
         # dataEndTime as they were sent (the same instants, to the second) is
-        # unverified. _wait_for fails on a report that doesn't match.
-        if sorted(report.marketplaceIds or []) != sorted(self.marketplace_ids):
+        # unverified. Only a report we just created may omit these fields.
+        if not (allow_missing and report.marketplaceIds is None) and (
+            sorted(report.marketplaceIds or []) != sorted(self.marketplace_ids)
+        ):
             return False
-        if report.dataStartTime != self.data_start or report.dataEndTime is None:
+        if not (allow_missing and report.dataStartTime is None) and (
+            report.dataStartTime != self.data_start
+        ):
             return False
+        if report.dataEndTime is None:
+            return allow_missing
         if self.data_end_after is None:
             return report.dataEndTime == self.data_end
         return self.data_end_after < report.dataEndTime <= self.data_end
@@ -325,20 +331,34 @@ async def _wait_for(
     request: ReportRequest,
     priority: Priority,
     log: Logger,
+    *,
+    created: bool = False,
 ) -> Report:
     """Returns the report once its status is terminal."""
     started = client.clock()
     delays = iter(FIRST_POLL_DELAYS)
+    warned_missing = False
     while True:
         await client.sleep(next(delays, POLL_INTERVAL).total_seconds())
         report = await get_report(client, report_id, priority, log)
-        if not request.made(report):
+        if not request.made(report, allow_missing=created):
             raise ReportMismatch(
                 f"Amazon lists report {report_id} as {report.reportType} "
                 f"{report.marketplaceIds} {report.dataStartTime}..{report.dataEndTime}, "
                 f"not the requested {request} for {list(request.marketplace_ids)}; "
                 "reuse after a restart can't find it."
             )
+        if created and not warned_missing:
+            missing = [
+                name for name in ("marketplaceIds", "dataStartTime", "dataEndTime")
+                if getattr(report, name) is None
+            ]
+            if missing:
+                log.warning(
+                    "created report omits request fields; trusting its reportId",
+                    {"report_id": report_id, "missing_fields": missing},
+                )
+                warned_missing = True
         if report.processingStatus in TERMINAL_STATUSES:
             return report
         if client.clock() - started >= REPORT_TIMEOUT.total_seconds():
@@ -421,6 +441,7 @@ async def request_report(
     within REPORT_TIMEOUT, or aborted, fails rather than being skipped.
     """
     cancelled: list[str] = []
+    created_ids: set[str] = set()
     seen_cancelled: set[str] = set()
     retry_after_cancel = False
     report = await _reused(client, request, priority, log)
@@ -428,7 +449,7 @@ async def request_report(
         if report is not None:
             # A reused report that ends before the request does covers only
             # part of its range, so its cancellation doesn't count.
-            if report.dataEndTime == request.data_end:
+            if report.reportId in created_ids or report.dataEndTime == request.data_end:
                 cancelled.append(report.reportId)
             seen_cancelled.add(report.reportId)
             retry_after_cancel = True
@@ -452,9 +473,10 @@ async def request_report(
         if retry_after_cancel:
             await client.sleep(CANCELLED_RETRY_DELAY.total_seconds())
         report_id = await create_report(client, request, priority, log)
+        created_ids.add(report_id)
         # Only a report requested before may end short of the request.
         exact = replace(request, data_end_after=None)
-        report = await _wait_for(client, report_id, exact, priority, log)
+        report = await _wait_for(client, report_id, exact, priority, log, created=True)
 
     if report.processingStatus == ProcessingStatus.FATAL:
         raise await _fatal_error(client, report, request, priority, log)
