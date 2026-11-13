@@ -107,7 +107,7 @@ class EndpointConfig(BaseModel):
         max_length=50,
     )
     start_date: AwareDatetime = Field(
-        description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Orders created, financial transactions posted, settlement reports created and all orders lines last updated before this date are not captured, nor Sales and Traffic days before the UTC day it falls in. Amazon serves about two years of order history, and of all orders and Sales and Traffic reports, but keeps settlement reports for only 90 days, so older data is not captured whatever this date. If left blank, the start date is set to 30 days before the present date, and moves forward each time the capture restarts.",
+        description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Orders created, financial transactions posted, settlement reports created and all orders lines last updated before this date are not captured, nor Sales and Traffic days before the UTC day it falls in. Amazon serves about two years of order history, and of all orders and Sales and Traffic reports, but keeps settlement reports for only 90 days, so older data is not captured whatever this date. If left blank, the start date is set to 30 days before the date each stream first starts backfilling.",
         title="Start Date",
         default_factory=default_start_date,
     )

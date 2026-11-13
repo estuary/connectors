@@ -681,7 +681,7 @@ async def test_incremental_lists_nothing_created_before_start_date():
     out = await collect(fetch_settlement_reports(client_for(fake), RecentReports(), start, LOG, cursor))
 
     assert {k[0] for k in keys(out)} == {"after-start"}
-    assert fake.report_requests[0]["createdSince"] == api.to_iso(api.ceil_to_tick(start))
+    assert fake.report_requests[0]["createdSince"] == api.to_iso(api.floor_to_tick(start))
     assert cursors(out) == [NOW - api.TICK]
 
 
@@ -802,3 +802,20 @@ def test_report_operations_use_amazons_default_limits():
     assert DEFAULT_LIMITS[Operation.GET_REPORTS] == OperationLimit(rate=0.0222, burst=10)
     assert DEFAULT_LIMITS[Operation.GET_REPORT] == OperationLimit(rate=2, burst=15)
     assert DEFAULT_LIMITS[Operation.GET_REPORT_DOCUMENT] == OperationLimit(rate=0.0167, burst=15)
+
+
+@pytest.mark.asyncio
+async def test_backfill_from_the_initial_state_skips_reports_just_before_start_date(monkeypatch: pytest.MonkeyPatch):
+    start = NOW - 10 * DAY
+    fake = fake_with(
+        ("just-before", start - timedelta(milliseconds=500), 1),
+        ("at-start", start, 1),
+    )
+    # Amazon's createdTime has milliseconds; report() writes whole seconds.
+    fake.reports[0]["createdTime"] = (start - timedelta(milliseconds=500)).isoformat()
+    client = client_for(fake)
+    state = resources.settlement_reports(LOG, client, make_config(["ATVPDKIKX0DER"], start_date=api.to_iso(start))).initial_state
+    out = await collect(
+        backfill_settlement_reports(client, RecentReports(), start, LOG, state.backfill.next_page, state.backfill.cutoff)
+    )
+    assert {k[0] for k in keys(out)} == {"at-start"}

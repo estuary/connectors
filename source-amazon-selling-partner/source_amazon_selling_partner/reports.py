@@ -288,10 +288,11 @@ async def _reusable_report(
     request: ReportRequest,
     priority: Priority,
     log: Logger,
+    skip: frozenset[str] = frozenset(),
 ) -> Report | None:
     """
     The newest report of `request` created within REUSE_LOOKBACK that
-    Amazon is processing or has finished, if any.
+    Amazon is processing or has finished, if any, other than those in `skip`.
     """
     request_params = {
         "reportTypes": request.report_type,
@@ -300,7 +301,7 @@ async def _reusable_report(
     }
     reports = await list_reports(client, request_params, priority, log)
     return max(
-        (r for r in reports if request.made(r)),
+        (r for r in reports if request.made(r) and r.reportId not in skip),
         key=lambda r: (r.createdTime, r.reportId),
         default=None,
     )
@@ -372,9 +373,10 @@ async def _reused(
     request: ReportRequest,
     priority: Priority,
     log: Logger,
+    skip: frozenset[str] = frozenset(),
 ) -> Report | None:
     """The report _reusable_report finds, run to a terminal status, if any."""
-    report = await _reusable_report(client, request, priority, log)
+    report = await _reusable_report(client, request, priority, log, skip)
     if report is not None and report.processingStatus != ProcessingStatus.DONE:
         log.info(
             "waiting on a report requested earlier",
@@ -399,10 +401,12 @@ async def request_report(
     processing or has finished within REUSE_LOOKBACK is used instead of
     requesting another, so a request made again, as after a restart, waits
     on or reads the report requested before.
-    A cancelled or aborted report is never reused. A report not finished
+    A cancelled or aborted report is never reused, even while Amazon still
+    lists it as processing or finished. A report not finished
     within REPORT_TIMEOUT, or aborted, fails rather than being skipped.
     """
     cancelled: list[str] = []
+    seen_cancelled: set[str] = set()
     retry_after_cancel = False
     report = await _reused(client, request, priority, log)
     while report is None or report.processingStatus == ProcessingStatus.CANCELLED:
@@ -411,10 +415,13 @@ async def request_report(
             # part of its range, so its cancellation doesn't count.
             if report.dataEndTime == request.data_end:
                 cancelled.append(report.reportId)
+            seen_cancelled.add(report.reportId)
             retry_after_cancel = True
             # Look for a reusable report again: Amazon may have cancelled this
             # one as too soon because a report of the same request was in flight.
-            report = await _reused(client, request, priority, log)
+            report = await _reused(
+                client, request, priority, log, frozenset(seen_cancelled)
+            )
             continue
         if len(cancelled) >= 2:
             log.warning(

@@ -113,7 +113,7 @@ async def test_seam_between_backfill_and_incremental_misses_nothing(monkeypatch:
     # Build the resource's real initial state at a known time.
     cutoff = NOW - timedelta(hours=1)
     monkeypatch.setattr(resources, "datetime", FrozenDatetime(cutoff + timedelta(microseconds=250_000)))
-    config = make_config(["ATVPDKIKX0DER"])
+    config = make_config(["ATVPDKIKX0DER"], start_date=api.to_iso(cutoff - timedelta(minutes=1)))
     fake = FakeAmazon(
         now=NOW,
         orders=[
@@ -138,6 +138,23 @@ async def test_seam_between_backfill_and_incremental_misses_nothing(monkeypatch:
     assert seen == {"before", "at", "after"}
     # The backfill covers creation up to cutoff−1s, incremental updates from cutoff.
     assert [o.orderId for o in backfilled if isinstance(o, Order)] == ["before"]
+
+
+@pytest.mark.asyncio
+async def test_backfill_resumes_from_the_saved_start_when_a_blank_start_date_has_moved():
+    # A blank start_date is 30 days before each start, so a restart the next
+    # day passes a later one; the saved page keeps the first.
+    config = make_config(["ATVPDKIKX0DER"])
+    saved = resources.orders(LOG, client_for(FakeAmazon(now=NOW, orders=[])), config).initial_state.backfill
+    assert saved.next_page == api.ceil_to_tick(config.start_date).isoformat()
+
+    first_start = datetime(2026, 1, 1, tzinfo=UTC)
+    fake = FakeAmazon(now=NOW, orders=[order("first-day", first_start, first_start)], page_size=10)
+    out = await collect(
+        backfill_orders(client_for(fake), MARKETPLACES, first_start + timedelta(days=1), timedelta(days=1), LOG, first_start.isoformat(), NOW - timedelta(hours=1))
+    )
+    assert [o.orderId for o in out if isinstance(o, Order)] == ["first-day"]
+    assert fake.requests[0]["createdAfter"] == "2026-01-01T00:00:00Z"
 
 
 class FrozenDatetime:

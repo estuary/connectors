@@ -286,6 +286,33 @@ async def test_never_reuses_a_cancelled_or_aborted_report_or_another_request():
     assert len(fake.create_requests) == 1
 
 
+class StaleListing(FakeAmazon):
+    """Lists report "stale" as in progress, while getReport says it is cancelled."""
+
+    def _get_report(self, report_id: str, params: dict[str, Any]):
+        if report_id != "stale":
+            return super()._get_report(report_id, params)
+        self.get_report_requests.append(report_id)
+        if len(self.get_report_requests) > 5:
+            raise RuntimeError("getReport keeps being asked for the cancelled report")
+        stale = next(r for r in self.reports if r["reportId"] == "stale")
+        return self._respond({**stale, "processingStatus": "CANCELLED"})
+
+
+@pytest.mark.asyncio
+async def test_never_reuses_a_report_seen_cancelled_while_still_listed_in_progress():
+    request = request_for(HORIZON - DAY, HORIZON)
+    fake = StaleListing(now=NOW, orders=[])
+    fake.reports.append(requested("stale", request, "IN_PROGRESS", NOW - timedelta(hours=1)))
+    client, _ = client_with(fake)
+
+    report = await request_report(client, request, Priority.INCREMENTAL, LOG)
+
+    assert report is not None and report.reportId == "requested-1"
+    assert fake.get_report_requests.count("stale") == 1
+    assert len(fake.create_requests) == 1
+
+
 @pytest.mark.asyncio
 async def test_incremental_never_reuses_a_report_ending_at_the_cursor():
     # The backfill's last window ends at the cursor and starts where the

@@ -131,6 +131,11 @@ def orders(log: Logger, client: SPAPIClient, config: EndpointConfig) -> Resource
 
     cutoff = datetime.now(tz=UTC).replace(microsecond=0)
 
+    # Each backfill's first page is start_date, saved with the initial state
+    # before any work: a blank start_date moves on every restart, so a restart
+    # inside the first window would otherwise skip the days it moved past.
+    # createdTime has whole seconds, so the first one counted is start_date's
+    # second, rounded up.
     return Resource(
         name="orders",
         key=["/orderId"],
@@ -138,7 +143,9 @@ def orders(log: Logger, client: SPAPIClient, config: EndpointConfig) -> Resource
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff - TICK),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
+            backfill=ResourceState.Backfill(
+                next_page=ceil_to_tick(config.start_date).isoformat(), cutoff=cutoff
+            ),
         ),
         initial_config=OrdersResourceConfig(
             name="orders", interval=timedelta(minutes=15)
@@ -172,7 +179,7 @@ def financial_transactions(
         cursor = cast(datetime, lookback_state.cursor)
         earliest = max(
             floor_to_tick(datetime.now(tz=UTC) - lookback),
-            ceil_to_tick(config.start_date),
+            floor_to_tick(config.start_date),
         )
         if earliest < cursor:
             log.info(
@@ -230,7 +237,7 @@ def financial_transactions(
     # where the realtime pass also starts; as with orders, transactions
     # posted between the cutoff and a later start_date are still captured.
     def rereading_cursor(lag: timedelta) -> datetime:
-        return max(cutoff - lag, min(ceil_to_tick(config.start_date), cutoff))
+        return max(cutoff - lag, min(floor_to_tick(config.start_date), cutoff))
 
     return Resource(
         name="financial_transactions",
@@ -245,7 +252,9 @@ def financial_transactions(
                 ),
                 LOOKBACK: ResourceState.Incremental(cursor=rereading_cursor(lookback)),
             },
-            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
+            backfill=ResourceState.Backfill(
+                next_page=floor_to_tick(config.start_date).isoformat(), cutoff=cutoff
+            ),
         ),
         initial_config=OrdersResourceConfig(
             name="financial_transactions", interval=timedelta(minutes=15)
@@ -303,7 +312,14 @@ def settlement_reports(
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff - TICK),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
+            # The page is the createdTime of the last report read, and reports
+            # after it are read, so it starts just before start_date.
+            backfill=ResourceState.Backfill(
+                next_page=(
+                    floor_to_tick(config.start_date) - timedelta(microseconds=1)
+                ).isoformat(),
+                cutoff=cutoff,
+            ),
         ),
         initial_config=OrdersResourceConfig(
             name="settlement_reports", interval=timedelta(hours=1)
@@ -351,7 +367,9 @@ def all_orders(log: Logger, client: SPAPIClient, config: EndpointConfig) -> Reso
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
+            backfill=ResourceState.Backfill(
+                next_page=floor_to_tick(config.start_date).isoformat(), cutoff=cutoff
+            ),
         ),
         initial_config=OrdersResourceConfig(
             name="all_orders", interval=timedelta(days=1)
@@ -401,7 +419,9 @@ def sales_and_traffic_by_date(
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
+            backfill=ResourceState.Backfill(
+                next_page=floor_to_day(config.start_date).isoformat(), cutoff=cutoff
+            ),
         ),
         initial_config=OrdersResourceConfig(
             name="sales_and_traffic_by_date", interval=timedelta(days=1)

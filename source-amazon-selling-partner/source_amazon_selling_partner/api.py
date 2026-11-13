@@ -504,7 +504,7 @@ async def backfill_financial_transactions(
     assert isinstance(cutoff, datetime)
 
     if page is None:
-        window_start = ceil_to_tick(start_date)
+        window_start = floor_to_tick(start_date)
     else:
         assert isinstance(page, str)
         window_start = datetime.fromisoformat(page)
@@ -669,7 +669,7 @@ async def fetch_settlement_reports(
 
     since = max(
         cursor + TICK - REPORT_LISTING_OVERLAP,
-        min(ceil_to_tick(start_date), cursor + TICK),
+        min(floor_to_tick(start_date), cursor + TICK),
     )
     if since < (floor := _retention_floor()):
         log.warning(
@@ -734,7 +734,7 @@ async def backfill_settlement_reports(
 
     watermark: datetime | None = None
     if page is None:
-        since = ceil_to_tick(start_date)
+        since = floor_to_tick(start_date)
     else:
         assert isinstance(page, str)
         watermark = datetime.fromisoformat(page)

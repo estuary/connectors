@@ -262,6 +262,16 @@ async def test_backfill_walks_half_open_windows_up_to_cutoff():
 
 
 @pytest.mark.asyncio
+async def test_backfill_keeps_a_transaction_in_a_fractional_start_seconds_second():
+    start = datetime(2026, 1, 1, 0, 0, 0, 500_000, tzinfo=UTC)
+    cutoff = datetime(2026, 1, 2, tzinfo=UTC)
+    fake = FakeAmazon(now=NOW, orders=[], transactions=[transaction("in-start-second", start + 250 * MS)], page_size=10)
+    out = await collect(backfill_financial_transactions(client_for(fake), start, DAY, LOG, None, cutoff))
+    assert ids(out) == ["in-start-second"]
+    assert fake.requests[0]["postedAfter"] == "2026-01-01T00:00:00Z"
+
+
+@pytest.mark.asyncio
 async def test_backfill_never_requests_more_than_180_days():
     start = datetime(2025, 1, 1, tzinfo=UTC)
     cutoff = datetime(2026, 1, 1, tzinfo=UTC)
@@ -582,7 +592,9 @@ async def test_lookback_rewind_survives_a_restart_before_the_first_window(monkey
     # The rewind's checkpoint leaves the other passes' saved state alone.
     assert inc_cursor(task.persisted, resources.REALTIME) == NOW
     assert inc_cursor(task.persisted, resources.LATE) == NOW - api.TRANSACTIONS_LATE_LAG
-    assert task.persisted.backfill == ResourceState.Backfill(next_page=None, cutoff=NOW)
+    assert task.persisted.backfill == ResourceState.Backfill(
+        next_page="2025-01-01T00:00:00+00:00", cutoff=NOW
+    )
 
 
 @pytest.mark.asyncio
