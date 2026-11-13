@@ -199,6 +199,50 @@ func TestIntegration(t *testing.T) {
 		require.NoError(t, rows.Err())
 	})
 
+	// CARDINALITY is an undocumented hint, so the plan it gets Loads is pinned
+	// here: each key looked up in the primary key, never a full scan.
+	t.Run("load-plan", func(t *testing.T) {
+		var ctx = context.Background()
+		var db = testConfig().openDB()
+		defer db.Close()
+
+		var name = fmt.Sprintf("load_plan_%d", time.Now().UnixNano())
+		_, err := db.ExecContext(ctx, "CREATE TABLE "+name+" (id NUMBER(38,0) NOT NULL, name VARCHAR2(1000 CHAR) NOT NULL, flow_document CLOB, PRIMARY KEY (id, name))")
+		require.NoError(t, err)
+		defer db.ExecContext(ctx, "DROP TABLE "+name+" PURGE")
+		_, err = db.ExecContext(ctx, "INSERT INTO "+name+" SELECT level, 'name-' || level, '{}' FROM dual CONNECT BY level <= 100000")
+		require.NoError(t, err)
+		_, err = db.ExecContext(ctx, "BEGIN DBMS_STATS.GATHER_TABLE_STATS(USER, :1); END;", strings.ToUpper(name))
+		require.NoError(t, err)
+
+		var table = sql.Table{
+			Identifier: name,
+			Keys: []sql.Column{
+				{Identifier: "id", MappedType: sql.MappedType{BareDDL: "NUMBER(38,0)"}},
+				{Identifier: "name", MappedType: sql.MappedType{BareDDL: "VARCHAR2(1000 CHAR)"}},
+			},
+			Document: &sql.Column{Identifier: "flow_document"},
+		}
+		_, err = db.ExecContext(ctx, "EXPLAIN PLAN SET STATEMENT_ID = '"+name+"' FOR "+loadSQL(&table))
+		require.NoError(t, err)
+
+		rows, err := db.QueryContext(ctx, "SELECT operation || ' ' || options || ' ' || object_name FROM plan_table WHERE statement_id = :1 ORDER BY id", name)
+		require.NoError(t, err)
+		var ops []string
+		for rows.Next() {
+			var op string
+			require.NoError(t, rows.Scan(&op))
+			ops = append(ops, strings.TrimSpace(op))
+		}
+		require.NoError(t, rows.Err())
+		require.NoError(t, rows.Close())
+
+		var plan = strings.Join(ops, "\n")
+		require.Contains(t, plan, "NESTED LOOPS", plan)
+		require.Contains(t, plan, "INDEX UNIQUE SCAN", plan)
+		require.NotContains(t, plan, "TABLE ACCESS FULL", plan)
+	})
+
 	// The boundary keeps its fraction, and rounds like stored values into
 	// columns of lesser precision.
 	t.Run("truncation-boundary", func(t *testing.T) {

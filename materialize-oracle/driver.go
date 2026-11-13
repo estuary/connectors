@@ -772,9 +772,11 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-// lobSizeClass is the bind type which both the driver and Oracle give a value
-// of a LOB column. A value over 4000 bytes, or over 32767 where the server
-// supports it, binds as a LONG and is sent after all other binds.
+// lobSizeClass classes a value of a LOB column by the bind type it may take.
+// A value binds as a LONG, sent after all other binds, when it's over 4000
+// bytes, or over 32767 where the server supports 32K strings
+// (MAX_STRING_SIZE=EXTENDED). The driver and Oracle each use one of those two
+// limits, so values of one class are on the same side of either.
 func lobSizeClass(v any) byte {
 	var n int
 	switch v := v.(type) {
