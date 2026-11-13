@@ -13,6 +13,7 @@ from .models import (
     ClientSideIncrementalOffsetPaginatedResponse,
     ClientSideIncrementalCursorPaginatedResponse,
     ConnectorState,
+    CursorExportStatePatch,
     EndpointConfig,
     FilterParam,
     FullRefreshResponse,
@@ -961,11 +962,44 @@ def talk_incremental_export_resources(
     return resources
 
 
+def _migrate_keyset_state_to_export(state: ResourceState) -> CursorExportStatePatch | None:
+    """
+    Returns the patch to checkpoint when `state` is the keyset sweep's, or None
+    when it's already the cursor-based export's.
+    """
+    if not isinstance(state.inc, dict):
+        return None
+
+    subtask_cursors: list[datetime] = []
+    for subtask in state.inc.values():
+        if subtask is not None:
+            assert isinstance(subtask.cursor, datetime)
+            subtask_cursors.append(subtask.cursor)
+
+    # A deletion subtask can trail the other subtask by over an hour, and list
+    # endpoints never return deleted records. Starting the export at the
+    # earliest subtask cursor reads the deletions in between again.
+    patch = CursorExportStatePatch(
+        inc={
+            **{subtask_id: None for subtask_id in state.inc},
+            "cursor": (str(dt_to_s(min(subtask_cursors))),),
+        },
+    )
+
+    if isinstance(state.backfill, ResourceState.Backfill) and isinstance(state.backfill.next_page, int):
+        patch.backfill = ResourceState.Backfill(
+            cutoff=state.backfill.cutoff,
+            next_page=str(state.backfill.next_page),
+        )
+
+    return patch
+
+
 def incremental_cursor_export_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
-    def open(
+    async def open(
         name: INCREMENTAL_CURSOR_EXPORT_TYPES,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -973,6 +1007,22 @@ def incremental_cursor_export_resources(
         task: Task,
         all_bindings,
     ):
+        patch = _migrate_keyset_state_to_export(state)
+
+        if patch is not None:
+            cursor = patch.inc["cursor"]
+            assert cursor is not None
+            state.inc = ResourceState.Incremental(cursor=cursor)
+            if patch.backfill is not None:
+                state.backfill = patch.backfill
+
+            task.log.info(f"Migrated {name} state from the keyset sweep to the cursor-based export.", {
+                "migrated_state": patch.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                common.ConnectorState[CursorExportStatePatch](bindingStateV1={binding.stateKey: patch}),
+            )
+
         common.open_binding(
             binding,
             binding_index,
