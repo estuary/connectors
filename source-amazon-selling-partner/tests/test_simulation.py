@@ -7,8 +7,8 @@ scenario assumption (Amazon's behavior here is not yet verified).
 
 Mutation audit: from this connector directory run
     PATH=$PWD/../.venv/bin:$PATH python tests/run_simulation_mutations.py
-The helper snapshots bytes, applies each mutation alone, runs only this file,
-and restores in finally; API edits are temporary. Verified M1--M8 all KILLED:
+The helper snapshots bytes, applies each mutation alone, runs this file and
+the orders regressions, and restores in finally; API edits are temporary. Verified M1--M9 all KILLED:
 M1 orders checkpoint + configured overlap (10m) + 1h: completed-window oracle.
 M2 finance backfill shrink assignment removed: repeated slow window budget.
 M3 orders backfill checkpoint uses original end: completed-window oracle.
@@ -16,7 +16,8 @@ M4 finance checkpoint + 1h: completed-window oracle.
 M5 runner skips late subtask: independent late-pass coverage.
 M6 runner commits pending docs on crash: rollback oracle.
 M7 orders cursor drops window size: sparse-history request budget.
-M8 daily orders sweep never reads its pending range: late-indexed coverage.
+M8 daily orders sweep never reads its due range: late-indexed coverage.
+M9 rejection retains a grown orders window: carried-size regression.
 A skip inside the orders overlap may legitimately be absorbed on the next
 poll. Final keyed-state equality permits duplicates but rejects missing keys
 and stale versions. M6 is a harness negative control: keeping rolled-back docs
@@ -400,23 +401,26 @@ async def test_daily_sweep_recovers_late_indexed_orders(monkeypatch):
                 cursor = item
     assert seen == []
     main_cursor = cursor
-    completed = (f"completed|{api.to_iso(at - DAY)}",)
+    clock.advance(2 * DAY)
+    amazon.now = clock.now()
+    covered = at - DAY
     committed = []
     pending = []
-    async for item in api.fetch_orders_sweep(client, MARKETPLACES, 2 * DAY, DAY, LOG, completed):
+    async for item in api.fetch_orders_sweep(client, MARKETPLACES, 2 * DAY, DAY, LOG, covered):
         if isinstance(item, Order):
             pending.append(item.orderId)
         else:
             committed.extend(pending)
             pending.clear()
-            completed = item
+            covered = item
     assert committed == ["late"]
-    assert completed[0].startswith("completed|")
+    assert covered == api.floor_to_tick(clock.now() - 2 * DAY)
     assert cursor == main_cursor
-    # After a restart, completion suppresses another run until a full day passes.
-    saved = tuple(completed)
+    # Coverage suppresses another run until a full day is due.
+    saved = covered
     assert [item async for item in api.fetch_orders_sweep(client, MARKETPLACES, 2 * DAY, DAY, LOG, saved)] == []
     clock.advance(DAY)
     amazon.now = clock.now()
     again = [item async for item in api.fetch_orders_sweep(client, MARKETPLACES, 2 * DAY, DAY, LOG, saved)]
-    assert [item.orderId for item in again if isinstance(item, Order)] == ["late"]
+    assert [item.orderId for item in again if isinstance(item, Order)] == []
+    assert again[-1] == covered + DAY

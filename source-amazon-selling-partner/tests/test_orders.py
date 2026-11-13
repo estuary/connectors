@@ -207,7 +207,7 @@ async def test_backfill_walks_windows_with_inclusive_bounds():
         pages.append(page)
 
     assert emitted == ["d1-start", "d1-end", "d2-start"]
-    assert pages == ["2026-01-02T00:00:00Z|172800.0"]
+    assert pages == ["2026-01-02T00:00:00Z|172800.0|86400.0"]
     assert fake.requests[0]["createdAfter"] == "2026-01-01T00:00:00Z"
     assert fake.requests[0]["createdBefore"] == "2026-01-01T23:59:59Z"
     assert fake.requests[-1]["createdBefore"] == "2026-01-03T11:59:59Z"
@@ -253,7 +253,7 @@ async def test_rejected_token_retries_halved_orders_window(backfill: bool, span:
             out = await collect(fetch_orders(client_for(fake), MARKETPLACES, span, timedelta(minutes=10), LOG, start))
 
     assert [o.orderId for o in out if isinstance(o, Order)] == ["1", "2", "1", "2", "3"]
-    assert out[-1] == (f"{api.to_iso(smaller_end + api.TICK)}|{(smaller_end + api.TICK - start).total_seconds()}" if backfill else smaller_end)
+    assert out[-1] == (f"{api.to_iso(smaller_end + api.TICK)}|{(smaller_end + api.TICK - start).total_seconds()}|{window_size.total_seconds()}" if backfill else smaller_end)
     assert len(fake.requests) == 4
     lower, upper = ("createdAfter", "createdBefore") if backfill else ("lastUpdatedAfter", "lastUpdatedBefore")
     assert fake.requests[0][upper] == api.to_iso(end)
@@ -323,7 +323,7 @@ async def test_backfill_rejected_token_in_final_window_resumes_to_cutoff():
     out = await collect(backfill_orders(client, MARKETPLACES, start, window_size, LOG, None, cutoff))
 
     assert [o.orderId for o in out if isinstance(o, Order)] == ["1", "2", "1", "2", "3"]
-    assert [o for o in out if not isinstance(o, Order)] == [f"{api.to_iso(smaller_end + api.TICK)}|7200.0"]
+    assert [o for o in out if not isinstance(o, Order)] == [f"{api.to_iso(smaller_end + api.TICK)}|7200.0|86400.0"]
     assert len(fake.requests) == 4
     assert fake.requests[0]["createdBefore"] == api.to_iso(cutoff - api.TICK)
     assert "paginationToken" in fake.requests[1]
@@ -535,20 +535,20 @@ async def test_backfill_legacy_cursor_uses_configured_size():
     out = await collect(backfill_orders(client_for(fake), MARKETPLACES, start + timedelta(days=1), timedelta(days=3), LOG, api.to_iso(start), NOW - timedelta(days=1)))
     assert fake.requests[0]["createdAfter"] == api.to_iso(start)
     assert fake.requests[0]["createdBefore"] == api.to_iso(start + timedelta(days=3) - api.TICK)
-    assert out == [f"{api.to_iso(start + timedelta(days=3))}|518400.0"]
+    assert out == [f"{api.to_iso(start + timedelta(days=3))}|518400.0|259200.0"]
 
 
 @pytest.mark.asyncio
-async def test_backfill_multi_page_holds_size_then_single_page_grows():
+async def test_backfill_dense_window_holds_size_then_sparse_window_grows():
     start = NOW - timedelta(days=20)
-    fake = FakeAmazon(now=NOW, orders=[order(str(i), start, start) for i in range(3)])
+    fake = FakeAmazon(now=NOW, orders=[order(str(i), start, start) for i in range(Order.PAGE_SIZE // 2 + 1)], page_size=2)
     client = client_for(fake)
     out = await collect(backfill_orders(client, MARKETPLACES, start, timedelta(days=1), LOG, f"{api.to_iso(start)}|345600.0", NOW - timedelta(days=1)))
-    assert len(fake.requests) == 2
-    assert out[-1] == f"{api.to_iso(start + timedelta(days=4))}|345600.0"
+    assert len(fake.requests) == 26
+    assert out[-1] == f"{api.to_iso(start + timedelta(days=4))}|345600.0|86400.0"
     out = await collect(backfill_orders(client, MARKETPLACES, start, timedelta(days=1), LOG, out[-1], NOW - timedelta(days=1)))
     assert fake.requests[-1]["createdBefore"] == api.to_iso(start + timedelta(days=8) - api.TICK)
-    assert out[-1] == f"{api.to_iso(start + timedelta(days=8))}|691200.0"
+    assert out[-1] == f"{api.to_iso(start + timedelta(days=8))}|691200.0|86400.0"
 
 
 @pytest.mark.asyncio
@@ -564,9 +564,53 @@ async def test_backfill_carries_shrunk_size_before_growing_again(successful_page
     client = client_for(fake)
     cutoff = NOW - timedelta(days=1)
     out = await collect(backfill_orders(client, MARKETPLACES, start, timedelta(days=4), LOG, None, cutoff))
-    assert out[-1] == f"{api.to_iso(start + timedelta(days=2))}|172800.0"
+    assert out[-1] == f"{api.to_iso(start + timedelta(days=2))}|172800.0|345600.0"
     before = len(fake.requests)
     out = await collect(backfill_orders(client, MARKETPLACES, start, timedelta(days=4), LOG, out[-1], cutoff))
     assert fake.requests[before]["createdAfter"] == api.to_iso(start + timedelta(days=2))
     assert fake.requests[before]["createdBefore"] == api.to_iso(start + timedelta(days=4) - api.TICK)
-    assert out[-1] == f"{api.to_iso(start + timedelta(days=4))}|345600.0"
+    assert out[-1] == f"{api.to_iso(start + timedelta(days=4))}|345600.0|345600.0"
+
+
+@pytest.mark.asyncio
+async def test_backfill_rejection_after_growth_shrinks_carried_size():
+    start = NOW - timedelta(days=20)
+    cutoff = NOW - timedelta(days=1)
+    busy = start + timedelta(days=1, hours=1)
+    fake = FakeAmazon(now=NOW, orders=[order(str(i), busy, busy) for i in range(3)])
+    client = client_for(fake)
+    first = await collect(backfill_orders(client, MARKETPLACES, start, timedelta(days=1), LOG, None, cutoff))
+    assert first[-1] == f"{api.to_iso(start + timedelta(days=1))}|172800.0|86400.0"
+    fake.expire_token_once = True
+    second = await collect(backfill_orders(client, MARKETPLACES, start, timedelta(days=1), LOG, first[-1], cutoff))
+    assert second[-1] == f"{api.to_iso(start + timedelta(days=2))}|86400.0|86400.0"
+    before = len(fake.requests)
+    await collect(backfill_orders(client, MARKETPLACES, start, timedelta(days=1), LOG, second[-1], cutoff))
+    request = fake.requests[before]
+    assert datetime.fromisoformat(request["createdBefore"]) + api.TICK - datetime.fromisoformat(request["createdAfter"]) == timedelta(days=1)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("changed_size", [timedelta(hours=1), timedelta(days=3)])
+async def test_backfill_changed_window_size_resets_carried_size(changed_size):
+    start = NOW - timedelta(days=20)
+    cutoff = NOW - timedelta(days=1)
+    fake = FakeAmazon(now=NOW, orders=[])
+    client = client_for(fake)
+    first = await collect(backfill_orders(client, MARKETPLACES, start, timedelta(days=1), LOG, None, cutoff))
+    before = len(fake.requests)
+    out = await collect(backfill_orders(client, MARKETPLACES, start, changed_size, LOG, first[-1], cutoff))
+    lo = start + timedelta(days=1)
+    assert fake.requests[before]["createdAfter"] == api.to_iso(lo)
+    assert fake.requests[before]["createdBefore"] == api.to_iso(lo + changed_size - api.TICK)
+    assert out[-1].split("|")[2] == str(changed_size.total_seconds())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("count, next_days", [(Order.PAGE_SIZE // 2, 2), (Order.PAGE_SIZE // 2 + 1, 1)])
+async def test_backfill_single_page_growth_requires_at_most_half_a_page(count, next_days):
+    start = NOW - timedelta(days=20)
+    fake = FakeAmazon(now=NOW, orders=[order(str(i), start, start) for i in range(count)], page_size=Order.PAGE_SIZE)
+    out = await collect(backfill_orders(client_for(fake), MARKETPLACES, start, timedelta(days=1), LOG, None, NOW - timedelta(days=1)))
+    assert len(fake.requests) == 1
+    assert out[-1].split("|")[1] == str(timedelta(days=next_days).total_seconds())

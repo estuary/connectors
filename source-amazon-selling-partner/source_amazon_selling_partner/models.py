@@ -145,21 +145,21 @@ class EndpointConfig(BaseModel):
             default=False,
         )
         window_size: Annotated[timedelta, Field(
-            description="Size of the date windows orders and financial transactions are requested in, in ISO 8601 format. E.g. P1D means 1 day, PT6H means 6 hours. The daily orders sweep uses these windows too. Orders backfill doubles single-page windows up to 30 days and retains smaller windows after rejected pagination tokens. Each order window must be paged through within 24 hours, so busy accounts may need smaller windows.",
+            description="Size of the date windows orders and financial transactions are requested in, in ISO 8601 format. E.g. P1D means 1 day, PT6H means 6 hours. The daily orders sweep uses these windows too. Orders backfill doubles windows with at most half a page of orders up to 30 days and retains smaller windows after rejected pagination tokens. Each order window must be paged through within 24 hours, so busy accounts may need smaller windows.",
             title="Window Size",
             default_factory=lambda: timedelta(days=1),
             ge=timedelta(hours=1),
             le=timedelta(days=30),
         )]
         overlap: Annotated[timedelta, Field(
-            description="How far each incremental request reaches back before the previous one ended, to catch orders Amazon makes searchable late, in ISO 8601 format. The daily sweep also re-reads Orders Lookback for longer indexing delays.",
+            description="How far each incremental request reaches back before the previous one ended, to catch orders Amazon makes searchable late, in ISO 8601 format. The daily sweep also re-reads each update after it is Orders Lookback old for longer indexing delays.",
             title="Incremental Overlap",
             default_factory=lambda: timedelta(minutes=10),
             ge=timedelta(),
             le=timedelta(hours=1),
         )]
         orders_lookback: Annotated[timedelta, Field(
-            description="How far back the daily orders sweep re-reads lastUpdatedTime, in ISO 8601 format. Defaults to PT48H; minimum PT1H. Runs at backfill priority, independently of the incremental cursor, at least a day after the previous sweep completes. Orders indexed after they age out of this lookback may be missed. An interrupted sweep replays its saved range before using a changed setting.",
+            description="How old each order update must be before the daily orders sweep re-reads it once, in ISO 8601 format. Defaults to PT48H; minimum PT1H. Runs at backfill priority, independently of the incremental cursor, when at least a day of updates is due. Orders Amazon makes searchable later than Orders Lookback after their update are missed. Completed windows are checkpointed so interrupted sweeps resume from the last window.",
             title="Orders Lookback",
             default_factory=lambda: timedelta(hours=48),
             ge=timedelta(hours=1),

@@ -1,5 +1,4 @@
 import asyncio
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import Any, AsyncGenerator, Iterable, cast
@@ -55,8 +54,8 @@ SEARCH_LAG = timedelta(minutes=2, seconds=30)
 MIN_INCREMENTAL_WINDOW = timedelta(minutes=5)
 
 # At about 180s/page, a 24h token permits about 480 pages, or 48,000 orders
-# at Order.PAGE_SIZE (100, assumed). Windows grown from single-page searches
-# stay well below that budget at 30 days; paging must finish well within 24h.
+# at Order.PAGE_SIZE (100, assumed). Grow only from windows with at most
+# half a page of orders, capped at 30 days; paging must finish within 24h.
 MAX_ORDERS_BACKFILL_WINDOW = timedelta(days=30)
 
 # How far behind the present the realtime pass over financial transactions
@@ -159,23 +158,16 @@ class PaginationTokenRejected(RuntimeError):
     """Amazon rejected a pagination token, most likely because it expired."""
 
 
-@dataclass
-class _OrderSearchPages:
-    count: int = 0
-
-
 async def _search_orders(
     client: SPAPIClient,
     marketplace_ids: list[str],
     request_params: dict[str, str],
     priority: Priority,
     log: Logger,
-    pages: _OrderSearchPages | None = None,
 ) -> AsyncGenerator[Order | SearchOrdersResponse, None]:
     """
     Yields every order matching `request_params` across all pages, then the
     remainder of the final page, whose window bounds Amazon echoes back.
-    If supplied, pages counts the fully read pages without changing the yields.
     """
     params: dict[str, Any] = {
         **request_params,
@@ -215,8 +207,6 @@ async def _search_orders(
             yield order
 
         remainder = processor.get_remainder()
-        if pages is not None:
-            pages.count += 1
         next_token = remainder.pagination.nextToken if remainder.pagination else None
         if not next_token:
             yield remainder
@@ -334,54 +324,42 @@ async def fetch_orders_sweep(
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Order | LogCursor, None]:
     """
-    Re-read recent updates at BACKFILL priority, a day after completion.
-    The independent tuple cursor contains one string: `completed|ISO8601`
-    records completion time; `pending|start|end` freezes inclusive bounds.
-    Pending bounds are saved before requests. Completion is saved only after
-    all windows drain. A restart replays the frozen range from its first page;
-    no page token or partial window completion crosses a checkpoint.
+    Re-read each update once it is at least lookback old, at BACKFILL priority.
+    The datetime cursor records inclusive coverage. Run when at least a day
+    of updates has aged past lookback, chaining windows from covered + TICK.
+    Checkpoint after each complete window so a restart resumes there; the
+    horizon may extend forward on restart without leaving a gap.
 
     ```
-                 start = started−lookback      end = started−SEARCH_LAG
-    ────────────────────┼──────────────────────────┼──▶ time (1s ticks)
-                        │                          │
-    lastUpdatedAfter ───[══════════════════════════╪══▶
-    lastUpdatedBefore ══╪══════════════════════════]
-    emitted ────────────[══════════════════════════]
-                        │                          └─ complete elapsed tick
-                        └─ frozen across restarts, independent of main cursor
+                  covered  covered+1s           end = now−lookback
+    ─────────────────┼────────┼──────────────────────────┼──▶ time (1s ticks)
+    already re-read ═]        │                          │
+    lastUpdatedAfter ─────────[══════════════════════════╪══▶
+    lastUpdatedBefore ════════╪══════════════════════════]
+    emitted ─────────────────[══════════════════════════]
+                             └─ checkpoint each window ─┘
     ```
 
-    Both bounds are inclusive. Indexing delay is unverified; orders that
-    become searchable after their update ages out of lookback may be missed.
-    Rejected tokens halve each window down to one hour, as in incremental.
-    Replays reduce by maximize on lastUpdatedTime.
+    Both bounds are inclusive. Orders indexed up to lookback late are read;
+    orders made searchable later may be missed. Rejected tokens halve each
+    window down to one hour. Replays reduce by maximize on lastUpdatedTime.
     """
-    assert isinstance(log_cursor, tuple) and isinstance(log_cursor[0], str)
-    phase, *times = log_cursor[0].split("|")
-    if phase == "completed":
-        completed = datetime.fromisoformat(times[0])
-        started = floor_to_tick(now())
-        if started - completed < DAY:
-            return
-        start = floor_to_tick(started - lookback)
-        end = floor_to_tick(started - SEARCH_LAG)
-        yield (f"pending|{to_iso(start)}|{to_iso(end)}",)
-    else:
-        assert phase == "pending" and len(times) == 2
-        start, end = (datetime.fromisoformat(t) for t in times)
+    assert isinstance(log_cursor, datetime)
+    covered = log_cursor
+    end = floor_to_tick(now() - lookback)
+    if end - covered < DAY:
+        return
 
-    cursor = start - TICK
-    while cursor < end:
+    while covered < end:
         async for item in _orders_updated_window(
-            client, marketplace_ids, cursor, min(cursor + window_size, end),
+            client, marketplace_ids, covered, min(covered + window_size, end),
             timedelta(), Priority.BACKFILL, log,
         ):
             if isinstance(item, datetime):
-                cursor = item
+                covered = item
+                yield covered
             else:
                 yield item
-    yield (f"completed|{to_iso(floor_to_tick(now()))}",)
 
 
 async def backfill_orders(
@@ -396,10 +374,12 @@ async def backfill_orders(
     """
     Captures orders created before the cutoff, as they are now, one window
     of creation time per invocation. The page cursor is the next window's
-    start and size, as the string `ISO8601|seconds` (seconds may be fractional).
-    A legacy plain ISO 8601 string uses the configured window_size.
-    Single-page windows double the size, capped at 30 days or the configured
-    size if larger. Multi-page windows keep it. Rejected pagination tokens
+    start, current size and configured size as `ISO8601|current_seconds|configured_seconds`.
+    A changed configured size resets the current size to window_size. A plain
+    ISO 8601 string uses window_size; a two-part cursor carries its size with
+    the current configuration. Windows with at most half a page of orders
+    double the size, capped at 30 days or the configured size if larger.
+    Denser windows keep it. Rejected pagination tokens
     halve the window, down to a one-hour floor, and carry the shrunk size
     into the next invocation before allowing growth again.
 
@@ -434,10 +414,10 @@ async def backfill_orders(
         window_start = ceil_to_tick(start_date)
     else:
         assert isinstance(page, str)
-        start, separator, seconds = page.partition("|")
+        start, *sizes = page.split("|")
         window_start = datetime.fromisoformat(start)
-        if separator:
-            current_size = timedelta(seconds=float(seconds))
+        if sizes and (len(sizes) == 1 or timedelta(seconds=float(sizes[1])) == window_size):
+            current_size = timedelta(seconds=float(sizes[0]))
 
     if window_start > last_tick:
         return
@@ -459,10 +439,9 @@ async def backfill_orders(
         }
 
         count = 0
-        pages = _OrderSearchPages()
         try:
             async for item in _search_orders(
-                client, marketplace_ids, request_params, Priority.BACKFILL, log, pages
+                client, marketplace_ids, request_params, Priority.BACKFILL, log
             ):
                 if isinstance(item, Order):
                     count += 1
@@ -495,9 +474,9 @@ async def backfill_orders(
     )
 
     if window_end < last_tick:
-        if not shrunk and pages.count == 1:
+        if not shrunk and count <= Order.PAGE_SIZE // 2:
             current_size = min(current_size * 2, max(MAX_ORDERS_BACKFILL_WINDOW, window_size))
-        yield f"{to_iso(window_end + TICK)}|{current_size.total_seconds()}"
+        yield f"{to_iso(window_end + TICK)}|{current_size.total_seconds()}|{window_size.total_seconds()}"
 
 
 async def _list_transactions(

@@ -179,9 +179,7 @@ def orders(log: Logger, client: SPAPIClient, config: EndpointConfig) -> Resource
         initial_state=ResourceState(
             inc={
                 REALTIME: ResourceState.Incremental(cursor=cutoff - TICK),
-                SWEEP: ResourceState.Incremental(
-                    cursor=(f"completed|{(cutoff - timedelta(days=1)).isoformat()}",)
-                ),
+                SWEEP: ResourceState.Incremental(cursor=cutoff - TICK),
             },
             backfill=ResourceState.Backfill(
                 next_page=ceil_to_tick(config.start_date).isoformat(), cutoff=cutoff

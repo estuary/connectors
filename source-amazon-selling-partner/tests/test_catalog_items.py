@@ -219,7 +219,9 @@ async def test_listing_ragged_rows_are_skipped_once_per_report(caplog):
     assert [doc.asin for doc in out[:-1]] == ["a", "b"]
     assert out[-1] == NOW
     assert len(caplog.records) == 1
-    assert caplog.records[0].args == {"rows_skipped": 2, "encoding": "utf-8-sig"}
+    assert caplog.records[0].args["rows_skipped"] == 2
+    assert caplog.records[0].args["encoding"] == "utf-8-sig"
+    assert caplog.records[0].args["report_id"] == "requested-1"
     assert "private" not in caplog.text
 
 
@@ -255,7 +257,11 @@ async def test_listing_without_charset_selects_encoding(suffix, expected, encodi
         assert caplog.records == []
     else:
         assert len(caplog.records) == 1
-        assert caplog.records[0].args == {"rows_skipped": 0, "encoding": encoding}
+        assert caplog.records[0].args == {
+            "report_id": "r1", "report_document_id": "doc-r1",
+            "report_type": CatalogItem.REPORT_TYPE, "content_type": content_type,
+            "rows_skipped": 0, "encoding": encoding,
+        }
 
 
 @pytest.mark.asyncio
@@ -271,7 +277,11 @@ async def test_listing_encoding_and_ragged_rows_share_one_warning(caplog):
         out = await read_document(body, None)
     assert [row["seller-sku"] for _, row in out] == ["SKU-€"]
     assert len(caplog.records) == 1
-    assert caplog.records[0].args == {"rows_skipped": 2, "encoding": "cp1252"}
+    assert caplog.records[0].args == {
+        "report_id": "r1", "report_document_id": "doc-r1",
+        "report_type": CatalogItem.REPORT_TYPE, "content_type": None,
+        "rows_skipped": 2, "encoding": "cp1252",
+    }
 
 
 @pytest.mark.asyncio
@@ -285,12 +295,16 @@ async def test_listing_declared_charset_stays_strict(content_type, value):
 
 
 @pytest.mark.asyncio
-async def test_listing_declared_charset_is_honored():
-    out = await read_document(
-        "asin1\tseller-sku\tstatus\na\tSKU-é\tActive\n".encode("utf-16"),
-        "text/plain; charset=UTF-16",
-    )
-    assert out[0][1]["seller-sku"] == "SKU-é"
+@pytest.mark.parametrize("encoding", ["utf-16", "shift_jis"])
+async def test_listing_declared_charset_is_honored_without_warning(caplog, encoding):
+    with caplog.at_level(logging.INFO):
+        out = await read_document(
+            "asin1\tseller-sku\tstatus\na\tSKU-商品\tActive\n".encode(encoding),
+            f"text/plain; charset={encoding}",
+        )
+    assert out[0][1]["seller-sku"] == "SKU-商品"
+    assert all(record.levelno < logging.WARNING for record in caplog.records)
+    assert caplog.records[-1].message == "read report document"
 
 
 @pytest.mark.asyncio

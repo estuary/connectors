@@ -692,10 +692,10 @@ async def read_report(
                 f"Report {report.reportId} ({report.reportType}) has no row matching "
                 f"its header's width; {skipped} row(s) skipped."
             )
-        if is_listing and (encoding != DEFAULT_ENCODING or skipped):
+        if is_listing and ((fallback and encoding != DEFAULT_ENCODING) or skipped):
             log.warning(
                 "read All Listings report with fallback or skipped rows",
-                {"rows_skipped": skipped, "encoding": encoding},
+                {**log_fields, "rows_skipped": skipped, "encoding": encoding},
             )
         elif count == 0 and empty_is_routine:
             log.debug("report document has no data rows", log_fields)
