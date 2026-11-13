@@ -601,7 +601,7 @@ def _build_incremental_resource(
         binding_index: int,
         state: ResourceState,
         task: Task,
-        _all_bindings,
+        all_bindings: list[tuple[CaptureBinding[ResourceConfig], Resource]],
     ):
         await _reconcile_connector_state(
             stores_with_access,
@@ -637,6 +637,19 @@ def _build_incremental_resource(
         fetch_changes: dict[str, functools.partial] = {}
         fetch_page: dict[str, functools.partial] = {}
 
+        balance_transactions_binding = (
+            next(
+                (
+                    index
+                    for index, (_, resource) in enumerate(all_bindings)
+                    if resource.name == gql.BalanceTransactions.NAME
+                ),
+                None,
+            )
+            if model is gql.Payouts
+            else None
+        )
+
         for store_id in stores_with_access:
             ctx = store_contexts[store_id]
 
@@ -671,9 +684,11 @@ def _build_incremental_resource(
                     fetch_payouts,
                     ctx.client,
                     create_response_data_model(gql.Payouts),
+                    create_response_data_model(gql.BalanceTransactions),
                     store_id,
                     ctx.capabilities,
                     configured_start_date,
+                    balance_transactions_binding,
                 )
                 fetch_page[store_id] = functools.partial(
                     backfill_incremental_unsorted,

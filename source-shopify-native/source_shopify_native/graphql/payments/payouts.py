@@ -26,6 +26,11 @@ class Payouts(ShopifyGraphQLResource):
     # (https://community.shopify.com/t/47794). We can't check this on a development store, so
     # 30 days leaves a margin of about twice that.
     STATUS_CHANGE_WINDOW: ClassVar[timedelta] = timedelta(days=30)
+    # Shopify's docs say a scheduled payout "has been created and had transactions assigned to
+    # it" (https://shopify.dev/docs/api/admin-graphql/2026-01/enums/ShopifyPaymentsPayoutStatus),
+    # so a few daily reads after it's issued fill in their payout ids. 7 days leaves several reads
+    # to spare, in case one read misses a transaction.
+    TRANSACTIONS_WINDOW: ClassVar[timedelta] = timedelta(days=7)
     QUERY = """
     id
     legacyResourceId
