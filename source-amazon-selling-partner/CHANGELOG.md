@@ -1,11 +1,10 @@
 # Changelog
 
-## 2026-11-10
+## Unreleased
 
 ### Added
 
 - `catalog_items` refreshes listed ASIN summaries and seller SKUs per marketplace daily.
-
 - `orders` captures orders from the Orders API as Amazon updates them.
 - `financial_transactions` captures transactions from the Finances API.
 - `settlement_reports` captures each row of the settlement reports Amazon

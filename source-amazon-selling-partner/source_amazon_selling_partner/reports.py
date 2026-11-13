@@ -154,6 +154,8 @@ class ReportRequest:
     data_end: datetime
     data_end_after: datetime | None = None
     report_options: dict[str, str] | None = None
+    # Override the default reuse lookback, bounded by report retention.
+    earliest_created: datetime | None = None
 
     def body(self) -> dict[str, Any]:
         body: dict[str, Any] = {
@@ -298,13 +300,16 @@ async def _reusable_report(
     skip: frozenset[str] = frozenset(),
 ) -> Report | None:
     """
-    The newest report of `request` created within REUSE_LOOKBACK that
+    The newest report of `request` created within its lookback that
     Amazon is processing or has finished, if any, other than those in `skip`.
     """
+    current = now()
+    earliest = request.earliest_created if request.earliest_created is not None else current - REUSE_LOOKBACK
+    earliest = max(earliest, current - REPORT_RETENTION + RETENTION_MARGIN)
     request_params = {
         "reportTypes": request.report_type,
         "processingStatuses": ",".join(REUSABLE_STATUSES),
-        Report.SINCE_PARAM: _iso(now() - REUSE_LOOKBACK),
+        Report.SINCE_PARAM: _iso(earliest),
     }
     reports = await list_reports(client, request_params, priority, log)
     return max(
@@ -382,7 +387,7 @@ async def _reused(
     log: Logger,
     skip: frozenset[str] = frozenset(),
 ) -> Report | None:
-    """The report _reusable_report finds, run to a terminal status, if any."""
+    """The report _reusable_report finds, run to terminal status; FATAL raises."""
     report = await _reusable_report(client, request, priority, log, skip)
     if report is not None and report.processingStatus != ProcessingStatus.DONE:
         log.info(
@@ -390,6 +395,8 @@ async def _reused(
             {"report_id": report.reportId, "report_type": request.report_type},
         )
         report = await _wait_for(client, report.reportId, request, priority, log)
+    if report is not None and report.processingStatus == ProcessingStatus.FATAL:
+        raise await _fatal_error(client, report, request, priority, log)
     return report
 
 
@@ -405,7 +412,8 @@ async def request_report(
     mean the range has no data and is logged as a warning.
 
     A report this request made (see ReportRequest.made) that Amazon is
-    processing or has finished within REUSE_LOOKBACK is used instead of
+    processing or has finished within its lookback (REUSE_LOOKBACK by default)
+    is used instead of
     requesting another, so a request made again, as after a restart, waits
     on or reads the report requested before.
     A cancelled or aborted report is never reused, even while Amazon still
@@ -468,6 +476,9 @@ def charset_encoding(content_type: str | None) -> str | None:
     if not isinstance(charset, str) or not charset:
         return None
 
+    # Python 3.12 does not recognize this common CP932 alias.
+    if charset.lower().replace("_", "-") == "windows-31j":
+        return "cp932"
     try:
         name = codecs.lookup(charset).name
     except LookupError as err:

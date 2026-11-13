@@ -27,11 +27,13 @@ from .models import (
 )
 from .reports import (
     REPORT_RETENTION,
+    REPORT_TIMEOUT,
     RETENTION_MARGIN,
     RecentReports,
     ReportMismatch,
     ReportRequest,
     ReportRoleMissing,
+    _reused,
     list_reports,
     read_json_report,
     read_report,
@@ -97,6 +99,13 @@ ALL_ORDERS_OVERLAP = timedelta(hours=1)
 # new report keys, so every line is emitted about 1 + overlap / interval
 # times.
 ALL_ORDERS_MIN_INTERVAL = timedelta(hours=1)
+
+CATALOG_MIN_INTERVAL = timedelta(hours=3)
+CATALOG_INTERVAL_ERROR = (
+    f"catalog_items needs an interval of at least {CATALOG_MIN_INTERVAL}: a listings report "
+    f"may take up to REPORT_TIMEOUT ({REPORT_TIMEOUT}, 2h), and a restart must land in the "
+    "same or the next request bucket to reuse it."
+)
 
 # Sales and Traffic is read in whole UTC days.
 DAY = timedelta(days=1)
@@ -1239,9 +1248,14 @@ async def fetch_catalog_items(
     The cursor is the start of the last completed refresh. It advances only
     after all marketplaces finish, so an interrupted refresh is retried.
     A failure in any marketplace fails the refresh, and the next attempt redoes
-    every marketplace, reusing reports requested in the same interval bucket.
+    every marketplace. A report for the same or previous request bucket is
+    reused within the retention-bounded lookback, only if its bucket is later
+    than the last completed refresh's bucket. refreshedAt is the refresh start,
+    not the snapshot time.
     """
     assert isinstance(log_cursor, datetime)
+    if interval <= timedelta():
+        raise ValueError(CATALOG_INTERVAL_ERROR)
     started = now()
     if started - log_cursor < interval:
         return
@@ -1250,15 +1264,35 @@ async def fetch_catalog_items(
     report_time = (epoch + ((started - epoch) // interval) * interval).replace(
         microsecond=0
     )
+    # A prior completed refresh must never supply the next refresh's snapshot.
+    previous_time = report_time - interval
+    completed_bucket = epoch + ((log_cursor - epoch) // interval) * interval
+    earliest_created = previous_time if previous_time > completed_bucket else report_time
+    # Allow clock skew in Amazon's createdTime before the retention clamp.
+    # Excluding the last completed refresh still relies on the dataStartTime
+    # match and the previous_time > completed_bucket guard below.
+    earliest_created -= RETENTION_MARGIN
     for marketplace_id in marketplace_ids:
+        # Matching relies on Amazon echoing the sent dataStartTime/dataEndTime
+        # for this snapshot report, unverified until the first live run. A
+        # mismatch fails loudly with ReportMismatch.
         request = ReportRequest(
             CatalogItem.REPORT_TYPE,
             (marketplace_id,),
             report_time,
             report_time,
             report_options={"preferredReportDocumentLocale": "en_US"},
+            earliest_created=earliest_created,
         )
-        report = await request_report(client, request, Priority.INCREMENTAL, log)
+        report = await _reused(client, request, Priority.INCREMENTAL, log)
+        if report is None and previous_time > completed_bucket:
+            previous_request = ReportRequest(
+                CatalogItem.REPORT_TYPE, (marketplace_id,), previous_time, previous_time,
+                earliest_created=earliest_created,
+            )
+            report = await _reused(client, previous_request, Priority.INCREMENTAL, log)
+        if report is None or report.processingStatus == ProcessingStatus.CANCELLED:
+            report = await request_report(client, request, Priority.INCREMENTAL, log)
         listings: dict[str, tuple[set[str], str | None]] = {}
         # Amazon cancels reports with no data. Treat two cancellations as no listings
         # so empty marketplaces can finish without spending quota on every invocation.

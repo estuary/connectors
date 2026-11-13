@@ -12,6 +12,8 @@ from .api import (
     ALL_ORDERS_LAG,
     ALL_ORDERS_MIN_INTERVAL,
     ALL_ORDERS_OVERLAP,
+    CATALOG_INTERVAL_ERROR,
+    CATALOG_MIN_INTERVAL,
     TICK,
     TRANSACTIONS_LATE_LAG,
     TRANSACTIONS_REALTIME_LAG,
@@ -39,9 +41,11 @@ from .models import (
     ConnectorState,
     EndpointConfig,
     FinancialTransaction,
+    OAuth2Credentials,
     Order,
     OrdersResourceConfig,
     ResourceState,
+    Region,
     SalesAndTrafficByDate,
     SettlementReportRow,
     lwa_credentials,
@@ -74,6 +78,10 @@ def _client(http: HTTPMixin, config: EndpointConfig) -> SPAPIClient:
 
 
 async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
+    if isinstance(config.credentials, OAuth2Credentials) and config.region != Region.NORTH_AMERICA:
+        raise ValidationError([
+            "Managed OAuth is for North America sellers; use Login with Amazon credentials for this region."
+        ])
     client = _client(http, config)
 
     try:
@@ -83,9 +91,19 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
         # with 400 or 401; SP-API rejects an unauthorized application with 403.
         if err.code not in (400, 401, 403):
             raise
+        if isinstance(config.credentials, OAuth2Credentials):
+            guidance = (
+                "Please re-authenticate with Amazon and confirm the selling account "
+                "authorized the Estuary application in the selected region."
+            )
+        else:
+            guidance = (
+                "Please confirm the client ID, client secret and refresh token are correct, "
+                "and that the selling account authorized this application in the selected region."
+            )
         raise ValidationError(
             [
-                f"Invalid credentials. Please confirm the client ID, client secret and refresh token are correct, and that the selling account authorized this application in the selected region.\n\n{err.message}"
+                f"Invalid credentials. {guidance}\n\n{err.message}"
             ]
         )
 
@@ -475,12 +493,14 @@ def sales_and_traffic_by_date(
 
 def validate_bindings(config: EndpointConfig, resolved: list[tuple[Any, Resource]]) -> None:
     """
-    Fails publication of an all_orders binding the capture couldn't run, so
-    it doesn't stop every other binding at each start. Orders-only captures
+    Rejects catalog intervals that prevent report reuse and all_orders
+    bindings the capture could not run. Orders-only captures
     may still use up to 50 marketplaces.
     """
     errors: list[str] = []
     for binding, resource in resolved:
+        if resource.name == "catalog_items" and binding.resourceConfig.interval < CATALOG_MIN_INTERVAL:
+            errors.append(CATALOG_INTERVAL_ERROR)
         if resource.name != "all_orders":
             continue
         if len(config.marketplace_ids) > REPORT_MARKETPLACE_LIMIT:

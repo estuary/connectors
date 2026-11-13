@@ -11,7 +11,7 @@ from estuary_cdk.capture import (
 )
 from estuary_cdk.flow import ConnectorSpec
 
-from .models import ConnectorState, EndpointConfig, OrdersResourceConfig
+from .models import MANAGED_OAUTH2_SPEC, ConnectorState, EndpointConfig, OrdersResourceConfig
 from .resources import all_resources, validate_bindings, validate_credentials
 
 
@@ -24,7 +24,7 @@ class Connector(
     async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
         return ConnectorSpec(
             configSchema=EndpointConfig.model_json_schema(),
-            oauth2=None,
+            oauth2=MANAGED_OAUTH2_SPEC,
             documentationUrl="https://go.estuary.dev/source-amazon-selling-partner",
             resourceConfigSchema=OrdersResourceConfig.model_json_schema(),
             resourcePathPointers=OrdersResourceConfig.PATH_POINTERS,

@@ -9,9 +9,9 @@ import pytest
 from source_amazon_selling_partner import api, reports
 from source_amazon_selling_partner.api import fetch_catalog_items
 from source_amazon_selling_partner.models import CatalogItem
-from source_amazon_selling_partner.reports import ReportRoleMissing
+from source_amazon_selling_partner.reports import ReportFailed, ReportRoleMissing
 
-from .fake_amazon import FakeAmazon
+from .fake_amazon import FakeAmazon, FakeDocument
 from .test_orders import NOW, client_for, collect
 
 LOG = logging.getLogger("test")
@@ -268,3 +268,139 @@ async def test_twice_cancelled_report_completes_empty_refresh():
     assert fake.catalog_requests == []
     assert await refresh(fake, cursor=NOW) == []
     assert len(fake.create_requests) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("interval", [timedelta(), timedelta(seconds=-1)])
+async def test_nonpositive_interval_fails_clearly(interval):
+    fake = fixture(["a"])
+    with pytest.raises(ValueError, match="catalog_items.*at least.*REPORT_TIMEOUT.*same or the next request bucket"):
+        await refresh(fake, interval=interval)
+    assert fake.create_requests == fake.report_requests == []
+
+
+@pytest.mark.parametrize("interval", [None, timedelta(), timedelta(hours=2, minutes=59)])
+def test_validation_rejects_short_catalog_interval(interval):
+    from types import SimpleNamespace
+    from estuary_cdk.flow import ValidationError
+    from source_amazon_selling_partner.models import OrdersResourceConfig
+    from source_amazon_selling_partner.resources import validate_bindings
+    from .test_orders import make_config
+
+    kwargs = {} if interval is None else {"interval": interval}
+    binding = SimpleNamespace(resourceConfig=OrdersResourceConfig(name="catalog_items", **kwargs))
+    with pytest.raises(ValidationError, match="catalog_items.*at least.*REPORT_TIMEOUT.*same or the next request bucket"):
+        validate_bindings(make_config(MARKETS), [(binding, SimpleNamespace(name="catalog_items"))])
+    binding.resourceConfig.interval = api.CATALOG_MIN_INTERVAL
+    validate_bindings(make_config(MARKETS), [(binding, SimpleNamespace(name="catalog_items"))])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "interval, first, delay",
+    [
+        (DAY, datetime(2026, 3, 1, 23, 30, tzinfo=UTC), timedelta(minutes=35)),
+        (2 * DAY, datetime(2026, 3, 2, 1, tzinfo=UTC), timedelta(hours=25)),
+    ],
+)
+async def test_restart_across_edge_or_after_24h_reuses_report(monkeypatch, interval, first, delay):
+    fake = fixture(["a"])
+    cursor = first - 2 * interval
+    fake.now = first
+    monkeypatch.setattr(api, "now", lambda: fake.now)
+    monkeypatch.setattr(reports, "now", lambda: fake.now)
+    with monkeypatch.context() as interrupted:
+        def fail_poll(*args):
+            raise RuntimeError("interrupted")
+        interrupted.setattr(fake, "_get_report", fail_poll)
+        with pytest.raises(RuntimeError, match="interrupted"):
+            await refresh(fake, cursor=cursor, interval=interval)
+    assert len(fake.create_requests) == 1
+    fake.now = first + delay
+    doc, completed = await refresh(fake, cursor=cursor, interval=interval)
+    assert doc.asin == "a"
+    assert doc.refreshedAt == completed == fake.now
+    assert len(fake.create_requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_bucket_after_completed_refresh_creates_new_report(monkeypatch):
+    fake = fixture(["a"])
+    first = datetime(2026, 3, 1, 0, 5, tzinfo=UTC)
+    fake.now = first
+    monkeypatch.setattr(api, "now", lambda: fake.now)
+    monkeypatch.setattr(reports, "now", lambda: fake.now)
+    _, cursor = await refresh(fake, cursor=first - DAY)
+    fake.now = first + DAY
+    _, completed = await refresh(fake, cursor=cursor)
+    assert completed == fake.now
+    assert len(fake.create_requests) == 2
+    assert fake.create_requests[0]["dataStartTime"] != fake.create_requests[1]["dataStartTime"]
+
+
+@pytest.mark.asyncio
+async def test_catalog_lookback_is_bounded_by_retention(monkeypatch):
+    fake = fixture(["a"])
+    interval = timedelta(days=200)
+    epoch = datetime(1970, 1, 1, tzinfo=UTC)
+    bucket = epoch + ((NOW - epoch) // interval) * interval
+    assert bucket - reports.RETENTION_MARGIN < NOW - reports.REPORT_RETENTION
+    # FakeAmazon rejects createdSince outside retention, so this also checks
+    # that a catalog interval longer than retention still runs.
+    assert await refresh(fake, cursor=NOW - interval, interval=interval)
+    assert fake.report_requests
+    assert all(
+        datetime.fromisoformat(request["createdSince"])
+        >= NOW - reports.REPORT_RETENTION + reports.RETENTION_MARGIN
+        for request in fake.report_requests
+        if "nextToken" not in request
+    )
+    assert len(fake.create_requests) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("previous_bucket", [False, True])
+async def test_reused_report_fatal_keeps_diagnostic(monkeypatch, previous_bucket):
+    fake = fixture(["a"])
+    fake.default_lifecycle = ["IN_PROGRESS", "FATAL"]
+    fake.fatal_document = FakeDocument(b"Amazon diagnostic: listing export failed")
+    cursor = NOW - 3 * DAY
+    with monkeypatch.context() as interrupted:
+        def fail_poll(*args):
+            raise RuntimeError("interrupted")
+        interrupted.setattr(fake, "_get_report", fail_poll)
+        with pytest.raises(RuntimeError, match="interrupted"):
+            await refresh(fake, cursor=cursor)
+    request_time = fake.create_requests[0]["dataStartTime"]
+    if previous_bucket:
+        fake.now += DAY
+        monkeypatch.setattr(api, "now", lambda: fake.now)
+        monkeypatch.setattr(reports, "now", lambda: fake.now)
+    with pytest.raises(ReportFailed, match="Amazon diagnostic: listing export failed") as exc:
+        await refresh(fake, cursor=cursor)
+    assert datetime.fromisoformat(request_time).date().isoformat() in str(exc.value)
+    assert len(fake.create_requests) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("previous_bucket", [False, True])
+async def test_reuses_report_created_before_bucket_start(monkeypatch, previous_bucket):
+    fake = fixture(["a"])
+    # The same-bucket retry must rely on the clock-skew margin, not an older lookback.
+    cursor = NOW - (3 * DAY if previous_bucket else DAY)
+    with monkeypatch.context() as interrupted:
+        def fail_poll(*args):
+            raise RuntimeError("interrupted")
+        interrupted.setattr(fake, "_get_report", fail_poll)
+        with pytest.raises(RuntimeError, match="interrupted"):
+            await refresh(fake, cursor=cursor)
+    bucket = datetime.fromisoformat(fake.create_requests[0]["dataStartTime"])
+    fake.reports[0]["createdTime"] = (bucket - timedelta(seconds=5)).isoformat()
+    if previous_bucket:
+        fake.now += DAY
+        monkeypatch.setattr(api, "now", lambda: fake.now)
+        monkeypatch.setattr(reports, "now", lambda: fake.now)
+    doc, completed = await refresh(fake, cursor=cursor)
+    assert doc.asin == "a"
+    assert completed == fake.now
+    assert len(fake.create_requests) == 1

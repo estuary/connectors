@@ -1,11 +1,12 @@
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
-from typing import Annotated, Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal
 
 from pydantic import (
     AwareDatetime,
     BaseModel,
     Field,
+    create_model,
     field_serializer,
     field_validator,
     model_validator,
@@ -24,17 +25,38 @@ from estuary_cdk.flow import BaseOAuth2Credentials, OAuth2Spec
 # requests carry in the `x-amz-access-token` header.
 LWA_TOKEN_URL = "https://api.amazon.com/auth/o2/token"
 
+# Set once Amazon approves the app and the dashboard handles spapi_oauth_code
+# and the Seller Central log-in hop. Remove version=beta once published.
+APPLICATION_ID: str | None = None
+
 OAUTH2_SPEC = OAuth2Spec(
     provider="amazon-selling-partner",
     accessTokenUrlTemplate=LWA_TOKEN_URL,
-    # Seller consent goes through Seller Central and returns `spapi_oauth_code`
-    # rather than `code`, which the dashboard's OAuth flow does not handle yet.
-    # Until it does, the spec isn't advertised and refresh tokens are entered by hand.
-    authUrlTemplate="",
-    accessTokenBody="",
-    accessTokenHeaders={},
-    accessTokenResponseMap={},
+    authUrlTemplate=(
+        "https://sellercentral.amazon.com/apps/authorize/consent?"
+        "application_id={application_id}"
+        r"&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
+        r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
+        "&version=beta"
+    ),
+    accessTokenBody=(
+        "grant_type=authorization_code"
+        r"&code={{#urlencode}}{{{ code }}}{{/urlencode}}"
+        r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
+        r"&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
+        r"&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}"
+    ),
+    accessTokenHeaders={"content-type": "application/x-www-form-urlencoded"},
+    accessTokenResponseMap={"refresh_token": "/refresh_token"},
 )
+
+if TYPE_CHECKING:
+    OAuth2Credentials = BaseOAuth2Credentials
+else:
+    class OAuth2Credentials(BaseOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)):
+        """Managed OAuth for North America sellers."""
+
+        model_config = {"title": "Managed OAuth (North America sellers)"}
 
 
 class Region(StrEnum):
@@ -83,7 +105,11 @@ class _LWARefreshCredentials(BaseOAuth2Credentials):
     def _you_must_build_oauth2_credentials_for_a_provider(self) -> None: ...
 
 
-def lwa_credentials(credentials: LoginWithAmazonCredentials) -> BaseOAuth2Credentials:
+def lwa_credentials(
+    credentials: OAuth2Credentials | LoginWithAmazonCredentials,
+) -> BaseOAuth2Credentials:
+    if isinstance(credentials, BaseOAuth2Credentials):
+        return credentials
     return _LWARefreshCredentials(
         client_id=credentials.client_id,
         client_secret=credentials.client_secret,
@@ -149,11 +175,42 @@ class EndpointConfig(BaseModel):
         json_schema_extra={"advanced": True},
     )
 
+    @field_validator("credentials", mode="before")
+    @classmethod
+    def _default_lwa_credentials(cls, value: Any) -> Any:
+        if isinstance(value, dict) and "credentials_title" not in value:
+            return {**value, "credentials_title": "Login with Amazon"}
+        return value
+
     @model_validator(mode="after")
     def _check_marketplaces(self) -> "EndpointConfig":
         if len(set(self.marketplace_ids)) != len(self.marketplace_ids):
             raise ValueError("Marketplace IDs must not repeat.")
         return self
+
+
+_LWAEndpointConfig = EndpointConfig
+
+
+def build_config_and_oauth(application_id: str | None) -> tuple[type[EndpointConfig], OAuth2Spec | None]:
+    """Build the dormant or enabled authentication shape from the same models."""
+    if application_id is None:
+        return _LWAEndpointConfig, None
+    config_model = create_model(
+        "EndpointConfig",
+        __base__=_LWAEndpointConfig,
+        credentials=(
+            LoginWithAmazonCredentials | OAuth2Credentials,
+            Field(discriminator="credentials_title", title="Authentication"),
+        ),
+    )
+    oauth = OAUTH2_SPEC.model_copy(update={
+        "authUrlTemplate": OAUTH2_SPEC.authUrlTemplate.replace("{application_id}", application_id),
+    })
+    return config_model, oauth
+
+
+EndpointConfig, MANAGED_OAUTH2_SPEC = build_config_and_oauth(APPLICATION_ID)
 
 
 ConnectorState = GenericConnectorState[ResourceState]
