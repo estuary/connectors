@@ -1,5 +1,14 @@
 # materialize-kafka
 
+## 2026-11-13
+
+### Fixed
+- A materialization could stop committing indefinitely, with no error, until
+  its shard restarted. The connector could miss the notification that the
+  last message of a transaction had been delivered.
+- A materialization could also stop indefinitely while it waited for room in
+  the Kafka client's send queue. That wait is now bounded and retried.
+
 ## 2026-09-22
 
 ### Added

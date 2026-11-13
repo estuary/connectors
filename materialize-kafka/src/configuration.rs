@@ -428,6 +428,10 @@ impl ProducerContext for AckTrackingContext {
 
                 // Only notify when all messages are acknowledged
                 if completed == pending {
+                    // A waiter holds the lock from reading the counters
+                    // until it begins waiting, so notifying under the lock
+                    // cannot fall between those two steps.
+                    let _guard = self.state.lock().unwrap();
                     self.notify.notify_all();
                 }
             }
