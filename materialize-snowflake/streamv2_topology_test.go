@@ -2,6 +2,8 @@ package connector
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -732,6 +734,30 @@ func TestStreamV2DeletedChannelMidSession(t *testing.T) {
 		_, err := m.flush(ctx)
 		require.ErrorContains(t, err, streamV2ErrChannelDoesNotExist)
 		require.NotContains(t, err.Error(), "reopening")
+	})
+
+	t.Run("a rejected append through the stage fails, and a restart resumes", func(t *testing.T) {
+		var m, prior, name = session(t)
+		fakeDeleteChannel(t, name)
+
+		// Random bytes don't compress, so this row's batch exceeds the direct
+		// append limit and goes through the stage.
+		var raw = make([]byte, streamV2MaxAppendBytes)
+		_, err := rand.Read(raw)
+		require.NoError(t, err)
+		var big = base64.StdEncoding.EncodeToString(raw)
+
+		require.NoError(t, testWriteRow(ctx, m, 0, []any{"c", big}))
+		_, err = m.flush(ctx)
+		require.ErrorContains(t, err, streamV2ErrChannelDoesNotExist)
+		require.NotContains(t, err.Error(), "reopening")
+
+		var restarted = singleChannelLayout(newTopologyManager(t, task, 0, math.MaxUint32, prior))
+		require.NoError(t, testWriteRow(ctx, restarted, 0, []any{"c", big}))
+		entries, err := restarted.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(3), mergeCheckpoints(entries)[fullKeyRange].Routed)
+		require.Equal(t, []string{"a", "b", "c"}, tableRows(t))
 	})
 
 	t.Run("another append error fails", func(t *testing.T) {
