@@ -1,0 +1,382 @@
+import json
+import logging
+from datetime import UTC, datetime, timedelta, tzinfo
+from typing import Any, AsyncIterator
+
+import pytest
+from estuary_cdk.flow import ValidationError
+from estuary_cdk.http import HTTPError
+from pydantic import ValidationError as PydanticValidationError
+
+from source_amazon_selling_partner import api, resources
+from source_amazon_selling_partner.api import (
+    PaginationTokenRejected,
+    backfill_orders,
+    fetch_orders,
+)
+from source_amazon_selling_partner.client import SPAPIClient
+from source_amazon_selling_partner.models import EndpointConfig, Order
+
+from .fake_amazon import FakeAmazon, order
+
+LOG = logging.getLogger("test")
+NOW = datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
+MARKETPLACES = ["ATVPDKIKX0DER"]
+
+
+class FakeTime:
+    def __init__(self) -> None:
+        self.t = 0.0
+        self.slept: list[float] = []
+
+    def clock(self) -> float:
+        return self.t
+
+    async def sleep(self, seconds: float) -> None:
+        self.slept.append(seconds)
+        self.t += seconds
+
+
+@pytest.fixture(autouse=True)
+def frozen_now(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(api, "now", lambda: NOW)
+
+
+def client_for(fake: FakeAmazon) -> SPAPIClient:
+    time = FakeTime()
+    return SPAPIClient(http=fake, base_url="https://fake", clock=time.clock, sleep=time.sleep)  # type: ignore[arg-type]
+
+
+async def collect(gen: AsyncIterator[Any]):
+    return [item async for item in gen]
+
+
+@pytest.mark.asyncio
+async def test_fetch_orders_pages_through_window_and_advances_cursor():
+    cursor = NOW - timedelta(hours=1)
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[
+            order("a", NOW - timedelta(days=3), cursor + timedelta(seconds=1)),
+            order("b", NOW - timedelta(days=3), cursor + timedelta(minutes=5)),
+            order("c", NOW - timedelta(days=3), cursor + timedelta(minutes=30)),
+            # Inside the overlap: re-emitted, harmless for a keyed collection.
+            order("d", NOW - timedelta(days=3), cursor - timedelta(minutes=5)),
+            # Before the overlap.
+            order("e", NOW - timedelta(days=3), cursor - timedelta(minutes=20)),
+        ],
+    )
+
+    out = await collect(
+        fetch_orders(client_for(fake), MARKETPLACES, timedelta(days=1), timedelta(minutes=10), LOG, cursor)
+    )
+
+    docs = [o.orderId for o in out if isinstance(o, Order)]
+    assert sorted(docs) == ["a", "b", "c", "d"]
+    horizon = NOW - api.SEARCH_LAG
+    assert out[-1] == horizon
+    assert len(fake.requests) == 2  # page size 2, four orders
+
+    first = fake.requests[0]
+    assert first["lastUpdatedAfter"] == "2026-03-01T10:50:01Z"
+    assert first["lastUpdatedBefore"] == "2026-03-01T11:57:30Z"
+    assert first["marketplaceIds"] == "ATVPDKIKX0DER"
+    assert "BUYER" not in first["includedData"]
+    assert "RECIPIENT" not in first["includedData"]
+    assert fake.requests[1]["paginationToken"].startswith("token-")
+
+
+@pytest.mark.asyncio
+async def test_fetch_orders_window_is_capped_by_window_size():
+    cursor = NOW - timedelta(days=3)
+    fake = FakeAmazon(now=NOW, orders=[])
+    out = await collect(
+        fetch_orders(client_for(fake), MARKETPLACES, timedelta(days=1), timedelta(), LOG, cursor)
+    )
+    assert out == [cursor + timedelta(days=1)]
+
+
+@pytest.mark.asyncio
+async def test_fetch_orders_waits_when_caught_up():
+    fake = FakeAmazon(now=NOW, orders=[])
+    cursor = NOW - api.SEARCH_LAG - api.MIN_INCREMENTAL_WINDOW + timedelta(seconds=1)
+    out = await collect(
+        fetch_orders(client_for(fake), MARKETPLACES, timedelta(days=1), timedelta(), LOG, cursor)
+    )
+    assert out == []
+    assert fake.requests == []
+
+
+@pytest.mark.parametrize("overlap", [timedelta(), timedelta(minutes=10)])
+@pytest.mark.asyncio
+async def test_seam_between_backfill_and_incremental_misses_nothing(monkeypatch: pytest.MonkeyPatch, overlap: timedelta):
+    # Build the resource's real initial state at a known time.
+    cutoff = NOW - timedelta(hours=1)
+    monkeypatch.setattr(resources, "datetime", FrozenDatetime(cutoff + timedelta(microseconds=250_000)))
+    config = make_config(["ATVPDKIKX0DER"])
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[
+            order("before", cutoff - timedelta(seconds=1), cutoff - timedelta(seconds=1)),
+            order("at", cutoff, cutoff),
+            order("after", cutoff + timedelta(seconds=1), cutoff + timedelta(seconds=1)),
+        ],
+        page_size=10,
+    )
+    client = client_for(fake)
+    state = resources.orders(LOG, client, config).initial_state
+    assert state.backfill.cutoff == cutoff
+
+    backfilled = await collect(
+        backfill_orders(client, MARKETPLACES, cutoff - timedelta(minutes=1), timedelta(days=1), LOG, state.backfill.next_page, state.backfill.cutoff)
+    )
+    incremental = await collect(
+        fetch_orders(client, MARKETPLACES, timedelta(days=1), overlap, LOG, state.inc.cursor)
+    )
+
+    seen = {o.orderId for o in backfilled + incremental if isinstance(o, Order)}
+    assert seen == {"before", "at", "after"}
+    # The backfill covers creation up to cutoff−1s, incremental updates from cutoff.
+    assert [o.orderId for o in backfilled if isinstance(o, Order)] == ["before"]
+
+
+class FrozenDatetime:
+    """Stands in for the `datetime` class in resources, freezing now()."""
+
+    def __init__(self, at: datetime) -> None:
+        self.at = at
+
+    def now(self, tz: tzinfo | None = None):
+        return self.at
+
+
+def make_config(marketplaces: list[str], **extra: Any) -> EndpointConfig:
+    return EndpointConfig.model_validate(
+        {
+            "credentials": {"credentials_title": "Login with Amazon", "client_id": "x", "client_secret": "y", "refresh_token": "z"},
+            "region": "North America",
+            "marketplace_ids": marketplaces,
+            **extra,
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_backfill_walks_windows_with_inclusive_bounds():
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    cutoff = datetime(2026, 1, 3, 12, tzinfo=UTC)
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[
+            order("d1-start", start, start),
+            order("d1-end", start + timedelta(days=1) - timedelta(seconds=1), NOW - timedelta(hours=3)),
+            order("d2-start", start + timedelta(days=1), start + timedelta(days=1)),
+            order("past-cutoff", cutoff, cutoff),
+        ],
+        page_size=10,
+    )
+    client = client_for(fake)
+
+    page = None
+    emitted: list[str] = []
+    pages: list[str] = []
+    while True:
+        out = await collect(backfill_orders(client, MARKETPLACES, start, timedelta(days=1), LOG, page, cutoff))
+        emitted += [o.orderId for o in out if isinstance(o, Order)]
+        cursors = [o for o in out if not isinstance(o, Order)]
+        if not cursors:
+            break
+        page = cursors[-1]
+        pages.append(page)
+
+    assert emitted == ["d1-start", "d1-end", "d2-start"]
+    assert pages == ["2026-01-02T00:00:00Z", "2026-01-03T00:00:00Z"]
+    assert fake.requests[0]["createdAfter"] == "2026-01-01T00:00:00Z"
+    assert fake.requests[0]["createdBefore"] == "2026-01-01T23:59:59Z"
+    assert fake.requests[-1]["createdBefore"] == "2026-01-03T11:59:59Z"
+
+
+@pytest.mark.asyncio
+async def test_backfill_waits_out_a_recent_cutoff(monkeypatch: pytest.MonkeyPatch):
+    cutoff = NOW - timedelta(seconds=30)
+    slept: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        slept.append(seconds)
+        monkeypatch.setattr(api, "now", lambda: NOW + timedelta(seconds=seconds))
+
+    monkeypatch.setattr(api.asyncio, "sleep", fake_sleep)
+    fake = FakeAmazon(now=NOW + timedelta(minutes=5), orders=[])
+
+    await collect(backfill_orders(client_for(fake), MARKETPLACES, cutoff - timedelta(hours=1), timedelta(days=1), LOG, None, cutoff))
+    assert slept and slept[0] == pytest.approx((cutoff - timedelta(seconds=1) + api.SEARCH_LAG - NOW).total_seconds())
+
+
+@pytest.mark.asyncio
+async def test_expired_pagination_token_raises_clear_error():
+    cursor = NOW - timedelta(hours=1)
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[order(str(i), cursor, cursor + timedelta(minutes=i)) for i in range(1, 4)],
+        expired_tokens=True,
+    )
+    with pytest.raises(PaginationTokenRejected, match="Window Size"):
+        await collect(fetch_orders(client_for(fake), MARKETPLACES, timedelta(days=1), timedelta(), LOG, cursor))
+
+
+@pytest.mark.asyncio
+async def test_token_refresh_failure_mid_pagination_is_not_blamed_on_page_token():
+    cursor = NOW - timedelta(hours=1)
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[order(str(i), cursor, cursor + timedelta(minutes=i)) for i in range(1, 4)],
+        refresh_fails_on_page=2,
+    )
+    with pytest.raises(HTTPError) as exc:
+        await collect(fetch_orders(client_for(fake), MARKETPLACES, timedelta(days=1), timedelta(), LOG, cursor))
+    assert not isinstance(exc.value, PaginationTokenRejected)
+
+
+@pytest.mark.asyncio
+async def test_response_without_orders_array_fails_instead_of_advancing():
+    cursor = NOW - timedelta(hours=1)
+    fake = FakeAmazon(now=NOW, orders=[], orders_key="results")
+    with pytest.raises(PydanticValidationError):
+        await collect(fetch_orders(client_for(fake), MARKETPLACES, timedelta(days=1), timedelta(), LOG, cursor))
+
+
+@pytest.mark.asyncio
+async def test_a_search_amazon_cut_short_fails_instead_of_advancing():
+    updated = NOW - timedelta(minutes=30)
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[order("a", updated - timedelta(days=1), updated)],
+        echoed_bound_shortfall=timedelta(minutes=5),
+    )
+
+    with pytest.raises(RuntimeError, match="updated only up to"):
+        await collect(
+            fetch_orders(client_for(fake), MARKETPLACES, timedelta(days=1), timedelta(), LOG, NOW - timedelta(hours=1))
+        )
+    with pytest.raises(RuntimeError, match="created only up to"):
+        await collect(
+            backfill_orders(
+                client_for(fake), MARKETPLACES, NOW - timedelta(days=2), timedelta(days=1), LOG, None, NOW - timedelta(hours=1)
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_backfill_rounds_fractional_start_up():
+    start = datetime(2026, 1, 1, 12, 0, 0, 500_000, tzinfo=UTC)
+    fake = FakeAmazon(now=NOW, orders=[order("too-early", start.replace(microsecond=0), start)], page_size=10)
+    out = await collect(
+        backfill_orders(client_for(fake), MARKETPLACES, start, timedelta(days=1), LOG, None, datetime(2026, 1, 2, tzinfo=UTC))
+    )
+    assert [o for o in out if isinstance(o, Order)] == []
+    assert fake.requests[0]["createdAfter"] == "2026-01-01T12:00:01Z"
+
+
+@pytest.mark.asyncio
+async def test_validate_credentials_checks_marketplaces():
+    class Http:
+        token_source = None
+
+    fake = FakeAmazon(now=NOW, orders=[])
+
+    def config(marketplaces: list[str]) -> EndpointConfig:
+        return EndpointConfig.model_validate(
+            {
+                "credentials": {"credentials_title": "Login with Amazon", "client_id": "x", "client_secret": "y", "refresh_token": "z"},
+                "region": "North America",
+                "marketplace_ids": marketplaces,
+            }
+        )
+
+    http = Http()
+    http.request_stream = fake.request_stream  # type: ignore[attr-defined]
+    await resources.validate_credentials(LOG, http, config(["ATVPDKIKX0DER"]))  # type: ignore[arg-type]
+    with pytest.raises(ValidationError, match="A1F83G8C2ARO7P"):
+        await resources.validate_credentials(LOG, http, config(["A1F83G8C2ARO7P"]))  # type: ignore[arg-type]
+
+
+# Login with Amazon answers a wrong or revoked refresh token with a 400.
+@pytest.mark.parametrize(
+    "code,expected", [(400, ValidationError), (401, ValidationError), (403, ValidationError), (503, HTTPError)]
+)
+@pytest.mark.asyncio
+async def test_validate_credentials_only_reports_auth_failures_as_config_errors(code: int, expected: type[Exception]):
+    class Http:
+        token_source = None
+
+        async def request_stream(self, log: logging.Logger, url: str, **kwargs: Any):
+            raise HTTPError(f"status {code}", code)
+
+    with pytest.raises(expected):
+        await resources.validate_credentials(LOG, Http(), make_config(["ATVPDKIKX0DER"]))  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_lwa_refresh_sends_refresh_grant_and_raw_token_header():
+    calls = []
+
+    class Session:
+        async def request(self, log: logging.Logger, url: str, method: str = "GET", headers: dict[str, str] | None = None, form: dict[str, str] | None = None, with_token: bool = True, **kwargs: Any):
+            calls.append({"url": url, "method": method, "form": form, "with_token": with_token})
+            return b'{"access_token": "Atza|abc", "token_type": "bearer", "expires_in": 3600}'
+
+    http: Any = type("Http", (), {"token_source": None})()
+    resources._client(http, make_config(["ATVPDKIKX0DER"]))  # type: ignore[arg-type]
+    token_source = http.token_source
+
+    token_type, token = await token_source.fetch_token(LOG, Session())  # type: ignore[arg-type]
+
+    assert token == "Atza|abc"
+    assert token_source.authorization_header == "x-amz-access-token"
+    assert calls == [
+        {
+            "url": "https://api.amazon.com/auth/o2/token",
+            "method": "POST",
+            "form": {"grant_type": "refresh_token", "client_id": "x", "client_secret": "y", "refresh_token": "z"},
+            "with_token": False,
+        }
+    ]
+
+
+def test_config_rejects_repeated_marketplaces():
+    with pytest.raises(ValueError, match="must not repeat"):
+        EndpointConfig.model_validate(
+            {
+                "credentials": {"credentials_title": "Login with Amazon", "client_id": "x", "client_secret": "y", "refresh_token": "z"},
+                "region": "Europe",
+                "marketplace_ids": ["A1F83G8C2ARO7P", "A1F83G8C2ARO7P"],
+            }
+        )
+
+
+def emitted_last_updated_time(value: str) -> str:
+    return json.loads(Order.model_validate({**order("o1", NOW, NOW), "lastUpdatedTime": value}).model_dump_json())[
+        "lastUpdatedTime"
+    ]
+
+
+@pytest.mark.parametrize(
+    "older, newer",
+    [
+        ("2026-03-01T10:00:00Z", "2026-03-01T10:00:01Z"),
+        # An offset that sorts above a later UTC time as written.
+        ("2026-03-01T11:00:00+02:00", "2026-03-01T10:00:00Z"),
+        # A fraction that sorts below the whole second as written.
+        ("2026-03-01T10:00:00Z", "2026-03-01T10:00:00.5Z"),
+    ],
+)
+def test_orders_collection_keeps_the_latest_copy_whatever_the_commit_order(older: str, newer: str):
+    # The backfill can commit an older copy of an order after the incremental
+    # task committed a newer one. The non-delete reduction keeps the copy with
+    # the greater lastUpdatedTime, which Flow compares as a string.
+    schema = Order.model_json_schema(mode="serialization")
+    assert schema["else"] == {"reduce": {"strategy": "maximize", "key": ["/lastUpdatedTime"]}}
+    assert schema["properties"]["lastUpdatedTime"] == {"format": "date-time", "title": "Lastupdatedtime", "type": "string"}
+
+    assert emitted_last_updated_time(older) < emitted_last_updated_time(newer)
+    assert emitted_last_updated_time("2026-03-01T11:00:00.5+01:00") == "2026-03-01T10:00:00.500000Z"

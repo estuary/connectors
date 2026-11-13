@@ -1,0 +1,178 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "sandbox": {
+              "default": false,
+              "description": "Send requests to Amazon's SP-API sandbox, which returns fixed example responses. For testing only.",
+              "title": "Use Sandbox",
+              "type": "boolean"
+            },
+            "window_size": {
+              "description": "Size of the date windows orders and financial transactions are requested in, in ISO 8601 format. E.g. P1D means 1 day, PT6H means 6 hours. Each order window must be paged through within 24 hours, so busy accounts may need smaller windows.",
+              "format": "duration",
+              "title": "Window Size",
+              "type": "string"
+            },
+            "overlap": {
+              "description": "How far each incremental request reaches back before the previous one ended, to catch orders Amazon makes searchable late, in ISO 8601 format.",
+              "format": "duration",
+              "title": "Incremental Overlap",
+              "type": "string"
+            },
+            "financial_transactions_lookback": {
+              "description": "How far behind the present financial transactions are read a final time, to catch deferred transactions Amazon has since released, in ISO 8601 format. Deferred transactions, such as invoiced (B2B) orders, are released on their maturity date, so set this past the longest deferral the account sees. Changes to a transaction after this point are not captured. Raising it re-reads the newly covered time.",
+              "format": "duration",
+              "title": "Financial Transactions Lookback",
+              "type": "string"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "LoginWithAmazonCredentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "Login with Amazon",
+              "default": "Login with Amazon",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "LWA Client ID",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "LWA Client Secret",
+              "type": "string"
+            },
+            "refresh_token": {
+              "description": "The refresh token issued when the selling account authorized the application.",
+              "secret": true,
+              "title": "Refresh Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret",
+            "refresh_token"
+          ],
+          "title": "LoginWithAmazonCredentials",
+          "type": "object"
+        },
+        "Region": {
+          "enum": [
+            "North America",
+            "Europe",
+            "Far East"
+          ],
+          "title": "Region",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "Login with Amazon": "#/$defs/LoginWithAmazonCredentials"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/LoginWithAmazonCredentials"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "region": {
+          "$ref": "#/$defs/Region",
+          "description": "The SP-API region of the selling account. Capture each region separately."
+        },
+        "marketplace_ids": {
+          "description": "Amazon marketplace IDs to capture, such as ATVPDKIKX0DER for Amazon.com. All must belong to the selected region.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Marketplace IDs",
+          "type": "array"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Orders created, financial transactions posted, settlement reports created and all orders lines last updated before this date are not captured, nor Sales and Traffic days before the UTC day it falls in. Amazon serves about two years of order history, and of all orders and Sales and Traffic reports, but keeps settlement reports for only 90 days, so older data is not captured whatever this date. If left blank, the start date is set to 30 days before the present date, and moves forward each time the capture restarts.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "credentials",
+        "region",
+        "marketplace_ids"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        },
+        "schedule": {
+          "default": "",
+          "description": "Schedule to automatically rebackfill this binding. Accepts a cron expression.",
+          "nonsensitive": true,
+          "pattern": "^((?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?)(?:,(?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?))*)\\s+((?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?)(?:,(?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?))*)\\s+((?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?)(?:,(?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?))*)\\s+((?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?)(?:,(?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?))*)\\s+((?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?)(?:,(?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?))*)$|^$",
+          "title": "Schedule",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "OrdersResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-amazon-selling-partner",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

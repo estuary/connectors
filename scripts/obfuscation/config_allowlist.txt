@@ -115,6 +115,8 @@ conversion_window_days
 attribution_window
 report_window_size
 report_lookback_days
+financial_transactions_lookback
+overlap
 time_increment
 fastSyncStartTime
 fastSyncStopTime

@@ -1,0 +1,7 @@
+variables:
+  - name: base_url
+    value: https://sellingpartnerapi-na.amazon.com
+  - name: config_path
+    value: ../config.yaml
+  - name: marketplace_id
+    value: ATVPDKIKX0DER
