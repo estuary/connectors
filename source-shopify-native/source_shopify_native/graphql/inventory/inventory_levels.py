@@ -9,7 +9,7 @@ from ...models import ShopifyGraphQLResource, StoreCapabilities
 class InventoryLevels(ShopifyGraphQLResource):
     NAME = "inventory_levels"
     QUERY_ROOT = "inventoryItems"
-    QUALIFYING_SCOPES = {"read_inventory"}
+    QUALIFYING_SCOPES = [{"read_inventory"}]
     QUERY = """
     inventoryLevels {
         edges {

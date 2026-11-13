@@ -249,8 +249,10 @@ def _get_available_resources(
     available: set[type[ShopifyGraphQLResource]] = set()
 
     for resource in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES:
-        # Skip if none of the qualifying scopes are granted
-        if resource.QUALIFYING_SCOPES.isdisjoint(granted_scopes):
+        # Skip unless at least one scope from each qualifying set is granted
+        if not resource.QUALIFYING_SCOPES or any(
+            scopes.isdisjoint(granted_scopes) for scopes in resource.QUALIFYING_SCOPES
+        ):
             continue
         # Skip PII resources for custom app tokens when plan doesn't allow PII
         if uses_custom_app_token and resource in PII_RESOURCES and not can_access_pii:
@@ -562,7 +564,7 @@ def _build_incremental_resource(
 
         # Warn if FulfillmentOrders has partial scope coverage
         if model == gql.FulfillmentOrders:
-            fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES
+            fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES[0]
             for store_id in stores_with_access:
                 granted = store_contexts[store_id].capabilities.scopes
                 if fo_scopes & granted and not fo_scopes <= granted:

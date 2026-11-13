@@ -16,7 +16,7 @@ class _Collections(ShopifyGraphQLResource):
     COLLECTION_TYPE: ClassVar[str] = ""
     QUERY_ROOT = "collections"
     SORT_KEY = SortKey.UPDATED_AT
-    QUALIFYING_SCOPES = {"read_products"}
+    QUALIFYING_SCOPES = [{"read_products"}]
     QUERY = """
     title
     handle

@@ -484,8 +484,8 @@ class ConditionalField:
 def requires_any_scope(*scopes: str) -> Callable[["StoreCapabilities"], bool]:
     """Build an `is_available` predicate that holds when any of `scopes` is granted.
 
-    Mirrors the any-of semantics of QUALIFYING_SCOPES. A field reachable via any one of
-    several scopes is available if at least one is present.
+    Mirrors the any-of semantics of each QUALIFYING_SCOPES set. A field reachable via any one
+    of several scopes is available if at least one is present.
     """
     required = frozenset(scopes)
     return lambda capabilities: not required.isdisjoint(capabilities.scopes)
@@ -597,7 +597,8 @@ class ShopifyGraphQLResource(ShopifyDocument):
     NAME: ClassVar[str] = ""
     SORT_KEY: ClassVar[SortKey | None] = None
     SHOULD_USE_BULK_QUERIES: ClassVar[bool] = True
-    QUALIFYING_SCOPES: ClassVar[set[str]] = set()
+    # A store must grant at least one scope from each set.
+    QUALIFYING_SCOPES: ClassVar[list[set[str]]] = []
     # Cron expression driving a periodic re-initialization of this stream's binding.
     BACKFILL_SCHEDULE: ClassVar[str] = ""
     # Some resources are only queryable on Shopify Plus / Advanced plans or

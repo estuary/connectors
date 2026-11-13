@@ -47,7 +47,7 @@ class Markets(ShopifyGraphQLResource):
     NAME = "markets"
     QUERY_ROOT = "markets"
     SHOULD_USE_BULK_QUERIES = False
-    QUALIFYING_SCOPES = {"read_markets"}
+    QUALIFYING_SCOPES = [{"read_markets"}]
     QUERY = """
     id
     name
