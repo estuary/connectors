@@ -6,7 +6,6 @@ from pydantic import (
     AwareDatetime,
     BaseModel,
     Field,
-    create_model,
     field_serializer,
     field_validator,
     model_validator,
@@ -198,18 +197,21 @@ class EndpointConfig(BaseModel):
 _LWAEndpointConfig = EndpointConfig
 
 
+class _OAuthEndpointConfig(_LWAEndpointConfig):
+    credentials: Annotated[  # pyright: ignore[reportIncompatibleVariableOverride]
+        LoginWithAmazonCredentials | OAuth2Credentials,
+        Field(discriminator="credentials_title", title="Authentication"),
+    ]
+
+
+_OAuthEndpointConfig.__name__ = _OAuthEndpointConfig.__qualname__ = "EndpointConfig"
+
+
 def build_config_and_oauth(application_id: str | None) -> tuple[type[EndpointConfig], OAuth2Spec | None]:
     """Build the dormant or enabled authentication shape from the same models."""
     if application_id is None:
         return _LWAEndpointConfig, None
-    config_model = create_model(
-        "EndpointConfig",
-        __base__=_LWAEndpointConfig,
-        credentials=(
-            LoginWithAmazonCredentials | OAuth2Credentials,
-            Field(discriminator="credentials_title", title="Authentication"),
-        ),
-    )
+    config_model = _OAuthEndpointConfig
     oauth = OAUTH2_SPEC.model_copy(update={
         "authUrlTemplate": OAUTH2_SPEC.authUrlTemplate.replace("{application_id}", application_id),
     })
