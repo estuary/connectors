@@ -2,6 +2,10 @@
 
 ## 2026-11-13
 
+### Changed
+- Task logs no longer report an error each time a Kafka broker closes a
+  connection that the connector then reopens on its own.
+
 ### Fixed
 - A materialization could stop committing indefinitely, with no error, until
   its shard restarted. The connector could miss the notification that the
