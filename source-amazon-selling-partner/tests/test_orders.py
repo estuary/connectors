@@ -374,13 +374,33 @@ async def test_response_without_orders_array_fails_instead_of_advancing():
 
 
 @pytest.mark.asyncio
-async def test_a_search_amazon_cut_short_fails_instead_of_advancing():
+async def test_a_search_amazon_cut_short_ends_the_window_where_amazon_stopped():
     updated = NOW - timedelta(minutes=30)
     fake = FakeAmazon(
         now=NOW,
         orders=[order("a", updated - timedelta(days=1), updated)],
         echoed_bound_shortfall=timedelta(minutes=5),
     )
+
+    items = await collect(
+        fetch_orders(client_for(fake), MARKETPLACES, timedelta(days=1), timedelta(), LOG, NOW - timedelta(hours=1))
+    )
+    requested = datetime.fromisoformat(fake.requests[-1]["lastUpdatedBefore"])
+    assert [i.orderId for i in items if isinstance(i, Order)] == ["a"]
+    assert items[-1] == requested - timedelta(minutes=5)
+
+    start = NOW - timedelta(days=2)
+    items = await collect(
+        backfill_orders(client_for(fake), MARKETPLACES, start, timedelta(days=1), LOG, None, NOW - timedelta(hours=1))
+    )
+    requested = datetime.fromisoformat(fake.requests[-1]["createdBefore"])
+    assert requested == start + timedelta(days=1) - api.TICK
+    assert items[-1].split("|")[0] == api.to_iso(requested - timedelta(minutes=5) + api.TICK)
+
+
+@pytest.mark.asyncio
+async def test_a_search_amazon_ends_before_the_window_start_fails_instead_of_advancing():
+    fake = FakeAmazon(now=NOW, orders=[], echoed_bound_shortfall=timedelta(days=3))
 
     with pytest.raises(RuntimeError, match="updated only up to"):
         await collect(

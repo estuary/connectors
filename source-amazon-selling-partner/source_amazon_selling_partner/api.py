@@ -292,10 +292,18 @@ async def _orders_updated_window(
                     count += 1
                     yield item
                 elif item.lastUpdatedBefore is not None and item.lastUpdatedBefore < window_end:
-                    raise RuntimeError(
-                        f"Amazon searched orders updated only up to {item.lastUpdatedBefore}, "
-                        f"not the requested {window_end}."
+                    # End the window where Amazon says it searched; the next one reads the rest.
+                    searched = floor_to_tick(item.lastUpdatedBefore)
+                    if searched <= cursor:
+                        raise RuntimeError(
+                            f"Amazon searched orders updated only up to {item.lastUpdatedBefore}, "
+                            f"not past the window start {cursor}."
+                        )
+                    log.warning(
+                        "Amazon searched a shorter orders window than requested",
+                        {"requested_end": window_end, "searched_end": searched},
                     )
+                    window_end = searched
         except PaginationTokenRejected:
             if window_end - cursor <= timedelta(hours=1):
                 raise
@@ -463,10 +471,18 @@ async def backfill_orders(
                     count += 1
                     yield item
                 elif item.createdBefore is not None and item.createdBefore < window_end:
-                    raise RuntimeError(
-                        f"Amazon searched orders created only up to {item.createdBefore}, "
-                        f"not the requested {window_end}."
+                    # End the window where Amazon says it searched; the next one reads the rest.
+                    searched = floor_to_tick(item.createdBefore)
+                    if searched < window_start:
+                        raise RuntimeError(
+                            f"Amazon searched orders created only up to {item.createdBefore}, "
+                            f"before the window start {window_start}."
+                        )
+                    log.warning(
+                        "Amazon searched a shorter orders backfill window than requested",
+                        {"requested_end": window_end, "searched_end": searched},
                     )
+                    window_end = searched
         except PaginationTokenRejected:
             if window_end - window_start <= timedelta(hours=1):
                 raise
