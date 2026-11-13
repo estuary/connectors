@@ -1,7 +1,8 @@
+import abc
 from datetime import datetime, UTC, timedelta
 from enum import StrEnum
 import json
-from typing import Annotated, Any, Literal, TYPE_CHECKING
+from typing import Annotated, Any, Literal, TYPE_CHECKING, override
 
 from estuary_cdk.capture.common import (
     BasicAuth,
@@ -171,8 +172,17 @@ class ZendeskResource(FullRefreshResource):
     id: int
 
 
-class TimestampedResource(ZendeskResource):
+class IncrementalResource(ZendeskResource):
+    @abc.abstractmethod
+    def get_cursor(self) -> AwareDatetime: ...
+
+
+class TimestampedResource(IncrementalResource):
     updated_at: AwareDatetime
+
+    @override
+    def get_cursor(self) -> AwareDatetime:
+        return self.updated_at
 
 
 class IncrementalTimeExportResponse(BaseModel, extra="allow"):
@@ -331,6 +341,21 @@ INCREMENTAL_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, FilterParam, str, t
     ("ticket_skips", "skips", FilterParam.START_TIME, "updated_at", TicketSkipsResponse),
     ("ticket_metric_events", "incremental/ticket_metric_events", FilterParam.START_TIME, "time", TicketMetricEventsResponse),
     ("ticket_activities", "activities", FilterParam.START_TIME, "updated_at", TicketActivitiesResponse),
+]
+
+
+class IncrementalKeysetPaginatedResponse(BaseModel, extra="allow"):
+    meta: FullRefreshCursorPaginatedResponse.Meta
+
+
+class OrganizationsListResponse(IncrementalKeysetPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="organizations")
+
+
+# Resources read by sweeping a list endpoint in ascending updated_at order.
+# Tuples contain the name, path, and response model for each resource.
+INCREMENTAL_KEYSET_PAGINATED_RESOURCES: list[tuple[str, str, type[IncrementalKeysetPaginatedResponse]]] = [
+    ("organizations", "organizations", OrganizationsListResponse),
 ]
 
 
