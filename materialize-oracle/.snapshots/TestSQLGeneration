@@ -1,0 +1,65 @@
+--- Begin key_value createTargetTable ---
+CREATE TABLE IF NOT EXISTS key_value (
+	key1 NUMBER(38,0) NOT NULL,
+	key2 BOOLEAN NOT NULL,
+	"key!binary" RAW(2000) NOT NULL,
+	array CLOB,
+	binary BLOB,
+	boolean BOOLEAN,
+	field_with_projection CLOB,
+	flow_published_at TIMESTAMP(9) WITH TIME ZONE NOT NULL,
+	"integer" NUMBER(38,0),
+	integerGt128Bit VARCHAR2(40 CHAR),
+	integerGt256Bit VARCHAR2(78 CHAR),
+	integerGt64Bit NUMBER(38,0),
+	integerWithUserDDL DECIMAL(20),
+	multiple CLOB,
+	"nonAsciiκόσμε" CLOB,
+	"number" BINARY_DOUBLE,
+	numberCastToString CLOB,
+	object CLOB,
+	string CLOB,
+	stringInteger NUMBER(38,0),
+	stringInteger18Chars NUMBER(38,0),
+	stringInteger38Chars NUMBER(38,0),
+	stringInteger39Chars VARCHAR2(39 CHAR),
+	stringInteger66Chars VARCHAR2(66 CHAR),
+	stringInteger77Chars VARCHAR2(77 CHAR),
+	stringNumber BINARY_DOUBLE,
+	flow_document CLOB,
+	PRIMARY KEY (key1, key2, "key!binary")
+)--- End key_value createTargetTable ---
+
+--- Begin delta_updates createTargetTable ---
+CREATE TABLE IF NOT EXISTS delta_updates (
+	theKey VARCHAR2(1000 CHAR),
+	aValue NUMBER(38,0),
+	flow_published_at TIMESTAMP(9) WITH TIME ZONE NOT NULL
+)--- End delta_updates createTargetTable ---
+
+--- Begin key_value insert ---
+INSERT INTO key_value (key1, key2, "key!binary", boolean, flow_published_at, "integer", integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, "number", stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, array, binary, field_with_projection, multiple, "nonAsciiκόσμε", numberCastToString, object, string, flow_document) VALUES (TO_NUMBER(:1), :2, :3, :4, TO_TIMESTAMP_TZ(:5, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM'), TO_NUMBER(:6), :7, :8, TO_NUMBER(:9), :10, TO_BINARY_DOUBLE(:11), TO_NUMBER(:12), TO_NUMBER(:13), TO_NUMBER(:14), :15, :16, :17, TO_BINARY_DOUBLE(:18), :19, :20, :21, :22, :23, :24, :25, :26, :27)
+--- End key_value insert ---
+
+--- Begin key_value delete ---
+DELETE FROM key_value WHERE key1 = TO_NUMBER(:1) AND key2 = :2 AND "key!binary" = :3
+--- End key_value delete ---
+
+--- Begin key_value load ---
+SELECT /*+ LEADING(l r) USE_NL(r) INDEX(r) CARDINALITY(l 10) */ r.flow_document
+FROM JSON_TABLE(:1, '$[*]' ERROR ON ERROR COLUMNS (k0 NUMBER PATH '$[0]' ERROR ON ERROR, k1 VARCHAR2(5) PATH '$[1]' ERROR ON ERROR, k2 VARCHAR2(4000) PATH '$[2]' ERROR ON ERROR)) l
+JOIN key_value r ON r.key1 = l.k0 AND r.key2 = TO_BOOLEAN(l.k1) AND r."key!binary" = HEXTORAW(l.k2)
+--- End key_value load ---
+
+--- Begin delta_updates insert ---
+INSERT INTO delta_updates (theKey, aValue, flow_published_at) VALUES (:1, TO_NUMBER(:2), TO_TIMESTAMP_TZ(:3, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM'))
+--- End delta_updates insert ---
+
+--- Begin delta_updates delete ---
+DELETE FROM delta_updates WHERE theKey = :1
+--- End delta_updates delete ---
+
+--- Begin Fence Update ---
+UPDATE path."to".checkpoints SET checkpoint = :1 WHERE materialization = 'some/Materialization' AND key_begin = 1122867 AND key_end = 4293844428 AND fence = 123
+--- End Fence Update ---
+

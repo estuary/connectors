@@ -1,0 +1,178 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-oracle/config",
+    "properties": {
+      "address": {
+        "type": "string",
+        "title": "Address",
+        "description": "Host and port of the database (in the form of host[:port]). Port 1521 is used as the default if no specific port is provided.",
+        "order": 0
+      },
+      "user": {
+        "type": "string",
+        "title": "User",
+        "description": "Database user to connect as.",
+        "order": 1
+      },
+      "credentials": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/materialize-oracle/user-password-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "UserPassword",
+                "default": "UserPassword",
+                "order": 0
+              },
+              "password": {
+                "type": "string",
+                "title": "Password",
+                "description": "Password for the specified database user.",
+                "order": 1,
+                "secret": true
+              }
+            },
+            "type": "object",
+            "required": [
+              "password"
+            ],
+            "title": "Password"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
+        "default": {
+          "auth_type": "UserPassword"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
+        "order": 2
+      },
+      "database": {
+        "type": "string",
+        "title": "Database",
+        "description": "Service name of the database (pluggable database) to materialize to.",
+        "order": 3
+      },
+      "schema": {
+        "type": "string",
+        "title": "Schema",
+        "description": "Schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 table. Defaults to the schema of the user.",
+        "order": 4
+      },
+      "sslmode": {
+        "type": "string",
+        "enum": [
+          "verify-full",
+          "require",
+          "disable"
+        ],
+        "title": "SSL Mode",
+        "description": "How to secure the connection. 'verify-full' connects over TLS (TCPS) and verifies the server certificate and host name. 'require' connects over TLS without verifying them. 'disable' connects over plain TCP and relies on an SSH tunnel or Oracle native network encryption for security.",
+        "default": "verify-full",
+        "nonsensitive": true,
+        "order": 5
+      },
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
+        "default": false,
+        "nonsensitive": true,
+        "order": 6
+      },
+      "networkTunnel": {
+        "properties": {
+          "sshForwarding": {
+            "properties": {
+              "sshEndpoint": {
+                "type": "string",
+                "title": "SSH Endpoint",
+                "description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+                "pattern": "^ssh://.+@.+$"
+              },
+              "privateKey": {
+                "type": "string",
+                "title": "SSH Private Key",
+                "description": "Private key to connect to the remote SSH server.",
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "sshEndpoint",
+              "privateKey"
+            ],
+            "title": "SSH Forwarding"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Network Tunnel",
+        "description": "Connect to your system through an SSH server that acts as a bastion host for your network."
+      },
+      "advanced": {
+        "properties": {
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "nonsensitive": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "address",
+      "user",
+      "credentials",
+      "database",
+      "sslmode"
+    ],
+    "title": "SQL Connection"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-oracle/table-config",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table",
+        "description": "Name of the database table",
+        "x-collection-name": true
+      },
+      "schema": {
+        "type": "string",
+        "title": "Alternative Schema",
+        "description": "Alternative schema for this table (optional)",
+        "x-schema-name": true
+      },
+      "delta_updates": {
+        "type": "boolean",
+        "title": "Delta Update",
+        "description": "Should updates to this table be done via delta updates. Default is false.",
+        "default": false,
+        "nonsensitive": true,
+        "x-delta-updates": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "table"
+    ],
+    "title": "SQL Table"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-oracle"
+}

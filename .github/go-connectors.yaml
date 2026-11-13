@@ -50,6 +50,7 @@
 - name: materialize-mongodb
 - name: materialize-motherduck
 - name: materialize-mysql
+- name: materialize-oracle
 - name: materialize-pinecone
 - name: materialize-postgres
 - name: materialize-redshift

@@ -1,0 +1,27 @@
+services:
+  oracle:
+    image: 'gvenzl/oracle-free:23-slim-faststart'
+    platform: linux/amd64
+    environment:
+      ORACLE_PASSWORD: 'adminpassword'
+      APP_USER: 'flow'
+      APP_USER_PASSWORD: 'flowpassword'
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+    networks:
+      - flow-test
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 5s
+      timeout: 10s
+      retries: 120
+    ports:
+      - "1522:1521"
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
+
+volumes:
+  oracle_data: {}

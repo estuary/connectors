@@ -1,0 +1,2 @@
+oracle://will:secret1234@localhost:1521/ORCLPDB1?PROGRAM=Estuary+Flow+Materialization&SSL=true&SSL+VERIFY=true
+config valid
