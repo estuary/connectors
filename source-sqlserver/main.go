@@ -41,33 +41,38 @@ var sqlserverDriver = &sqlcapture.Driver{
 
 const defaultPort = "1433"
 
-var featureFlagDefaults = map[string]bool{
+var featureFlagDefaults = map[string]common.FlagDefault{
 	// When set, discovered collection schemas will request that schema inference be
 	// used _in addition to_ the full column/types discovery we already do.
-	"use_schema_inference": true,
+	"use_schema_inference": common.FlagEnabled,
 
 	// When set, discovered collection schemas will be emitted as SourcedSchema messages
 	// so that Flow can have access to 'official' schema information from the source DB.
-	"emit_sourced_schemas": true,
+	"emit_sourced_schemas": common.FlagEnabled,
 
 	// When true, the capture will use a fence mechanism based on observing CDC worker runs
 	// and LSN positions rather than the old watermark write mechanism.
-	"read_only": true,
+	"read_only": common.FlagEnabled,
 
 	// When true, the connector will tolerate missed changes in the CDC stream and will not
 	// trigger an automatic re-backfill if changes go missing. This may be useful if the CDC
 	// event data starts to expire before it can be captured, but should generally only be
 	// needed in exceptional circumstances when recovering from some sort of major breakage.
-	"tolerate_missed_changes": false,
+	"tolerate_missed_changes": common.FlagDisabled,
 
 	// Force use of the 'replica fence' mechanism, which is normally used automatically
 	// when the target database is detected as a replica.
-	"replica_fencing": false,
+	"replica_fencing": common.FlagDisabled,
 
 	// Discover ROWVERSION / TIMESTAMP column types as {type: string, format: base64}.
 	// Captures without this setting will discover them as the catch-all type {} though
 	// the actual value will be a base64 string either way.
-	"discover_rowversion_as_bytes": false,
+	"discover_rowversion_as_bytes": common.FlagDisabled,
+
+	// When a table's key index is partitioned on a column other than its leading key
+	// column, backfill it one partition at a time, which SQL Server can do without sorting.
+	// Set `no_partition_aware_backfill` to backfill such tables in global key order instead.
+	"partition_aware_backfill": common.FlagEnabledForTasksCreatedAfter("2026-11-13"),
 }
 
 type AuthType string
@@ -375,7 +380,7 @@ func maxStartupDelay(cfg json.RawMessage) (time.Duration, error) {
 	return sqlcapture.ParseMaxStartupDelay(config.Advanced.MaxStartupDelay)
 }
 
-func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sqlcapture.Database, error) {
+func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage, createdAt common.CreatedAt) (sqlcapture.Database, error) {
 	var config Config
 	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
 		return nil, fmt.Errorf("error parsing config json: %w", err)
@@ -383,9 +388,9 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 	config.SetDefaults()
 	config.normalizeCredentials()
 
-	var featureFlags = common.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
+	var featureFlags = common.ResolveFlags(config.Advanced.FeatureFlags, featureFlagDefaults, createdAt)
 	if config.Advanced.FeatureFlags != "" {
-		log.WithField("flags", featureFlags).Info("parsed feature flags")
+		log.WithFields(log.Fields{"flags": featureFlags, "created_at": createdAt.String()}).Info("parsed feature flags")
 	}
 
 	// This is a bit of an ugly hack to allow us to specify a single _value_ as part of a feature flag.

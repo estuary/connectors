@@ -208,6 +208,18 @@ Granting that permission to the capture user is a hard requirement for using thi
 
 Note also that you still need to have enough free storage space to hold the full 3 days of CDC event retention in the worst case. Otherwise, in the event of downtime exceeding what you can store, you have only changed the failure mode to running out of disk space. This option is best used in situations where it is _possible_ to use that much storage but it is still undesirable for other reasons to use that much in normal operation, such as when using flexible storage volumes on a cloud host.
 
+### Partitioned Tables
+
+SQL Server can't return the rows of a partitioned table in primary key order without sorting them, unless the table is partitioned on the first column of its primary key. On a large table that sort can take hours.
+
+When a table's primary key index is partitioned on a column other than its first key column, the connector backfills it one partition at a time, in primary key order within each partition. These tables use the [Normal](/reference/backfilling-data/#resource-configuration-backfill-modes) backfill mode when the binding's backfill mode is left on automatic. A binding explicitly set to the Precise backfill mode, or whose collection key differs from the table's primary key, is backfilled in primary key order instead, and the connector logs a warning when that backfill starts.
+
+Partitions can be split or merged while a backfill is in progress. If the partition currently being backfilled changes, the connector reads it again from its start. If that partition is merged into the one before it, the connector reads the merged partition again from its start.
+
+Tables whose partition column is computed, or of a floating-point, `money`, or binary type, are backfilled in primary key order.
+
+This applies to captures created on or after 2026-11-13. Older captures keep backfilling partitioned tables in primary key order unless `partition_aware_backfill` is added to the capture's [feature flags](/guides/advanced-usage/feature-flags), and adding `no_partition_aware_backfill` turns it off for newer captures.
+
 ## Configuration
 
 You configure connectors either in the Estuary web app, or by directly editing the catalog specification file.

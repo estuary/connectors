@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
@@ -128,7 +129,9 @@ type Driver struct {
 	ResourceSchema   json.RawMessage // Optional: if set, overrides the default resource schema
 	DocumentationURL string
 
-	Connect func(ctx context.Context, name string, cfg json.RawMessage) (Database, error)
+	// Connect opens the database for a task created on createdAt, which cutoff-gated
+	// feature flags resolve against.
+	Connect func(ctx context.Context, name string, cfg json.RawMessage, createdAt common.CreatedAt) (Database, error)
 
 	// Optional: if set, Pull waits a random time up to the returned duration before connecting.
 	MaxStartupDelay func(cfg json.RawMessage) (time.Duration, error)
@@ -205,7 +208,15 @@ func (d *Driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response
 
 // Validate that store resources and proposed collection bindings are compatible.
 func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Response_Validated, error) {
-	var db, err = d.Connect(ctx, string(req.Name), req.ConfigJson)
+	var lastCreatedAt string // Empty for a brand-new task, which has no last spec.
+	if req.LastCapture != nil {
+		lastCreatedAt = req.LastCapture.CreatedAt
+	}
+	createdAt, err := common.ParseCreatedAt(lastCreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	db, err := d.Connect(ctx, string(req.Name), req.ConfigJson, createdAt)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
@@ -297,7 +308,11 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 
 // Discover returns the set of resources available from this Driver.
 func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
-	var db, err = d.Connect(ctx, "Flow Discovery", req.ConfigJson)
+	createdAt, err := common.ParseCreatedAt(req.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	db, err := d.Connect(ctx, "Flow Discovery", req.ConfigJson, createdAt)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
@@ -399,7 +414,11 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}
 	log.WithField("eventType", "connectorStatus").Info("Connecting to database")
-	db, err := d.Connect(ctx, string(open.Capture.Name), open.Capture.ConfigJson)
+	createdAt, err := common.ParseCreatedAt(open.Capture.CreatedAt)
+	if err != nil {
+		return err
+	}
+	db, err := d.Connect(ctx, string(open.Capture.Name), open.Capture.ConfigJson, createdAt)
 	if err != nil {
 		return fmt.Errorf("error connecting to database: %w", err)
 	}

@@ -1,0 +1,570 @@
+sql> CREATE PARTITION FUNCTION [pf_953533] (INT) AS RANGE RIGHT FOR VALUES (1000, 2000, 3000)
+sql> CREATE PARTITION SCHEME [ps_953533] AS PARTITION [pf_953533] ALL TO ([PRIMARY])
+sql> CREATE TABLE dbo.PartitionedBackfillDDL_MergePrevious_953533 (a INT NOT NULL, b INT NOT NULL, data VARCHAR(32), PRIMARY KEY CLUSTERED (a, b)) ON [ps_953533](b)
+sql> INSERT INTO dbo.PartitionedBackfillDDL_MergePrevious_953533 VALUES (1, 1700, 'row 1/1700'), (2, 2400, 'row 2/2400'), (3, 3100, 'row 3/3100'), (4, 800, 'row 4/800'), (5, 1500, 'row 5/1500'), (6, 2200, 'row 6/2200'), (7, 3900, 'row 7/3900'), (8, 600, 'row 8/600'), (9, 1300, 'row 9/1300'), (10, 2000, 'row 10/2000'), (11, 3700, 'row 11/3700'), (12, 400, 'row 12/400'), (13, 1100, 'row 13/1100'), (14, 2800, 'row 14/2800'), (15, 3500, 'row 15/3500'), (16, 200, 'row 16/200')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 4,
+    "b": 800,
+    "data": "row 4/800"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 8,
+    "b": 600,
+    "data": "row 8/600"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 12,
+    "b": 400,
+    "data": "row 12/400"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 16,
+    "b": 200,
+    "data": "row 16/200"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 1,
+    "b": 1700,
+    "data": "row 1/1700"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 5,
+    "b": 1500,
+    "data": "row 5/1500"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 9,
+    "b": 1300,
+    "data": "row 9/1300"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 13,
+    "b": 1100,
+    "data": "row 13/1100"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 2,
+    "b": 2400,
+    "data": "row 2/2400"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 6,
+    "b": 2200,
+    "data": "row 6/2200"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 10,
+    "b": 2000,
+    "data": "row 10/2000"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 14,
+    "b": 2800,
+    "data": "row 14/2800"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 3,
+    "b": 3100,
+    "data": "row 3/3100"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 7,
+    "b": 3900,
+    "data": "row 7/3900"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 11,
+    "b": 3700,
+    "data": "row 11/3700"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 15,
+    "b": 3500,
+    "data": "row 15/3500"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FPartitionedBackfillDDL_MergePrevious_953533": {
+      "backfilled": 16,
+      "key_columns": [
+        "a",
+        "b"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> ALTER PARTITION FUNCTION [pf_953533]() MERGE RANGE (2000)
+=== Run: Resumed Backfill ===
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 1,
+    "b": 1700,
+    "data": "row 1/1700"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 2,
+    "b": 2400,
+    "data": "row 2/2400"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 5,
+    "b": 1500,
+    "data": "row 5/1500"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 6,
+    "b": 2200,
+    "data": "row 6/2200"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 9,
+    "b": 1300,
+    "data": "row 9/1300"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 10,
+    "b": 2000,
+    "data": "row 10/2000"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 13,
+    "b": 1100,
+    "data": "row 13/1100"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 14,
+    "b": 2800,
+    "data": "row 14/2800"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 3,
+    "b": 3100,
+    "data": "row 3/3100"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 7,
+    "b": 3900,
+    "data": "row 7/3900"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 11,
+    "b": 3700,
+    "data": "row 11/3700"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/partitionedbackfillddl_mergeprevious_953533",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "PartitionedBackfillDDL_MergePrevious_953533"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a": 15,
+    "b": 3500,
+    "data": "row 15/3500"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FPartitionedBackfillDDL_MergePrevious_953533": {
+      "backfilled": 28,
+      "key_columns": [
+        "a",
+        "b"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

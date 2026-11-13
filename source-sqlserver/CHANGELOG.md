@@ -1,5 +1,11 @@
 # source-sqlserver
 
+## 2026-11-09
+
+### Changed
+- FEATURE FLAG SWITCH: Starting 2026-11-13 the feature flag partition_aware_backfill will be on by default for new tasks, while existing tasks created at or before 2026-11-12 will keep their existing behaviour. Backfills of tables partitioned on a column other than the first primary key column no longer sort the whole table for every chunk, so they progress on very large tables.
+- With `partition_aware_backfill` on, bindings on such tables in the automatic backfill mode use the normal backfill mode.
+
 ## 2026-10-30
 
 ### Changed
