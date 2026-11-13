@@ -1,0 +1,34 @@
+info:
+  name: private included
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/conversations.list?types=public_channel,private_channel&exclude_archived=false&limit=999"
+  params:
+    - name: types
+      value: "public_channel,private_channel"
+      type: query
+    - name: exclude_archived
+      value: "false"
+      type: query
+    - name: limit
+      value: "999"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 30000
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [conversations.list](https://docs.slack.dev/reference/methods/conversations.list)
+
+  **WHY:** confirms private channels the bot was invited to appear only when
+  `private_channel` is requested (needs `groups:read`), backing the
+  `include_private_channels` option.
+
+  **PENDING:** run once credentials are in place.

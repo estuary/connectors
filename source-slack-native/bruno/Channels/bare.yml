@@ -1,0 +1,47 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/conversations.list?types=public_channel&exclude_archived=false&limit=999"
+  params:
+    - name: types
+      value: "public_channel"
+      type: query
+    - name: exclude_archived
+      value: "false"
+      type: query
+    - name: limit
+      value: "999"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        const channels = res.getBody()?.channels ?? [];
+        const joined = channels.find((c) => c.is_member && !c.is_archived);
+        const unjoined = channels.find((c) => !c.is_member && !c.is_archived);
+        if (joined) bru.setVar('channel_id', joined.id);
+        if (unjoined) bru.setVar('unjoined_channel_id', unjoined.id);
+
+settings:
+  encodeUrl: true
+  timeout: 30000
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [conversations.list](https://docs.slack.dev/reference/methods/conversations.list)
+
+  **WHY:** shape of the `channels` snapshot stream, and the `is_member`,
+  `is_archived`, `is_private`, `name`, `id` fields `resolve_channels` depends on.
+  `types` defaults to `public_channel` and `exclude_archived` to `false`
+  (DOCUMENTED 2026-11-03); both are passed explicitly. Pins `channel_id` (a
+  channel the bot is in) and `unjoined_channel_id` (one it is not) for later
+  requests.
+
+  **PENDING:** run once credentials are in place.

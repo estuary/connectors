@@ -1,0 +1,49 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/conversations.history?channel={{channel_id}}&limit=999"
+  params:
+    - name: channel
+      value: "{{channel_id}}"
+      type: query
+    - name: limit
+      value: "999"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('channel_id')) throw new Error('channel_id not set — run `Channels / bare` first in this session');
+    - type: after-response
+      code: |-
+        const msgs = res.getBody()?.messages ?? [];
+        if (msgs.length >= 3) {
+          bru.setVar('newest_ts', msgs[0].ts);
+          bru.setVar('middle_ts', msgs[Math.floor(msgs.length / 2)].ts);
+          bru.setVar('oldest_ts', msgs[msgs.length - 1].ts);
+        }
+        const parent = msgs.find((m) => (m.reply_count ?? 0) > 0);
+        if (parent) bru.setVar('thread_ts', parent.ts);
+
+settings:
+  encodeUrl: true
+  timeout: 30000
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [conversations.history](https://docs.slack.dev/reference/methods/conversations.history)
+
+  **WHY:** shape of the `messages` stream (`ts`, `thread_ts`, `reply_count`,
+  `latest_reply`) and of the `has_more` / `is_limited` remainder. Also confirms
+  that regular thread replies are absent while "also send to channel" replies
+  (`subtype: thread_broadcast`) are present. Pins three message timestamps
+  (newest, middle, oldest) and one thread parent for the boundary probes.
+
+  **PENDING:** run once credentials are in place.
