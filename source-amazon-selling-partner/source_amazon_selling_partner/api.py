@@ -937,8 +937,8 @@ async def backfill_settlement_reports(
                      │         │          └─ first report after watermark
                      │         └─ every report through here was read;
                      │            initially just before start_date
-                     └─ the watermark floored to the second, or the
-                        retention floor if later
+                     └─ the watermark (or start_date) floored to the
+                        second, or the retention floor if later
     ```
 
     Listing bounds are inclusive here; a resume watermark is exclusive.
@@ -955,7 +955,7 @@ async def backfill_settlement_reports(
 
     watermark: datetime | None = None
     if page is None:
-        since = start_date
+        since = floor_to_tick(start_date)
     else:
         assert isinstance(page, str)
         watermark = datetime.fromisoformat(page)
