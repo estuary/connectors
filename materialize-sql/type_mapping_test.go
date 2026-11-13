@@ -217,3 +217,32 @@ func TestAsFlatType_Binary(t *testing.T) {
 		})
 	}
 }
+
+func TestMapString_WithContentType(t *testing.T) {
+	mapper := MapString(StringMappings{
+		Fallback:   MapStatic("TEXT"),
+		WithFormat: map[string]MapProjectionFn{"date": MapStatic("DATE")},
+		WithContentType: map[string]MapProjectionFn{
+			"application/x-protobuf; proto=consumer.Checkpoint": MapStatic("CHECKPOINT"),
+			"application/vnd.estuary.mysql.varchar":             MapStatic("VARCHAR"),
+		},
+	})
+
+	for _, tc := range []struct{ contentType, format, want string }{
+		{"application/x-protobuf; proto=consumer.Checkpoint", "", "CHECKPOINT"},
+		{"application/x-protobuf; proto=flow.Other", "", "TEXT"},
+		{"application/vnd.estuary.mysql.varchar", "", "VARCHAR"},
+		{"application/vnd.estuary.mysql.varchar; size=20", "", "VARCHAR"},
+		{"Application/VND.Estuary.MySQL.VarChar;size=20", "", "VARCHAR"},
+		{"application/vnd.estuary.mysql.varchar; size", "", "VARCHAR"},
+		{"application/vnd.estuary.mysql.varchar; size=20", "date", "DATE"},
+		{"application/vnd.estuary.mysql.text; size=20", "", "TEXT"},
+		{"", "", "TEXT"},
+	} {
+		ddl, _, _ := mapper(&Projection{Projection: pf.Projection{Inference: pf.Inference{
+			Types:   []string{"string"},
+			String_: &pf.Inference_String{ContentType: tc.contentType, Format: tc.format},
+		}}})
+		require.Equal(t, tc.want, ddl.DDL(), tc.contentType)
+	}
+}
