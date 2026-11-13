@@ -2,6 +2,15 @@
 
 ## 2026-11-13
 
+### Added
+- Tasks can run on more than one shard with bindings that stage files. The
+  shard whose key range begins at zero applies every shard's staged files,
+  and combines the shards' MERGE INTO statements into one per table.
+
+### Changed
+- Tasks that run on more than one shard now fail at startup only if a
+  delta-updates binding writes through `snowpipe_streaming` or Snowpipe.
+
 ### Fixed
 - High-performance Snowpipe Streaming bindings that receive no new data for
   30 days no longer fail when their next document arrives.

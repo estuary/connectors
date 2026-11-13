@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strconv"
@@ -270,11 +271,26 @@ type transactor struct {
 	bindings  []*binding
 	uploads   *semaphore.Weighted
 	be        *m.BindingEvents
-	cp        checkpoint
 	profiler  *boilerplate.QueryProfiler
 	// commitProfile is the profile of the commit queries of the checkpoint
 	// last built, which Acknowledge runs.
 	commitProfile *boilerplate.QueryProfile
+	// cp holds this shard's flat items by binding state key, which carry no
+	// staged work.
+	cp checkpoint
+	// staged holds this shard's staged entries and, on the primary, those of
+	// every other shard and session, which the primary applies.
+	staged stagedCheckpoint
+	// legacyStaged holds, on the primary, staged entries persisted as the flat
+	// fields of their state key, without a range key.
+	// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
+	legacyStaged checkpoint
+	// primary is set for the shard whose key range begins at zero.
+	primary  bool
+	rangeKey string
+	// sweptStreamV2 are the state keys whose streaming v2 channels were
+	// dropped when their binding left that write path.
+	sweptStreamV2 []string
 
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec
@@ -297,11 +313,7 @@ func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
-	if err := json.Unmarshal(state, &d.cp); err != nil {
-		return err
-	}
-
-	return nil
+	return d.absorbState(state, false)
 }
 
 func newTransactor(
@@ -357,6 +369,10 @@ func newTransactor(
 		version:             open.Version,
 		be:                  be,
 		cp:                  make(checkpoint),
+		staged:              make(stagedCheckpoint),
+		legacyStaged:        make(checkpoint),
+		primary:             open.Range.KeyBegin == 0,
+		rangeKey:            fmt.Sprintf("%08x-%08x", open.Range.KeyBegin, open.Range.KeyEnd),
 		uploads:             newUploadLimiter(),
 
 		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
@@ -489,6 +505,8 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 			"table":    b.target.Identifier,
 			"channels": cp.StreamV2.channelNames(),
 		}).Warn("this binding is leaving the snowpipe_streaming_v2 write path; documents its channels committed beyond the checkpoint will be materialized again; with delta updates these duplicates would be permanent")
+
+		d.forgetStreamV2(target.StateKey)
 	}
 
 	if d.cfg.isStreamsV1(b.target.DeltaUpdates, d.featureFlags) {
@@ -744,10 +762,12 @@ type checkpointItem struct {
 	Round int
 	Rows  int64
 	// TruncateBefore is the boundary of a backfill that completed in the
-	// transaction. Applying the item deletes the table's rows published
-	// before it, after the item's stores. It is omitted when unset, so that
-	// the item stays readable by a connector build without it.
+	// transaction. Applying the binding's entries deletes the table's rows
+	// published before it, after their stores.
 	TruncateBefore *time.Time `json:",omitempty"`
+	// Bounds are the rendered merge-bound literals of the keys staged for a
+	// MERGE INTO, positional with the target table's key columns.
+	Bounds []mergeBoundLiterals `json:",omitempty"`
 }
 
 type checkpoint = map[string]*checkpointItem
@@ -892,9 +912,9 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 				Version:   d.version,
 				Round:     round,
 				Rows:      rows,
+				Bounds:    boundsLiterals(bounds),
 			}
-			d.cp[b.target.StateKey] = item
-			d.commitProfile.SetBounds(idx, bounds)
+			d.staged.add(b.target.StateKey, d.rangeKey, item)
 		}
 
 		if !b.store.copyStage.started {
@@ -956,33 +976,29 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 			item.CopyQuery = copyIntoQuery
 			item.CopyStagedDir = dir
 		} else {
-			d.cp[b.target.StateKey] = &checkpointItem{
+			d.staged.add(b.target.StateKey, d.rangeKey, &checkpointItem{
 				Table:     b.target.Identifier,
 				Query:     copyIntoQuery,
 				StagedDir: dir,
+				Version:   d.version,
 				Round:     round,
 				Rows:      rows,
-			}
+			})
 		}
 	}
 
 	for idx, boundary := range d.truncations {
 		var b = d.bindings[idx]
-		var item = d.cp[b.target.StateKey]
+		var item = d.staged[b.target.StateKey][d.rangeKey]
 		if item == nil {
 			item = &checkpointItem{Table: b.target.Identifier, Round: round}
-			d.cp[b.target.StateKey] = item
+			d.staged.add(b.target.StateKey, d.rangeKey, item)
 		}
 		item.TruncateBefore = &boundary
 	}
 	d.truncations = nil
 
-	var checkpointJSON, err = json.Marshal(d.cp)
-	if err != nil {
-		return nil, fmt.Errorf("creating checkpoint json: %w", err)
-	}
-
-	return checkpointJSON, nil
+	return d.startCommitState()
 }
 
 type pipeRecord struct {
@@ -1104,11 +1120,37 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		d.didRecovery = true
 	}()
 
+	if err := d.mergePeerStatePatches(statePatches); err != nil {
+		return nil, err
+	}
+
 	// Run store queries concurrently, as each independently operates on a separate table.
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(MaxConcurrentQueries)
 
 	shouldProcess := m.StateKeyFilter(stateKeys)
+
+	// The primary applies every shard's staged entries, so the other shards
+	// drop theirs once the transaction commits.
+	var committed []string
+	for _, b := range d.bindings {
+		var stateKey = b.target.StateKey
+		if !shouldProcess(stateKey) || (len(d.staged[stateKey]) == 0 && d.legacyStaged[stateKey] == nil) {
+			continue
+		} else if !d.primary {
+			delete(d.staged, stateKey)
+			continue
+		}
+
+		committed = append(committed, stateKey)
+		var legacy, entries = d.legacyStaged[stateKey], d.staged[stateKey]
+		group.Go(func() error {
+			// NB: Not using groupCtx here since the Go Snowflake driver
+			// retains contexts internally, and groupCtx is cancelled after
+			// group.Wait() returns.
+			return d.commitStaged(ctx, b, legacy, entries)
+		})
+	}
 
 	var drained []string
 	var pipes = make(map[string]*pipeRecord)
@@ -1134,45 +1176,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 
 		drained = append(drained, stateKey)
 
-		if len(item.Query) > 0 || item.TruncateBefore != nil {
-			item := item
-			group.Go(func() error {
-				d.be.StartedResourceCommit(path)
-				// NB: Not using groupTx here since the Go Snowflake driver
-				// retains contexts internally, and groupCtx is cancelled after
-				// group.Wait() returns.
-				if len(item.Query) > 0 {
-					if err := d.runStoreQuery(ctx, item, item.Query, item.Rows, idx, path); err != nil {
-						return err
-					}
-				}
-				// The COPY runs after the MERGE so that the MERGE doesn't scan
-				// the rows the COPY appends.
-				if len(item.CopyQuery) > 0 {
-					if err := d.runStoreQuery(ctx, item, item.CopyQuery, 0, idx, path); err != nil {
-						return err
-					}
-				}
-				// The truncation runs after the stores, so that it keeps the
-				// rows they just wrote, which were published after the boundary.
-				if item.TruncateBefore != nil {
-					if err := d.runTruncation(ctx, item, idx, path); err != nil {
-						return err
-					}
-				}
-				d.be.FinishedResourceCommit(path)
-
-				for _, dir := range []string{item.StagedDir, item.CopyStagedDir} {
-					if dir == "" {
-						continue
-					} else if err := d.deleteFiles(groupCtx, []string{dir}); err != nil {
-						return fmt.Errorf("cleaning up files: %w", err)
-					}
-				}
-
-				return nil
-			})
-		} else if len(item.StreamBlobs) > 0 {
+		if len(item.StreamBlobs) > 0 {
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
 				if err := d.snowpipeStreaming.write(groupCtx, item.StreamBlobs, item.EncryptionKey, !d.didRecovery); err != nil {
@@ -1413,7 +1417,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		}
 	}
 
-	if len(drained) == 0 {
+	if len(drained) == 0 && len(committed) == 0 {
 		return nil, nil
 	}
 
@@ -1425,9 +1429,26 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	// that have been committed in this transaction. The reason is that it may be the case that a binding
 	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
 	// the binding and running the queries that are pending for its last transaction.
-	var checkpointClear = make(checkpoint)
+	var checkpointClear = make(map[string]any)
+	for _, sk := range committed {
+		var clear = make(map[string]any)
+		for rk := range d.staged[sk] {
+			clear[rk] = nil
+		}
+		// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
+		if d.legacyStaged[sk] != nil {
+			maps.Copy(clear, legacyItemClear)
+		}
+		checkpointClear[sk] = clear
+		delete(d.staged, sk)
+		delete(d.legacyStaged, sk)
+	}
 	for _, sk := range drained {
-		checkpointClear[sk] = nil
+		if clear, ok := checkpointClear[sk].(map[string]any); ok {
+			maps.Copy(clear, flatItemClear)
+		} else {
+			checkpointClear[sk] = nil
+		}
 		delete(d.cp, sk)
 	}
 
@@ -1439,14 +1460,13 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
-// runStoreQuery runs one of a checkpoint item's MERGE INTO or COPY INTO
-// queries and reports the row counts from its result set, plus staged rows if
-// staged is positive. A result that can't be read is logged and skipped; only
-// the query itself can fail the commit.
-func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, query string, staged int64, binding int, path []string) error {
-	isMerge := strings.HasPrefix(query, "\nMERGE INTO")
+// runStoreQuery runs a binding's MERGE INTO or COPY INTO of staged rows and
+// reports the row counts from its result set. A result that can't be read is
+// logged and skipped; only the query itself can fail the commit.
+func (d *transactor) runStoreQuery(ctx context.Context, b *binding, query string, round int, staged int64) error {
+	isMerge := isMergeQuery(query)
 
-	var queryCtx, trace = d.commitProfile.Trace(ctx, binding, boilerplate.StatementKind(query))
+	var queryCtx, trace = d.commitProfile.Trace(ctx, b.target.Binding, boilerplate.StatementKind(query))
 	rows, err := d.db.QueryContext(queryCtx, query)
 	trace.Finish(err)
 	if err != nil {
@@ -1455,28 +1475,27 @@ func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, qu
 
 	stats, err := scanStoreResult(rows, isMerge)
 	if err != nil {
-		log.WithError(err).WithField("table", item.Table).Warn("could not read store query result")
+		log.WithError(err).WithField("table", b.target.Identifier).Warn("could not read store query result")
 		return nil
 	}
 	if staged > 0 {
 		stats = stats.WithStaged(staged)
 	}
-	d.be.ReportRowStats(item.Round, path, stats)
+	d.be.ReportRowStats(round, b.target.Path, stats)
 	return nil
 }
 
-// runTruncation deletes the rows of the item's table published before its
-// TruncateBefore boundary, and reports how many it deleted.
-func (d *transactor) runTruncation(ctx context.Context, item *checkpointItem, binding int, path []string) error {
-	var b = d.bindings[binding]
+// runTruncation deletes the rows of the binding's table published before
+// boundary, and reports how many it deleted.
+func (d *transactor) runTruncation(ctx context.Context, b *binding, boundary time.Time, round int) error {
 	if b.truncateSQL == "" {
 		var _, reason = b.target.PublishedAtColumn()
 		return fmt.Errorf("unable to apply truncation boundary %s for table %s: %w",
-			item.TruncateBefore.Format(time.RFC3339Nano), b.target.Identifier, reason)
+			boundary.Format(time.RFC3339Nano), b.target.Identifier, reason)
 	}
 
-	var queryCtx, trace = d.profiler.Trace(ctx, binding, boilerplate.StatementKind(b.truncateSQL))
-	result, err := d.db.ExecContext(queryCtx, b.truncateSQL, item.TruncateBefore.UTC().Format(time.RFC3339Nano))
+	var queryCtx, trace = d.profiler.Trace(ctx, b.target.Binding, boilerplate.StatementKind(b.truncateSQL))
+	result, err := d.db.ExecContext(queryCtx, b.truncateSQL, boundary.UTC().Format(time.RFC3339Nano))
 	trace.Finish(err)
 	if err != nil {
 		return fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
@@ -1486,10 +1505,10 @@ func (d *transactor) runTruncation(ctx context.Context, item *checkpointItem, bi
 		return fmt.Errorf("reading rows deleted from %s after backfill: %w", b.target.Identifier, err)
 	}
 
-	d.be.ReportRowStats(item.Round, path, m.ExactRowStats(0, 0, 0).WithTruncated(deleted))
+	d.be.ReportRowStats(round, b.target.Path, m.ExactRowStats(0, 0, 0).WithTruncated(deleted))
 	log.WithFields(log.Fields{
 		"table":    b.target.Identifier,
-		"boundary": *item.TruncateBefore,
+		"boundary": boundary,
 		"deleted":  deleted,
 	}).Info("truncated rows published before the backfill")
 	return nil
@@ -1561,14 +1580,20 @@ func (d *transactor) bindingForStateKey(stateKey string) int {
 	return slices.IndexFunc(d.bindings, func(b *binding) bool { return b.target.StateKey == stateKey })
 }
 
-func (d *transactor) deleteFiles(ctx context.Context, files []string) error {
-	for _, f := range files {
-		if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("REMOVE %s", f)); err != nil {
-			return err
-		}
-	}
+// maxConcurrentRemoves bounds the REMOVE statements of deleteFiles in flight
+// at once. REMOVE runs on no warehouse.
+const maxConcurrentRemoves = 16
 
-	return nil
+func (d *transactor) deleteFiles(ctx context.Context, files []string) error {
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(maxConcurrentRemoves)
+	for _, f := range files {
+		group.Go(func() error {
+			_, err := d.db.ExecContext(groupCtx, fmt.Sprintf("REMOVE %s", f))
+			return err
+		})
+	}
+	return group.Wait()
 }
 
 func (d *transactor) dropPipe(ctx context.Context, pipeName string) error {
