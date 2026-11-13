@@ -1,0 +1,37 @@
+collections:
+  acmeCo/companies:
+    schema: companies.schema.yaml
+    key:
+    - /id
+  acmeCo/dashboards:
+    schema: dashboards.schema.yaml
+    key:
+    - /id
+  acmeCo/noteTargets:
+    schema: noteTargets.schema.yaml
+    key:
+    - /id
+  acmeCo/notes:
+    schema: notes.schema.yaml
+    key:
+    - /id
+  acmeCo/opportunities:
+    schema: opportunities.schema.yaml
+    key:
+    - /id
+  acmeCo/people:
+    schema: people.schema.yaml
+    key:
+    - /id
+  acmeCo/taskTargets:
+    schema: taskTargets.schema.yaml
+    key:
+    - /id
+  acmeCo/tasks:
+    schema: tasks.schema.yaml
+    key:
+    - /id
+  acmeCo/workflows:
+    schema: workflows.schema.yaml
+    key:
+    - /id
