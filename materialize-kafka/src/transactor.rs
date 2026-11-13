@@ -8,7 +8,7 @@ use proto_flow::materialize::{
 };
 use rdkafka::{
     error::KafkaError,
-    producer::{BaseRecord, Producer},
+    producer::{BaseRecord, Producer, ThreadedProducer},
     types::RDKafkaErrorCode,
     util::Timeout,
 };
@@ -16,7 +16,7 @@ use tuple::Element;
 
 use crate::{
     binding_info::{get_binding_info, BindingInfo},
-    configuration::{EndpointConfig, MessageFormat},
+    configuration::{AckTrackingContext, EndpointConfig, MessageFormat},
     Input, Output,
 };
 
@@ -61,7 +61,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
             })?;
             tracing::debug!("wrote Flushed");
         } else if let Some(store) = request.store {
-            let mut msg = msg_for_store(
+            let msg = msg_for_store(
                 &config.message_format,
                 &mut key_buf,
                 &mut payload_buf,
@@ -69,28 +69,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
                 &bindings,
             )?;
             producer_context.increment_pending();
-
-            loop {
-                match producer.send(msg) {
-                    Ok(_) => {
-                        break;
-                    }
-                    Err((err, original_message)) => match err {
-                        KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull) => {
-                            tracing::debug!("polling producer since queue is full");
-                            producer.poll(Timeout::Never);
-                            msg = original_message;
-                        }
-                        _ => {
-                            anyhow::bail!(
-                                "failed to send store message to topic {}: {}",
-                                original_message.topic,
-                                err
-                            )
-                        }
-                    },
-                }
-            }
+            send_when_queue_has_room(&producer, msg)?;
         } else if request.start_commit.is_some() {
             // Wait for explicit delivery confirmations for all messages,
             // or fail-fast on first delivery failure.
@@ -111,6 +90,33 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
 
         key_buf.clear();
         payload_buf.clear();
+    }
+}
+
+/// Enqueues `msg` on `producer`, retrying for as long as the producer's queue
+/// is full.
+pub fn send_when_queue_has_room(
+    producer: &ThreadedProducer<AckTrackingContext>,
+    mut msg: BaseRecord<'_, Vec<u8>, Vec<u8>, usize>,
+) -> Result<()> {
+    loop {
+        match producer.send(msg) {
+            Ok(_) => return Ok(()),
+            Err((err, original_message)) => match err {
+                KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull) => {
+                    tracing::debug!("polling producer since queue is full");
+                    producer.poll(Timeout::Never);
+                    msg = original_message;
+                }
+                _ => {
+                    anyhow::bail!(
+                        "failed to send store message to topic {}: {}",
+                        original_message.topic,
+                        err
+                    )
+                }
+            },
+        }
     }
 }
 
