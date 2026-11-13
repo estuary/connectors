@@ -287,7 +287,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			"boundary": boundary,
 			"deleted":  deleted,
 		}).Info("truncated items published before the backfill")
-		t.be.ReportRowStats(round, b.path, m.ExactRowStats(0, 0, 0).WithTruncated(deleted))
+		t.be.ReportRowStats(round, b.path, m.TotalRowStats(0).WithTruncated(deleted))
 	}
 	clear(t.truncations)
 
@@ -410,9 +410,12 @@ func (t *transactor) storeWorker(ctx context.Context, batches <-chan map[string]
 }
 
 // truncateStaleItems deletes items from the table whose selected
-// publication-time field (see publishedAtField) predates boundary. An item
-// with no value for that field at all is left alone. It scans the whole table
-// because DynamoDB has no secondary index on the publication time by default.
+// publishedAtField predates boundary. An item with no value for that field at
+// all is left alone. It typically scans the whole table because DynamoDB has
+// no secondary index on the publication time.
+//
+// Performance could potentially be improved by parallelizing the Scan
+// operation using its Segment and TotalSegments options.
 func truncateStaleItems(ctx context.Context, client *client, b binding, boundary time.Time) (int64, error) {
 	exprNames := make(map[string]string, len(b.keyFields)+1)
 	projExpr := make([]string, len(b.keyFields), len(b.keyFields)+1)
@@ -429,9 +432,7 @@ func truncateStaleItems(ctx context.Context, client *client, b binding, boundary
 	}
 
 	// A single deleteWorker processes one batch of DeleteRequests at a
-	// time, so at most one is ever in flight, the same way storeWorker
-	// limits stores to one in-flight batch. Scanning ahead for the next
-	// page overlaps with it rather than waiting for it to finish first.
+	// time, so at most one is ever in flight.
 	batches := make(chan []types.WriteRequest)
 	group, groupCtx := errgroup.WithContext(ctx)
 	var deleted atomic.Int64
@@ -440,10 +441,6 @@ func truncateStaleItems(ctx context.Context, client *client, b binding, boundary
 		return deleteWorker(groupCtx, client, b.tableName, batches, &deleted)
 	})
 
-	// The scan runs in the group alongside deleteWorker, so whichever fails
-	// first determines the error group.Wait returns, rather than the other
-	// failing with a canceled context. batches is closed only after the last
-	// page, since a failure cancels groupCtx, which stops deleteWorker.
 	group.Go(func() error {
 		var exclusiveStartKey map[string]types.AttributeValue
 		for {
@@ -460,7 +457,7 @@ func truncateStaleItems(ctx context.Context, client *client, b binding, boundary
 				return fmt.Errorf("scanning table %q: %w", b.tableName, err)
 			}
 
-			var staleKeys []map[string]types.AttributeValue
+			staleKeys := make([]map[string]types.AttributeValue, 0, len(out.Items))
 			for _, item := range out.Items {
 				if !b.isStale(item, boundary) {
 					continue
@@ -499,44 +496,11 @@ func truncateStaleItems(ctx context.Context, client *client, b binding, boundary
 	return deleted.Load(), err
 }
 
-// deleteWorker issues one BatchWriteItem of DeleteRequests at a time, the
-// same way storeWorker issues PutRequests, so truncateStaleItems never has
-// more than one delete in flight.
-func deleteWorker(ctx context.Context, client *client, tableName string, batches <-chan []types.WriteRequest, deleted *atomic.Int64) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case reqs := <-batches:
-			if reqs == nil {
-				// Channel is closed and no more batches will be sent.
-				return nil
-			}
-
-			n, err := deleteBatchWithRetry(ctx, client, tableName, reqs)
-			deleted.Add(n)
-			if err != nil {
-				return err
-			}
-		}
-	}
-}
-
-// filterBoundary is the boundary time rounded to the next second.
-func filterBoundary(boundary time.Time) string {
-	ceil := boundary.Truncate(time.Second)
-	if !ceil.Equal(boundary) {
-		ceil = ceil.Add(time.Second)
-	}
-	return ceil.UTC().Format(time.RFC3339)
-}
-
 // isStale reports whether item's publication time predates boundary. An
-// item with no value for the field at all is left alone: it was written
-// before the field was selected, or before this feature existed, and
-// there's no publication time to compare. An item whose value can't be
-// read as the expected date-time string is also left alone, rather than
-// risk deleting live data.
+// item with no value for the field at all is left alone, since there's no
+// publication time to compare. An item whose value can't be read as the
+// expected date-time string is also left alone, rather than risk deleting
+// live data.
 func (b binding) isStale(item map[string]types.AttributeValue, boundary time.Time) bool {
 	av, ok := item[b.publishedAtField]
 	if !ok {
@@ -556,29 +520,46 @@ func (b binding) isStale(item map[string]types.AttributeValue, boundary time.Tim
 	return parsed.Before(boundary)
 }
 
-// deleteBatchWithRetry issues a BatchWriteItem of DeleteRequests for a single
-// table and retries any UnprocessedItems, the same way storeWorker retries
-// unprocessed PutRequests.
-func deleteBatchWithRetry(ctx context.Context, client *client, tableName string, reqs []types.WriteRequest) (int64, error) {
-	var deleted int64
-	batch := map[string][]types.WriteRequest{tableName: reqs}
+// deleteWorker reads batches from the channel and issues BatchWriteItem requests.
+func deleteWorker(ctx context.Context, client *client, tableName string, batches <-chan []types.WriteRequest, deleted *atomic.Int64) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case reqs := <-batches:
+			if reqs == nil {
+				// Channel is closed and no more batches will be sent.
+				return nil
+			}
 
-	err := unprocessedRetry.Do(ctx, "BatchWriteItem (truncate)", func(ctx context.Context) error {
-		res, err := client.db.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
-			RequestItems: batch,
-		})
-		if err != nil {
-			return fmt.Errorf("BatchWriteItem for truncation: %w", err)
+			batch := map[string][]types.WriteRequest{tableName: reqs}
+			if err := unprocessedRetry.Do(ctx, "BatchWriteItem (truncate)", func(ctx context.Context) error {
+				res, err := client.db.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
+					RequestItems: batch,
+				})
+				if err != nil {
+					return fmt.Errorf("BatchWriteItem for truncation: %w", err)
+				}
+
+				deleted.Add(int64(len(batch[tableName]) - len(res.UnprocessedItems[tableName])))
+
+				if len(res.UnprocessedItems) == 0 {
+					return nil
+				}
+				batch = res.UnprocessedItems
+				return &unprocessedError{operation: "BatchWriteItem", count: len(batch[tableName])}
+			}); err != nil {
+				return err
+			}
 		}
+	}
+}
 
-		deleted += int64(len(batch[tableName]) - len(res.UnprocessedItems[tableName]))
-
-		if len(res.UnprocessedItems) == 0 {
-			return nil
-		}
-		batch = res.UnprocessedItems
-		return &unprocessedError{operation: "BatchWriteItem", count: len(batch[tableName])}
-	})
-
-	return deleted, err
+// filterBoundary is the boundary time rounded to the next second.
+func filterBoundary(boundary time.Time) string {
+	ceil := boundary.Truncate(time.Second)
+	if !ceil.Equal(boundary) {
+		ceil = ceil.Add(time.Second)
+	}
+	return ceil.UTC().Format(time.RFC3339)
 }
