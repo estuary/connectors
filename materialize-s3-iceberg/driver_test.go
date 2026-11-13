@@ -100,7 +100,7 @@ func materializeSanitizers() []func(string) string {
 func ensureNamespace(t *testing.T, cfg config) {
 	t.Helper()
 
-	cat, err := newCatalog(context.Background(), cfg, NestedLocationStyle)
+	cat, err := newCatalog(context.Background(), cfg, NestedLocationStyle, false)
 	require.NoError(t, err)
 	// Glue's CreateDatabase returns a raw AWS AlreadyExistsException that
 	// iceberg-go does not map to ErrNamespaceAlreadyExists (mirroring the
@@ -127,7 +127,7 @@ func sweepStaleTestTables(t *testing.T, cfg config) {
 	t.Helper()
 	ctx := context.Background()
 
-	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle, false)
 	require.NoError(t, err)
 
 	var stale []icebergtable.Identifier
@@ -207,7 +207,7 @@ func TestIntegration(t *testing.T) {
 			// writes them.
 			b := appliedSpec.Bindings[0]
 
-			cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+			cat, err := newCatalog(ctx, cfg, NestedLocationStyle, false)
 			require.NoError(t, err)
 			infos, err := cat.tableInfos(ctx, [][]string{b.ResourcePath})
 			require.NoError(t, err)
@@ -479,7 +479,7 @@ type regressionTable struct {
 func newRegressionTable(t *testing.T, ctx context.Context, cfg config, table string, extraProps iceberg.Properties, fields ...iceberg.NestedField) *regressionTable {
 	t.Helper()
 
-	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle, false)
 	require.NoError(t, err)
 
 	ensureNamespace(t, cfg)
@@ -957,7 +957,7 @@ func runNanosecondCreateResourceTest(t *testing.T, cfg config) {
 
 	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.NanosecondTimestamps = true })
 
-	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle, false)
 	require.NoError(t, err)
 	ensureNamespace(t, cfg)
 
@@ -1214,9 +1214,13 @@ func runOmitTableLocationTest(t *testing.T, cfg config) {
 	t.Helper()
 	ctx := context.Background()
 
-	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	// A prefix distinct from the catalog's base location, so a connector-built
+	// location is distinguishable from a catalog-assigned one.
+	cfg.Prefix = "omit-location-test"
+	connectorPrefix := fmt.Sprintf("s3://%s/%s/", cfg.Bucket, cfg.Prefix)
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle, true)
 	require.NoError(t, err)
-	cat.omitLocation = true
 	ensureNamespace(t, cfg)
 
 	// "_flow_test_" naming so leaked tables are swept by the stale-table cleanup.
@@ -1251,9 +1255,8 @@ func runOmitTableLocationTest(t *testing.T, cfg config) {
 	require.NoError(t, err)
 	loc := tbl.Location()
 	require.NotEmpty(t, loc)
-	require.NotEqual(t,
-		tablePath(cfg.Bucket, cfg.Prefix, cfg.Namespace, table, NestedLocationStyle),
-		loc, "location should be catalog-assigned, not the connector's")
+	require.False(t, strings.HasPrefix(loc, connectorPrefix),
+		"location %q should be catalog-assigned, not under the connector's prefix %q", loc, connectorPrefix)
 	require.Equal(t, cfg.Bucket, bucketFromS3Path(loc))
 }
 
@@ -1379,7 +1382,7 @@ func runVariantCreateResourceTest(t *testing.T, cfg config) {
 
 	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.VariantColumns = true })
 
-	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle, false)
 	require.NoError(t, err)
 	ensureNamespace(t, cfg)
 
@@ -1515,7 +1518,7 @@ func runVariantDuckDBRegression(t *testing.T, cfg config) {
 
 	cfg = withAdvanced(cfg, func(a *advancedConfig) { a.VariantColumns = true })
 
-	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle, false)
 	require.NoError(t, err)
 	ensureNamespace(t, cfg)
 

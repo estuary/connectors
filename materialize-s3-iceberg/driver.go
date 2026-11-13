@@ -384,11 +384,11 @@ func NewMaterializer(ctx context.Context, materializationName string, cfg config
 		locationStyle = NestedDotHashLocationStyle
 	}
 
-	catalog, err := newCatalog(ctx, cfg, locationStyle)
+	omitLocation := featureFlags["omit_table_location"]
+	catalog, err := newCatalog(ctx, cfg, locationStyle, omitLocation)
 	if err != nil {
 		return nil, fmt.Errorf("creating iceberg catalog: %w", err)
 	}
-	catalog.omitLocation = featureFlags["omit_table_location"]
 
 	return &materialization{
 		cfg:     cfg,
@@ -603,17 +603,12 @@ func (d *materialization) NewTransactor(
 		b := &bindings[idx]
 		b.catalogTablePath = tableInfos[idx].location
 
-		// Data files are uploaded to the configured bucket, but their paths are
-		// derived from the table's catalog location. With omit_table_location
-		// the catalog assigns that location, and one in another bucket would
-		// commit references to files never written there, so fail before
-		// writing anything. Only checked under the flag so existing tasks are
-		// unaffected.
+		// Data files are uploaded to the configured bucket, so a table
+		// location in another bucket would commit references to files
+		// that were never written there.
 		if d.catalog.omitLocation {
-			if got := bucketFromS3Path(b.catalogTablePath); got != d.cfg.Bucket {
-				return nil, fmt.Errorf(
-					"table %q has storage location %q in bucket %q, but data files are written to the configured bucket %q: set Bucket to the bucket of the catalog's storage location",
-					pathToFQN(b.path), b.catalogTablePath, got, d.cfg.Bucket)
+			if err := checkTableLocationBucket(pathToFQN(b.path), b.catalogTablePath, d.cfg.Bucket); err != nil {
+				return nil, err
 			}
 		}
 

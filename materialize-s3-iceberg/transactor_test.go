@@ -19,3 +19,13 @@ func TestBucketFromS3Path(t *testing.T) {
 		require.Equal(t, tc.want, bucketFromS3Path(tc.in), tc.in)
 	}
 }
+
+func TestCheckTableLocationBucket(t *testing.T) {
+	require.NoError(t, checkTableLocationBucket("ns.t", "s3://bucket/warehouse/ns/t", "bucket"))
+
+	err := checkTableLocationBucket("ns.t", "s3://other/warehouse/ns/t", "bucket")
+	require.ErrorContains(t, err, `in bucket "other"`)
+	require.ErrorContains(t, err, `configured bucket "bucket"`)
+
+	require.Error(t, checkTableLocationBucket("ns.t", "gs://bucket/warehouse/ns/t", "bucket"))
+}
