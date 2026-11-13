@@ -470,6 +470,7 @@ async def test_a_fixed_echo_shortfall_stops_the_backfill_at_its_last_window():
         for _ in range(10):
             items = await collect(backfill_orders(client_for(fake), MARKETPLACES, start, timedelta(days=3), LOG, page, cutoff))
             page = items[-1]
+    assert isinstance(page, str)
     assert page.split("|")[0] == api.to_iso(cutoff - api.TICK - timedelta(minutes=5) + api.TICK)
 
 
