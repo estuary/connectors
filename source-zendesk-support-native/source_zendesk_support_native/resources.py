@@ -909,13 +909,33 @@ def tickets(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> common.Resource:
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        # The export orders tickets by generated_timestamp, which can be later
+        # than a change's updated_at. So a ticket updated before the export's
+        # cursor may not have been exported yet, and the sweep starts
+        # INCREMENTAL_LAG earlier.
+        migrated = _migrate_export_state_to_keyset(
+            state, ("tickets", "deleted_tickets"), INCREMENTAL_LAG,
+        )
+
+        if migrated is not None:
+            state.inc = migrated.inc
+            if migrated.backfill is not None:
+                state.backfill = migrated.backfill
+
+            task.log.info("Migrated tickets state from the cursor-based export to the keyset sweep.", {
+                "migrated_state": migrated.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: migrated}),
+            )
+
         common.open_binding(
             binding,
             binding_index,
