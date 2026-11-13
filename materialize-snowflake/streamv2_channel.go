@@ -139,6 +139,9 @@ func (c *streamV2Channel) sendBatch(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("finishing batch of channel %q: %w", c.channelName, err)
 	}
+	// An append through the stage encrypts the batch file in place, so only a
+	// direct append can be sent again from the same file.
+	reopenable = reopenable && file.compressedBytes <= streamV2MaxAppendBytes
 
 	if c.appends == nil {
 		c.appends, c.appendsCtx = errgroup.WithContext(ctx)
