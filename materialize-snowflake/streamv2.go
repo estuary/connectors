@@ -754,7 +754,12 @@ func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, ch
 
 	var started = time.Now()
 	var statuses, err = m.client.WaitCommit(ctx, tokens)
-	if err != nil {
+	if unknown, ok := errors.AsType[*streamV2UnknownChannelError](err); ok {
+		return fmt.Errorf(
+			"channel %q of %s is unknown to Snowflake, which deletes a channel after 30 days without ingestion or when it is dropped: the rows this transaction appended to it did not land. The task resumes from its checkpoint when it restarts",
+			unknown.channelName, b.table,
+		)
+	} else if err != nil {
 		return fmt.Errorf("waiting for commit on %s: %w", b.table, err)
 	}
 

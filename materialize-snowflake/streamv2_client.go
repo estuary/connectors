@@ -542,12 +542,22 @@ func (c *streamV2Client) channelStatuses(ctx context.Context, channelNames []str
 	for _, name := range channelNames {
 		var status, ok = res.Statuses[name]
 		if !ok || status == nil {
-			return nil, fmt.Errorf("channel %q is unknown to Snowflake", name)
+			return nil, &streamV2UnknownChannelError{channelName: name}
 		} else if err := status.checkCode(name); err != nil {
 			return nil, err
 		}
 	}
 	return res.Statuses, nil
+}
+
+// streamV2UnknownChannelError is a channel status request naming a channel that
+// Snowflake does not hold.
+type streamV2UnknownChannelError struct {
+	channelName string
+}
+
+func (e *streamV2UnknownChannelError) Error() string {
+	return fmt.Sprintf("channel %q is unknown to Snowflake", e.channelName)
 }
 
 // WaitCommit blocks until the committed offset token of each channel in tokens
