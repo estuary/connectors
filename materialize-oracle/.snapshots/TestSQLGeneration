@@ -104,7 +104,7 @@ CREATE TABLE IF NOT EXISTS flow_applied_v1 (token VARCHAR2(64) PRIMARY KEY)
 --- End create applied ---
 
 --- Begin record applied ---
-MERGE INTO flow_applied_v1 a USING (SELECT :1 token FROM dual) s ON (a.token = s.token) WHEN NOT MATCHED THEN INSERT (token) VALUES (s.token)
+INSERT INTO flow_applied_v1 (token) VALUES (:1)
 --- End record applied ---
 
 --- Begin count applied ---

@@ -163,6 +163,11 @@ table's columns change. It records the transactions it has applied in a
 either: a transaction whose staged rows are deleted before they're applied
 fails the materialization.
 
+Change the endpoint's schema only while the materialization runs without
+errors. A transaction it was applying when it failed is recorded in the old
+schema's `flow_applied_v1` table, so the materialization can't resume it from
+the new schema.
+
 ## Delta updates
 
 This connector supports both standard (merge) and [delta updates](/concepts/materialization/#delta-updates).

@@ -292,7 +292,8 @@ func TestIntegration(t *testing.T) {
 	})
 
 	// An entry's staged rows are applied once, and applying it again does
-	// nothing. Applying an entry whose rows were deleted is an error.
+	// nothing. Applying an entry whose rows were deleted, or applying staged
+	// rows twice, is an error.
 	t.Run("apply-staged", func(t *testing.T) {
 		var ctx = context.Background()
 		var db = testConfig().openDB()
@@ -357,6 +358,12 @@ func TestIntegration(t *testing.T) {
 
 		require.NoError(t, apply(first))
 		require.Equal(t, want, rows("SELECT id, val FROM "+name))
+
+		// Rows of an applied entry would be applied twice.
+		stageRows(first.Token, []any{opInsert, 7, "seven"})
+		require.ErrorContains(t, apply(first), "holds 1 rows of transactions already applied")
+		_, err = db.ExecContext(ctx, "DELETE FROM "+stage)
+		require.NoError(t, err)
 
 		var second = &stateItem{Token: newToken(tr.tag), Inserts: 1}
 		stageRows(second.Token, []any{opInsert, 3, "three"})

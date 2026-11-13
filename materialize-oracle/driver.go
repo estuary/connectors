@@ -981,12 +981,11 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 // apply applies the pending entries of each binding in one transaction.
 //
 // Staged rows are deleted only by the transaction that applies them, which
-// also records their tokens in the applied table. Applying an entry again
-// finds its rows gone and its token recorded, and does nothing. Each
-// binding's stage table is locked first, which makes any other instance
-// applying the same entries wait, then find the rows gone. Rows that are
-// gone without their token recorded were deleted by something else, which is
-// an error.
+// also records their tokens in the applied table. Applying an entry whose
+// token is recorded does nothing. Each binding's stage table is locked first,
+// which makes any other instance applying the same entries wait, then find
+// them recorded. Rows of an entry that isn't recorded must all be there, and
+// those of one that is must all be gone, or the apply fails.
 func (t *transactor) apply(ctx context.Context, pending map[*binding]map[string]*stateItem) error {
 	txn, err := t.storeConn.BeginTx(ctx, nil)
 	if err != nil {
@@ -1038,39 +1037,49 @@ func (t *transactor) apply(ctx context.Context, pending map[*binding]map[string]
 
 		var stats = m.ExactRowStats(0, 0, 0)
 		if len(tokens) > 0 {
-			var replaced, deleted, inserted int64
-			if _, err := txn.ExecContext(ctx, "LOCK TABLE "+b.stage+" IN EXCLUSIVE MODE"); err != nil {
-				return fmt.Errorf("locking stage table %s: %w", b.stage, err)
-			}
-			if staged.Updates > 0 {
-				if replaced, err = exec(applyDeleteSQL(&b.target, b.stage, opUpdate, len(tokens)), tokens...); err != nil {
-					return fmt.Errorf("deleting the replaced rows of %s: %w", b.target.Identifier, err)
-				}
-			}
-			if staged.Deletes > 0 {
-				if deleted, err = exec(applyDeleteSQL(&b.target, b.stage, opDelete, len(tokens)), tokens...); err != nil {
-					return fmt.Errorf("deleting rows of %s: %w", b.target.Identifier, err)
-				}
-			}
-			if staged.Inserts+staged.Updates > 0 {
-				if inserted, err = exec(applyInsertSQL(&b.target, b.stage, len(tokens)), tokens...); err != nil {
-					return fmt.Errorf("inserting rows of %s: %w", b.target.Identifier, err)
-				}
-			}
 			var want = staged.Inserts + staged.Updates + staged.Deletes
 			var recorded int64
-			if cleared, err := exec(clearStageSQL(b.stage, len(tokens)), tokens...); err != nil {
-				return fmt.Errorf("deleting applied rows of stage table %s: %w", b.stage, err)
-			} else if cleared == want {
-				applied = append(applied, tokens...)
-			} else if cleared > 0 {
-				return fmt.Errorf("stage table %s holds %d of the %d rows staged for %s", b.stage, cleared, want, b.target.Identifier)
+			if _, err := txn.ExecContext(ctx, "LOCK TABLE "+b.stage+" IN EXCLUSIVE MODE"); err != nil {
+				return fmt.Errorf("locking stage table %s: %w", b.stage, err)
 			} else if err := txn.QueryRowContext(ctx, countAppliedSQL(t.applied, len(tokens)), tokens...).Scan(&recorded); err != nil {
 				return fmt.Errorf("reading %s: %w", t.applied, err)
-			} else if recorded != int64(len(tokens)) {
-				return fmt.Errorf("stage table %s holds none of the %d rows staged for %s, which were not applied", b.stage, want, b.target.Identifier)
 			}
-			stats = m.ExactRowStats(inserted-replaced, replaced, deleted)
+
+			switch recorded {
+			case int64(len(tokens)):
+				// Applied already, so any rows left would be applied twice.
+				if n, err := exec(clearStageSQL(b.stage, len(tokens)), tokens...); err != nil {
+					return fmt.Errorf("deleting applied rows of stage table %s: %w", b.stage, err)
+				} else if n != 0 {
+					return fmt.Errorf("stage table %s holds %d rows of transactions already applied to %s", b.stage, n, b.target.Identifier)
+				}
+			case 0:
+				var replaced, deleted, inserted int64
+				if staged.Updates > 0 {
+					if replaced, err = exec(applyDeleteSQL(&b.target, b.stage, opUpdate, len(tokens)), tokens...); err != nil {
+						return fmt.Errorf("deleting the replaced rows of %s: %w", b.target.Identifier, err)
+					}
+				}
+				if staged.Deletes > 0 {
+					if deleted, err = exec(applyDeleteSQL(&b.target, b.stage, opDelete, len(tokens)), tokens...); err != nil {
+						return fmt.Errorf("deleting rows of %s: %w", b.target.Identifier, err)
+					}
+				}
+				if staged.Inserts+staged.Updates > 0 {
+					if inserted, err = exec(applyInsertSQL(&b.target, b.stage, len(tokens)), tokens...); err != nil {
+						return fmt.Errorf("inserting rows of %s: %w", b.target.Identifier, err)
+					}
+				}
+				if cleared, err := exec(clearStageSQL(b.stage, len(tokens)), tokens...); err != nil {
+					return fmt.Errorf("deleting applied rows of stage table %s: %w", b.stage, err)
+				} else if cleared != want {
+					return fmt.Errorf("stage table %s holds %d of the %d rows staged for %s, which were not applied", b.stage, cleared, want, b.target.Identifier)
+				}
+				applied = append(applied, tokens...)
+				stats = m.ExactRowStats(inserted-replaced, replaced, deleted)
+			default:
+				return fmt.Errorf("%d of the %d transactions staged for %s were applied already", recorded, len(tokens), b.target.Identifier)
+			}
 		}
 
 		// The truncation follows the stores, so it removes only the rows they

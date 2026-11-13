@@ -507,8 +507,7 @@ func createAppliedSQL(applied string) string {
 
 // recordAppliedSQL records the tokens bound as an array.
 func recordAppliedSQL(applied string) string {
-	return fmt.Sprintf("MERGE INTO %[1]s a USING (SELECT :1 %[2]s FROM dual) s ON (a.%[2]s = s.%[2]s) WHEN NOT MATCHED THEN INSERT (%[2]s) VALUES (s.%[2]s)",
-		applied, appliedTokenColumn)
+	return fmt.Sprintf("INSERT INTO %s (%s) VALUES (:1)", applied, appliedTokenColumn)
 }
 
 // countAppliedSQL counts the recorded tokens among the n bound.
