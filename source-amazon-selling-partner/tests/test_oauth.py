@@ -1,11 +1,12 @@
 import logging
 import re
+from typing import TypedDict, cast
 from urllib.parse import parse_qs, quote, urlsplit
 
 import pytest
 from estuary_cdk.capture import request
 from estuary_cdk.flow import BaseOAuth2Credentials, ValidationError
-from estuary_cdk.http import HTTPError
+from estuary_cdk.http import HTTPError, HTTPMixin
 from pydantic import ValidationError as ModelValidationError
 
 from source_amazon_selling_partner import Connector
@@ -67,7 +68,13 @@ def test_oauth_templates():
     }
 
 
-def config_input(title="Login with Amazon", region="North America"):
+class ConfigInput(TypedDict):
+    credentials: dict[str, str]
+    region: str
+    marketplace_ids: list[str]
+
+
+def config_input(title: str = "Login with Amazon", region: str = "North America") -> ConfigInput:
     return {
         "credentials": {
             "credentials_title": title,
@@ -81,7 +88,7 @@ def config_input(title="Login with Amazon", region="North America"):
 
 
 @pytest.mark.parametrize("app_id", [None, APP_ID])
-def test_existing_lwa_config_and_refresh(app_id):
+def test_existing_lwa_config_and_refresh(app_id: str | None):
     model, _ = build_config_and_oauth(app_id)
     data = config_input()
     # Existing configs may omit the LWA discriminator.
@@ -127,11 +134,11 @@ async def test_default_spec_has_only_lwa():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("region", [Region.EUROPE, Region.FAR_EAST])
-async def test_managed_oauth_rejects_other_regions_before_network(region):
+async def test_managed_oauth_rejects_other_regions_before_network(region: str):
     model, _ = build_config_and_oauth(APP_ID)
     config = model.model_validate(config_input("OAuth Credentials", region))
     with pytest.raises(ValidationError, match="use Login with Amazon credentials for this region"):
-        await validate_credentials(logging.getLogger("test"), None, config)
+        await validate_credentials(logging.getLogger("test"), None, config)  # pyright: ignore[reportArgumentType]
 
 
 @pytest.mark.asyncio
@@ -139,7 +146,7 @@ async def test_managed_oauth_rejects_other_regions_before_network(region):
     "title, region",
     [("OAuth Credentials", Region.NORTH_AMERICA), ("Login with Amazon", Region.EUROPE)],
 )
-async def test_region_guard_allows_supported_credentials(title, region):
+async def test_region_guard_allows_supported_credentials(title: str, region: str):
     model, _ = build_config_and_oauth(APP_ID)
     config = model.model_validate(config_input(title, region))
     fake = FakeAmazon(now=NOW, orders=[])
@@ -148,7 +155,7 @@ async def test_region_guard_allows_supported_credentials(title, region):
         token_source = None
         request_stream = fake.request_stream
 
-    await validate_credentials(logging.getLogger("test"), Http(), config)
+    await validate_credentials(logging.getLogger("test"), cast(HTTPMixin, Http()), config)
 
 
 @pytest.mark.asyncio
@@ -167,18 +174,18 @@ async def test_region_guard_allows_supported_credentials(title, region):
         ),
     ],
 )
-async def test_credential_error_guidance_per_arm(title, guidance):
+async def test_credential_error_guidance_per_arm(title: str, guidance: str):
     model, _ = build_config_and_oauth(APP_ID)
     config = model.model_validate(config_input(title))
 
     class Http:
         token_source = None
 
-        async def request_stream(self, *args, **kwargs):
+        async def request_stream(self, *args: object, **kwargs: object):
             raise HTTPError("Amazon rejected authorization", 403)
 
     with pytest.raises(ValidationError) as exc:
-        await validate_credentials(logging.getLogger("test"), Http(), config)
+        await validate_credentials(logging.getLogger("test"), cast(HTTPMixin, Http()), config)
     assert exc.value.errors == [f"Invalid credentials. {guidance}\n\nAmazon rejected authorization"]
     if title == "OAuth Credentials":
         assert "client ID" not in str(exc.value)

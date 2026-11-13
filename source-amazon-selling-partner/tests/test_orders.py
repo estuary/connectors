@@ -592,7 +592,7 @@ async def test_backfill_rejection_after_growth_shrinks_carried_size():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("changed_size", [timedelta(hours=1), timedelta(days=3)])
-async def test_backfill_changed_window_size_resets_carried_size(changed_size):
+async def test_backfill_changed_window_size_resets_carried_size(changed_size: timedelta):
     start = NOW - timedelta(days=20)
     cutoff = NOW - timedelta(days=1)
     fake = FakeAmazon(now=NOW, orders=[])
@@ -608,7 +608,7 @@ async def test_backfill_changed_window_size_resets_carried_size(changed_size):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("count, next_days", [(Order.PAGE_SIZE // 2, 2), (Order.PAGE_SIZE // 2 + 1, 1)])
-async def test_backfill_single_page_growth_requires_at_most_half_a_page(count, next_days):
+async def test_backfill_single_page_growth_requires_at_most_half_a_page(count: int, next_days: int):
     start = NOW - timedelta(days=20)
     fake = FakeAmazon(now=NOW, orders=[order(str(i), start, start) for i in range(count)], page_size=Order.PAGE_SIZE)
     out = await collect(backfill_orders(client_for(fake), MARKETPLACES, start, timedelta(days=1), LOG, None, NOW - timedelta(days=1)))

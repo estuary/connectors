@@ -31,10 +31,11 @@ import logging
 import random
 from datetime import UTC, datetime, timedelta
 from time import perf_counter
-from typing import Any
+from typing import Any, AsyncGenerator, Callable, TypeVar, cast
 
 import pytest
-from estuary_cdk.http import HTTPError
+from estuary_cdk.http import HTTPError, HTTPSession
+from estuary_cdk.capture.common import LogCursor, PageCursor
 
 from source_amazon_selling_partner import api, resources
 from source_amazon_selling_partner.client import SPAPIClient
@@ -49,6 +50,7 @@ DAY = timedelta(days=1)
 LOOKBACK = 7 * DAY
 BUSY = START + 10 * DAY
 SEED = 270027
+CursorT = TypeVar("CursorT", str, datetime)
 
 
 class SimulationTime(FakeTime):
@@ -110,13 +112,13 @@ class SimulationAmazon(FakeAmazon):
                 result.append(available[-1])
         return result
 
-    def _respond(self, body):
+    def _respond(self, body: dict[str, Any]):
         docs = body["orders"] if self.kind == "orders" else body["payload"]["transactions"]
         self.page_lengths.append(len(docs))
         assert len(docs) <= self.page_size
         return super()._respond(body)
 
-    async def request_stream(self, log, url, method="GET", params=None, **kwargs):
+    async def request_stream(self, log: logging.Logger, url: str, method: str = "GET", params: dict[str, Any] | None = None, **kwargs: Any):
         params = dict(params or {})
         token = params.get("paginationToken", params.get("nextToken"))
         if token:
@@ -174,7 +176,7 @@ class Runtime:
     def new_client(self):
         return SPAPIClient(http=self.amazon, base_url="https://fake", clock=self.amazon.time.clock, sleep=self.amazon.time.sleep)  # type: ignore[arg-type]
 
-    async def invoke(self, factory, cursor):
+    async def invoke(self, factory: Callable[[CursorT], AsyncGenerator[Order | FinancialTransaction | LogCursor | PageCursor, None]], cursor: CursorT) -> tuple[CursorT, bool]:
         self.invocations += 1
         assert self.invocations < 600, "simulation failed to converge"
         pending = []
@@ -193,7 +195,7 @@ class Runtime:
                 else:
                     # A checkpoint commits all preceding documents atomically.
                     previous = parse(cursor.split("|")[0]) if isinstance(cursor, str) else cursor
-                    next_cursor = parse(item.split("|")[0]) if isinstance(item, str) else item
+                    next_cursor = parse(item.split("|")[0]) if isinstance(item, str) else cast(datetime, item)
                     assert next_cursor > previous
                     # Check against the actual completed window, including retries.
                     # Later overlap/lookback passes must not hide a skipped seam.
@@ -206,7 +208,7 @@ class Runtime:
                     assert next_cursor == expected_end, "checkpoint skipped beyond the completed window"
                     self.committed.extend(pending)
                     pending.clear()
-                    cursor = item
+                    cursor = cast(CursorT, item)
                     return cursor, False
             self.committed.extend(pending)
             return cursor, True
@@ -216,7 +218,7 @@ class Runtime:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("kind,expected_count", [("orders", 1950), ("finance", 1500)])
-async def test_fake_clock_backfill_then_incremental(kind, expected_count, monkeypatch, caplog, record_property):
+async def test_fake_clock_backfill_then_incremental(kind: str, expected_count: int, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, record_property: Callable[[str, object], None]):
     began = perf_counter()
     cutoff = START + 30 * DAY
     clock = SimulationTime(cutoff)
@@ -229,9 +231,9 @@ async def test_fake_clock_backfill_then_incremental(kind, expected_count, monkey
     resource = resources.orders if kind == "orders" else resources.financial_transactions
     state = resource(LOG, runtime.client, config).initial_state
     assert state.backfill.cutoff == cutoff
-    page = state.backfill.next_page
+    page = cast(str, state.backfill.next_page)
 
-    async def invoke(factory, saved):
+    async def invoke(factory: Callable[[CursorT], AsyncGenerator[Order | FinancialTransaction | LogCursor | PageCursor, None]], saved: CursorT) -> tuple[CursorT, bool]:
         # Independent harness check: a crash before a checkpoint commits nothing.
         # This allows replay duplicates after recovery, but prevents the oracle
         # from using rolled-back documents to conceal data loss.
@@ -247,7 +249,7 @@ async def test_fake_clock_backfill_then_incremental(kind, expected_count, monkey
         while True:
             before = len(amazon.requests)
             old_page = page
-            def backfill(saved):
+            def backfill(saved: str):
                 if kind == "orders":
                     return api.backfill_orders(runtime.client, MARKETPLACES, START, DAY, LOG, saved, cutoff)
                 return api.backfill_financial_transactions(runtime.client, START, DAY, LOG, saved, cutoff)
@@ -269,11 +271,11 @@ async def test_fake_clock_backfill_then_incremental(kind, expected_count, monkey
             assert any(parse(r[lower]) == lo and parse(r[upper]) < hi
                        for r in amazon.requests if lower in r), "expired backfill window never shrank"
         if kind == "orders":
-            cursors = {"orders": state.inc[resources.REALTIME].cursor}
+            cursors = {"orders": cast(datetime, state.inc[resources.REALTIME].cursor)}
             lags = {"orders": api.SEARCH_LAG}
             assert cursors["orders"] == cutoff - api.TICK
         else:
-            cursors = {name: inc.cursor for name, inc in state.inc.items()}
+            cursors = {name: cast(datetime, inc.cursor) for name, inc in state.inc.items()}
             lags = {resources.REALTIME: api.TRANSACTIONS_REALTIME_LAG,
                     resources.LATE: api.TRANSACTIONS_LATE_LAG,
                     resources.LOOKBACK: LOOKBACK}
@@ -287,7 +289,7 @@ async def test_fake_clock_backfill_then_incremental(kind, expected_count, monkey
                 while True:
                     old = cursors[name]
                     before = len(amazon.requests)
-                    def fetch(saved, lag=lag):
+                    def fetch(saved: datetime, lag: timedelta = lag):
                         if kind == "orders":
                             return api.fetch_orders(runtime.client, MARKETPLACES, DAY, config.advanced.overlap, LOG, saved)
                         return api.fetch_financial_transactions(runtime.client, lag, DAY, LOG, saved)
@@ -319,7 +321,7 @@ async def test_fake_clock_backfill_then_incremental(kind, expected_count, monkey
     assert len(runtime.committed) > len(last), "scenario must allow duplicate keys"
     # Verify the simulation actually observed changing records, not just finals.
     if kind == "orders":
-        assert any(doc.lastUpdatedTime != expected[doc.orderId].lastUpdatedTime for doc in runtime.committed)
+        assert any(doc.lastUpdatedTime != cast(Order, expected[doc.orderId]).lastUpdatedTime for doc in runtime.committed)
     else:
         assert any(doc.transactionStatus == "DEFERRED" for doc in runtime.committed)
         # A genuinely late record was absent on realtime and caught later.
@@ -343,8 +345,8 @@ async def test_fake_clock_backfill_then_incremental(kind, expected_count, monkey
     assert amazon.stalled and amazon.expirations >= 1
     assert max(amazon.page_lengths) == (Order.PAGE_SIZE if kind == "orders" else 100)
     warnings = [r for r in caplog.records if "shrinking" in r.getMessage()]
-    assert any(r.args["window_start"] <= BUSY < r.args["window_end"] for r in warnings)
-    assert all(r.args["new_window_end"] < r.args["window_end"] for r in warnings)
+    assert any(cast(dict[str, datetime], r.args)["window_start"] <= BUSY < cast(dict[str, datetime], r.args)["window_end"] for r in warnings)
+    assert all(cast(dict[str, datetime], r.args)["new_window_end"] < cast(dict[str, datetime], r.args)["window_end"] for r in warnings)
     elapsed = perf_counter() - began
     record_property("simulation", {"keys": len(last), "committed_docs": len(runtime.committed),
                                    "invocations": runtime.invocations, "restarts": runtime.restarts,
@@ -353,7 +355,7 @@ async def test_fake_clock_backfill_then_incremental(kind, expected_count, monkey
 
 
 @pytest.mark.asyncio
-async def test_sparse_600_day_orders_backfill(monkeypatch):
+async def test_sparse_600_day_orders_backfill(monkeypatch: pytest.MonkeyPatch):
     cutoff = START + 600 * DAY
     clock = SimulationTime(cutoff + DAY)
     monkeypatch.setattr(api, "now", clock.now)
@@ -381,7 +383,7 @@ async def test_sparse_600_day_orders_backfill(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_daily_sweep_recovers_late_indexed_orders(monkeypatch):
+async def test_daily_sweep_recovers_late_indexed_orders(monkeypatch: pytest.MonkeyPatch):
     # Poll every fifteen minutes: a two-hour indexing delay escapes the
     # ten-minute overlap even though the incremental cursor advances normally.
     clock = SimulationTime(START + 3 * DAY)
@@ -389,7 +391,7 @@ async def test_daily_sweep_recovers_late_indexed_orders(monkeypatch):
     at = clock.now()
     amazon = FakeAmazon(now=at, orders=[order("late", START, at)],
                         order_index_delays={"late": timedelta(hours=2)})
-    client = SPAPIClient(http=amazon, base_url="https://fake", clock=clock.clock, sleep=clock.sleep)
+    client = SPAPIClient(http=cast(HTTPSession, amazon), base_url="https://fake", clock=clock.clock, sleep=clock.sleep)
     cursor = at - timedelta(minutes=15)
     seen = []
     for _ in range(16):
@@ -399,7 +401,7 @@ async def test_daily_sweep_recovers_late_indexed_orders(monkeypatch):
             if isinstance(item, Order):
                 seen.append(item.orderId)
             else:
-                cursor = item
+                cursor = cast(datetime, item)
     assert seen == []
     clock.advance(2 * DAY)
     amazon.now = clock.now()
@@ -412,7 +414,7 @@ async def test_daily_sweep_recovers_late_indexed_orders(monkeypatch):
         else:
             committed.extend(pending)
             pending.clear()
-            covered = item
+            covered = cast(datetime, item)
     assert committed == ["late"]
     assert covered == api.floor_to_tick(clock.now() - 2 * DAY)
     before = len(amazon.requests)

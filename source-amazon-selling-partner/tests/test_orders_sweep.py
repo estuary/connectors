@@ -1,10 +1,12 @@
+import logging
 from datetime import datetime, timedelta
+from typing import Any, cast
 
 import pytest
 from pydantic import ValidationError
 
 from source_amazon_selling_partner import api, resources
-from source_amazon_selling_partner.client import Priority
+from source_amazon_selling_partner.client import Operation, Priority
 from source_amazon_selling_partner.models import EndpointConfig, Order, ResourceState
 
 from .fake_amazon import FakeAmazon, order
@@ -14,19 +16,19 @@ LOOKBACK = timedelta(hours=48)
 
 
 @pytest.mark.parametrize("value", ["PT1H", "PT48H", "P7D"])
-def test_orders_lookback_accepts_iso_duration(value):
+def test_orders_lookback_accepts_iso_duration(value: str):
     assert EndpointConfig.Advanced.model_validate({"orders_lookback": value}).orders_lookback >= timedelta(hours=1)
-    assert EndpointConfig.Advanced().orders_lookback == LOOKBACK
+    assert EndpointConfig.Advanced.model_validate({}).orders_lookback == LOOKBACK
 
 
 @pytest.mark.parametrize("value", ["PT59M", "PT0S", "-P1D", "invalid"])
-def test_orders_lookback_rejects_invalid_duration(value):
+def test_orders_lookback_rejects_invalid_duration(value: str):
     with pytest.raises(ValidationError):
         EndpointConfig.Advanced.model_validate({"orders_lookback": value})
 
 
 @pytest.mark.asyncio
-async def test_sweep_ranges_chain_when_runs_are_late_and_slow(monkeypatch):
+async def test_sweep_ranges_chain_when_runs_are_late_and_slow(monkeypatch: pytest.MonkeyPatch):
     fake = FakeAmazon(now=NOW, orders=[])
     monkeypatch.setattr(api, "now", lambda: fake.now)
     client = client_for(fake)
@@ -35,7 +37,7 @@ async def test_sweep_ranges_chain_when_runs_are_late_and_slow(monkeypatch):
     ranges = []
     original_get = client.get
 
-    async def get(log, operation, path, params, priority):
+    async def get(log: logging.Logger, operation: Operation, path: str, params: dict[str, Any], priority: Priority):
         result = await original_get(log, operation, path, params, priority)
         fake.now += timedelta(hours=8)
         return result
@@ -61,7 +63,7 @@ async def test_sweep_ranges_chain_when_runs_are_late_and_slow(monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("delay", [timedelta(hours=2), LOOKBACK])
-async def test_sweep_emits_orders_indexed_up_to_lookback_late(monkeypatch, delay):
+async def test_sweep_emits_orders_indexed_up_to_lookback_late(monkeypatch: pytest.MonkeyPatch, delay: timedelta):
     updated = NOW - LOOKBACK
     fake = FakeAmazon(now=NOW, orders=[order("late", updated, updated)],
                       order_index_delays={"late": delay})
@@ -75,7 +77,7 @@ async def test_sweep_emits_orders_indexed_up_to_lookback_late(monkeypatch, delay
 
 
 @pytest.mark.asyncio
-async def test_sweep_includes_window_seams_and_range_end(monkeypatch):
+async def test_sweep_includes_window_seams_and_range_end(monkeypatch: pytest.MonkeyPatch):
     end = NOW - LOOKBACK
     covered = end - timedelta(days=2)
     seam = covered + timedelta(days=1)
@@ -95,7 +97,7 @@ async def test_sweep_includes_window_seams_and_range_end(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_restart_resumes_after_last_complete_window(monkeypatch):
+async def test_restart_resumes_after_last_complete_window(monkeypatch: pytest.MonkeyPatch):
     start = NOW - LOOKBACK - timedelta(days=3)
     fake = FakeAmazon(now=NOW, orders=[
         order(str(i), start, start + timedelta(days=i, hours=1)) for i in range(3)
@@ -103,13 +105,14 @@ async def test_restart_resumes_after_last_complete_window(monkeypatch):
     monkeypatch.setattr(api, "now", lambda: fake.now)
     client = client_for(fake)
     gen = api.fetch_orders_sweep(client, MARKETPLACES, LOOKBACK, timedelta(days=1), LOG, start)
-    assert (await anext(gen)).orderId == "0"
-    checkpoint = await anext(gen)
+    assert cast(Order, await anext(gen)).orderId == "0"
+    checkpoint = cast(datetime, await anext(gen))
     saved = ResourceState.Incremental.model_validate_json(
         ResourceState.Incremental(cursor=checkpoint).model_dump_json()
     ).cursor
+    saved = cast(datetime, saved)
     assert saved == start + timedelta(days=1)
-    assert (await anext(gen)).orderId == "1"
+    assert cast(Order, await anext(gen)).orderId == "1"
     await gen.aclose()
 
     fake.now += timedelta(days=2)
@@ -123,7 +126,7 @@ async def test_restart_resumes_after_last_complete_window(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_no_request_before_a_full_day_is_due(monkeypatch):
+async def test_no_request_before_a_full_day_is_due(monkeypatch: pytest.MonkeyPatch):
     fake = FakeAmazon(now=NOW, orders=[])
     monkeypatch.setattr(api, "now", lambda: fake.now)
     covered = NOW - LOOKBACK
@@ -141,7 +144,7 @@ async def test_no_request_before_a_full_day_is_due(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_sweep_reuses_token_halving_and_backfill_priority(monkeypatch):
+async def test_sweep_reuses_token_halving_and_backfill_priority(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(api, "now", lambda: NOW)
     covered = NOW - LOOKBACK - timedelta(days=1)
     fake = FakeAmazon(now=NOW, orders=[
@@ -151,7 +154,7 @@ async def test_sweep_reuses_token_halving_and_backfill_priority(monkeypatch):
     priorities = []
     original_get = client.get
 
-    async def get(log, operation, path, params, priority):
+    async def get(log: logging.Logger, operation: Operation, path: str, params: dict[str, Any], priority: Priority):
         priorities.append(priority)
         return await original_get(log, operation, path, params, priority)
 
@@ -165,7 +168,7 @@ async def test_sweep_reuses_token_halving_and_backfill_priority(monkeypatch):
     assert out[-1] == NOW - LOOKBACK
 
 
-def test_initial_sweep_cursor_starts_at_cutoff(monkeypatch):
+def test_initial_sweep_cursor_starts_at_cutoff(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(resources, "datetime", FrozenDatetime(NOW))
     state = resources.orders(LOG, client_for(FakeAmazon(now=NOW, orders=[])), make_config(MARKETPLACES)).initial_state
     assert state.inc[resources.SWEEP].cursor == state.backfill.cutoff - api.TICK

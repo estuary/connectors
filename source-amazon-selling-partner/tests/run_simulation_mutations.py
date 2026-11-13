@@ -30,7 +30,7 @@ def main() -> None:
     # Read the actual configured default: there is no API overlap constant;
     # fetch_orders receives Advanced.overlap (currently ten minutes).
     from source_amazon_selling_partner.models import EndpointConfig
-    overlap = EndpointConfig.Advanced().overlap
+    overlap = EndpointConfig.Advanced.model_validate({}).overlap
     skip_seconds = int(overlap.total_seconds()) + 3600
     api_original, sim_original = API.read_bytes(), SIM.read_bytes()
     mutations = [

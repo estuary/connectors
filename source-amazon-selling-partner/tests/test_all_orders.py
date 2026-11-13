@@ -292,7 +292,7 @@ async def test_never_reuses_a_cancelled_or_aborted_report_or_another_request():
     ["marketplaceIds", "dataStartTime", "dataEndTime"],
 ])
 @pytest.mark.parametrize("reuse_candidate", [False, True])
-async def test_created_report_with_missing_echo_proceeds_once_warned(monkeypatch, caplog, missing, reuse_candidate):
+async def test_created_report_with_missing_echo_proceeds_once_warned(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, missing: list[str], reuse_candidate: bool):
     request = ReportRequest("GET_MERCHANT_LISTINGS_ALL_DATA", (MARKETPLACES[0],), NOW, NOW)
     fake = FakeAmazon(now=NOW, orders=[])
     if reuse_candidate:
@@ -302,7 +302,7 @@ async def test_created_report_with_missing_echo_proceeds_once_warned(monkeypatch
         fake.reports.append(earlier)
     get_report = reports.get_report
 
-    async def without_echo(*args):
+    async def without_echo(*args: *tuple[SPAPIClient, str, Priority, logging.Logger]):
         report = await get_report(*args)
         return report.model_copy(update={name: None for name in missing})
 
@@ -327,9 +327,9 @@ async def test_created_report_with_missing_echo_proceeds_once_warned(monkeypatch
 @pytest.mark.parametrize("missing", [
     ["dataEndTime"], ["marketplaceIds", "dataStartTime", "dataEndTime"],
 ])
-async def test_all_orders_created_report_missing_echo_advances_cursor(backfill, missing, caplog):
+async def test_all_orders_created_report_missing_echo_advances_cursor(backfill: bool, missing: list[str], caplog: pytest.LogCaptureFixture):
     class MissingEchoAmazon(FakeAmazon):
-        def _respond(self, body):
+        def _respond(self, body: dict[str, Any]):
             if "processingStatus" in body:
                 body = {name: value for name, value in body.items() if name not in missing}
             return super()._respond(body)
@@ -363,12 +363,12 @@ async def test_all_orders_created_report_missing_echo_advances_cursor(backfill, 
 
 
 @pytest.mark.asyncio
-async def test_created_report_missing_echo_still_rejects_a_different_start(monkeypatch):
+async def test_created_report_missing_echo_still_rejects_a_different_start(monkeypatch: pytest.MonkeyPatch):
     request = request_for(HORIZON - DAY, HORIZON)
     fake = FakeAmazon(now=NOW, orders=[])
     get_report = reports.get_report
 
-    async def changed_echo(*args):
+    async def changed_echo(*args: *tuple[SPAPIClient, str, Priority, logging.Logger]):
         report = await get_report(*args)
         update: dict[str, Any] = {"marketplaceIds": None}
         if len(fake.get_report_requests) == 2:
@@ -385,12 +385,12 @@ async def test_created_report_missing_echo_still_rejects_a_different_start(monke
 
 
 @pytest.mark.asyncio
-async def test_created_report_missing_echo_still_rejects_different_marketplaces(monkeypatch):
+async def test_created_report_missing_echo_still_rejects_different_marketplaces(monkeypatch: pytest.MonkeyPatch):
     request = request_for(HORIZON - DAY, HORIZON)
     fake = FakeAmazon(now=NOW, orders=[])
     get_report = reports.get_report
 
-    async def changed_echo(*args):
+    async def changed_echo(*args: *tuple[SPAPIClient, str, Priority, logging.Logger]):
         report = await get_report(*args)
         return report.model_copy(update={
             "marketplaceIds": [MARKETPLACES[0]],
@@ -409,12 +409,12 @@ async def test_created_report_missing_echo_still_rejects_different_marketplaces(
 
 
 @pytest.mark.asyncio
-async def test_created_report_missing_end_still_counts_cancellations(monkeypatch):
+async def test_created_report_missing_end_still_counts_cancellations(monkeypatch: pytest.MonkeyPatch):
     request = request_for(HORIZON - DAY, HORIZON)
     fake = FakeAmazon(now=NOW, orders=[], lifecycles=[["CANCELLED"], ["CANCELLED"]])
     get_report = reports.get_report
 
-    async def without_end(*args):
+    async def without_end(*args: *tuple[SPAPIClient, str, Priority, logging.Logger]):
         report = await get_report(*args)
         return report.model_copy(update={"dataEndTime": None})
 
@@ -633,7 +633,7 @@ async def test_an_aborted_report_whose_diagnostic_is_corrupt_still_fails_as_abor
     fake.fatal_document = FakeDocument(b"error", compressed=True, served=served)
     if case == "malformed document":
 
-        async def malformed(*args: Any):
+        async def malformed(*args: *tuple[SPAPIClient, str, Priority, logging.Logger]):
             return ReportDocument.model_validate_json(b"{}")
 
         monkeypatch.setattr(reports, "fetch_report_document", malformed)

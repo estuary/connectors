@@ -60,7 +60,7 @@ def record_operations(client: SPAPIClient) -> list[tuple[Operation, Priority]]:
 
 
 def reject_transaction_pages(fake: FakeAmazon, monkeypatch: pytest.MonkeyPatch, *, once: bool = False):
-    list_transactions = fake._list_transactions
+    list_transactions = fake._list_transactions  # pyright: ignore[reportPrivateUsage]
     rejected = False
 
     def rejecting(params: dict[str, Any]):
@@ -165,7 +165,7 @@ async def test_other_transactions_errors_are_unchanged(backfill: bool, page: int
         transactions=[transaction(str(i), start + timedelta(minutes=i)) for i in range(1, 4)],
     )
     error = HTTPError(message, code)
-    list_transactions = fake._list_transactions
+    list_transactions = fake._list_transactions  # pyright: ignore[reportPrivateUsage]
 
     def failing(params: dict[str, Any]):
         if len(fake.requests) == page:
