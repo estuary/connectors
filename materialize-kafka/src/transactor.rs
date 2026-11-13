@@ -10,8 +10,8 @@ use rdkafka::{
     error::KafkaError,
     producer::{BaseRecord, Producer, ThreadedProducer},
     types::RDKafkaErrorCode,
-    util::Timeout,
 };
+use std::time::Duration;
 use tuple::Element;
 
 use crate::{
@@ -93,6 +93,8 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
     }
 }
 
+const QUEUE_FULL_POLL_TIMEOUT: Duration = Duration::from_millis(10);
+
 /// Enqueues `msg` on `producer`, retrying for as long as the producer's queue
 /// is full.
 pub fn send_when_queue_has_room(
@@ -105,7 +107,10 @@ pub fn send_when_queue_has_room(
             Err((err, original_message)) => match err {
                 KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull) => {
                     tracing::debug!("polling producer since queue is full");
-                    producer.poll(Timeout::Never);
+                    // The producer's own polling thread may serve every
+                    // delivery report, so this poll must not wait without
+                    // bound for an event.
+                    producer.poll(QUEUE_FULL_POLL_TIMEOUT);
                     msg = original_message;
                 }
                 _ => {
