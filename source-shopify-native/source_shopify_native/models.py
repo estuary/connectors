@@ -593,6 +593,10 @@ class ShopifyDocument(BaseDocument):
 class ShopifyGraphQLResource(ShopifyDocument):
     QUERY: ClassVar[str] = ""
     QUERY_ROOT: ClassVar[str] = ""
+    # The fields from QUERY_ROOT down to the connection that's paged through, for a
+    # connection that isn't a top-level query field. For example, payouts sit under
+    # `shopifyPaymentsAccount`, so their path is `["payouts"]`.
+    CONNECTION_PATH: ClassVar[list[str]] = []
     FRAGMENTS: ClassVar[list[str]] = []
     NAME: ClassVar[str] = ""
     SORT_KEY: ClassVar[SortKey | None] = None
@@ -740,6 +744,10 @@ class ShopifyGraphQLResource(ShopifyDocument):
         # that only one connection accepts (ex: `includeInactive` on `locations`).
         extra_root_args: str = "",
     ) -> str:
+        if cls.CONNECTION_PATH:
+            raise NotImplementedError(
+                f"{cls.__name__} sets CONNECTION_PATH, so it must build its own query."
+            )
         lower_bound = dt_to_str(start)
         upper_bound = dt_to_str(end)
         query_body = cls._resolve_nested_connections(
@@ -851,15 +859,38 @@ def create_response_data_model(
 ) -> type[BaseResponseData[TShopifyGraphQLResource]]:
     """Factory function to create typed GraphQL data field models."""
     query_root = resource_type.QUERY_ROOT
+    path = [query_root, *resource_type.CONNECTION_PATH]
+
+    # Every object above the connection, starting at QUERY_ROOT, can be null, like
+    # shopifyPaymentsAccount for a store without Shopify Payments. A null one reads as an
+    # empty page.
+    field_type: Any = EdgesData[resource_type]
+    for parent, child in reversed(list(zip(path, path[1:]))):
+        parent_model = type(
+            f"{parent[0].upper()}{parent[1:]}Data",
+            (BaseModel,),
+            {"__annotations__": {child: field_type}},
+        )
+        field_type = parent_model | None
+
+    def get_connection(data: Any) -> EdgesData[TShopifyGraphQLResource] | None:
+        value = data
+        for name in path:
+            value = getattr(value, name)
+            if value is None:
+                return None
+        return value
 
     def get_edges(self) -> list[Edge[TShopifyGraphQLResource]]:
-        return getattr(self, query_root).edges
+        connection = get_connection(self)
+        return connection.edges if connection is not None else []
 
     def get_page_info(self) -> PageInfo:
-        return getattr(self, query_root).pageInfo
+        connection = get_connection(self)
+        return connection.pageInfo if connection is not None else PageInfo()
 
     class_dict = {
-        "__annotations__": {query_root: EdgesData[resource_type]},
+        "__annotations__": {query_root: field_type},
         "edges": property(get_edges),
         "page_info": property(get_page_info),
     }
