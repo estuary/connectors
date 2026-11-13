@@ -885,7 +885,7 @@ def users(
     return common.Resource(
         name="users",
         key=["/id"],
-        model=TimestampedResource,
+        model=ZendeskResource,
         open=open,
         initial_state=ResourceState(
             inc={
@@ -1052,7 +1052,7 @@ def incremental_cursor_export_resources(
             common.Resource(
             name=name,
             key=["/id"],
-            model=TimestampedResource,
+            model=ZendeskResource,
             open=functools.partial(open, name),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=initial_state),
