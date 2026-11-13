@@ -36,6 +36,7 @@ from .subscriptions.subscription_contracts import SubscriptionContracts
 from .staff_members import StaffMembers
 from .disputes import Disputes
 from .payments.payouts import Payouts
+from .payments.balance_transactions import BalanceTransactions
 
 
 __all__ = [
@@ -74,5 +75,6 @@ __all__ = [
     "OrderTransactions",
     "Disputes",
     "Payouts",
+    "BalanceTransactions",
     "SubscriptionContracts",
 ]

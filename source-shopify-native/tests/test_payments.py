@@ -18,6 +18,7 @@ from estuary_cdk.capture import Task
 import source_shopify_native.api as api
 from source_shopify_native.api import _paginate_through_resources, fetch_payouts
 from source_shopify_native.graphql.client import ShopifyGraphQLClient
+from source_shopify_native.graphql.payments.balance_transactions import BalanceTransactions
 from source_shopify_native.graphql.payments.payouts import Payouts
 from source_shopify_native.models import (
     EndpointConfig,
@@ -74,6 +75,33 @@ def _payouts_page(nodes: list[dict], has_next: bool = False, end_cursor: str | N
                 "pageInfo": {"hasNextPage": has_next, "endCursor": end_cursor},
             }
         }
+    }
+
+
+def _transactions_page(
+    nodes: list[dict], has_next: bool = False, end_cursor: str | None = None
+) -> dict:
+    return {
+        "shopifyPaymentsAccount": {
+            "balanceTransactions": {
+                "edges": [{"node": n} for n in nodes],
+                "pageInfo": {"hasNextPage": has_next, "endCursor": end_cursor},
+            }
+        }
+    }
+
+
+def _transaction(number: int, payout: dict | None) -> dict:
+    return {
+        "id": f"gid://shopify/ShopifyPaymentsBalanceTransaction/{number}",
+        "transactionDate": "2012-11-12T00:00:00Z",
+        "type": "CHARGE",
+        "test": False,
+        "amount": {"amount": "11.5", "currencyCode": "USD"},
+        "fee": {"amount": "0.65", "currencyCode": "USD"},
+        "net": {"amount": "10.85", "currencyCode": "USD"},
+        "associatedOrder": {"id": "gid://shopify/Order/450789469"},
+        "associatedPayout": {"id": payout["id"] if payout else None},
     }
 
 
@@ -188,12 +216,13 @@ def log():
         ),
     ],
 )
-def test_payouts_need_a_scope_from_each_set(granted, available):
+@pytest.mark.parametrize("model", [Payouts, BalanceTransactions])
+def test_payments_streams_need_a_scope_from_each_set(model, granted, available):
     resources = _get_available_resources(
         granted, uses_custom_app_token=False, can_access_pii=True, is_plus_or_advanced=True
     )
 
-    assert (Payouts in resources) is available
+    assert (model in resources) is available
 
 
 @pytest.mark.asyncio
@@ -232,6 +261,33 @@ async def test_null_account_reads_no_payouts(log):
 
     assert docs == []
     assert len(http.queries) == 1
+
+
+@pytest.mark.asyncio
+async def test_balance_transactions_are_read_through_the_account_by_processed_at(log):
+    http = MockHTTP([_transactions_page([_transaction(1, PAYOUT_PAID), _transaction(2, None)])])
+    client = ShopifyGraphQLClient(http, STORE)  # type: ignore[arg-type]
+
+    docs = [
+        doc.model_dump(by_alias=True)
+        async for doc in _paginate_through_resources(
+            client,
+            BalanceTransactions,
+            create_response_data_model(BalanceTransactions),
+            START,
+            END,
+            STORE,
+            CAPS,
+            log,
+        )
+    ]
+
+    assert [d["associatedPayout"]["id"] for d in docs] == [PAYOUT_PAID["id"], None]
+    assert re.search(r"shopifyPaymentsAccount \{\s*balanceTransactions\(", http.queries[0])
+    assert (
+        "processed_at:>='2012-11-01T00:00:00Z' AND processed_at:<='2012-12-01T00:00:00Z'"
+        in http.queries[0]
+    )
 
 
 @pytest.mark.parametrize(

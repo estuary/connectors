@@ -11,6 +11,7 @@ This connector captures data from [Shopify's GraphQL Admin API](https://shopify.
 The following data resources are supported through the Shopify API:
 
 * [Abandoned Checkouts](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/abandonedCheckouts?example=Retrieves+a+list+of+abandoned+checkouts)
+* [Balance Transactions](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ShopifyPaymentsBalanceTransaction)
 * [Custom Collections](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/collections?example=Retrieves+a+list+of+custom+collections)
    * Custom Collection Metafields
 * [Customers](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/customers)
