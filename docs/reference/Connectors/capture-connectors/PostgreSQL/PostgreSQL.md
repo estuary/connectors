@@ -195,6 +195,56 @@ ALTER PUBLICATION flow_publication ADD TABLE public.flow_watermarks, <other_tabl
    - Find the instance's host under Server Name, and the port under Connection Strings (usually `5432`). Together, you'll use the host:port as the `address` property when you configure the connector.
    - Format `user` as `username@databasename`; for example, `flow_capture@myazuredb`.
 
+### Tables without primary keys
+
+:::warning
+Adding a table without a primary key to the publication can break writes to that table in
+your source database. Set a replica identity on the table **before** you add it to the
+publication.
+:::
+
+A table without a primary key has no usable replica identity by default. With
+`REPLICA IDENTITY DEFAULT`, PostgreSQL treats a table without a primary key like
+`REPLICA IDENTITY NOTHING`. If that table is included in a publication that replicates
+`UPDATE` or `DELETE` operations, those operations will error on the publisher until you
+configure a suitable unique replica-identity index or use `REPLICA IDENTITY FULL`
+([PostgreSQL docs](https://www.postgresql.org/docs/current/logical-replication-publication.html#LOGICAL-REPLICATION-PUBLICATION-REPLICA-IDENTITY)).
+`INSERT` operations are not affected.
+
+Applications writing to the table will see an error like:
+
+```
+cannot update table "my_table" because it does not have a replica identity and publishes updates
+```
+
+To capture a table without a primary key, choose one of the following before adding it to the publication:
+
+1. **Add a primary key (recommended).** The default replica identity then works with no
+   further changes, and Estuary uses the primary key as the collection key.
+
+2. **Use a unique index as the replica identity.** If the table has a unique index on `NOT NULL` columns (not partial, not deferrable):
+
+   ```sql
+   ALTER TABLE <schema>.<table> REPLICA IDENTITY USING INDEX <index_name>;
+   ```
+
+    *Note:* When a table has no primary key, Estuary uses a unique index on non-nullable columns as
+    the collection key. If the table has more than one such index, Estuary picks the first one
+    alphabetically by name. If that isn't the index you set as the replica identity, set the
+    collection key to that index's columns when you add the binding.
+
+3. **Use `REPLICA IDENTITY FULL`.** If no suitable unique index exists:
+
+   ```sql
+   ALTER TABLE <schema>.<table> REPLICA IDENTITY FULL;
+   ```
+
+   This logs the entire old row for every `UPDATE` and `DELETE`, which increases WAL volume
+   on wide or frequently updated tables. Without a unique key, Estuary cannot merge changes for
+   the same row: each change event is captured as a separate document, and the table is
+   backfilled using the [Without Primary Key](/reference/backfilling-data/#resource-configuration-backfill-modes)
+   backfill mode.
+
 ### SSL Mode
 
 Certain managed PostgreSQL implementations may require you to explicitly set the [SSL Mode](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION) to connect with Estuary. One example is [Neon](https://neon.tech/docs/connect/connect-securely), which requires the setting `verify-full`. Check your managed PostgreSQL's documentation for details if you encounter errors related to the SSL mode configuration.
