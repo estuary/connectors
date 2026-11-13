@@ -237,7 +237,8 @@ class FakeAmazon:
             if bound in params:
                 body[bound] = params[bound]
                 if self.echoed_bound_shortfall:
-                    body[bound] = iso(parse(params[bound]) - self.echoed_bound_shortfall)
+                    # isoformat keeps fractional seconds, so tests can check the connector rounds them.
+                    body[bound] = (parse(params[bound]) - self.echoed_bound_shortfall).isoformat().replace("+00:00", "Z")
         return self._respond(body)
 
     def _search(self, params: dict[str, Any]) -> list[dict[str, Any]]:

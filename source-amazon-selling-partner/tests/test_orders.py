@@ -415,6 +415,37 @@ async def test_a_search_amazon_ends_before_the_window_start_fails_instead_of_adv
 
 
 @pytest.mark.asyncio
+async def test_an_echo_at_the_window_edge_raises_or_advances_one_tick():
+    # Incremental: the cursor is already covered, so an echo equal to it is no progress.
+    cursor = NOW - timedelta(hours=1)
+    horizon = api.floor_to_tick(NOW - api.SEARCH_LAG)
+    fake = FakeAmazon(now=NOW, orders=[], echoed_bound_shortfall=horizon - cursor)
+    with pytest.raises(RuntimeError, match="not past the window start"):
+        await collect(fetch_orders(client_for(fake), MARKETPLACES, timedelta(days=1), timedelta(), LOG, cursor))
+    fake = FakeAmazon(now=NOW, orders=[], echoed_bound_shortfall=horizon - cursor - api.TICK)
+    items = await collect(fetch_orders(client_for(fake), MARKETPLACES, timedelta(days=1), timedelta(), LOG, cursor))
+    assert items[-1] == cursor + api.TICK
+
+    # Backfill: window_start is inclusive, so an echo equal to it covers one tick.
+    start = NOW - timedelta(days=2)
+    fake = FakeAmazon(now=NOW, orders=[], echoed_bound_shortfall=timedelta(days=1))
+    with pytest.raises(RuntimeError, match="before the window start"):
+        await collect(backfill_orders(client_for(fake), MARKETPLACES, start, timedelta(days=1), LOG, None, NOW - timedelta(hours=1)))
+    fake = FakeAmazon(now=NOW, orders=[], echoed_bound_shortfall=timedelta(days=1) - api.TICK)
+    items = await collect(backfill_orders(client_for(fake), MARKETPLACES, start, timedelta(days=1), LOG, None, NOW - timedelta(hours=1)))
+    assert items[-1].split("|")[0] == api.to_iso(start + api.TICK)
+
+
+@pytest.mark.asyncio
+async def test_a_fractional_echo_rounds_down_so_the_next_window_reads_again():
+    cursor = NOW - timedelta(hours=1)
+    horizon = api.floor_to_tick(NOW - api.SEARCH_LAG)
+    fake = FakeAmazon(now=NOW, orders=[], echoed_bound_shortfall=timedelta(minutes=5, milliseconds=300))
+    items = await collect(fetch_orders(client_for(fake), MARKETPLACES, timedelta(days=1), timedelta(), LOG, cursor))
+    assert items[-1] == horizon - timedelta(minutes=5, seconds=1)
+
+
+@pytest.mark.asyncio
 async def test_backfill_rounds_fractional_start_up():
     start = datetime(2026, 1, 1, 12, 0, 0, 500_000, tzinfo=UTC)
     fake = FakeAmazon(now=NOW, orders=[order("too-early", start.replace(microsecond=0), start)], page_size=10)
