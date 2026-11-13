@@ -51,6 +51,9 @@ from .audit_logs import (
     fetch_audit_logs,
     backfill_audit_logs,
 )
+from .deletions import (
+    fetch_deleted_users,
+)
 from .community import (
     fetch_post_child_resources,
     fetch_post_comment_votes,
@@ -71,6 +74,7 @@ __all__ = [
     "fetch_audit_logs",
     "fetch_client_side_incremental_offset_paginated_resources",
     "fetch_client_side_incremental_cursor_paginated_resources",
+    "fetch_deleted_users",
     "fetch_incremental_time_export_resources",
     "fetch_incremental_cursor_export_resources",
     "fetch_incremental_cursor_paginated_resources",
