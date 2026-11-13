@@ -348,6 +348,13 @@ class OrganizationsListResponse(IncrementalKeysetPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias=ITEMS_KEY)
 
 
+class UsersListResponse(IncrementalKeysetPaginatedResponse):
+    PATH: ClassVar[str] = "users"
+    ITEMS_KEY: ClassVar[str] = "users"
+
+    resources: list[TimestampedResource] = Field(alias=ITEMS_KEY)
+
+
 class DeletedUsersResponse(BaseModel, extra="allow"):
     PATH: ClassVar[str] = "deleted_users"
     ITEMS_KEY: ClassVar[str] = "deleted_users"

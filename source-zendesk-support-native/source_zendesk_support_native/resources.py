@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta, UTC
 import functools
 from logging import Logger
-from typing import Any
+from typing import Any, AsyncGenerator, Callable
 
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.capture import common, Task
-from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
+from estuary_cdk.http import HTTPMixin, HTTPSession, TokenSource, HTTPError
 
 from .models import (
     AccountSettings,
@@ -42,6 +42,7 @@ from .models import (
     OAUTH2_SPEC,
     TICKET_CHILD_RESOURCES,
     POST_CHILD_RESOURCES,
+    UsersListResponse,
     update_oauth_spec,
 )
 from .api import (
@@ -58,6 +59,7 @@ from .api import (
     fetch_audit_logs,
     fetch_client_side_incremental_offset_paginated_resources,
     fetch_client_side_incremental_cursor_paginated_resources,
+    fetch_deleted_users,
     fetch_incremental_time_export_resources,
     fetch_incremental_keyset_paginated_resources,
     fetch_incremental_cursor_export_resources,
@@ -766,6 +768,79 @@ def incremental_keyset_paginated_resources(
     ]
 
     return resources
+
+
+# Nothing calls this yet. A later PR adds the feature flag that switches
+# users from the cursor-based export to these resources (#5357).
+def incremental_keyset_paginated_resources_with_deletions(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+        name: str,
+        response_model: type[IncrementalKeysetPaginatedResponse],
+        fetch_deletions: Callable[[HTTPSession, str, Logger, common.LogCursor], AsyncGenerator[ZendeskResource | common.LogCursor, None]],
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes={
+                name: functools.partial(
+                    fetch_incremental_keyset_paginated_resources,
+                    http,
+                    config.subdomain,
+                    response_model,
+                ),
+                f"deleted_{name}": functools.partial(
+                    fetch_deletions,
+                    http,
+                    config.subdomain,
+                ),
+            },
+            fetch_page=functools.partial(
+                backfill_incremental_keyset_paginated_resources,
+                http,
+                config.subdomain,
+                response_model,
+                config.start_date,
+            )
+        )
+
+    def resource(
+        name: str,
+        response_model: type[IncrementalKeysetPaginatedResponse],
+        fetch_deletions: Callable[[HTTPSession, str, Logger, common.LogCursor], AsyncGenerator[ZendeskResource | common.LogCursor, None]],
+    ) -> common.Resource:
+        cutoff = (datetime.now(tz=UTC) - INCREMENTAL_LAG).replace(microsecond=0)
+
+        return common.Resource(
+            name=name,
+            key=["/id"],
+            model=TimestampedResource,
+            open=functools.partial(open, name, response_model, fetch_deletions),
+            initial_state=ResourceState(
+                inc={
+                    name: ResourceState.Incremental(cursor=cutoff),
+                    f"deleted_{name}": ResourceState.Incremental(cursor=cutoff),
+                },
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+
+    return [
+        resource("users", UsersListResponse, fetch_deleted_users),
+    ]
 
 
 def talk_incremental_export_resources(
