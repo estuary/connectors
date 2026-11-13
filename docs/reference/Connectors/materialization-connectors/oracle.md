@@ -158,7 +158,10 @@ backfill of a large collection, or the deletion of the rows published before a
 completed backfill, can make for a large transaction.
 
 The connector drops a stage table with its table, and recreates it when the
-table's columns change. Don't write to stage tables.
+table's columns change. It records the transactions it has applied in a
+`flow_applied_v1` table in the endpoint's schema. Don't change the rows of
+either: a transaction whose staged rows are deleted before they're applied
+fails the materialization.
 
 ## Delta updates
 

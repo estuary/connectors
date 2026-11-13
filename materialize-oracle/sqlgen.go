@@ -414,7 +414,7 @@ func stagePath(path []string) []string {
 // columns.
 func createStageSQL(t *sql.Table, stage string) string {
 	var cols = []string{
-		"CAST(NULL AS VARCHAR2(36)) " + stageTokenColumn,
+		"CAST(NULL AS VARCHAR2(64)) " + stageTokenColumn,
 		"CAST(NULL AS CHAR(1)) " + stageOpColumn,
 	}
 	for _, c := range t.Columns() {
@@ -422,6 +422,13 @@ func createStageSQL(t *sql.Table, stage string) string {
 	}
 	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS SELECT %s FROM dual LEFT JOIN %s t ON 1 = 0 WHERE 1 = 0",
 		stage, strings.Join(cols, ", "), t.Identifier)
+}
+
+// createStageIndexSQL indexes the stage table by token, so that reading a
+// transaction's rows doesn't scan the blocks a larger one left empty. Indexes
+// are named apart from tables, so it takes the table's name.
+func createStageIndexSQL(stage string) string {
+	return fmt.Sprintf("CREATE INDEX IF NOT EXISTS %s ON %s (%s)", stage, stage, stageTokenColumn)
 }
 
 // stageInsertSQL inserts one row per element of the bound arrays into the
@@ -438,13 +445,13 @@ func stageInsertSQL(t *sql.Table, stage string) string {
 	return fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", stage, strings.Join(names, ", "), strings.Join(binds, ", "))
 }
 
-// tokenBinds lists n placeholders, for tokens bound in order.
-func tokenBinds(n int) string {
-	var binds = make([]string, n)
-	for i := range binds {
-		binds[i] = fmt.Sprintf(":%d", i+1)
+// binds lists the placeholders of n values bound from position first.
+func binds(first, n int) string {
+	var out = make([]string, n)
+	for i := range out {
+		out[i] = fmt.Sprintf(":%d", first+i)
 	}
-	return strings.Join(binds, ", ")
+	return strings.Join(out, ", ")
 }
 
 // applyDeleteSQL deletes the rows of t whose keys are staged with op, by the
@@ -454,40 +461,59 @@ func applyDeleteSQL(t *sql.Table, stage, op string, tokens int) string {
 	for _, k := range t.Keys {
 		conds = append(conds, fmt.Sprintf("s.%s = r.%s", k.Identifier, k.Identifier))
 	}
-	return fmt.Sprintf("DELETE FROM %s r WHERE EXISTS (SELECT 1 FROM %s s WHERE s.%s IN (%s) AND s.%s = '%s' AND %s)",
-		t.Identifier, stage, stageTokenColumn, tokenBinds(tokens), stageOpColumn, op, strings.Join(conds, " AND "))
+	return fmt.Sprintf("DELETE FROM %s r WHERE EXISTS (SELECT /*+ INDEX(s) */ 1 FROM %s s WHERE s.%s IN (%s) AND s.%s = '%s' AND %s)",
+		t.Identifier, stage, stageTokenColumn, binds(1, tokens), stageOpColumn, op, strings.Join(conds, " AND "))
 }
 
 // applyInsertSQL inserts into t the rows staged by the transactions of the
 // bound tokens, other than deletions.
 func applyInsertSQL(t *sql.Table, stage string, tokens int) string {
-	var names []string
+	var names, sel []string
 	for _, c := range t.Columns() {
 		names = append(names, c.Identifier)
+		sel = append(sel, "s."+c.Identifier)
 	}
-	var cols = strings.Join(names, ", ")
-	return fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s WHERE %s IN (%s) AND %s <> '%s'",
-		t.Identifier, cols, cols, stage, stageTokenColumn, tokenBinds(tokens), stageOpColumn, opDelete)
+	return fmt.Sprintf("INSERT INTO %s (%s) SELECT /*+ INDEX(s) */ %s FROM %s s WHERE s.%s IN (%s) AND s.%s <> '%s'",
+		t.Identifier, strings.Join(names, ", "), strings.Join(sel, ", "), stage, stageTokenColumn, binds(1, tokens), stageOpColumn, opDelete)
 }
 
 // clearStageSQL deletes the rows staged by the transactions of the bound
 // tokens.
 func clearStageSQL(stage string, tokens int) string {
-	return fmt.Sprintf("DELETE FROM %s WHERE %s IN (%s)", stage, stageTokenColumn, tokenBinds(tokens))
+	return fmt.Sprintf("DELETE /*+ INDEX(s) */ FROM %s s WHERE s.%s IN (%s)", stage, stageTokenColumn, binds(1, tokens))
 }
 
-// pruneStageSQL deletes the rows of tokens that sort before the token bound as
-// :1, other than the n tokens bound after it.
-func pruneStageSQL(stage string, n int) string {
-	var query = fmt.Sprintf("DELETE FROM %s WHERE %s < :1", stage, stageTokenColumn)
+// pruneSQL deletes the rows of table whose tokens sort between those bound as
+// :1 and :2, other than the n tokens bound after them.
+func pruneSQL(table, column string, n int) string {
+	var query = fmt.Sprintf("DELETE FROM %s WHERE %s > :1 AND %s < :2", table, column, column)
 	if n > 0 {
-		var binds = make([]string, n)
-		for i := range binds {
-			binds[i] = fmt.Sprintf(":%d", i+2)
-		}
-		query += fmt.Sprintf(" AND %s NOT IN (%s)", stageTokenColumn, strings.Join(binds, ", "))
+		query += fmt.Sprintf(" AND %s NOT IN (%s)", column, binds(3, n))
 	}
 	return query
+}
+
+// The applied table records the tokens of the transactions whose staged rows
+// were applied, so that applying one again can tell it from one whose rows
+// were deleted.
+const (
+	appliedTable       = "flow_applied_v1"
+	appliedTokenColumn = "token"
+)
+
+func createAppliedSQL(applied string) string {
+	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s VARCHAR2(64) PRIMARY KEY)", applied, appliedTokenColumn)
+}
+
+// recordAppliedSQL records the tokens bound as an array.
+func recordAppliedSQL(applied string) string {
+	return fmt.Sprintf("MERGE INTO %[1]s a USING (SELECT :1 %[2]s FROM dual) s ON (a.%[2]s = s.%[2]s) WHEN NOT MATCHED THEN INSERT (%[2]s) VALUES (s.%[2]s)",
+		applied, appliedTokenColumn)
+}
+
+// countAppliedSQL counts the recorded tokens among the n bound.
+func countAppliedSQL(applied string, n int) string {
+	return fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE %s IN (%s)", applied, appliedTokenColumn, binds(1, n))
 }
 
 // keyKind is how a key column is sent to JSON_TABLE and compared to the

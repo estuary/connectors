@@ -291,8 +291,8 @@ func TestIntegration(t *testing.T) {
 		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 
-	// An entry's staged rows are applied once. Applying it again finds them
-	// gone, which is an error unless the entry was recovered from the state.
+	// An entry's staged rows are applied once, and applying it again does
+	// nothing. Applying an entry whose rows were deleted is an error.
 	t.Run("apply-staged", func(t *testing.T) {
 		var ctx = context.Background()
 		var db = testConfig().openDB()
@@ -306,26 +306,19 @@ func TestIntegration(t *testing.T) {
 			Keys:       []sql.Column{{Identifier: "id", MappedType: sql.MappedType{BareDDL: "NUMBER(38,0)"}}},
 			Values:     []sql.Column{{Identifier: "val", MappedType: sql.MappedType{BareDDL: "VARCHAR2(10 CHAR)"}}},
 		}
-		var stage = newOracleDialect("FLOW").Identifier(stagePath(table.Path)...)
+		var dialect = newOracleDialect("FLOW")
+		var stage = dialect.Identifier(stagePath(table.Path)...)
 		_, err := db.ExecContext(ctx, "CREATE TABLE "+name+" (id NUMBER(38,0) PRIMARY KEY, val VARCHAR2(10 CHAR))")
 		require.NoError(t, err)
 		defer db.ExecContext(ctx, "DROP TABLE "+name+" PURGE")
-		_, err = db.ExecContext(ctx, createStageSQL(&table, stage))
-		require.NoError(t, err)
-		defer db.ExecContext(ctx, "DROP TABLE "+stage+" PURGE")
+		defer db.ExecContext(ctx, "DROP TABLE IF EXISTS "+stage+" PURGE")
 		_, err = db.ExecContext(ctx, "INSERT INTO "+name+" VALUES (1, 'old')")
 		require.NoError(t, err)
-
-		var entry = &stateItem{Token: newToken(), Inserts: 1, Updates: 1}
-		for _, row := range [][]any{{opUpdate, 1, "new"}, {opInsert, 2, "two"}} {
-			_, err := db.ExecContext(ctx, "INSERT INTO "+stage+" (flow_token, flow_op, id, val) VALUES (:1, :2, :3, :4)", append([]any{entry.Token}, row...)...)
-			require.NoError(t, err)
-		}
 
 		conn, err := db.Conn(ctx)
 		require.NoError(t, err)
 		defer conn.Close()
-		var b = &binding{target: table, stage: stage}
+		var b = &binding{target: table, stage: stage, createStageSQL: createStageSQL(&table, stage)}
 		var tr = &transactor{
 			db:        db,
 			storeConn: conn,
@@ -333,27 +326,54 @@ func TestIntegration(t *testing.T) {
 			be:        m.NewBindingEvents(),
 			rangeKey:  rangeKeyOf(0, math.MaxUint32),
 			primary:   true,
-			recovered: make(map[string]bool),
+			state:     make(connectorState),
+			tag:       taskTag(name),
+			applied:   dialect.Identifier(appliedPath("")...),
 		}
-		apply := func() error {
-			return tr.apply(ctx, map[*binding]map[string]*stateItem{b: {tr.rangeKey: entry}})
+		require.NoError(t, tr.prepareStages(ctx))
+
+		stageRows := func(token string, rows ...[]any) {
+			for _, row := range rows {
+				_, err := db.ExecContext(ctx, "INSERT INTO "+stage+" (flow_token, flow_op, id, val) VALUES (:1, :2, :3, :4)", append([]any{token}, row...)...)
+				require.NoError(t, err)
+			}
 		}
-		rows := func() [][]any {
-			_, got, err := sql.SnapshotTestTableQuery(ctx, db, name, "SELECT id, val FROM "+name)
+		apply := func(e *stateItem) error {
+			return tr.apply(ctx, map[*binding]map[string]*stateItem{b: {tr.rangeKey: e}})
+		}
+		rows := func(query string) [][]any {
+			_, got, err := sql.SnapshotTestTableQuery(ctx, db, name, query)
 			require.NoError(t, err)
 			sql.SortRows(got)
 			return got
 		}
 
-		require.NoError(t, apply())
-		var want = rows()
+		var first = &stateItem{Token: newToken(tr.tag), Inserts: 1, Updates: 1}
+		stageRows(first.Token, []any{opUpdate, 1, "new"}, []any{opInsert, 2, "two"})
+		require.NoError(t, apply(first))
+		var want = rows("SELECT id, val FROM " + name)
 		require.Len(t, want, 2)
 		require.Equal(t, "new", want[0][1])
 
-		require.ErrorContains(t, apply(), "holds 0 of the 2 rows")
-		tr.recovered[entry.Token] = true
-		require.NoError(t, apply())
-		require.Equal(t, want, rows())
+		require.NoError(t, apply(first))
+		require.Equal(t, want, rows("SELECT id, val FROM "+name))
+
+		var second = &stateItem{Token: newToken(tr.tag), Inserts: 1}
+		stageRows(second.Token, []any{opInsert, 3, "three"})
+		_, err = db.ExecContext(ctx, "DELETE FROM "+stage)
+		require.NoError(t, err)
+		require.ErrorContains(t, apply(second), "which were not applied")
+
+		// Open deletes the task's rows staged before the cutoff, unless they're
+		// pending, and no other task's.
+		var old = time.Now().Add(-2 * abandonedAge)
+		var abandoned, pending, foreign = tokenBefore(tr.tag, old) + "a", tokenBefore(tr.tag, old) + "b", tokenBefore(taskTag("other"), old)
+		stageRows(abandoned, []any{opInsert, 4, "four"})
+		stageRows(pending, []any{opInsert, 5, "five"})
+		stageRows(foreign, []any{opInsert, 6, "six"})
+		tr.state.add(table.StateKey, tr.rangeKey, &stateItem{Token: pending})
+		require.NoError(t, tr.prepareStages(ctx))
+		require.Equal(t, [][]any{{"five"}, {"six"}}, rows("SELECT val FROM "+stage))
 	})
 
 	t.Run("apply-drain", func(t *testing.T) {
@@ -362,7 +382,7 @@ func TestIntegration(t *testing.T) {
 			var tableName = fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
 			var res = makeResourceFn(tableName, false).WithDefaults(cfg)
 			var dialect = newOracleDialect("FLOW")
-			var token = newToken()
+			var token = newToken(taskTag(taskName))
 
 			seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
 				var b = appliedSpec.Bindings[0]
@@ -372,7 +392,7 @@ func TestIntegration(t *testing.T) {
 				defer db.Close()
 
 				_, err := db.ExecContext(ctx, fmt.Sprintf(
-					"CREATE TABLE %s AS SELECT CAST(NULL AS VARCHAR2(36)) %s, CAST(NULL AS CHAR(1)) %s, t.* FROM dual LEFT JOIN %s t ON 1 = 0 WHERE 1 = 0",
+					"CREATE TABLE %s AS SELECT CAST(NULL AS VARCHAR2(64)) %s, CAST(NULL AS CHAR(1)) %s, t.* FROM dual LEFT JOIN %s t ON 1 = 0 WHERE 1 = 0",
 					stage, stageTokenColumn, stageOpColumn, target))
 				require.NoError(t, err)
 

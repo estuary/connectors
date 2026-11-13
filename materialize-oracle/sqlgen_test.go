@@ -46,11 +46,12 @@ func TestSQLGeneration(t *testing.T) {
 			sql  string
 		}{
 			{"create stage", createStageSQL(&tbl, stage)},
+			{"index stage", createStageIndexSQL(stage)},
 			{"stage insert", stageInsertSQL(&tbl, stage)},
 			{"apply update", applyDeleteSQL(&tbl, stage, opUpdate, 2)},
 			{"apply insert", applyInsertSQL(&tbl, stage, 2)},
 			{"clear stage", clearStageSQL(stage, 2)},
-			{"prune stage", pruneStageSQL(stage, 1)},
+			{"prune stage", pruneSQL(stage, stageTokenColumn, 1)},
 		} {
 			snap.WriteString("--- Begin " + tbl.Identifier + " " + tc.name + " ---\n")
 			snap.WriteString(tc.sql)
@@ -61,6 +62,20 @@ func TestSQLGeneration(t *testing.T) {
 			snap.WriteString(loadSQL(&tbl))
 			snap.WriteString("\n--- End " + tbl.Identifier + " load ---\n\n")
 		}
+	}
+
+	var applied = testDialect.Identifier(appliedPath("")...)
+	for _, tc := range []struct {
+		name string
+		sql  string
+	}{
+		{"create applied", createAppliedSQL(applied)},
+		{"record applied", recordAppliedSQL(applied)},
+		{"count applied", countAppliedSQL(applied, 2)},
+	} {
+		snap.WriteString("--- Begin " + tc.name + " ---\n")
+		snap.WriteString(tc.sql)
+		snap.WriteString("\n--- End " + tc.name + " ---\n\n")
 	}
 
 	cupaloy.SnapshotT(t, snap.String())

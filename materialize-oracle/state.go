@@ -2,6 +2,8 @@ package connector
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -37,16 +39,23 @@ func (s connectorState) add(stateKey, rangeKey string, e *stateItem) {
 	s[stateKey][rangeKey] = e
 }
 
-// newToken returns a UUIDv7, whose text sorts by the time it was made.
-func newToken() string {
-	return uuid.Must(uuid.NewV7()).String()
+// A token is a task's tag, a hash of its name, then a UUIDv7. The text of one
+// task's tokens sorts by the time they were made.
+func taskTag(materialization string) string {
+	var sum = sha256.Sum256([]byte(materialization))
+	return hex.EncodeToString(sum[:4])
 }
 
-// tokenBefore returns text that sorts after every token made before ts, and
-// before every token made from ts on.
-func tokenBefore(ts time.Time) string {
+func newToken(tag string) string {
+	return tag + "-" + uuid.Must(uuid.NewV7()).String()
+}
+
+// tokenBefore returns text that sorts after every token of tag made before
+// ts, and before every one made from ts on. tag+"-" sorts before all of
+// them.
+func tokenBefore(tag string, ts time.Time) string {
 	var ms = uint64(ts.UnixMilli())
-	return fmt.Sprintf("%08x-%04x-0000-0000-000000000000", ms>>16, ms&0xffff)
+	return fmt.Sprintf("%s-%08x-%04x-0000-0000-000000000000", tag, ms>>16, ms&0xffff)
 }
 
 func rangeKeyOf(keyBegin, keyEnd uint32) string {
