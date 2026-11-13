@@ -30,6 +30,10 @@ const streamV2BatchFileBudget = 4 * 1024 * 1024 * 1024
 // The value is the documented per-channel ceiling.
 const streamV2PaceBytesPerSecond = 20 * 1000 * 1000
 
+// streamV2ErrChannelDoesNotExist is the error code of an append to a channel that
+// Snowflake does not hold, or that the role may not use.
+const streamV2ErrChannelDoesNotExist = "ERR_CHANNEL_DOES_NOT_EXIST_OR_IS_NOT_AUTHORIZED"
+
 // streamV2Channel is a handle for one Snowpipe channel of one connector binding.
 type streamV2Channel struct {
 	// binding is the binding whose table the channel writes to.

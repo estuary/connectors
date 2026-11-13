@@ -398,7 +398,7 @@ func (f *fakeSnowpipe) ingest(w http.ResponseWriter, channel, continuation, star
 			f.reply(w, 200, map[string]any{"next_continuation_token": continuation})
 			return
 		} else if f.state.Deleted[channel] {
-			f.fail(w, 400, "ERR_CHANNEL_DOES_NOT_EXIST_OR_IS_NOT_AUTHORIZED", "")
+			f.fail(w, 400, streamV2ErrChannelDoesNotExist, "")
 			return
 		} else if f.mode == "append_must_reopen" {
 			f.fail(w, 400, "ERR_CHANNEL_MUST_BE_REOPENED", "channel must be reopened")
