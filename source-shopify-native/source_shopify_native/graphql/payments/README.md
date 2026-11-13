@@ -9,8 +9,8 @@ The `payouts` and `balance_transactions` streams capture [Shopify Payments](http
 - Neither payouts nor balance transactions have an updated-at field to read changes by.
 - A payout's status can change after it's issued. Shopify staff say a paid payout can come back failed up to about 10 business days later.
 - A balance transaction's `associatedPayout` id is null until the transaction is put in a payout. That happens when the payout is created, which depends on the store's payout schedule. For manual payouts, it's whenever the merchant asks for one.
-- A payout can't list its own transactions. The only way to get them is the `payments_transfer_id` filter on the account's `balanceTransactions` list. Shopify lists that filter but doesn't say what it matches, so we assume it matches the payout's `legacyResourceId`.
-- Development stores can't generate payouts, so none of this can be tested against real data.
+- A payout can't list its own transactions. The only way to get them is the `payments_transfer_id` filter on the account's `balanceTransactions` list. Shopify lists that filter but doesn't say what it matches, so we assume it matches the payout's `legacyResourceId` (`Payments / payout filters` in the Bruno collection).
+- Development stores can't generate payouts, so none of this can be tested against real data. The Bruno collection's `Payments/` requests record what the test store could show.
 
 ## How the streams work
 
@@ -29,5 +29,5 @@ The `payouts` and `balance_transactions` streams capture [Shopify Payments](http
 
 ## Known gaps
 
-- A Shopify Plus shop can have several business entities, each with its own payments account. The streams read the shop-level account. Shopify doesn't say which account that is in a shop with several entities, and it's probably the primary entity's. Reading every entity's account would need a subtask per entity.
+- A Shopify Plus shop can have several business entities, each with its own payments account. The streams read the shop-level account. Shopify doesn't say which account that is in a shop with several entities, and it's probably the primary entity's (`Payments / business entities` in the Bruno collection). Reading every entity's account would need a subtask per entity.
 - Two reads of the same transaction can overlap at the moment its payout is created. If the older read's null payout id is written last, the transaction keeps it until the next daily `payouts` read writes it again with the id.
