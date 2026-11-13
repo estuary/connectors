@@ -38,14 +38,16 @@ def main() -> None:
          f"    yield window_end + timedelta(seconds={skip_seconds})\n"),
         ("M2", API, "backfill_financial_transactions", "            window_end = smaller_end\n",
          "            pass\n"),
-        ("M3", API, "backfill_orders", "        yield to_iso(window_end + TICK)\n",
-         "        yield to_iso(min(window_start + window_size - TICK, last_tick) + TICK)\n"),
+        ("M3", API, "backfill_orders", '        yield f"{to_iso(window_end + TICK)}|{current_size.total_seconds()}"\n',
+         '        yield f"{to_iso(min(window_start + window_size - TICK, last_tick) + TICK)}|{current_size.total_seconds()}"\n'),
         ("M4", API, "fetch_financial_transactions", "    yield window_end\n",
          "    yield window_end + timedelta(hours=1)\n"),
         ("M5", SIM, None, "            for name, lag in lags.items():\n",
          "            for name, lag in lags.items():\n                if name == resources.LATE:\n                    continue\n"),
         ("M6", SIM, None, "                        self.discarded += len(pending)\n",
          "                        self.committed.extend(pending)\n                        self.discarded += len(pending)\n"),
+        ("M7", API, "backfill_orders", '        yield f"{to_iso(window_end + TICK)}|{current_size.total_seconds()}"\n',
+         "        yield to_iso(window_end + TICK)\n"),
     ]
     survived = []
     for name, path, function, old, new in mutations:

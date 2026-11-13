@@ -145,7 +145,7 @@ class EndpointConfig(BaseModel):
             default=False,
         )
         window_size: Annotated[timedelta, Field(
-            description="Size of the date windows orders and financial transactions are requested in, in ISO 8601 format. E.g. P1D means 1 day, PT6H means 6 hours. Each order window must be paged through within 24 hours, so busy accounts may need smaller windows.",
+            description="Size of the date windows orders and financial transactions are requested in, in ISO 8601 format. E.g. P1D means 1 day, PT6H means 6 hours. Orders backfill doubles single-page windows up to 30 days and retains smaller windows after rejected pagination tokens. Each order window must be paged through within 24 hours, so busy accounts may need smaller windows.",
             title="Window Size",
             default_factory=lambda: timedelta(days=1),
             ge=timedelta(hours=1),

@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import Any, AsyncGenerator, Iterable, cast
@@ -52,6 +53,11 @@ SEARCH_LAG = timedelta(minutes=2, seconds=30)
 # shorter than SEARCH_LAG polls continuously and starves the backfill of
 # searchOrders' rate budget.
 MIN_INCREMENTAL_WINDOW = timedelta(minutes=5)
+
+# At about 180s/page, a 24h token permits about 480 pages, or 48,000 orders
+# at Order.PAGE_SIZE (100, assumed). Windows grown from single-page searches
+# stay well below that budget at 30 days; paging must finish well within 24h.
+MAX_ORDERS_BACKFILL_WINDOW = timedelta(days=30)
 
 # How far behind the present the realtime pass over financial transactions
 # stays. Amazon says financial events may take up to 48 hours to appear; the
@@ -153,16 +159,23 @@ class PaginationTokenRejected(RuntimeError):
     """Amazon rejected a pagination token, most likely because it expired."""
 
 
+@dataclass
+class _OrderSearchPages:
+    count: int = 0
+
+
 async def _search_orders(
     client: SPAPIClient,
     marketplace_ids: list[str],
     request_params: dict[str, str],
     priority: Priority,
     log: Logger,
+    pages: _OrderSearchPages | None = None,
 ) -> AsyncGenerator[Order | SearchOrdersResponse, None]:
     """
     Yields every order matching `request_params` across all pages, then the
     remainder of the final page, whose window bounds Amazon echoes back.
+    If supplied, pages counts the fully read pages without changing the yields.
     """
     params: dict[str, Any] = {
         **request_params,
@@ -202,6 +215,8 @@ async def _search_orders(
             yield order
 
         remainder = processor.get_remainder()
+        if pages is not None:
+            pages.count += 1
         next_token = remainder.pagination.nextToken if remainder.pagination else None
         if not next_token:
             yield remainder
@@ -302,8 +317,12 @@ async def backfill_orders(
     """
     Captures orders created before the cutoff, as they are now, one window
     of creation time per invocation. The page cursor is the next window's
-    start, as an ISO 8601 string.
-    Rejected pagination tokens halve the window, down to a one-hour floor.
+    start and size, as the string `ISO8601|seconds` (seconds may be fractional).
+    A legacy plain ISO 8601 string uses the configured window_size.
+    Single-page windows double the size, capped at 30 days or the configured
+    size if larger. Multi-page windows keep it. Rejected pagination tokens
+    halve the window, down to a one-hour floor, and carry the shrunk size
+    into the next invocation before allowing growth again.
 
     ```
                 window_start      window_end ≤ cutoff−1s   cutoff
@@ -330,17 +349,22 @@ async def backfill_orders(
     """
     assert isinstance(cutoff, datetime)
     last_tick = cutoff - TICK
+    current_size = window_size
 
     if page is None:
         window_start = ceil_to_tick(start_date)
     else:
         assert isinstance(page, str)
-        window_start = datetime.fromisoformat(page)
+        start, separator, seconds = page.partition("|")
+        window_start = datetime.fromisoformat(start)
+        if separator:
+            current_size = timedelta(seconds=float(seconds))
 
     if window_start > last_tick:
         return
 
-    window_end = min(window_start + window_size - TICK, last_tick)
+    window_end = min(window_start + current_size - TICK, last_tick)
+    shrunk = False
 
     # A cutoff from the last few minutes is too recent for searchOrders' upper
     # bound. Wait it out instead of narrowing the window. The wait can't be
@@ -356,9 +380,10 @@ async def backfill_orders(
         }
 
         count = 0
+        pages = _OrderSearchPages()
         try:
             async for item in _search_orders(
-                client, marketplace_ids, request_params, Priority.BACKFILL, log
+                client, marketplace_ids, request_params, Priority.BACKFILL, log, pages
             ):
                 if isinstance(item, Order):
                     count += 1
@@ -380,6 +405,8 @@ async def backfill_orders(
             )
             # Re-emitting orders is safe: the collection reduces by lastUpdatedTime.
             window_end = smaller_end
+            current_size = window_end + TICK - window_start
+            shrunk = True
             continue
         break
 
@@ -389,7 +416,9 @@ async def backfill_orders(
     )
 
     if window_end < last_tick:
-        yield to_iso(window_end + TICK)
+        if not shrunk and pages.count == 1:
+            current_size = min(current_size * 2, max(MAX_ORDERS_BACKFILL_WINDOW, window_size))
+        yield f"{to_iso(window_end + TICK)}|{current_size.total_seconds()}"
 
 
 async def _list_transactions(

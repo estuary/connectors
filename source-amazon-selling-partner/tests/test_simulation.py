@@ -8,13 +8,14 @@ scenario assumption (Amazon's behavior here is not yet verified).
 Mutation audit: from this connector directory run
     PATH=$PWD/../.venv/bin:$PATH python tests/run_simulation_mutations.py
 The helper snapshots bytes, applies each mutation alone, runs only this file,
-and restores in finally; API edits are temporary. Verified M1--M6 all KILLED:
+and restores in finally; API edits are temporary. Verified M1--M7 all KILLED:
 M1 orders checkpoint + configured overlap (10m) + 1h: completed-window oracle.
 M2 finance backfill shrink assignment removed: repeated slow window budget.
 M3 orders backfill checkpoint uses original end: completed-window oracle.
 M4 finance checkpoint + 1h: completed-window oracle.
 M5 runner skips late subtask: independent late-pass coverage.
 M6 runner commits pending docs on crash: rollback oracle.
+M7 orders cursor drops window size: sparse-history request budget.
 A skip inside the orders overlap may legitimately be absorbed on the next
 poll. Final keyed-state equality permits duplicates but rejects missing keys
 and stale versions. M6 is a harness negative control: keeping rolled-back docs
@@ -188,8 +189,8 @@ class Runtime:
                         return cursor, False
                 else:
                     # A checkpoint commits all preceding documents atomically.
-                    previous = parse(cursor) if isinstance(cursor, str) else cursor
-                    next_cursor = parse(item) if isinstance(item, str) else item
+                    previous = parse(cursor.split("|")[0]) if isinstance(cursor, str) else cursor
+                    next_cursor = parse(item.split("|")[0]) if isinstance(item, str) else item
                     assert next_cursor > previous
                     # Check against the actual completed window, including retries.
                     # Later overlap/lookback passes must not hide a skipped seam.
@@ -250,9 +251,9 @@ async def test_fake_clock_backfill_then_incremental(kind, expected_count, monkey
             page, done = await invoke(backfill, page)
             first = amazon.requests[before]
             lower, upper = ("createdAfter", "createdBefore") if kind == "orders" else ("postedAfter", "postedBefore")
-            assert parse(first[lower]) == parse(old_page)
+            assert parse(first[lower]) == parse(old_page.split("|")[0])
             if page != old_page:
-                backfill_starts.append(parse(page))
+                backfill_starts.append(parse(page.split("|")[0]))
             if done:
                 # Last backfill window meets the initial realtime cursor.
                 last_end = parse(amazon.requests[-1][upper])
@@ -346,3 +347,31 @@ async def test_fake_clock_backfill_then_incremental(kind, expected_count, monkey
                                    "invocations": runtime.invocations, "restarts": runtime.restarts,
                                    "expired_tokens": amazon.expirations, "seconds": round(elapsed, 3)})
     assert elapsed < 5
+
+
+@pytest.mark.asyncio
+async def test_sparse_600_day_orders_backfill(monkeypatch):
+    cutoff = START + 600 * DAY
+    clock = SimulationTime(cutoff + DAY)
+    monkeypatch.setattr(api, "now", clock.now)
+    amazon = SimulationAmazon(clock, "orders")
+    amazon.history = {
+        str(day): [(START + day * DAY, order(str(day), START + day * DAY, START + day * DAY))]
+        for day in range(0, 600, 20)
+    }
+    runtime = Runtime(amazon)
+    runtime.restart_points = []
+    page = api.to_iso(START)
+    while True:
+        assert runtime.invocations < 24, "sparse backfill exceeded its 24-window budget"
+        page, done = await runtime.invoke(
+            lambda saved: api.backfill_orders(runtime.client, MARKETPLACES, START, DAY, LOG, saved, cutoff), page
+        )
+        if done:
+            break
+
+    assert {doc.orderId for doc in runtime.committed} == set(amazon.history)
+    # 1 + 2 + 4 + 8 + 16 = 31 days, then ceil(569 / 30) = 19 windows.
+    assert len(amazon.requests) <= 24
+    assert len(amazon.requests) == runtime.invocations
+    assert parse(amazon.requests[-1]["createdBefore"]) == cutoff - api.TICK
