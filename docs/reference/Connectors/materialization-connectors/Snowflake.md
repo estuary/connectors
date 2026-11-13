@@ -393,6 +393,13 @@ boundaries that splitting and joining shards do not produce. In either case,
 [backfill](/reference/backfilling-data/#materialization-backfill) the affected binding to recover: this materializes the
 binding from the beginning and resets the connector's streaming state along with it.
 
+Snowflake deletes a channel, along with its record of which rows the channel holds, after 30 days in which nothing is
+written through it. This happens to a binding whose collection receives no new documents for 30 days, and to every
+binding of a task that stays disabled that long. The connector resumes such a channel from its own checkpoint, so the
+binding needs no backfill. If the task stopped in the middle of a transaction and its channels were deleted before it
+ran again, the rows Snowflake had already received from that transaction are materialized again, and because the
+binding uses delta updates, those duplicates remain in the table.
+
 A backfill truncates the destination table, the same as on every other write path, and
 [`retain_existing_data_on_backfill`](/guides/advanced-usage/feature-flags#retain_existing_data_on_backfill) works the
 same way too.

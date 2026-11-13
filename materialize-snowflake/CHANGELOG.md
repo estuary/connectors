@@ -1,5 +1,11 @@
 # materialize-snowflake
 
+## 2026-11-13
+
+### Fixed
+- High-performance Snowpipe Streaming bindings that receive no new data for
+  30 days no longer fail when their next document arrives.
+
 ## 2026-11-12
 
 ### Changed
