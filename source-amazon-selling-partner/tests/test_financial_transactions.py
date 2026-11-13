@@ -3,10 +3,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from estuary_cdk.http import HTTPError
 from pydantic import ValidationError as PydanticValidationError
 
 from source_amazon_selling_partner import api, resources
 from source_amazon_selling_partner.api import (
+    PaginationTokenRejected,
     backfill_financial_transactions,
     fetch_financial_transactions,
 )
@@ -55,6 +57,151 @@ def record_operations(client: SPAPIClient) -> list[tuple[Operation, Priority]]:
 
     client.get = recording_get  # type: ignore[method-assign]
     return seen
+
+
+def reject_transaction_pages(fake: FakeAmazon, monkeypatch: pytest.MonkeyPatch, *, once: bool = False):
+    list_transactions = fake._list_transactions
+    rejected = False
+
+    def rejecting(params: dict[str, Any]):
+        nonlocal rejected
+        if "nextToken" in params and (not once or not rejected):
+            rejected = True
+            raise HTTPError("400 Bad Request: InvalidInput", 400)
+        return list_transactions(params)
+
+    monkeypatch.setattr(fake, "_list_transactions", rejecting)
+
+
+@pytest.mark.parametrize("backfill", [True, False])
+@pytest.mark.asyncio
+async def test_rejected_token_retries_halved_transactions_window(backfill: bool, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture):
+    start = NOW - timedelta(days=3)
+    end = start + timedelta(days=2)
+    smaller_end = start + DAY
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[],
+        transactions=[transaction(str(i), start + timedelta(minutes=i)) for i in range(1, 4)],
+    )
+    reject_transaction_pages(fake, monkeypatch, once=True)
+    client = client_for(fake)
+    cutoff = NOW - timedelta(hours=1)
+
+    with caplog.at_level(logging.WARNING, logger=LOG.name):
+        if backfill:
+            out = await collect(backfill_financial_transactions(client, start, 2 * DAY, LOG, None, cutoff))
+        else:
+            out = await collect(fetch_financial_transactions(client, api.TRANSACTIONS_REALTIME_LAG, 2 * DAY, LOG, start))
+
+    assert ids(out) == ["1", "2", "1", "2", "3"]
+    assert cursors(out) == [api.to_iso(smaller_end) if backfill else smaller_end]
+    assert len(fake.requests) == 4
+    assert fake.requests[0]["postedBefore"] == api.to_iso(end)
+    assert "nextToken" in fake.requests[1]
+    assert "nextToken" not in fake.requests[2]
+    assert fake.requests[2]["postedAfter"] == fake.requests[0]["postedAfter"]
+    assert fake.requests[2]["postedBefore"] == api.to_iso(smaller_end)
+    assert "nextToken" in fake.requests[3]
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelno == logging.WARNING
+    assert caplog.records[0].msg == "shrinking a financial transactions window after Amazon rejected its page token"
+    assert caplog.records[0].args == {"window_start": start, "window_end": end, "new_window_end": smaller_end}
+
+    if backfill:
+        await collect(backfill_financial_transactions(client, start, 2 * DAY, LOG, out[-1], cutoff))
+    else:
+        await collect(fetch_financial_transactions(client, api.TRANSACTIONS_REALTIME_LAG, 2 * DAY, LOG, out[-1]))
+    assert fake.requests[4]["postedAfter"] == api.to_iso(smaller_end)
+
+
+@pytest.mark.parametrize("backfill", [True, False])
+@pytest.mark.parametrize("span", [timedelta(hours=8, seconds=7), timedelta(hours=1), timedelta(minutes=30)])
+@pytest.mark.asyncio
+async def test_rejected_tokens_shrink_transactions_window_until_floor(backfill: bool, span: timedelta, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture):
+    start = NOW - timedelta(days=3)
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[],
+        transactions=[transaction(str(i), start + timedelta(minutes=i)) for i in range(1, 4)],
+    )
+    reject_transaction_pages(fake, monkeypatch)
+    expected_ends = [start + span]
+    if span > timedelta(hours=1):
+        expected_ends += [
+            start + timedelta(hours=4, seconds=3),
+            start + timedelta(hours=2, seconds=1),
+            start + timedelta(hours=1),
+        ]
+
+    with caplog.at_level(logging.WARNING, logger=LOG.name):
+        with pytest.raises(PaginationTokenRejected, match="already tried smaller windows; reduce the Window Size") as exc:
+            if backfill:
+                await collect(backfill_financial_transactions(client_for(fake), start, span, LOG, None, NOW - timedelta(hours=1)))
+            else:
+                await collect(fetch_financial_transactions(client_for(fake), api.TRANSACTIONS_REALTIME_LAG, span, LOG, start))
+
+    assert isinstance(exc.value.__cause__, HTTPError)
+    assert [r["postedBefore"] for r in fake.requests if "nextToken" not in r] == [api.to_iso(end) for end in expected_ends]
+    assert len(fake.requests) == 2 * len(expected_ends)
+    assert len(caplog.records) == len(expected_ends) - 1
+
+
+@pytest.mark.parametrize("backfill", [True, False])
+@pytest.mark.parametrize("page,code,message", [
+    (1, 400, "400 Bad Request: InvalidInput"),
+    (2, 400, f"400 Bad Request: {api.LWA_TOKEN_URL} invalid_grant"),
+    (2, 403, "403 Access denied"),
+])
+@pytest.mark.asyncio
+async def test_other_transactions_errors_are_unchanged(backfill: bool, page: int, code: int, message: str, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture):
+    start = NOW - timedelta(days=3)
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[],
+        transactions=[transaction(str(i), start + timedelta(minutes=i)) for i in range(1, 4)],
+    )
+    error = HTTPError(message, code)
+    list_transactions = fake._list_transactions
+
+    def failing(params: dict[str, Any]):
+        if len(fake.requests) == page:
+            raise error
+        return list_transactions(params)
+
+    monkeypatch.setattr(fake, "_list_transactions", failing)
+    with pytest.raises(HTTPError) as exc:
+        if backfill:
+            await collect(backfill_financial_transactions(client_for(fake), start, DAY, LOG, None, NOW - timedelta(hours=1)))
+        else:
+            await collect(fetch_financial_transactions(client_for(fake), api.TRANSACTIONS_REALTIME_LAG, DAY, LOG, start))
+    assert exc.value is error
+    assert len(fake.requests) == page
+    assert not caplog.records
+
+
+@pytest.mark.asyncio
+async def test_backfill_waits_only_before_first_transactions_attempt(monkeypatch: pytest.MonkeyPatch):
+    cutoff = NOW - timedelta(seconds=30)
+    start = cutoff - timedelta(hours=4)
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[],
+        transactions=[transaction(str(i), start + timedelta(minutes=i)) for i in range(1, 4)],
+    )
+    reject_transaction_pages(fake, monkeypatch, once=True)
+    slept: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        assert fake.requests == []
+        slept.append(seconds)
+        fake.now = NOW + timedelta(seconds=seconds)
+        monkeypatch.setattr(api, "now", lambda: fake.now)
+
+    monkeypatch.setattr(api.asyncio, "sleep", fake_sleep)
+    out = await collect(backfill_financial_transactions(client_for(fake), start, DAY, LOG, None, cutoff))
+    assert slept == [(cutoff + api.TRANSACTIONS_REALTIME_LAG - NOW).total_seconds()]
+    assert out[-1] == api.to_iso(start + timedelta(hours=2))
 
 
 @pytest.mark.asyncio

@@ -398,14 +398,27 @@ async def _list_transactions(
     Yields every transaction matching `request_params` across all pages,
     including pages Amazon returns empty with a nextToken. Every region
     marketplace is included, since filtering by marketplaceId drops US
-    merchant-fulfilled orders.
+    merchant-fulfilled orders. Rejected page tokens raise PaginationTokenRejected.
     """
     params: dict[str, Any] = dict(request_params)
 
     while True:
-        _, body = await client.get(
-            log, Operation.LIST_TRANSACTIONS, FinancialTransaction.PATH, params, priority
-        )
+        try:
+            _, body = await client.get(
+                log, Operation.LIST_TRANSACTIONS, FinancialTransaction.PATH, params, priority
+            )
+        except HTTPError as err:
+            if (
+                err.code == 400
+                and "nextToken" in params
+                and LWA_TOKEN_URL not in err.message
+            ):
+                raise PaginationTokenRejected(
+                    "Amazon rejected a financial transactions page token. "
+                    "The connector already tried smaller windows; reduce the Window Size "
+                    f"so each window pages through faster.\n\n{err.message}"
+                ) from err
+            raise
 
         processor = IncrementalJsonProcessor(
             body(),
@@ -462,6 +475,7 @@ async def fetch_financial_transactions(
     TRANSACTIONS_LATE_LAG, catching transactions Amazon posts late; the
     lookback subtask reads it a final time with the configured lookback,
     catching deferred transactions it has since released.
+    Rejected page tokens halve the window, down to a one-hour floor.
 
     ```
                    cursor      window_end − ε  window_end ≤ horizon
@@ -501,10 +515,24 @@ async def fetch_financial_transactions(
         return
 
     window_end = min(cursor + min(window_size, MAX_TRANSACTIONS_WINDOW), horizon)
-    async for transaction in _transactions_window(
-        client, cursor, window_end, Priority.INCREMENTAL, log
-    ):
-        yield transaction
+    while True:
+        try:
+            async for transaction in _transactions_window(
+                client, cursor, window_end, Priority.INCREMENTAL, log
+            ):
+                yield transaction
+        except PaginationTokenRejected:
+            smaller_end = floor_to_tick(cursor + (window_end - cursor) / 2)
+            if smaller_end - cursor < timedelta(hours=1):
+                raise
+            log.warning(
+                "shrinking a financial transactions window after Amazon rejected its page token",
+                {"window_start": cursor, "window_end": window_end, "new_window_end": smaller_end},
+            )
+            # Re-emitting transactions is safe: the collection is keyed by transactionId.
+            window_end = smaller_end
+            continue
+        break
 
     yield window_end
 
@@ -520,7 +548,8 @@ async def backfill_financial_transactions(
     """
     Captures transactions posted before the cutoff, one window of posting
     time per invocation. The page cursor is the next window's start, as an
-    ISO 8601 string.
+    ISO 8601 string. Rejected page tokens halve the window, down to a
+    one-hour floor.
 
     ```
                window_start    window_end − ε  window_end ≤ cutoff
@@ -566,10 +595,24 @@ async def backfill_financial_transactions(
     if wait > 0:
         await asyncio.sleep(wait)
 
-    async for transaction in _transactions_window(
-        client, window_start, window_end, Priority.BACKFILL, log
-    ):
-        yield transaction
+    while True:
+        try:
+            async for transaction in _transactions_window(
+                client, window_start, window_end, Priority.BACKFILL, log
+            ):
+                yield transaction
+        except PaginationTokenRejected:
+            smaller_end = floor_to_tick(window_start + (window_end - window_start) / 2)
+            if smaller_end - window_start < timedelta(hours=1):
+                raise
+            log.warning(
+                "shrinking a financial transactions window after Amazon rejected its page token",
+                {"window_start": window_start, "window_end": window_end, "new_window_end": smaller_end},
+            )
+            # Re-emitting transactions is safe: the collection is keyed by transactionId.
+            window_end = smaller_end
+            continue
+        break
 
     if window_end < cutoff:
         yield to_iso(window_end)
