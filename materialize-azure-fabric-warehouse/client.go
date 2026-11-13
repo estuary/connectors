@@ -362,98 +362,111 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 }
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
-	var txn, err = c.db.BeginTx(ctx, nil)
-	if err != nil {
-		return sql.Fence{}, fmt.Errorf("db.BeginTx: %w", err)
-	}
-	defer func() {
-		if txn != nil {
-			_ = txn.Rollback()
+	// A deadlock or snapshot-isolation conflict aborts the whole transaction,
+	// so the entire read-modify-write below is retried from a fresh
+	// transaction rather than just the statement that failed. This can
+	// happen when two materializations install a fence against the same
+	// schema concurrently.
+	result := fence
+	if err := commitRetry.Do(ctx, "installing fence", func(ctx context.Context) error {
+		result = fence
+
+		var txn, err = c.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("db.BeginTx: %w", err)
 		}
-	}()
+		defer func() {
+			if txn != nil {
+				_ = txn.Rollback()
+			}
+		}()
 
-	// Increment the fence value of _any_ checkpoint which overlaps our key range.
-	if _, err = txn.Exec(
-		fmt.Sprintf(`
-			UPDATE %s
-				SET fence=fence+1
-				WHERE materialization=%s
-				AND key_end>=%s
-				AND key_begin<=%s
-			;
-			`,
-			checkpoints.Identifier,
-			checkpoints.Keys[0].Placeholder,
-			checkpoints.Keys[1].Placeholder,
-			checkpoints.Keys[2].Placeholder,
-		),
-		fence.Materialization,
-		fence.KeyBegin,
-		fence.KeyEnd,
-	); err != nil {
-		return sql.Fence{}, fmt.Errorf("incrementing fence: %w", err)
+		// Increment the fence value of _any_ checkpoint which overlaps our key range.
+		if _, err = txn.Exec(
+			fmt.Sprintf(`
+				UPDATE %s
+					SET fence=fence+1
+					WHERE materialization=%s
+					AND key_end>=%s
+					AND key_begin<=%s
+				;
+				`,
+				checkpoints.Identifier,
+				checkpoints.Keys[0].Placeholder,
+				checkpoints.Keys[1].Placeholder,
+				checkpoints.Keys[2].Placeholder,
+			),
+			result.Materialization,
+			result.KeyBegin,
+			result.KeyEnd,
+		); err != nil {
+			return fmt.Errorf("incrementing fence: %w", err)
+		}
+
+		// Read the checkpoint with the narrowest [key_begin, key_end] which fully overlaps our range.
+		var readBegin, readEnd uint32
+		var checkpoint string
+
+		if err = txn.QueryRow(
+			fmt.Sprintf(`
+				SELECT TOP 1 fence, key_begin, key_end, "checkpoint"
+					FROM %s
+					WHERE materialization=%s
+					AND key_begin<=%s
+					AND key_end>=%s
+					ORDER BY key_end - key_begin ASC
+				;
+				`,
+				checkpoints.Identifier,
+				checkpoints.Keys[0].Placeholder,
+				checkpoints.Keys[1].Placeholder,
+				checkpoints.Keys[2].Placeholder,
+			),
+			result.Materialization,
+			result.KeyBegin,
+			result.KeyEnd,
+		).Scan(&result.Fence, &readBegin, &readEnd, &checkpoint); err == stdsql.ErrNoRows {
+			// Set an invalid range, which compares as unequal to trigger an insertion below.
+			readBegin, readEnd = 1, 0
+		} else if err != nil {
+			return fmt.Errorf("scanning fence and checkpoint: %w", err)
+		} else if result.Checkpoint, err = base64.StdEncoding.DecodeString(checkpoint); err != nil {
+			return fmt.Errorf("base64.Decode(checkpoint): %w", err)
+		}
+
+		// If a checkpoint for this exact range doesn't exist then insert it now.
+		if readBegin == result.KeyBegin && readEnd == result.KeyEnd {
+			// Exists; no-op.
+		} else if _, err = txn.Exec(
+			fmt.Sprintf(
+				`INSERT INTO %s (materialization, key_begin, key_end, fence, "checkpoint") VALUES (%s, %s, %s, %s, %s);`,
+				checkpoints.Identifier,
+				checkpoints.Keys[0].Placeholder,
+				checkpoints.Keys[1].Placeholder,
+				checkpoints.Keys[2].Placeholder,
+				checkpoints.Values[0].Placeholder,
+				checkpoints.Values[1].Placeholder,
+			),
+			result.Materialization,
+			result.KeyBegin,
+			result.KeyEnd,
+			result.Fence,
+			base64.StdEncoding.EncodeToString(result.Checkpoint),
+		); err != nil {
+			return fmt.Errorf("inserting fence: %w", err)
+		}
+
+		err = txn.Commit()
+		txn = nil // Disable deferred rollback.
+
+		if err != nil {
+			return fmt.Errorf("txn.Commit: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return sql.Fence{}, err
 	}
-
-	// Read the checkpoint with the narrowest [key_begin, key_end] which fully overlaps our range.
-	var readBegin, readEnd uint32
-	var checkpoint string
-
-	if err = txn.QueryRow(
-		fmt.Sprintf(`
-			SELECT TOP 1 fence, key_begin, key_end, "checkpoint"
-				FROM %s
-				WHERE materialization=%s
-				AND key_begin<=%s
-				AND key_end>=%s
-				ORDER BY key_end - key_begin ASC
-			;
-			`,
-			checkpoints.Identifier,
-			checkpoints.Keys[0].Placeholder,
-			checkpoints.Keys[1].Placeholder,
-			checkpoints.Keys[2].Placeholder,
-		),
-		fence.Materialization,
-		fence.KeyBegin,
-		fence.KeyEnd,
-	).Scan(&fence.Fence, &readBegin, &readEnd, &checkpoint); err == stdsql.ErrNoRows {
-		// Set an invalid range, which compares as unequal to trigger an insertion below.
-		readBegin, readEnd = 1, 0
-	} else if err != nil {
-		return sql.Fence{}, fmt.Errorf("scanning fence and checkpoint: %w", err)
-	} else if fence.Checkpoint, err = base64.StdEncoding.DecodeString(checkpoint); err != nil {
-		return sql.Fence{}, fmt.Errorf("base64.Decode(checkpoint): %w", err)
-	}
-
-	// If a checkpoint for this exact range doesn't exist then insert it now.
-	if readBegin == fence.KeyBegin && readEnd == fence.KeyEnd {
-		// Exists; no-op.
-	} else if _, err = txn.Exec(
-		fmt.Sprintf(
-			`INSERT INTO %s (materialization, key_begin, key_end, fence, "checkpoint") VALUES (%s, %s, %s, %s, %s);`,
-			checkpoints.Identifier,
-			checkpoints.Keys[0].Placeholder,
-			checkpoints.Keys[1].Placeholder,
-			checkpoints.Keys[2].Placeholder,
-			checkpoints.Values[0].Placeholder,
-			checkpoints.Values[1].Placeholder,
-		),
-		fence.Materialization,
-		fence.KeyBegin,
-		fence.KeyEnd,
-		fence.Fence,
-		base64.StdEncoding.EncodeToString(fence.Checkpoint),
-	); err != nil {
-		return sql.Fence{}, fmt.Errorf("inserting fence: %w", err)
-	}
-
-	err = txn.Commit()
-	txn = nil // Disable deferred rollback.
-
-	if err != nil {
-		return sql.Fence{}, fmt.Errorf("txn.Commit: %w", err)
-	}
-	return fence, nil
+	return result, nil
 }
 
 func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {

@@ -160,6 +160,37 @@ func TestMergeBoundsBuilder(t *testing.T) {
 	}
 }
 
+func TestMergeBoundsBuilderNullKey(t *testing.T) {
+	literaler := ToLiteralFn(QuoteTransform("'", "''"))
+	field := func(name string, inf pf.Inference) Column {
+		return Column{Identifier: name, Projection: Projection{Projection: pf.Projection{Field: name, Inference: inf}}}
+	}
+	str := field("str", pf.Inference{Types: []string{"string"}})
+	num := field("num", pf.Inference{Types: []string{"integer"}})
+	ts := field("ts", pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{Format: "date-time"}})
+
+	for _, tt := range []struct {
+		name string
+		keys [][]any
+		want string
+	}{
+		{"a null string after other values", [][]any{{"a", int64(1), "2025-05-05T00:00:00Z"}, {nil, int64(2), "2025-05-05T00:00:00Z"}}, `key field "str" is null`},
+		{"a null number as the first value", [][]any{{"a", nil, "2025-05-05T00:00:00Z"}}, `key field "num" is null`},
+		{"a null date-time", [][]any{{"a", int64(1), nil}}, `key field "ts" is null`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			b := NewMergeBoundsBuilder([]Column{str, num, ts}, literaler)
+			var err error
+			for _, k := range tt.keys {
+				if err = b.NextKey(k); err != nil {
+					break
+				}
+			}
+			require.EqualError(t, err, tt.want)
+		})
+	}
+}
+
 func TestRootLevelColumns(t *testing.T) {
 	// Create test columns with different pointer paths
 	columns := []Column{
@@ -263,7 +294,6 @@ func TestMergeBoundsBuilderDatetimeKeys(t *testing.T) {
 			MergeBound{datetime, literaler("2025-05-04"), literaler("2025-05-07"), nil}},
 		{"an unparseable value drops the bound", exact, withKey("2025-05-05 00:00:00", "k"), MergeBound{datetime, "", "", nil}},
 		{"an unparseable value drops the date bound", nil, withKey("2025-05-05 00:00:00", "k"), MergeBound{datetime, "", "", nil}},
-		{"a null key drops the bound", exact, withKey(nil, "k"), MergeBound{datetime, "", "", nil}},
 		{"dates before year 1 drop the bound", nil, withKey("0001-01-01T00:00:00Z", "k"), MergeBound{datetime, "", "", nil}},
 		{"dates after year 9999 drop the bound", nil, withKey("9999-12-31T00:00:00Z", "k"), MergeBound{datetime, "", "", nil}},
 		{"year edges still get exact bounds", exact, withKey("0001-01-01T00:00:00Z", "k"),

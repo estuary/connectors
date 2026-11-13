@@ -48,6 +48,11 @@ type checkpointItem struct {
 	// attributing its commit's row stats. Recovered and peer entries are
 	// reported outside of round pairing, so theirs is left zero.
 	round int
+	// rangeFirst marks an entry recovered from {rangeKey: {stateKey: entry}},
+	// the layout earlier versions wrote, which is where it is cleared.
+	// TODO(#5681): remove three months after the release that stopped
+	// writing that layout has rolled out.
+	rangeFirst bool
 }
 
 // mergeBoundLiterals is the serialized form of a key column's sql.MergeBound:
@@ -77,10 +82,19 @@ func boundsLiterals(bounds []sql.MergeBound) []mergeBoundLiterals {
 	return out
 }
 
-type checkpoint = map[string]*checkpointItem  // keyed by bare StateKey
-type rangeCheckpoints = map[string]checkpoint // keyed by "%08x-%08x"
+// checkpoints holds entries by binding StateKey, then by the range key
+// ("%08x-%08x") of the shard that staged them, which is how they persist.
+type checkpoints map[string]map[string]*checkpointItem
+
+func (c checkpoints) add(stateKey, rangeKey string, item *checkpointItem) {
+	if c[stateKey] == nil {
+		c[stateKey] = make(map[string]*checkpointItem)
+	}
+	c[stateKey][rangeKey] = item
+}
 
 // legacyRangeKey holds entries written before range-scoping (bare StateKey).
+// TODO(#5681): remove after 2026-12-02.
 const legacyRangeKey = ""
 
 var rangeKeyRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{8}$`)
@@ -131,13 +145,12 @@ type transactor struct {
 
 	bindings []*binding
 	be       *m.BindingEvents
-	cp       checkpoint
-	// peerShardsCheckpoints holds pending entries of other shards, and of
-	// sessions predating the range-scoped checkpoint format (legacyRangeKey).
-	// Only the primary shard tracks and executes these.
-	peerShardsCheckpoints rangeCheckpoints
-	primaryShard          bool
-	rangeKey              string
+	// cp holds this shard's entries under its own range key. The primary
+	// shard also holds, and alone executes, the pending entries of other
+	// shards and of sessions predating range-scoping (legacyRangeKey).
+	cp           checkpoints
+	primaryShard bool
+	rangeKey     string
 	// truncateAfterBackfill permits deleting the rows published before a
 	// completed backfill.
 	truncateAfterBackfill bool
@@ -201,8 +214,7 @@ func prepareNewTransactor(
 			skipCleanup:           featureFlags["skip_cleanup"],
 			client:                client,
 			be:                    be,
-			cp:                    make(checkpoint, 0),
-			peerShardsCheckpoints: make(rangeCheckpoints),
+			cp:                    make(checkpoints),
 			primaryShard:          primaryShard,
 			rangeKey:              fmt.Sprintf("%08x-%08x", keyBegin, keyEnd),
 			truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
@@ -355,41 +367,64 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 		return nil
 	}
 
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(state, &raw); err != nil {
-		return fmt.Errorf("unmarshaling checkpoint state: %w", err)
+	cp, err := parseCheckpoints(state)
+	if err != nil {
+		return err
 	}
-
-	for key, val := range raw {
-		if rangeKeyRe.MatchString(key) {
-			var bucket checkpoint
-			if err := json.Unmarshal(val, &bucket); err != nil {
-				return fmt.Errorf("unmarshaling checkpoint range %q: %w", key, err)
-			}
-			if key == t.rangeKey {
-				t.cp = bucket
-			} else {
-				t.peerShardsCheckpoints[key] = bucket
-			}
-			continue
-		}
-
-		// A bare StateKey: an entry from before range-scoping was added.
-		var item checkpointItem
-		if err := json.Unmarshal(val, &item); err != nil {
-			return fmt.Errorf("unmarshaling checkpoint entry %q: %w", key, err)
-		}
-		t.legacyBucket()[key] = &item
-	}
+	t.cp = cp
 
 	return nil
 }
 
-func (t *transactor) legacyBucket() checkpoint {
-	if t.peerShardsCheckpoints[legacyRangeKey] == nil {
-		t.peerShardsCheckpoints[legacyRangeKey] = make(checkpoint)
+// parseCheckpoints decodes a checkpoint, persisted as {stateKey: {rangeKey:
+// entry}}. Entries that earlier versions wrote as {rangeKey: {stateKey:
+// entry}} are marked rangeFirst, and entries from before range-scoping are
+// held under legacyRangeKey.
+func parseCheckpoints(state json.RawMessage) (checkpoints, error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(state, &raw); err != nil {
+		return nil, fmt.Errorf("unmarshaling checkpoint state: %w", err)
 	}
-	return t.peerShardsCheckpoints[legacyRangeKey]
+
+	var out = make(checkpoints)
+	for key, val := range raw {
+		var nested map[string]*checkpointItem
+		var err = json.Unmarshal(val, &nested)
+
+		if rangeKeyRe.MatchString(key) {
+			if err != nil {
+				return nil, fmt.Errorf("unmarshaling checkpoint range %q: %w", key, err)
+			}
+			for stateKey, item := range nested {
+				if item != nil {
+					item.rangeFirst = true
+				}
+				out.add(stateKey, key, item)
+			}
+		} else if err == nil && allRangeKeys(nested) {
+			for rangeKey, item := range nested {
+				out.add(key, rangeKey, item)
+			}
+		} else {
+			// A bare StateKey: an entry from before range-scoping was added.
+			var item checkpointItem
+			if err := json.Unmarshal(val, &item); err != nil {
+				return nil, fmt.Errorf("unmarshaling checkpoint entry %q: %w", key, err)
+			}
+			out.add(key, legacyRangeKey, &item)
+		}
+	}
+
+	return out, nil
+}
+
+func allRangeKeys(nested map[string]*checkpointItem) bool {
+	for key := range nested {
+		if !rangeKeyRe.MatchString(key) {
+			return false
+		}
+	}
+	return true
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
@@ -402,8 +437,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("converting load key: %w", err)
 		} else if err = t.loadFiles.WriteRow(ctx, it.Binding, converted); err != nil {
 			return fmt.Errorf("writing normalized key to keyfile: %w", err)
-		} else {
-			b.loadMergeBounds.NextKey(b.boundsKey(converted))
+		} else if err := b.loadMergeBounds.NextKey(b.boundsKey(converted)); err != nil {
+			return fmt.Errorf("tracking Load key bounds for resource %s: %w", b.target.Path, err)
 		}
 	}
 	if it.Err() != nil {
@@ -533,8 +568,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		} else if err = t.storeFiles.WriteRow(ctx, it.Binding, append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
-		} else {
-			b.storeMergeBounds.NextKey(b.boundsKey(converted[:len(b.target.Keys)]))
+		} else if err := b.storeMergeBounds.NextKey(b.boundsKey(converted[:len(b.target.Keys)])); err != nil {
+			return nil, fmt.Errorf("tracking Store key bounds for resource %s: %w", b.target.Path, err)
 		}
 	}
 	if it.Err() != nil {
@@ -551,13 +586,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
 		}
 
-		t.cp[b.target.StateKey] = &checkpointItem{
+		t.cp.add(b.target.StateKey, t.rangeKey, &checkpointItem{
 			Bounds:     boundsLiterals(b.storeMergeBounds.Build()),
 			NeedsMerge: b.mustMerge,
 			SourceURIs: uris,
 			JobPrefix:  uuid.NewString(),
 			round:      it.Round,
-		}
+		})
 
 		b.mustMerge = false
 		b.storeMergeBounds.Reset()
@@ -565,19 +600,25 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	for binding, boundary := range t.truncations {
 		var b = t.bindings[binding]
-		if t.cp[b.target.StateKey] == nil {
-			t.cp[b.target.StateKey] = &checkpointItem{JobPrefix: uuid.NewString(), round: it.Round}
+		if t.cp[b.target.StateKey][t.rangeKey] == nil {
+			t.cp.add(b.target.StateKey, t.rangeKey, &checkpointItem{JobPrefix: uuid.NewString(), round: it.Round})
 		}
-		t.cp[b.target.StateKey].TruncateBefore = &boundary
+		t.cp[b.target.StateKey][t.rangeKey].TruncateBefore = &boundary
 	}
 	t.truncations = nil
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		// Nest under this shard's range key: range keys are disjoint across
-		// shards, so concurrent patches never clobber when the runtime
-		// consolidates connector state. A single-shard task uses the same
-		// format, with one bucket covering the full key range.
-		var checkpointJSON, err = json.Marshal(rangeCheckpoints{t.rangeKey: t.cp})
+		// Record this shard's entries, which sit under its range key: range
+		// keys are disjoint across shards, so concurrent patches never
+		// clobber when the runtime consolidates connector state. A
+		// single-shard task uses the same format, with the full key range.
+		var patch = make(checkpoints, len(t.cp))
+		for stateKey, bucket := range t.cp {
+			if item := bucket[t.rangeKey]; item != nil {
+				patch.add(stateKey, t.rangeKey, item)
+			}
+		}
+		var checkpointJSON, err = json.Marshal(patch)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
@@ -599,34 +640,17 @@ func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 			return fmt.Errorf("unexpected state reset patch in aggregated shard state")
 		}
 
-		var raw map[string]json.RawMessage
-		if err := json.Unmarshal(patch, &raw); err != nil {
+		peers, err := parseCheckpoints(patch)
+		if err != nil {
 			return fmt.Errorf("parsing aggregated state patch: %w", err)
 		}
 
-		for key, val := range raw {
-			if key == t.rangeKey {
-				continue // our own contribution, echoed back by the runtime
-			}
-
-			if !rangeKeyRe.MatchString(key) {
-				var item checkpointItem
-				if err := json.Unmarshal(val, &item); err != nil {
-					return fmt.Errorf("parsing aggregated state patch entry %q: %w", key, err)
+		for stateKey, bucket := range peers {
+			for rangeKey, item := range bucket {
+				if rangeKey == t.rangeKey {
+					continue // our own contribution, echoed back by the runtime
 				}
-				t.legacyBucket()[key] = &item
-				continue
-			}
-
-			var bucket checkpoint
-			if err := json.Unmarshal(val, &bucket); err != nil {
-				return fmt.Errorf("parsing aggregated state patch bucket %q: %w", key, err)
-			}
-			if t.peerShardsCheckpoints[key] == nil {
-				t.peerShardsCheckpoints[key] = make(checkpoint)
-			}
-			for stateKey, item := range bucket {
-				t.peerShardsCheckpoints[key][stateKey] = item
+				t.cp.add(stateKey, rangeKey, item)
 			}
 		}
 	}
@@ -672,7 +696,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	if !t.primaryShard {
 		for _, b := range t.bindings {
 			if shouldProcess(b.target.StateKey) {
-				delete(t.cp, b.target.StateKey)
+				delete(t.cp[b.target.StateKey], t.rangeKey)
 			}
 		}
 		return nil, nil
@@ -697,7 +721,6 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 	// unlimited just to maintain some sense of decorum.
 	group.SetLimit(100)
 
-	var peerRangeKeys = slices.Sorted(maps.Keys(t.peerShardsCheckpoints))
 	var drained []pendingItem
 
 	for _, b := range t.bindings {
@@ -711,11 +734,11 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 		// This binding's pending entries: its own, then those of legacy
 		// sessions and peer shards.
 		var items []pendingItem
-		if item := t.cp[sk]; item != nil {
+		if item := t.cp[sk][t.rangeKey]; item != nil {
 			items = append(items, pendingItem{t.rangeKey, sk, item})
 		}
-		for _, rk := range peerRangeKeys {
-			if item := t.peerShardsCheckpoints[rk][sk]; item != nil {
+		for _, rk := range slices.Sorted(maps.Keys(t.cp[sk])) {
+			if item := t.cp[sk][rk]; item != nil && rk != t.rangeKey {
 				items = append(items, pendingItem{rk, sk, item})
 			}
 		}
@@ -835,24 +858,24 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 	}
 
 	// Null each executed entry at the JSON path it occupies: nested under
-	// its range key, or top-level for legacyRangeKey.
+	// its state key then range key, the reverse for rangeFirst entries, or
+	// top-level for legacyRangeKey.
 	var clear = make(map[string]interface{})
+	var clearAt = func(outer, inner string) {
+		if clear[outer] == nil {
+			clear[outer] = make(map[string]interface{})
+		}
+		clear[outer].(map[string]interface{})[inner] = nil
+	}
 	for _, d := range drained {
 		if d.rangeKey == legacyRangeKey {
 			clear[d.stateKey] = nil
-			delete(t.legacyBucket(), d.stateKey)
-			continue
-		}
-		if clear[d.rangeKey] == nil {
-			clear[d.rangeKey] = make(map[string]interface{})
-		}
-		clear[d.rangeKey].(map[string]interface{})[d.stateKey] = nil
-
-		if d.rangeKey == t.rangeKey {
-			delete(t.cp, d.stateKey)
+		} else if d.item.rangeFirst {
+			clearAt(d.rangeKey, d.stateKey)
 		} else {
-			delete(t.peerShardsCheckpoints[d.rangeKey], d.stateKey)
+			clearAt(d.stateKey, d.rangeKey)
 		}
+		delete(t.cp[d.stateKey], d.rangeKey)
 	}
 
 	checkpointJSON, err := json.Marshal(clear)

@@ -121,10 +121,17 @@ func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string, opts
 	return b
 }
 
-// NextKey updates the observed minimum and maximum key for a transaction.
-func (b *MergeBoundsBuilder) NextKey(key []any) {
+// NextKey updates the observed minimum and maximum key for a transaction. A
+// null key field is an error, because a null has no order among the other
+// values.
+func (b *MergeBoundsBuilder) NextKey(key []any) error {
 	if len(key) != len(b.keyColumns) {
 		panic(fmt.Sprintf("application error: %d key fields vs. %d key columns for merge query bounds", len(key), len(b.keyColumns)))
+	}
+	for idx, k := range key {
+		if k == nil {
+			return fmt.Errorf("key field %q is null", b.keyColumns[idx].Field)
+		}
 	}
 
 	if b.lower == nil {
@@ -160,6 +167,8 @@ func (b *MergeBoundsBuilder) NextKey(key []any) {
 			spans.observe(k)
 		}
 	}
+
+	return nil
 }
 
 func isDateColumn(col Column) bool {

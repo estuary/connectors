@@ -1,6 +1,8 @@
 from estuary_cdk.capture.document import BaseDocument
 from estuary_cdk.capture.task import (
+    DEFAULT_ARRAY_BOUNDS,
     DEFAULT_NUMERIC_BOUNDS,
+    DEFAULT_NUMERIC_STRING_BOUNDS,
     DEFAULT_STRING_BOUNDS,
     with_sourced_schema_defaults,
 )
@@ -9,6 +11,8 @@ STRING_MIN = DEFAULT_STRING_BOUNDS["minLength"]
 STRING_MAX = DEFAULT_STRING_BOUNDS["maxLength"]
 NUMERIC_MIN = DEFAULT_NUMERIC_BOUNDS["minimum"]
 NUMERIC_MAX = DEFAULT_NUMERIC_BOUNDS["maximum"]
+ITEMS_MIN = DEFAULT_ARRAY_BOUNDS["minItems"]
+ITEMS_MAX = DEFAULT_ARRAY_BOUNDS["maxItems"]
 
 
 def test_a_bare_schema_gets_every_default():
@@ -41,6 +45,7 @@ def test_numeric_and_boolean_locations():
                 "i": {"type": "integer"},
                 "n": {"type": "number"},
                 "b": {"type": "boolean"},
+                "s": {"type": "string", "format": "integer"},
             }
         }
     )
@@ -53,6 +58,13 @@ def test_numeric_and_boolean_locations():
     assert out["properties"]["n"]["maximum"] == NUMERIC_MAX
     # Booleans have nothing to bound.
     assert out["properties"]["b"] == {"type": "boolean"}
+    assert out["properties"]["s"] == {
+        "type": "string",
+        "format": "integer",
+        "minLength": STRING_MIN,
+        "maxLength": STRING_MAX,
+        **DEFAULT_NUMERIC_STRING_BOUNDS,
+    }
 
 
 def test_what_the_connector_declared_wins():
@@ -68,6 +80,10 @@ def test_what_the_connector_declared_wins():
                 "_meta": own_meta,
                 "id": {"type": "string", "minLength": 15, "maxLength": 18},
                 "lat": {"type": "number", "minimum": -90, "maximum": 90},
+                "tags": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                },
             },
         }
     )
@@ -83,6 +99,11 @@ def test_what_the_connector_declared_wins():
     assert out["properties"]["id"]["maxLength"] == 18
     assert out["properties"]["lat"]["minimum"] == -90
     assert out["properties"]["lat"]["maximum"] == 90
+    assert out["properties"]["tags"]["additionalProperties"] == {
+        "type": "string",
+        "minLength": STRING_MIN,
+        "maxLength": STRING_MAX,
+    }
 
 
 def test_a_declared_meta_still_gets_the_runtime_owned_uuid():
@@ -198,6 +219,8 @@ def test_every_nested_location_is_reached():
             "properties": {
                 "nested": {"properties": {"deep": {"type": "string"}}},
                 "list": {"type": "array", "items": {"type": "string"}},
+                "bare_list": {"type": "array"},
+                "bare": {"type": "object"},
                 "either": {"oneOf": [{"type": "string"}, {"type": "integer"}]},
             },
             "patternProperties": {"^x-": {"type": "string"}},
@@ -210,7 +233,16 @@ def test_every_nested_location_is_reached():
     assert nested["required"] == ["deep"]
     assert nested["properties"]["deep"]["maxLength"] == STRING_MAX
 
+    assert out["properties"]["list"]["minItems"] == ITEMS_MIN
+    assert out["properties"]["list"]["maxItems"] == ITEMS_MAX
     assert out["properties"]["list"]["items"]["maxLength"] == STRING_MAX
+    assert out["properties"]["bare_list"] == {
+        "type": "array",
+        "minItems": ITEMS_MIN,
+        "maxItems": ITEMS_MAX,
+        "items": False,
+    }
+    assert out["properties"]["bare"] == {"type": "object", "additionalProperties": False}
     assert out["properties"]["either"]["oneOf"][0]["maxLength"] == STRING_MAX
     assert out["properties"]["either"]["oneOf"][1]["maximum"] == NUMERIC_MAX
     assert out["patternProperties"]["^x-"]["maxLength"] == STRING_MAX

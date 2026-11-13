@@ -121,6 +121,12 @@ func newStagedFile(tempdir string, uploads *semaphore.Weighted) *stagedFile {
 
 const MaxConcurrentUploads = 5
 
+// stagedFileSizeLimit is the compressed size at which a staged file is closed
+// and uploaded while rows are still being written. A transaction's last file
+// uploads after its final row, so a smaller limit shortens that wait, and
+// Snowflake loads the files of a query in parallel, one file per thread.
+const stagedFileSizeLimit = 64 << 20
+
 // The gosnowflake driver hands uploadPartSize to the S3 transfer manager as
 // both the part size and the multipart threshold. The transfer manager then
 // reads one part up front and keeps a pool of uploadParallel+1 parts, so every
@@ -203,8 +209,8 @@ func (f *stagedFile) writeRow(row []interface{}) error {
 	}
 
 	// Concurrently start the PUT process for this file if the current file has reached
-	// fileSizeLimit.
-	if f.writer.Written() >= writer.DefaultJsonFileSizeLimit {
+	// stagedFileSizeLimit.
+	if f.writer.Written() >= stagedFileSizeLimit {
 		if err := f.putFile(); err != nil {
 			return fmt.Errorf("writeRow putFile: %w", err)
 		}
