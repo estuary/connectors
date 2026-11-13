@@ -384,14 +384,25 @@ this write path has different delivery semantics than every other Snowflake writ
   When the interrupted transaction is retried, the connector establishes which rows Snowflake already holds and
   sends only the remainder, so the retry does not duplicate them.
 * **Every transaction that commits is delivered exactly once**, including across task restarts, unclean shutdowns,
-  and splitting or joining the task's shards.
+  and splitting or joining the task's shards. The one exception is a deleted channel, described below.
 
-If the connector cannot establish which rows Snowflake already holds, it fails rather than risk duplicating or dropping
-rows. This happens if Snowflake's record of a channel no longer matches the task's checkpoint — for example, because
+Apart from a deleted channel, described below, if the connector cannot establish which rows Snowflake already holds,
+it fails rather than risk duplicating or dropping rows. This happens if Snowflake's record of a channel no longer matches the task's checkpoint — for example, because
 the destination lost data the connector had already committed — or if the task's shard key ranges were changed to
 boundaries that splitting and joining shards do not produce. In either case,
 [backfill](/reference/backfilling-data/#materialization-backfill) the affected binding to recover: this materializes the
 binding from the beginning and resets the connector's streaming state along with it.
+
+Snowflake deletes a channel, along with its record of which rows the channel holds, after 30 days in which nothing is
+written through it. This happens to a binding whose collection receives no new documents for 30 days, and to every
+binding of a task that stays disabled that long. The connector resumes such a channel from its own checkpoint, so the
+binding needs no backfill. If the task stopped in the middle of a transaction and its channels were deleted before it
+ran again, the rows Snowflake had already received from that transaction are materialized again, and because the
+binding uses delta updates, those duplicates remain in the table.
+
+Replacing the table outside Estuary also leaves its channels without a record of which rows they hold. The connector
+cannot tell this apart from a deleted channel, so it keeps writing to the new table, which lacks the rows written
+before. Backfill the binding after you replace its table.
 
 A backfill truncates the destination table, the same as on every other write path, and
 [`retain_existing_data_on_backfill`](/guides/advanced-usage/feature-flags#retain_existing_data_on_backfill) works the

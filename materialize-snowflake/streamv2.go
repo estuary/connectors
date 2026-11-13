@@ -754,7 +754,12 @@ func (m *streamV2Manager) waitCommit(ctx context.Context, b *streamV2Binding, ch
 
 	var started = time.Now()
 	var statuses, err = m.client.WaitCommit(ctx, tokens)
-	if err != nil {
+	if unknown, ok := errors.AsType[*streamV2UnknownChannelError](err); ok {
+		return fmt.Errorf(
+			"channel %q of %s is unknown to Snowflake, which deletes a channel after 30 days without ingestion or when it is dropped: the rows this transaction appended to it did not land. The task resumes from its checkpoint when it restarts",
+			unknown.channelName, b.table,
+		)
+	} else if err != nil {
 		return fmt.Errorf("waiting for commit on %s: %w", b.table, err)
 	}
 
@@ -783,14 +788,18 @@ func streamV2ValidateCommittedToken(channelName, table string, committedToken *s
 		routed = sv2ChannelCheckpointItem.Routed
 	}
 
+	// A checkpoint item is written only after Snowflake commits its channel through
+	// Routed, so a table that was not replaced holds every document through Routed
+	// even once the channel and its token are gone.
 	if committedToken == nil {
 		if routed > 0 {
-			return 0, fmt.Errorf(
-				"channel %q reports no committed offset token while this task's checkpoint records offset %d for it: Snowflake has lost this channel's committed offset token, so this shard cannot identify which of its documents Snowflake still holds. Backfill this binding",
-				channelName, routed,
-			)
+			log.WithFields(log.Fields{
+				"table":   table,
+				"channel": channelName,
+				"routed":  routed,
+			}).Warn("snowpipe streaming v2: Snowflake reports no offset token for this channel, so the channel resumes from the checkpoint's offset. Snowflake deletes a channel and its token after 30 days without ingestion. If the table was instead replaced outside Estuary, it lacks the rows written before it was replaced, and the binding needs a backfill. A transaction interrupted before its checkpoint may be appended again")
 		}
-		return 0, nil
+		return routed, nil
 	}
 
 	committedOffset, appendedBy, ok := streamV2ParseOffsetToken(*committedToken)

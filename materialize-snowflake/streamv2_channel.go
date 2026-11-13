@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -29,6 +30,10 @@ const streamV2BatchFileBudget = 4 * 1024 * 1024 * 1024
 //
 // The value is the documented per-channel ceiling.
 const streamV2PaceBytesPerSecond = 20 * 1000 * 1000
+
+// streamV2ErrChannelDoesNotExist is the error code of an append to a channel that
+// Snowflake does not hold, or that the role may not use.
+const streamV2ErrChannelDoesNotExist = "ERR_CHANNEL_DOES_NOT_EXIST_OR_IS_NOT_AUTHORIZED"
 
 // streamV2Channel is a handle for one Snowpipe channel of one connector binding.
 type streamV2Channel struct {
@@ -126,10 +131,17 @@ func (c *streamV2Channel) sendBatch(ctx context.Context) error {
 	// channel's routed count can be one ahead of the batch's last row, because a
 	// row is counted as routed before it is added to a batch.
 	var startToken, endToken = c.offsetToken(c.batch.firstOffset), c.offsetToken(c.batch.firstOffset + int64(c.batch.rows) - 1)
+	// A channel whose every routed document before this batch is committed and
+	// checkpointed holds nothing a reopen would lose.
+	var reopenable = c.batch.firstOffset-1 == c.progress.committed && c.progress.committed == c.progress.checkpointed
+	var checkpointed = c.progress.checkpointed
 	file, err := c.batch.finish()
 	if err != nil {
 		return fmt.Errorf("finishing batch of channel %q: %w", c.channelName, err)
 	}
+	// An append through the stage encrypts the batch file in place, so only a
+	// direct append can be sent again from the same file.
+	reopenable = reopenable && file.compressedBytes <= streamV2MaxAppendBytes
 
 	if c.appends == nil {
 		c.appends, c.appendsCtx = errgroup.WithContext(ctx)
@@ -154,8 +166,38 @@ func (c *streamV2Channel) sendBatch(ctx context.Context) error {
 		if err := streamV2Pace(appendsCtx, c.limiter, file.uncompressedBytes); err != nil {
 			return fmt.Errorf("pacing channel %q: %w", c.channelName, err)
 		}
+		var err = c.client.AppendRows(appendsCtx, c.channelName, startToken, endToken, file)
+		if apiErr, ok := errors.AsType[*streamV2APIError](err); !reopenable || !ok || apiErr.Code != streamV2ErrChannelDoesNotExist {
+			return err
+		}
+		if reopenErr := c.reopen(appendsCtx, checkpointed); reopenErr != nil {
+			return fmt.Errorf("%w, and reopening the channel failed: %w", err, reopenErr)
+		}
 		return c.client.AppendRows(appendsCtx, c.channelName, startToken, endToken, file)
 	})
+	return nil
+}
+
+// reopen opens the channel again once Snowflake no longer holds it, and fails
+// unless the reopened channel's committed offset is the checkpointed offset, which
+// is where the lost channel's appends left off.
+func (c *streamV2Channel) reopen(ctx context.Context, checkpointed int64) error {
+	var b = c.binding
+	status, err := c.client.OpenChannel(ctx, b.database, b.schema, unquotedIdentifier(b.table), c.channelName)
+	if err != nil {
+		return fmt.Errorf("opening channel %q: %w", c.channelName, err)
+	}
+	if err := status.validateRejectedRows(c.channelName, b.table); err != nil {
+		return err
+	}
+	var item = &streamV2ChannelCheckpointItem{ChannelName: c.channelName, Routed: checkpointed}
+	committed, err := streamV2ValidateCommittedToken(c.channelName, b.table, status.CommittedToken, item, c.keyRange, 1)
+	if err != nil {
+		return err
+	}
+	if committed != checkpointed {
+		return fmt.Errorf("reopened channel %q reports committed offset %d, not its checkpointed offset %d", c.channelName, committed, checkpointed)
+	}
 	return nil
 }
 
