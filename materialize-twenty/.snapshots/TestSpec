@@ -1,0 +1,206 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-twenty/config",
+    "properties": {
+      "base_url": {
+        "type": "string",
+        "title": "Twenty URL",
+        "description": "The address of the Twenty API. Use the default for Twenty Cloud or your self-hosted Twenty's address.",
+        "default": "https://api.twenty.com",
+        "order": 0
+      },
+      "api_key": {
+        "type": "string",
+        "title": "API Key",
+        "description": "An API key from Settings \u003e APIs \u0026 Webhooks in Twenty. Its role needs read and write access to the objects you materialize and read access to their metadata.",
+        "order": 1,
+        "secret": true
+      },
+      "default_phone_country": {
+        "type": "string",
+        "pattern": "^[A-Za-z]{2}$",
+        "title": "Default Phone Country",
+        "description": "The two-letter country code (like US or GB) for phone numbers that don't start with + and whose document gives no country. Twenty refuses such numbers without one.",
+        "order": 2
+      },
+      "advanced": {
+        "properties": {
+          "requests_per_minute": {
+            "type": "integer",
+            "maximum": 6000,
+            "minimum": 1,
+            "title": "Requests Per Minute",
+            "description": "The most requests per minute the connector sends to Twenty across all bindings. Keep it under your Twenty plan's API limit.",
+            "default": 40
+          },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "nonsensitive": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "api_key"
+    ],
+    "title": "Twenty"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-twenty/resource",
+    "properties": {
+      "name": {
+        "type": "string",
+        "x-collection-name": true,
+        "x-hidden-field": true
+      },
+      "object": {
+        "type": "string",
+        "title": "Object",
+        "description": "The Twenty object to write to, by its plural API name, like \"companies\", \"people\" or a custom object's name.",
+        "order": 0
+      },
+      "id_field": {
+        "type": "string",
+        "title": "ID Field",
+        "description": "A unique Text field on the object that holds the collection key. The connector finds each record by this field, so re-sent documents update the same record.",
+        "order": 1
+      },
+      "delete_mode": {
+        "type": "string",
+        "enum": [
+          "ignore",
+          "flag",
+          "trash",
+          "delete"
+        ],
+        "title": "Deletes",
+        "description": "What a deleted document does. \"ignore\" leaves the record as it is. \"flag\" sets the Deleted Field on the record. \"trash\" moves the record to Twenty's trash, where it can be restored; if the document comes back, it is skipped unless Restore Records Deleted in Twenty is on. \"delete\" deletes the record for good; if the document comes back, it creates a new record.",
+        "default": "ignore",
+        "order": 2
+      },
+      "deleted_field": {
+        "type": "string",
+        "title": "Deleted Field",
+        "description": "A Boolean field the connector sets to true when the document is deleted, and back to false when the document comes back. Required when Deletes is \"flag\".",
+        "order": 3
+      },
+      "deleted_at_field": {
+        "type": "string",
+        "title": "Deleted At Field",
+        "description": "An optional Date and Time field the connector sets to the time it flags a record as deleted.",
+        "order": 4
+      },
+      "restore_deleted": {
+        "type": "boolean",
+        "title": "Restore Records Deleted in Twenty",
+        "description": "If true, a change to a record in Twenty's trash restores it, whether a Twenty user or the connector trashed it. If false, the connector leaves the record in the trash and skips the change.",
+        "default": false,
+        "order": 5
+      },
+      "unique_conflict": {
+        "type": "string",
+        "enum": [
+          "skip_field",
+          "fail"
+        ],
+        "title": "Unique Value Conflicts",
+        "description": "What happens when a value for a unique field, like a company's domain or a person's email, already belongs to another record. \"skip_field\" writes the record without that value. \"fail\" stops the task.",
+        "default": "skip_field",
+        "order": 6
+      },
+      "rejected_records": {
+        "type": "string",
+        "enum": [
+          "fail",
+          "skip"
+        ],
+        "title": "Rejected Records",
+        "description": "What happens when Twenty rejects a record. \"fail\" stops the task. \"skip\" first leaves out an email, phone or link value that Twenty calls invalid, then logs and skips the record if Twenty still rejects it. The task stops if a binding skips more than 10 records and 10% of its documents in a transaction.",
+        "default": "fail",
+        "order": 7
+      },
+      "relations": {
+        "items": {
+          "properties": {
+            "field": {
+              "type": "string",
+              "title": "Relation Field",
+              "description": "A relation field of the object that points at one record, like \"company\" on people."
+            },
+            "id_field": {
+              "type": "string",
+              "title": "Linked ID Field",
+              "description": "The unique Text field that holds the keys of the records the relation points at, like the ID Field of their binding. Use \"id\" for Twenty ids, or \"userEmail\" or \"name\" for workspace members."
+            },
+            "source_field": {
+              "type": "string",
+              "title": "Collection Field",
+              "description": "The collection field that holds the key of the record to link. Defaults to the relation field's name."
+            }
+          },
+          "type": "object",
+          "required": [
+            "field",
+            "id_field"
+          ]
+        },
+        "type": "array",
+        "title": "Relations",
+        "description": "Relation fields to link, like a person's company. The connector finds the linked record by its key and writes its Twenty id. A key that isn't in Twenty leaves the link as it is.",
+        "order": 8
+      },
+      "create_fields": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array",
+        "title": "Create Fields",
+        "description": "Collection fields to add to the Twenty object as new fields, if it doesn't have them. The connector requires them, and creates each one when it applies, with a type from the collection's schema, and never changes or deletes a field. It may also list the binding's ID Field, created as a unique Text field, and its delete fields. Needs an API key whose role can change the data model.",
+        "order": 9
+      },
+      "null_values": {
+        "type": "string",
+        "enum": [
+          "clear",
+          "keep"
+        ],
+        "title": "Null Values",
+        "description": "What a null in a document does to the Twenty value. \"clear\" clears it. \"keep\" leaves it as it is, like a field missing from the document, so values people or other tools set in Twenty stay until the source has one.",
+        "default": "clear",
+        "order": 10
+      },
+      "adopt_by": {
+        "type": "string",
+        "title": "Match Existing Records By",
+        "description": "A unique field the binding writes, like \"emails\" on people or \"domainName\" on companies. A document with no record takes the live record that holds the same value and has an empty ID Field, such as one a person made in Twenty, rather than leaving the value out. Deletes must be \"ignore\" or \"flag\", and no other binding may write the object.",
+        "order": 11
+      },
+      "delta_updates": {
+        "type": "boolean",
+        "title": "Delta Update",
+        "description": "Should updates to this object be done via delta updates. This connector always uses delta updates.",
+        "default": true,
+        "readOnly": true,
+        "order": 12
+      }
+    },
+    "type": "object",
+    "required": [
+      "name",
+      "object",
+      "id_field"
+    ],
+    "title": "Twenty Object"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-twenty"
+}
