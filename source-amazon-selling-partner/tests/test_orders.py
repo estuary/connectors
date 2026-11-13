@@ -131,7 +131,7 @@ async def test_seam_between_backfill_and_incremental_misses_nothing(monkeypatch:
         backfill_orders(client, MARKETPLACES, cutoff - timedelta(minutes=1), timedelta(days=1), LOG, state.backfill.next_page, state.backfill.cutoff)
     )
     incremental = await collect(
-        fetch_orders(client, MARKETPLACES, timedelta(days=1), overlap, LOG, state.inc.cursor)
+        fetch_orders(client, MARKETPLACES, timedelta(days=1), overlap, LOG, state.inc[resources.REALTIME].cursor)
     )
 
     seen = {o.orderId for o in backfilled + incremental if isinstance(o, Order)}

@@ -264,6 +264,26 @@ async def fetch_orders(
         return
 
     window_end = min(cursor + window_size, horizon)
+    async for item in _orders_updated_window(
+        client, marketplace_ids, cursor, window_end, overlap, Priority.INCREMENTAL, log
+    ):
+        if isinstance(item, datetime):
+            window_end = item
+        else:
+            yield item
+    yield window_end
+
+
+async def _orders_updated_window(
+    client: SPAPIClient,
+    marketplace_ids: list[str],
+    cursor: datetime,
+    window_end: datetime,
+    overlap: timedelta,
+    priority: Priority,
+    log: Logger,
+) -> AsyncGenerator[Order | datetime, None]:
+    """Read a complete updated-time window, shrinking rejected token windows."""
     while True:
         request_params = {
             "lastUpdatedAfter": to_iso(cursor + TICK - overlap),
@@ -273,7 +293,7 @@ async def fetch_orders(
         count = 0
         try:
             async for item in _search_orders(
-                client, marketplace_ids, request_params, Priority.INCREMENTAL, log
+                client, marketplace_ids, request_params, priority, log
             ):
                 if isinstance(item, Order):
                     count += 1
@@ -303,6 +323,65 @@ async def fetch_orders(
         {"window_start": cursor, "window_end": window_end, "count": count},
     )
     yield window_end
+
+
+async def fetch_orders_sweep(
+    client: SPAPIClient,
+    marketplace_ids: list[str],
+    lookback: timedelta,
+    window_size: timedelta,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[Order | LogCursor, None]:
+    """
+    Re-read recent updates at BACKFILL priority, a day after completion.
+    The independent tuple cursor contains one string: `completed|ISO8601`
+    records completion time; `pending|start|end` freezes inclusive bounds.
+    Pending bounds are saved before requests. Completion is saved only after
+    all windows drain. A restart replays the frozen range from its first page;
+    no page token or partial window completion crosses a checkpoint.
+
+    ```
+                 start = started−lookback      end = started−SEARCH_LAG
+    ────────────────────┼──────────────────────────┼──▶ time (1s ticks)
+                        │                          │
+    lastUpdatedAfter ───[══════════════════════════╪══▶
+    lastUpdatedBefore ══╪══════════════════════════]
+    emitted ────────────[══════════════════════════]
+                        │                          └─ complete elapsed tick
+                        └─ frozen across restarts, independent of main cursor
+    ```
+
+    Both bounds are inclusive. Indexing delay is unverified; orders that
+    become searchable after their update ages out of lookback may be missed.
+    Rejected tokens halve each window down to one hour, as in incremental.
+    Replays reduce by maximize on lastUpdatedTime.
+    """
+    assert isinstance(log_cursor, tuple) and isinstance(log_cursor[0], str)
+    phase, *times = log_cursor[0].split("|")
+    if phase == "completed":
+        completed = datetime.fromisoformat(times[0])
+        started = floor_to_tick(now())
+        if started - completed < DAY:
+            return
+        start = floor_to_tick(started - lookback)
+        end = floor_to_tick(started - SEARCH_LAG)
+        yield (f"pending|{to_iso(start)}|{to_iso(end)}",)
+    else:
+        assert phase == "pending" and len(times) == 2
+        start, end = (datetime.fromisoformat(t) for t in times)
+
+    cursor = start - TICK
+    while cursor < end:
+        async for item in _orders_updated_window(
+            client, marketplace_ids, cursor, min(cursor + window_size, end),
+            timedelta(), Priority.BACKFILL, log,
+        ):
+            if isinstance(item, datetime):
+                cursor = item
+            else:
+                yield item
+    yield (f"completed|{to_iso(floor_to_tick(now()))}",)
 
 
 async def backfill_orders(

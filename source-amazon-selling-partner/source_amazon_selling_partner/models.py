@@ -145,18 +145,24 @@ class EndpointConfig(BaseModel):
             default=False,
         )
         window_size: Annotated[timedelta, Field(
-            description="Size of the date windows orders and financial transactions are requested in, in ISO 8601 format. E.g. P1D means 1 day, PT6H means 6 hours. Orders backfill doubles single-page windows up to 30 days and retains smaller windows after rejected pagination tokens. Each order window must be paged through within 24 hours, so busy accounts may need smaller windows.",
+            description="Size of the date windows orders and financial transactions are requested in, in ISO 8601 format. E.g. P1D means 1 day, PT6H means 6 hours. The daily orders sweep uses these windows too. Orders backfill doubles single-page windows up to 30 days and retains smaller windows after rejected pagination tokens. Each order window must be paged through within 24 hours, so busy accounts may need smaller windows.",
             title="Window Size",
             default_factory=lambda: timedelta(days=1),
             ge=timedelta(hours=1),
             le=timedelta(days=30),
         )]
         overlap: Annotated[timedelta, Field(
-            description="How far each incremental request reaches back before the previous one ended, to catch orders Amazon makes searchable late, in ISO 8601 format.",
+            description="How far each incremental request reaches back before the previous one ended, to catch orders Amazon makes searchable late, in ISO 8601 format. The daily sweep also re-reads Orders Lookback for longer indexing delays.",
             title="Incremental Overlap",
             default_factory=lambda: timedelta(minutes=10),
             ge=timedelta(),
             le=timedelta(hours=1),
+        )]
+        orders_lookback: Annotated[timedelta, Field(
+            description="How far back the daily orders sweep re-reads lastUpdatedTime, in ISO 8601 format. Defaults to PT48H; minimum PT1H. Runs at backfill priority, independently of the incremental cursor, at least a day after the previous sweep completes. Orders indexed after they age out of this lookback may be missed. An interrupted sweep replays its saved range before using a changed setting.",
+            title="Orders Lookback",
+            default_factory=lambda: timedelta(hours=48),
+            ge=timedelta(hours=1),
         )]
         financial_transactions_lookback: Annotated[timedelta, Field(
             description="How far behind the present financial transactions are read a final time, to catch deferred transactions Amazon has since released, in ISO 8601 format. Deferred transactions, such as invoiced (B2B) orders, are released on their maturity date, so set this past the longest deferral the account sees. Changes to a transaction after this point are not captured. Raising it re-reads the newly covered time.",

@@ -28,6 +28,7 @@ from .api import (
     fetch_financial_transactions,
     fetch_marketplace_participations,
     fetch_orders,
+    fetch_orders_sweep,
     fetch_sales_and_traffic_by_date,
     fetch_settlement_reports,
     floor_to_day,
@@ -64,6 +65,9 @@ ACCESS_TOKEN_HEADER = "x-amz-access-token"
 REALTIME = "realtime"
 LATE = "late"
 LOOKBACK = "lookback"
+
+# Orders re-read recent updates independently of their realtime cursor.
+SWEEP = "sweep"
 
 
 def _client(http: HTTPMixin, config: EndpointConfig) -> SPAPIClient:
@@ -135,13 +139,22 @@ def orders(log: Logger, client: SPAPIClient, config: EndpointConfig) -> Resource
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(
-                fetch_orders,
-                client,
-                config.marketplace_ids,
-                config.advanced.window_size,
-                config.advanced.overlap,
-            ),
+            fetch_changes={
+                REALTIME: functools.partial(
+                    fetch_orders,
+                    client,
+                    config.marketplace_ids,
+                    config.advanced.window_size,
+                    config.advanced.overlap,
+                ),
+                SWEEP: functools.partial(
+                    fetch_orders_sweep,
+                    client,
+                    config.marketplace_ids,
+                    config.advanced.orders_lookback,
+                    config.advanced.window_size,
+                ),
+            },
             fetch_page=functools.partial(
                 backfill_orders,
                 client,
@@ -164,7 +177,12 @@ def orders(log: Logger, client: SPAPIClient, config: EndpointConfig) -> Resource
         model=Order,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=cutoff - TICK),
+            inc={
+                REALTIME: ResourceState.Incremental(cursor=cutoff - TICK),
+                SWEEP: ResourceState.Incremental(
+                    cursor=(f"completed|{(cutoff - timedelta(days=1)).isoformat()}",)
+                ),
+            },
             backfill=ResourceState.Backfill(
                 next_page=ceil_to_tick(config.start_date).isoformat(), cutoff=cutoff
             ),

@@ -8,7 +8,7 @@ scenario assumption (Amazon's behavior here is not yet verified).
 Mutation audit: from this connector directory run
     PATH=$PWD/../.venv/bin:$PATH python tests/run_simulation_mutations.py
 The helper snapshots bytes, applies each mutation alone, runs only this file,
-and restores in finally; API edits are temporary. Verified M1--M7 all KILLED:
+and restores in finally; API edits are temporary. Verified M1--M8 all KILLED:
 M1 orders checkpoint + configured overlap (10m) + 1h: completed-window oracle.
 M2 finance backfill shrink assignment removed: repeated slow window budget.
 M3 orders backfill checkpoint uses original end: completed-window oracle.
@@ -16,6 +16,7 @@ M4 finance checkpoint + 1h: completed-window oracle.
 M5 runner skips late subtask: independent late-pass coverage.
 M6 runner commits pending docs on crash: rollback oracle.
 M7 orders cursor drops window size: sparse-history request budget.
+M8 daily orders sweep never reads its pending range: late-indexed coverage.
 A skip inside the orders overlap may legitimately be absorbed on the next
 poll. Final keyed-state equality permits duplicates but rejects missing keys
 and stale versions. M6 is a harness negative control: keeping rolled-back docs
@@ -266,7 +267,7 @@ async def test_fake_clock_backfill_then_incremental(kind, expected_count, monkey
             assert any(parse(r[lower]) == lo and parse(r[upper]) < hi
                        for r in amazon.requests if lower in r), "expired backfill window never shrank"
         if kind == "orders":
-            cursors = {"orders": state.inc.cursor}
+            cursors = {"orders": state.inc[resources.REALTIME].cursor}
             lags = {"orders": api.SEARCH_LAG}
             assert cursors["orders"] == cutoff - api.TICK
         else:
@@ -375,3 +376,47 @@ async def test_sparse_600_day_orders_backfill(monkeypatch):
     assert len(amazon.requests) <= 24
     assert len(amazon.requests) == runtime.invocations
     assert parse(amazon.requests[-1]["createdBefore"]) == cutoff - api.TICK
+
+
+@pytest.mark.asyncio
+async def test_daily_sweep_recovers_late_indexed_orders(monkeypatch):
+    # Poll every fifteen minutes: a two-hour indexing delay escapes the
+    # ten-minute overlap even though the incremental cursor advances normally.
+    clock = SimulationTime(START + 3 * DAY)
+    monkeypatch.setattr(api, "now", clock.now)
+    at = clock.now()
+    amazon = FakeAmazon(now=at, orders=[order("late", START, at)],
+                        order_index_delays={"late": timedelta(hours=2)})
+    client = SPAPIClient(http=amazon, base_url="https://fake", clock=clock.clock, sleep=clock.sleep)
+    cursor = at - timedelta(minutes=15)
+    seen = []
+    for _ in range(16):
+        clock.advance(timedelta(minutes=15))
+        amazon.now = clock.now()
+        async for item in api.fetch_orders(client, MARKETPLACES, DAY, timedelta(minutes=10), LOG, cursor):
+            if isinstance(item, Order):
+                seen.append(item.orderId)
+            else:
+                cursor = item
+    assert seen == []
+    main_cursor = cursor
+    completed = (f"completed|{api.to_iso(at - DAY)}",)
+    committed = []
+    pending = []
+    async for item in api.fetch_orders_sweep(client, MARKETPLACES, 2 * DAY, DAY, LOG, completed):
+        if isinstance(item, Order):
+            pending.append(item.orderId)
+        else:
+            committed.extend(pending)
+            pending.clear()
+            completed = item
+    assert committed == ["late"]
+    assert completed[0].startswith("completed|")
+    assert cursor == main_cursor
+    # After a restart, completion suppresses another run until a full day passes.
+    saved = tuple(completed)
+    assert [item async for item in api.fetch_orders_sweep(client, MARKETPLACES, 2 * DAY, DAY, LOG, saved)] == []
+    clock.advance(DAY)
+    amazon.now = clock.now()
+    again = [item async for item in api.fetch_orders_sweep(client, MARKETPLACES, 2 * DAY, DAY, LOG, saved)]
+    assert [item.orderId for item in again if isinstance(item, Order)] == ["late"]

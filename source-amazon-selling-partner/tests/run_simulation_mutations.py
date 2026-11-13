@@ -48,6 +48,8 @@ def main() -> None:
          "                        self.committed.extend(pending)\n                        self.discarded += len(pending)\n"),
         ("M7", API, "backfill_orders", '        yield f"{to_iso(window_end + TICK)}|{current_size.total_seconds()}"\n',
          "        yield to_iso(window_end + TICK)\n"),
+        ("M8", API, "fetch_orders_sweep", "    cursor = start - TICK\n",
+         "    return\n    cursor = start - TICK\n"),
     ]
     survived = []
     for name, path, function, old, new in mutations:

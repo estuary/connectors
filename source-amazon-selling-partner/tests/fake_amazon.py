@@ -92,6 +92,8 @@ class FakeAmazon:
     # Fail the access-token refresh that precedes this page, as Login with
     # Amazon does when the seller revokes the application.
     refresh_fails_on_page: int | None = None
+    # Per-order delay between lastUpdatedTime and search visibility.
+    order_index_delays: dict[str, timedelta] = field(default_factory=dict)
     orders_key: str = "orders"
     # Echo the search's upper bound this much earlier than requested, as if
     # Amazon had searched a shorter window.
@@ -254,7 +256,11 @@ class FakeAmazon:
         if hi > self.now - SEARCH_LAG_MIN:
             raise HTTPError(f"400: {before} must be at least 2 minutes before now", 400)
 
-        return [o for o in self.orders if lo <= parse(o[field_name]) <= hi]
+        return [
+            o for o in self.orders
+            if lo <= parse(o[field_name]) <= hi
+            and parse(o["lastUpdatedTime"]) + self.order_index_delays.get(o["orderId"], timedelta()) <= self.now
+        ]
 
     def _list_transactions(self, params: dict[str, Any]):
         if "nextToken" in params:

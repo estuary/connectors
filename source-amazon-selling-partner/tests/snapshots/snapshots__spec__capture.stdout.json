@@ -12,15 +12,21 @@
               "type": "boolean"
             },
             "window_size": {
-              "description": "Size of the date windows orders and financial transactions are requested in, in ISO 8601 format. E.g. P1D means 1 day, PT6H means 6 hours. Orders backfill doubles single-page windows up to 30 days and retains smaller windows after rejected pagination tokens. Each order window must be paged through within 24 hours, so busy accounts may need smaller windows.",
+              "description": "Size of the date windows orders and financial transactions are requested in, in ISO 8601 format. E.g. P1D means 1 day, PT6H means 6 hours. The daily orders sweep uses these windows too. Orders backfill doubles single-page windows up to 30 days and retains smaller windows after rejected pagination tokens. Each order window must be paged through within 24 hours, so busy accounts may need smaller windows.",
               "format": "duration",
               "title": "Window Size",
               "type": "string"
             },
             "overlap": {
-              "description": "How far each incremental request reaches back before the previous one ended, to catch orders Amazon makes searchable late, in ISO 8601 format.",
+              "description": "How far each incremental request reaches back before the previous one ended, to catch orders Amazon makes searchable late, in ISO 8601 format. The daily sweep also re-reads Orders Lookback for longer indexing delays.",
               "format": "duration",
               "title": "Incremental Overlap",
+              "type": "string"
+            },
+            "orders_lookback": {
+              "description": "How far back the daily orders sweep re-reads lastUpdatedTime, in ISO 8601 format. Defaults to PT48H; minimum PT1H. Runs at backfill priority, independently of the incremental cursor, at least a day after the previous sweep completes. Orders indexed after they age out of this lookback may be missed. An interrupted sweep replays its saved range before using a changed setting.",
+              "format": "duration",
+              "title": "Orders Lookback",
               "type": "string"
             },
             "financial_transactions_lookback": {
