@@ -356,6 +356,11 @@ class UsersListResponse(IncrementalKeysetPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="users")
 
 
+class DeletedUsersResponse(BaseModel, extra="allow"):
+    meta: FullRefreshCursorPaginatedResponse.Meta
+    resources: list[TimestampedResource] = Field(alias="deleted_users")
+
+
 # Resources read by sweeping a list endpoint in ascending updated_at order.
 # Tuples contain the name, path, and response model for each resource.
 INCREMENTAL_KEYSET_PAGINATED_RESOURCES: list[tuple[str, str, type[IncrementalKeysetPaginatedResponse]]] = [
