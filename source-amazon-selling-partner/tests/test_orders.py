@@ -229,14 +229,17 @@ async def test_backfill_waits_out_a_recent_cutoff(monkeypatch: pytest.MonkeyPatc
     assert slept and slept[0] == pytest.approx((cutoff - timedelta(seconds=1) + api.SEARCH_LAG - NOW).total_seconds())
 
 
+@pytest.mark.parametrize("span", [timedelta(days=2), timedelta(minutes=90)])
 @pytest.mark.parametrize("backfill", [True, False])
 @pytest.mark.asyncio
-async def test_rejected_token_retries_halved_orders_window(backfill: bool, caplog: pytest.LogCaptureFixture):
+async def test_rejected_token_retries_halved_orders_window(backfill: bool, span: timedelta, caplog: pytest.LogCaptureFixture):
     start = NOW - timedelta(days=3)
-    end = start + timedelta(days=2)
-    if backfill:
-        end -= api.TICK
-    smaller_end = start + timedelta(days=1) - (api.TICK if backfill else timedelta())
+    window_size = span + api.TICK if backfill and span == timedelta(minutes=90) else span
+    end = start + window_size - (api.TICK if backfill else timedelta())
+    smaller_end = start + (
+        timedelta(hours=1) if span == timedelta(minutes=90)
+        else timedelta(days=1) - (api.TICK if backfill else timedelta())
+    )
     fake = FakeAmazon(
         now=NOW,
         orders=[order(str(i), start + timedelta(minutes=i), start + timedelta(minutes=i)) for i in range(1, 4)],
@@ -245,9 +248,9 @@ async def test_rejected_token_retries_halved_orders_window(backfill: bool, caplo
 
     with caplog.at_level(logging.WARNING, logger=LOG.name):
         if backfill:
-            out = await collect(backfill_orders(client_for(fake), MARKETPLACES, start, timedelta(days=2), LOG, None, NOW - timedelta(hours=1)))
+            out = await collect(backfill_orders(client_for(fake), MARKETPLACES, start, window_size, LOG, None, NOW - timedelta(hours=1)))
         else:
-            out = await collect(fetch_orders(client_for(fake), MARKETPLACES, timedelta(days=2), timedelta(minutes=10), LOG, start))
+            out = await collect(fetch_orders(client_for(fake), MARKETPLACES, span, timedelta(minutes=10), LOG, start))
 
     assert [o.orderId for o in out if isinstance(o, Order)] == ["1", "2", "1", "2", "3"]
     assert out[-1] == (api.to_iso(smaller_end + api.TICK) if backfill else smaller_end)
@@ -265,7 +268,7 @@ async def test_rejected_token_retries_halved_orders_window(backfill: bool, caplo
 
 
 @pytest.mark.parametrize("backfill", [True, False])
-@pytest.mark.parametrize("span", [timedelta(hours=8, seconds=7), timedelta(hours=1), timedelta(minutes=30)])
+@pytest.mark.parametrize("span", [timedelta(hours=8, seconds=7), timedelta(minutes=90), timedelta(hours=1), timedelta(minutes=30)])
 @pytest.mark.asyncio
 async def test_rejected_tokens_shrink_orders_window_until_floor(backfill: bool, span: timedelta, caplog: pytest.LogCaptureFixture):
     start = NOW - timedelta(days=3)
@@ -275,7 +278,9 @@ async def test_rejected_tokens_shrink_orders_window_until_floor(backfill: bool, 
         expired_tokens=True,
     )
     expected_ends = [start + span]
-    if span > timedelta(hours=1):
+    if span == timedelta(minutes=90):
+        expected_ends.append(start + timedelta(hours=1))
+    elif span > timedelta(hours=1):
         expected_ends += [
             start + timedelta(hours=4, seconds=3),
             start + timedelta(hours=2, seconds=1),
@@ -283,7 +288,7 @@ async def test_rejected_tokens_shrink_orders_window_until_floor(backfill: bool, 
         ]
 
     with caplog.at_level(logging.WARNING, logger=LOG.name):
-        with pytest.raises(PaginationTokenRejected, match="already tried smaller windows"):
+        with pytest.raises(PaginationTokenRejected, match="retries with smaller windows down to one hour"):
             if backfill:
                 await collect(backfill_orders(client_for(fake), MARKETPLACES, start, span + api.TICK, LOG, None, NOW - timedelta(hours=1)))
             else:

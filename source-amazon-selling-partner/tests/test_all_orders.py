@@ -312,8 +312,51 @@ async def test_created_report_with_missing_echo_proceeds_once_warned(monkeypatch
     report = await request_report(client, request, Priority.INCREMENTAL, LOG)
 
     assert report is not None and report.reportId == "requested-1"
+    assert report.marketplaceIds == list(request.marketplace_ids)
+    assert report.dataStartTime == request.data_start
+    assert report.dataEndTime == request.data_end
     assert len(fake.create_requests) == 1
     assert fake.get_report_requests == ["requested-1", "requested-1"]
+    [warning] = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert warning.message == "created report omits request fields; trusting its reportId"
+    assert warning.args == {"report_id": "requested-1", "missing_fields": missing}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("backfill", [False, True])
+@pytest.mark.parametrize("missing", [
+    ["dataEndTime"], ["marketplaceIds", "dataStartTime", "dataEndTime"],
+])
+async def test_all_orders_created_report_missing_echo_advances_cursor(backfill, missing, caplog):
+    class MissingEchoAmazon(FakeAmazon):
+        def _respond(self, body):
+            if "processingStatus" in body:
+                body = {name: value for name, value in body.items() if name not in missing}
+            return super()._respond(body)
+
+    start = HORIZON - timedelta(days=40) if backfill else HORIZON - DAY
+    fake = MissingEchoAmazon(now=NOW, orders=[])
+    fake.order_lines = [order_line("111-1", start + timedelta(hours=1))]
+    client, _ = client_with(fake)
+
+    if backfill:
+        out = await collect(backfill_all_orders(client, MARKETPLACES, start, LOG, None, HORIZON))
+        end = start + ALL_ORDERS_MAX_WINDOW
+        expected_cursor = api.to_iso(end - ALL_ORDERS_OVERLAP)
+    else:
+        out = await collect(fetch_all_orders(client, MARKETPLACES, LOG, start))
+        end = HORIZON
+        expected_cursor = end
+        assert await collect(fetch_all_orders(client, MARKETPLACES, LOG, out[-1])) == []
+
+    assert keys(out) == [("requested-1", 1)]
+    assert order_ids(out) == ["111-1"]
+    assert cursors(out) == [expected_cursor]
+    assert rows(out)[0].dataEndTime == end
+    assert rows(out)[0].dataStartTime == (start if backfill else start - ALL_ORDERS_OVERLAP)
+    assert rows(out)[0].marketplaceIds == MARKETPLACES
+    assert len(fake.create_requests) == 1
+    assert len(fake.downloads) == 1
     [warning] = [r for r in caplog.records if r.levelno == logging.WARNING]
     assert warning.message == "created report omits request fields; trusting its reportId"
     assert warning.args == {"report_id": "requested-1", "missing_fields": missing}

@@ -360,6 +360,16 @@ async def _wait_for(
                 )
                 warned_missing = True
         if report.processingStatus in TERMINAL_STATUSES:
+            if created:
+                report = report.model_copy(update={
+                    name: value
+                    for name, value in (
+                        ("marketplaceIds", list(request.marketplace_ids)),
+                        ("dataStartTime", request.data_start),
+                        ("dataEndTime", request.data_end),
+                    )
+                    if getattr(report, name) is None
+                })
             return report
         if client.clock() - started >= REPORT_TIMEOUT.total_seconds():
             raise ReportTimedOut(

@@ -186,9 +186,9 @@ async def _search_orders(
             ):
                 raise PaginationTokenRejected(
                     "Amazon rejected an order search pagination token. Tokens expire 24 hours "
-                    "after the first page of a window. The connector already tried smaller windows; "
-                    "reduce the Window Size so each window "
-                    f"pages through faster.\n\n{err.message}"
+                    "after the first page of a window. The connector retries with smaller windows "
+                    "down to one hour; if this still fails at one hour, reduce Window Size "
+                    f"or report it.\n\n{err.message}"
                 ) from err
             raise
 
@@ -269,9 +269,11 @@ async def fetch_orders(
                         f"not the requested {window_end}."
                     )
         except PaginationTokenRejected:
-            smaller_end = floor_to_tick(cursor + (window_end - cursor) / 2)
-            if smaller_end - cursor < timedelta(hours=1):
+            if window_end - cursor <= timedelta(hours=1):
                 raise
+            smaller_end = floor_to_tick(max(
+                cursor + (window_end - cursor) / 2, cursor + timedelta(hours=1)
+            ))
             log.warning(
                 "shrinking an orders window after Amazon rejected its pagination token",
                 {"window_start": cursor, "window_end": window_end, "new_window_end": smaller_end},
@@ -367,9 +369,11 @@ async def backfill_orders(
                         f"not the requested {window_end}."
                     )
         except PaginationTokenRejected:
-            smaller_end = floor_to_tick(window_start + (window_end - window_start) / 2)
-            if smaller_end - window_start < timedelta(hours=1):
+            if window_end - window_start <= timedelta(hours=1):
                 raise
+            smaller_end = floor_to_tick(max(
+                window_start + (window_end - window_start) / 2, window_start + timedelta(hours=1)
+            ))
             log.warning(
                 "shrinking an orders window after Amazon rejected its pagination token",
                 {"window_start": window_start, "window_end": window_end, "new_window_end": smaller_end},
@@ -415,8 +419,9 @@ async def _list_transactions(
             ):
                 raise PaginationTokenRejected(
                     "Amazon rejected a financial transactions page token. "
-                    "The connector already tried smaller windows; reduce the Window Size "
-                    f"so each window pages through faster.\n\n{err.message}"
+                    "The connector retries with smaller windows down to one hour; "
+                    "if this still fails at one hour, reduce Window Size "
+                    f"or report it.\n\n{err.message}"
                 ) from err
             raise
 
@@ -522,9 +527,11 @@ async def fetch_financial_transactions(
             ):
                 yield transaction
         except PaginationTokenRejected:
-            smaller_end = floor_to_tick(cursor + (window_end - cursor) / 2)
-            if smaller_end - cursor < timedelta(hours=1):
+            if window_end - cursor <= timedelta(hours=1):
                 raise
+            smaller_end = floor_to_tick(max(
+                cursor + (window_end - cursor) / 2, cursor + timedelta(hours=1)
+            ))
             log.warning(
                 "shrinking a financial transactions window after Amazon rejected its page token",
                 {"window_start": cursor, "window_end": window_end, "new_window_end": smaller_end},
@@ -602,9 +609,11 @@ async def backfill_financial_transactions(
             ):
                 yield transaction
         except PaginationTokenRejected:
-            smaller_end = floor_to_tick(window_start + (window_end - window_start) / 2)
-            if smaller_end - window_start < timedelta(hours=1):
+            if window_end - window_start <= timedelta(hours=1):
                 raise
+            smaller_end = floor_to_tick(max(
+                window_start + (window_end - window_start) / 2, window_start + timedelta(hours=1)
+            ))
             log.warning(
                 "shrinking a financial transactions window after Amazon rejected its page token",
                 {"window_start": window_start, "window_end": window_end, "new_window_end": smaller_end},
@@ -942,7 +951,7 @@ async def fetch_all_orders(
         yield row
 
     # A reused report may end before the request does. Its end is the new
-    # cursor; ReportRequest.made has checked it is set.
+    # cursor; request_report checks reused bounds and fills missing created bounds.
     window_end = request.data_end if report is None else report.dataEndTime
     assert window_end is not None
     yield window_end

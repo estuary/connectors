@@ -73,12 +73,13 @@ def reject_transaction_pages(fake: FakeAmazon, monkeypatch: pytest.MonkeyPatch, 
     monkeypatch.setattr(fake, "_list_transactions", rejecting)
 
 
+@pytest.mark.parametrize("span", [timedelta(days=2), timedelta(minutes=90)])
 @pytest.mark.parametrize("backfill", [True, False])
 @pytest.mark.asyncio
-async def test_rejected_token_retries_halved_transactions_window(backfill: bool, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture):
+async def test_rejected_token_retries_halved_transactions_window(backfill: bool, span: timedelta, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture):
     start = NOW - timedelta(days=3)
-    end = start + timedelta(days=2)
-    smaller_end = start + DAY
+    end = start + span
+    smaller_end = start + (timedelta(hours=1) if span == timedelta(minutes=90) else DAY)
     fake = FakeAmazon(
         now=NOW,
         orders=[],
@@ -90,9 +91,9 @@ async def test_rejected_token_retries_halved_transactions_window(backfill: bool,
 
     with caplog.at_level(logging.WARNING, logger=LOG.name):
         if backfill:
-            out = await collect(backfill_financial_transactions(client, start, 2 * DAY, LOG, None, cutoff))
+            out = await collect(backfill_financial_transactions(client, start, span, LOG, None, cutoff))
         else:
-            out = await collect(fetch_financial_transactions(client, api.TRANSACTIONS_REALTIME_LAG, 2 * DAY, LOG, start))
+            out = await collect(fetch_financial_transactions(client, api.TRANSACTIONS_REALTIME_LAG, span, LOG, start))
 
     assert ids(out) == ["1", "2", "1", "2", "3"]
     assert cursors(out) == [api.to_iso(smaller_end) if backfill else smaller_end]
@@ -109,14 +110,14 @@ async def test_rejected_token_retries_halved_transactions_window(backfill: bool,
     assert caplog.records[0].args == {"window_start": start, "window_end": end, "new_window_end": smaller_end}
 
     if backfill:
-        await collect(backfill_financial_transactions(client, start, 2 * DAY, LOG, out[-1], cutoff))
+        await collect(backfill_financial_transactions(client, start, span, LOG, out[-1], cutoff))
     else:
-        await collect(fetch_financial_transactions(client, api.TRANSACTIONS_REALTIME_LAG, 2 * DAY, LOG, out[-1]))
+        await collect(fetch_financial_transactions(client, api.TRANSACTIONS_REALTIME_LAG, span, LOG, out[-1]))
     assert fake.requests[4]["postedAfter"] == api.to_iso(smaller_end)
 
 
 @pytest.mark.parametrize("backfill", [True, False])
-@pytest.mark.parametrize("span", [timedelta(hours=8, seconds=7), timedelta(hours=1), timedelta(minutes=30)])
+@pytest.mark.parametrize("span", [timedelta(hours=8, seconds=7), timedelta(minutes=90), timedelta(hours=1), timedelta(minutes=30)])
 @pytest.mark.asyncio
 async def test_rejected_tokens_shrink_transactions_window_until_floor(backfill: bool, span: timedelta, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture):
     start = NOW - timedelta(days=3)
@@ -127,7 +128,9 @@ async def test_rejected_tokens_shrink_transactions_window_until_floor(backfill: 
     )
     reject_transaction_pages(fake, monkeypatch)
     expected_ends = [start + span]
-    if span > timedelta(hours=1):
+    if span == timedelta(minutes=90):
+        expected_ends.append(start + timedelta(hours=1))
+    elif span > timedelta(hours=1):
         expected_ends += [
             start + timedelta(hours=4, seconds=3),
             start + timedelta(hours=2, seconds=1),
@@ -135,7 +138,7 @@ async def test_rejected_tokens_shrink_transactions_window_until_floor(backfill: 
         ]
 
     with caplog.at_level(logging.WARNING, logger=LOG.name):
-        with pytest.raises(PaginationTokenRejected, match="already tried smaller windows; reduce the Window Size") as exc:
+        with pytest.raises(PaginationTokenRejected, match="retries with smaller windows down to one hour") as exc:
             if backfill:
                 await collect(backfill_financial_transactions(client_for(fake), start, span, LOG, None, NOW - timedelta(hours=1)))
             else:
