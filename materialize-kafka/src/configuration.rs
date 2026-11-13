@@ -303,6 +303,9 @@ impl EndpointConfig {
 
         config.set("bootstrap.servers", self.bootstrap_servers.clone());
         config.set("security.protocol", self.security_protocol());
+        // A broker closing a connection is routine, because the client
+        // reconnects on its own.
+        config.set("log.connection.close", "false");
 
         match &self.credentials {
             Some(Credentials::UserPassword {
