@@ -221,7 +221,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 	t.Run("a binding which has never streamed v2 is added as usual", func(t *testing.T) {
 		t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
 		var d = newTransactor(t, "fresh.v1", nil)
-		require.NoError(t, d.addBinding(ctx, target("fresh.v1", false), *d.cp["fresh.v1"]))
+		require.NoError(t, d.addBinding(ctx, target("fresh.v1", false), *d.cp["fresh.v1"], nil))
 	})
 
 	t.Run("staying on the write path keeps the channel", func(t *testing.T) {
@@ -231,7 +231,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		var d = newTransactor(t, stateKey, prior)
 		d.featureFlags = common.ResolveFlags("snowpipe_streaming_v2", featureFlagDefaults, common.CreatedAt{})
 
-		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey]))
+		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey], nil))
 		require.True(t, lastBinding(d).streamingV2)
 		require.Contains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE")), channel)
 	})
@@ -246,7 +246,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		d.featureFlags = common.ResolveFlags("", featureFlagDefaults, common.CreatedAt{})
 		d.snowpipeStreaming = openChannelServer(t, 0)
 
-		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey]))
+		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey], nil))
 		require.True(t, lastBinding(d).streaming)
 		require.NotContains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE")), channel)
 	})
@@ -259,7 +259,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		d.featureFlags = common.ResolveFlags("snowpipe_streaming", featureFlagDefaults, common.CreatedAt{})
 		d.snowpipeStreaming = openChannelServer(t, 6)
 
-		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey]))
+		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey], nil))
 		require.False(t, lastBinding(d).streaming)
 		require.NotNil(t, lastBinding(d).store.copyStage)
 		require.NotContains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE")), channel)
@@ -272,7 +272,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		var d = newTransactor(t, stateKey, prior)
 		d.featureFlags = common.ResolveFlags("snowpipe_streaming_v2", featureFlagDefaults, common.CreatedAt{})
 
-		require.NoError(t, d.addBinding(ctx, target(stateKey, false), *d.cp[stateKey]))
+		require.NoError(t, d.addBinding(ctx, target(stateKey, false), *d.cp[stateKey], nil))
 		require.False(t, lastBinding(d).streaming)
 		require.False(t, lastBinding(d).streamingV2)
 		require.NotContains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE")), channel)
@@ -285,14 +285,14 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 
 		var away = newTransactor(t, stateKey, prior)
 		away.featureFlags = common.ResolveFlags("snowpipe_streaming_v2", featureFlagDefaults, common.CreatedAt{})
-		require.NoError(t, away.addBinding(ctx, target(stateKey, false), *away.cp[stateKey]))
+		require.NoError(t, away.addBinding(ctx, target(stateKey, false), *away.cp[stateKey], nil))
 
 		// The return derives the same channel name and finds nothing under it, so
 		// the documents it is about to materialize are not skipped: compare
 		// TestStreamV2ReturningToTheWritePathSkipsNewDocuments.
 		var back = newTransactor(t, stateKey, nil)
 		back.featureFlags = common.ResolveFlags("snowpipe_streaming_v2", featureFlagDefaults, common.CreatedAt{})
-		require.NoError(t, back.addBinding(ctx, target(stateKey, true), *back.cp[stateKey]))
+		require.NoError(t, back.addBinding(ctx, target(stateKey, true), *back.cp[stateKey], nil))
 		require.NoError(t, testWriteRow(ctx, back.snowpipeStreamingV2, 0, []any{"k", "new"}))
 		var c = back.snowpipeStreamingV2.bindings[0].activeChannels[0]
 		require.Equal(t, channel, c.channelName)
@@ -306,7 +306,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 		const stateKey = "dropped.v1"
 		var d = newTransactor(t, stateKey, streamV2Checkpoint{streamV2Range{keyBegin: 0x80000000, keyEnd: math.MaxUint32}: nil})
 
-		require.NoError(t, d.addBinding(ctx, target(stateKey, false), *d.cp[stateKey]))
+		require.NoError(t, d.addBinding(ctx, target(stateKey, false), *d.cp[stateKey], nil))
 	})
 }
 
@@ -485,7 +485,7 @@ func TestStreamV2WritePathSwitch(t *testing.T) {
 			cp:                  checkpoint{tgt.StateKey: &checkpointItem{StreamV2: entries[0]}},
 			snowpipeStreamingV2: sv2,
 		}
-		require.NoError(t, d.addBinding(ctx, off, *d.cp[tgt.StateKey]))
+		require.NoError(t, d.addBinding(ctx, off, *d.cp[tgt.StateKey], nil))
 
 		var back = newV2(t, tgt, nil)
 		client = back.client
@@ -578,7 +578,7 @@ func TestStreamV2SwitchOntoTheWritePathWithPendingWorkIsRejected(t *testing.T) {
 	// The configuration enables the streaming v2 flag throughout, which is what
 	// routes the binding to the streaming v2 manager.
 	var addBinding = func(d *transactor) error {
-		return d.addBinding(ctx, target, *cmp.Or(d.cp[target.StateKey], &checkpointItem{}))
+		return d.addBinding(ctx, target, *cmp.Or(d.cp[target.StateKey], &checkpointItem{}), nil)
 	}
 
 	t.Run("pending blobs whose channel cannot be opened are rejected", func(t *testing.T) {

@@ -386,7 +386,7 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, *cmp.Or(d.cp[binding.StateKey], &checkpointItem{})); err != nil {
+		if err = d.addBinding(ctx, binding, *cmp.Or(d.cp[binding.StateKey], &checkpointItem{}), is); err != nil {
 			return nil, fmt.Errorf("adding binding for %s: %w", binding.Path, err)
 		}
 	}
@@ -444,15 +444,47 @@ type binding struct {
 	}
 }
 
-func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkpointItem) error {
+// existingColumn is what Snowflake reports of an existing column beyond its
+// type.
+type existingColumn struct {
+	// Collation is the column's collation specification, or empty if it has
+	// none.
+	Collation string
+}
+
+// mergeBoundsOptions are the options of the merge bounds of target, whose
+// existing table is described by is. String keys get ranges only if every key
+// column is known to have no collation, because Snowflake compares such a
+// column byte by byte.
+func mergeBoundsOptions(target sql.Table, is *boilerplate.InfoSchema) []sql.MergeBoundsOption {
+	if is == nil {
+		return nil
+	}
+	var existing = is.GetResource(target.Path)
+	if existing == nil {
+		return nil
+	}
+	for _, key := range target.Keys {
+		var field = existing.GetField(key.Field)
+		if field == nil {
+			return nil
+		} else if col, ok := field.Meta.(existingColumn); !ok || col.Collation != "" {
+			return nil
+		}
+	}
+	return []sql.MergeBoundsOption{sql.WithStringRanges()}
+}
+
+func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkpointItem, is *boilerplate.InfoSchema) error {
 	var b = new(binding)
 	b.target = target
 	if col, err := target.PublishedAtColumn(); err == nil {
 		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < ?;", target.Identifier, col.Identifier)
 	}
 	b.nullFieldsToStrip = target.NullablePropertiesToStrip()
-	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
-	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
+	var boundsOpts = mergeBoundsOptions(target, is)
+	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal, boundsOpts...)
+	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal, boundsOpts...)
 	var loc = d.ep.Dialect.TableLocator(b.target.Path)
 
 	if d.cfg.isStreamsV2(b.target.DeltaUpdates, d.featureFlags) {

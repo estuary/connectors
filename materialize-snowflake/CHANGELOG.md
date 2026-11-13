@@ -13,6 +13,14 @@
   250 MB, so uploads overlap with writing and commits of large transactions
   start sooner.
 
+## 2026-11-10
+
+### Changed
+- Load and merge queries restrict a string key to up to eight ranges split at
+  the widest gaps between a transaction's keys, instead of one range from its
+  smallest key to its largest. Transactions whose keys cluster with a few
+  outliers, such as time-ordered IDs, can read less of the table.
+
 ## 2026-11-09
 
 ### Changed

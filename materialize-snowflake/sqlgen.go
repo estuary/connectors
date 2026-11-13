@@ -302,7 +302,7 @@ SELECT {{ $.Table.Binding }}, {{ if eq $.Table.Document.BareDDL "VARIANT" }}TO_J
 	{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }}AND {{ else }}ON {{ end -}}
 	{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-	{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- template "boundCondition" (BoundOn $.Table.Identifier $bound) }}
 	{{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
@@ -347,7 +347,7 @@ JOIN (
 {{- range $ind, $bound := $.Bounds }}
 {{ if $ind }}AND {{ else }}ON {{ end -}}
 {{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- template "boundCondition" (BoundOn $.Table.Identifier $bound) }}
 {{- end }}
 {{ end }}
 
@@ -396,7 +396,7 @@ USING (
 ON {{ range $ind, $bound := $.Bounds }}
 	{{ if $ind -}} AND {{ end -}}
 	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- template "boundCondition" (BoundOn "l" $bound) }}
 {{- end }}
 WHEN MATCHED AND r._flow_delete=true THEN
 	DELETE
