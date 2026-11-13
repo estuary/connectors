@@ -1,0 +1,92 @@
+info:
+  name: updated_at filter
+  type: graphql
+  seq: 6
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query PaymentsUpdatedAtFilter {
+        shopifyPaymentsAccount {
+          payoutsByUpdatedAt: payouts(first: 1, query: "updated_at:>='2026-01-01T00:00:00Z'") {
+            edges { node { id } }
+          }
+          payoutsByIssuedAt: payouts(first: 1, query: "issued_at:>='2026-01-01T00:00:00Z'") {
+            edges { node { id } }
+          }
+          transactionsByUpdatedAt: balanceTransactions(first: 1, query: "updated_at:>='2026-01-01T00:00:00Z'") {
+            edges { node { id } }
+          }
+          transactionsByProcessedAt: balanceTransactions(first: 1, query: "processed_at:>='2026-01-01T00:00:00Z'") {
+            edges { node { id } }
+          }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [ShopifyPaymentsAccount](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ShopifyPaymentsAccount), [PayoutSortKeys](https://shopify.dev/docs/api/admin-graphql/2026-01/enums/PayoutSortKeys) and [BalanceTransactionSortKeys](https://shopify.dev/docs/api/admin-graphql/2026-01/enums/BalanceTransactionSortKeys)
+
+  **WHY:** most APIs give changing records an updated time, and neither
+  payouts nor balance transactions documents one. Answers: does Shopify
+  accept an `updated_at` filter on either list anyway. `issued_at` and
+  `processed_at` are the controls: Shopify should accept them.
+
+  **VERIFIED (2026-11-10):** Shopify rejects `updated_at` on both lists
+  ("Invalid search field for this query.", `invalid_field`) and accepts both
+  controls. The rejection is a warning in `extensions.search`, not an error:
+  the request still returns 200. Neither type has an updated-time field in
+  the live schema, deprecated fields included (see `Payments / schema`), and
+  neither sort key enum has `UPDATED_AT`.
+
+examples:
+  - name: "200 - updated_at rejected on both lists (projection: search warnings)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "extensions": {
+              "search": [
+                {
+                  "path": ["shopifyPaymentsAccount", "payoutsByUpdatedAt"],
+                  "query": "updated_at:>='2026-01-01T00:00:00Z'",
+                  "warnings": [
+                    {
+                      "field": "updated_at",
+                      "message": "Invalid search field for this query.",
+                      "code": "invalid_field"
+                    }
+                  ]
+                },
+                {
+                  "path": ["shopifyPaymentsAccount", "transactionsByUpdatedAt"],
+                  "query": "updated_at:>='2026-01-01T00:00:00Z'",
+                  "warnings": [
+                    {
+                      "field": "updated_at",
+                      "message": "Invalid search field for this query.",
+                      "code": "invalid_field"
+                    }
+                  ]
+                }
+              ]
+            }
+          }

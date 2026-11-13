@@ -26,6 +26,8 @@ from pydantic import AwareDatetime
 
 import source_shopify_native.graphql as gql
 from .graphql.bulk_job_manager import BulkJobManager
+from .graphql.client import QueryError
+from .graphql.payments.account import BusinessEntities
 
 from .api import (
     backfill_incremental,
@@ -34,6 +36,8 @@ from .api import (
     bulk_fetch_snapshot,
     fetch_incremental,
     fetch_incremental_unsorted,
+    fetch_recent_payout_transactions,
+    fetch_recent_payouts,
     fetch_snapshot,
 )
 from .models import (
@@ -173,6 +177,8 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.LocationMetafields,
     gql.SubscriptionContracts,
     gql.Disputes,
+    gql.Payouts,
+    gql.BalanceTransactions,
 ]
 
 PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {
@@ -251,6 +257,9 @@ def _get_available_resources(
     for resource in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES:
         # Skip if none of the qualifying scopes are granted
         if resource.QUALIFYING_SCOPES.isdisjoint(granted_scopes):
+            continue
+        # Skip if any further required scope set has none of its scopes granted
+        if any(required.isdisjoint(granted_scopes) for required in resource.ADDITIONAL_REQUIRED_SCOPES):
             continue
         # Skip PII resources for custom app tokens when plan doesn't allow PII
         if uses_custom_app_token and resource in PII_RESOURCES and not can_access_pii:
@@ -346,46 +355,47 @@ def _migrate_flat_to_dict_state(
 
 
 async def _reconcile_connector_state(
-    store_ids: list[str],
+    subtask_ids: list[str],
     binding: CaptureBinding[ResourceConfig],
     state: ResourceState,
     initial_state: ResourceState,
     task: Task,
     legacy_store_id: str,
 ) -> None:
-    """Reconcile connector state: migrate format if needed and add missing stores.
+    """Reconcile connector state: migrate format if needed and add missing subtasks.
 
     This handles two scenarios:
     1. Migration from flat to dict-based state (legacy single-store captures)
-    2. Adding missing store entries for newly configured stores
+    2. Adding missing subtask entries for newly configured stores
     """
     prev_state = deepcopy(state)
 
     # Step 1: Migrate flat state to dict-based if needed.
     migrated = _migrate_flat_to_dict_state(state, legacy_store_id, task.log)
 
-    # Step 2: Add missing store entries for newly configured stores.
+    # Step 2: Add missing subtask entries for newly configured stores.
     should_checkpoint = migrated
 
     if (
         isinstance(state.inc, dict) and
         isinstance(initial_state.inc, dict)
     ):
-        for store_id in store_ids:
-            # If the store is not in the incremental state dict, that means that this is
+        for subtask_id in subtask_ids:
+            # If the subtask is not in the incremental state dict, that means that this is
             # a new store that needs to be added to the resource state.
-            if store_id not in state.inc:
-                task.log.info(f"Initializing new subtask state for store {store_id}.")
-                state.inc[store_id] = deepcopy(initial_state.inc[store_id])
+            if subtask_id not in state.inc:
+                task.log.info(f"Initializing new subtask state for {subtask_id}.")
+                state.inc[subtask_id] = deepcopy(initial_state.inc[subtask_id])
 
-                # Not all resources use backfills (ex: bulk query resources), so only add
-                # backfill state for this store if this resource uses backfills.
+                # Not all subtasks use backfills (ex: bulk query resources), so only add
+                # backfill state for this subtask if it uses backfills.
                 if (
                     isinstance(state.backfill, dict) and
-                    isinstance(initial_state.backfill, dict)
+                    isinstance(initial_state.backfill, dict) and
+                    subtask_id in initial_state.backfill
                 ):
-                    state.backfill[store_id] = deepcopy(
-                        initial_state.backfill[store_id]
+                    state.backfill[subtask_id] = deepcopy(
+                        initial_state.backfill[subtask_id]
                     )
                 should_checkpoint = True
 
@@ -408,6 +418,47 @@ async def _get_shop_plan(
         await http.request(log, url, method="POST", json={"query": ShopDetails.query()})
     )
     return response.data.shop.plan
+
+
+async def _warn_if_several_payments_accounts(
+    log: Logger,
+    client: gql.ShopifyGraphQLClient,
+    store: str,
+) -> None:
+    """Warn if more than one of the store's business entities has a Shopify Payments
+    account. The payments streams read only the shop-level account, and Shopify doesn't say
+    whose that is when there are several.
+
+    Only warns if the check itself fails, since the streams can still be captured.
+    """
+    try:
+        data = await client.request(BusinessEntities.query(), BusinessEntities, log)
+    except QueryError as err:
+        log.warning(
+            f"Store '{store}': couldn't check which business entities have a Shopify "
+            "Payments account, so the payouts and balance_transactions streams can't tell "
+            "whether they miss any.",
+            {"error": err.message, "errors": err.errors},
+        )
+        return
+
+    account_ids = {
+        entity.shopifyPaymentsAccount.id
+        for entity in data.businessEntities
+        if entity.shopifyPaymentsAccount is not None
+    }
+    if len(account_ids) > 1:
+        # Observable so we can find the captures that need each entity's account read.
+        log.warning(
+            f"Store '{store}': {len(account_ids)} business entities have a Shopify Payments "
+            "account, but the payouts and balance_transactions streams read only the "
+            "shop's, so they may miss the others' data.",
+            extra={
+                OBSERVABLE_FIELD: True,
+                "store": store,
+                "payments_accounts": len(account_ids),
+            },
+        )
 
 
 def _plan_allows_pii(plan: ShopDetails.Data.Shop.Plan, log: Logger) -> bool:
@@ -526,6 +577,8 @@ def _build_incremental_resource(
     config: EndpointConfig,
 ) -> Resource:
     """Build the incremental resource for `model`, with one subtask per store in `stores_with_access`.
+    Payouts and balance transactions get a second subtask per store, which refreshes the
+    recent payouts once a day.
 
     State format is always dictionary-based: {"inc": {"store_id": {...}}}
 
@@ -544,6 +597,25 @@ def _build_incremental_resource(
     )
     legacy_store_id = config._legacy_store or config.stores[0].store
 
+    # Payouts and balance transactions change after the date they're read by, so a second
+    # subtask per store reads the recent payouts again once a day. Captures save state under
+    # the subtask's name, so it can't change.
+    recent_payouts_subtasks = (
+        {store_id: f"{store_id}:recent_payouts" for store_id in stores_with_access}
+        if model in (gql.Payouts, gql.BalanceTransactions)
+        else {}
+    )
+    assert isinstance(initial_state.inc, dict)
+    for store_id, subtask_id in recent_payouts_subtasks.items():
+        initial_state.inc[subtask_id] = deepcopy(initial_state.inc[store_id])
+
+    # A blank start_date is reset to 30 days back at every start, which can pass transactions
+    # the capture already holds and still needs to refresh. The refreshes honor only a
+    # start_date the config sets.
+    configured_start_date = (
+        config.start_date if "start_date" in config.model_fields_set else None
+    )
+
     async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -552,7 +624,7 @@ def _build_incremental_resource(
         _all_bindings,
     ):
         await _reconcile_connector_state(
-            stores_with_access,
+            [*stores_with_access, *recent_payouts_subtasks.values()],
             binding,
             state,
             initial_state,
@@ -634,6 +706,35 @@ def _build_incremental_resource(
                     ctx.capabilities,
                     config.start_date,
                 )
+
+        if recent_payouts_subtasks:
+            payout_data_model = create_response_data_model(gql.Payouts)
+            transaction_data_model = create_response_data_model(gql.BalanceTransactions)
+
+            for store_id, subtask_id in recent_payouts_subtasks.items():
+                ctx = store_contexts[store_id]
+
+                if model == gql.Payouts:
+                    fetch_changes[subtask_id] = functools.partial(
+                        fetch_recent_payouts,
+                        ctx.client,
+                        payout_data_model,
+                        store_id,
+                        ctx.capabilities,
+                        configured_start_date,
+                    )
+                elif model == gql.BalanceTransactions:
+                    fetch_changes[subtask_id] = functools.partial(
+                        fetch_recent_payout_transactions,
+                        ctx.client,
+                        payout_data_model,
+                        transaction_data_model,
+                        store_id,
+                        ctx.capabilities,
+                        configured_start_date,
+                    )
+                else:
+                    raise RuntimeError(f"{model.__name__} has no recent payouts refresh.")
 
         open_binding(
             binding,
@@ -862,5 +963,13 @@ async def bound_resources(
         resources.append(
             _build_resource(model, stores_with_access, store_contexts, config)
         )
+
+    # Once per store, whichever payments streams are bound. Both need the same scopes, so
+    # the stores that can serve payouts are the ones to check.
+    if bound_stream_names & {gql.Payouts.NAME, gql.BalanceTransactions.NAME}:
+        for store_id in _stores_with_access_to(gql.Payouts, store_contexts):
+            await _warn_if_several_payments_accounts(
+                log, store_contexts[store_id].client, store_id
+            )
 
     return resources

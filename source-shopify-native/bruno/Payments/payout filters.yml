@@ -1,0 +1,97 @@
+info:
+  name: payout filters
+  type: graphql
+  seq: 4
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query BalanceTransactionPayoutFilters {
+        shopifyPaymentsAccount {
+          byTransfer: balanceTransactions(first: 1, query: "payments_transfer_id:1") {
+            edges { node { id } }
+          }
+          byPayoutDate: balanceTransactions(
+            first: 1
+            sortKey: PAYOUT_DATE
+            query: "payout_date:>='2016-01-01T00:00:00Z' AND payout_date:<='2026-11-09T00:00:00Z'"
+          ) {
+            edges { node { id } }
+          }
+          byPayoutStatus: balanceTransactions(first: 1, query: "payout_status:pending") {
+            edges { node { id } }
+          }
+          byId: balanceTransactions(first: 1, query: "id:1") {
+            edges { node { id } }
+          }
+          control: balanceTransactions(first: 1, query: "not_a_filter:1") {
+            edges { node { id } }
+          }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [ShopifyPaymentsAccount.balanceTransactions](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ShopifyPaymentsAccount) and [search syntax](https://shopify.dev/docs/api/usage/search-syntax)
+
+  **WHY:** a balance transaction gets its payout after it's processed, so the
+  stream needs a second way to find transactions once their payout exists.
+  The candidates are `payments_transfer_id` (one payout's transactions; OCA's
+  Odoo connector uses it with the payout's `legacyResourceId`), `payout_date`
+  (a window of payout dates), `payout_status` and `id`. Answers: does Shopify
+  recognize each filter. `not_a_filter` is a control: Shopify should warn
+  about it and about nothing else.
+
+  **VERIFIED (2026-11-09):** Shopify recognizes `payments_transfer_id`,
+  `payout_date` (with sort key `PAYOUT_DATE`), `payout_status` and `id`. It
+  warns only about the control: "Invalid search field for this query."
+  (`invalid_field`). Every list is empty because the account isn't activated.
+
+  **UNOBSERVABLE:** what `payments_transfer_id` matches (OCA treats it as the
+  payout's `legacyResourceId`) and whether `payout_date` holds a date or a
+  time. Both need a store with payouts; see `Payments / account`.
+
+examples:
+  - name: "200 - only the control warns (projection: search warnings)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "extensions": {
+              "search": [
+                {
+                  "path": ["shopifyPaymentsAccount", "control"],
+                  "query": "not_a_filter:1",
+                  "parsed": {
+                    "field": "not_a_filter",
+                    "match_all": "1"
+                  },
+                  "warnings": [
+                    {
+                      "field": "not_a_filter",
+                      "message": "Invalid search field for this query.",
+                      "code": "invalid_field"
+                    }
+                  ]
+                }
+              ]
+            }
+          }

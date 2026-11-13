@@ -1,0 +1,92 @@
+info:
+  name: entity schema
+  type: graphql
+  seq: 9
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query EntitySchema {
+        queryRoot: __type(name: "QueryRoot") {
+          fields { name description args { name description } }
+        }
+        businessEntity: __type(name: "BusinessEntity") {
+          description
+          fields { name description }
+        }
+        payout: __type(name: "ShopifyPaymentsPayout") {
+          fields { name description }
+        }
+        balanceTransaction: __type(name: "ShopifyPaymentsBalanceTransaction") {
+          fields { name description }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [GraphQL Admin API](https://shopify.dev/docs/api/admin-graphql/2026-01) (introspection is standard GraphQL)
+
+  **WHY:** the docs pages don't say which account the shop-level
+  `shopifyPaymentsAccount` returns when a shop has several business entities
+  (`Payments / business entities`). Answers: do the live schema's
+  descriptions say more.
+
+  **VERIFIED (2026-11-10):** they don't. The shop-level
+  `shopifyPaymentsAccount` and `BusinessEntity.shopifyPaymentsAccount` share
+  one description, "Returns the Shopify Payments account information for the
+  shop", which doesn't mention entities. `businessEntity` without an `id`
+  "Returns the primary Business Entity". `ShopifyPaymentsPayout.businessEntity`
+  is "The business entity associated with the payout".
+  `ShopifyPaymentsBalanceTransaction` has no entity field.
+
+examples:
+  - name: "200 - no entity rule for the shop-level account (projection: the entity and account fields)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "queryRoot": [
+              {
+                "name": "businessEntities",
+                "description": "Returns the list of [business entities](https://shopify.dev/docs/api/admin-graphql/latest/objects/BusinessEntity) associated with the shop. Use this query to retrieve business entities for assigning to markets, managing payment providers per entity, or viewing entity attribution on orders.\n\nEach shop can have multiple business entities with one designated as primary. To identify the primary entity in the query results, set the [`primary`](https://shopify.dev/docs/api/admin-graphql/latest/queries/businessEntities#returns-BusinessEntity.fields.primary) field to `true`.\n\nLearn more about [managing multiple legal entities](https://shopify.dev/docs/apps/build/markets/multiple-entities)."
+              },
+              {
+                "name": "businessEntity",
+                "args": [
+                  {
+                    "name": "id",
+                    "description": "The ID of the Business Entity to return. Returns the primary Business Entity if not provided."
+                  }
+                ]
+              },
+              {
+                "name": "shopifyPaymentsAccount",
+                "description": "Returns the Shopify Payments account information for the shop. Includes current balances across all currencies, payout schedules, and bank account configurations.\n\n..."
+              }
+            ],
+            "businessEntity.shopifyPaymentsAccount": {
+              "description": "Returns the Shopify Payments account information for the shop. Includes current balances across all currencies, payout schedules, and bank account configurations.\n\n..."
+            },
+            "payout.businessEntity": {
+              "description": "The business entity associated with the payout."
+            },
+            "balanceTransaction entity fields": []
+          }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-10
+
+### Added
+- New `payouts` and `balance_transactions` streams capture Shopify Payments
+  payouts and balance transactions.
+
 ## 2026-11-02
 
 ### Added

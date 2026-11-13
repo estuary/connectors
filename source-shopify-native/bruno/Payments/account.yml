@@ -1,0 +1,100 @@
+info:
+  name: account
+  type: graphql
+  seq: 1
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query PaymentsAccount {
+        shopifyPaymentsAccount {
+          id
+          activated
+          onboardable
+          country
+          defaultCurrency
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [shopifyPaymentsAccount](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/shopifyPaymentsAccount) and [ShopifyPaymentsAccount](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ShopifyPaymentsAccount)
+
+  **WHY:** payouts and balance transactions are connections under this
+  account, not top-level queries. Answers: does Shopify accept the account
+  query with the scopes the test app holds (`read_shopify_payments_accounts`
+  and `read_shopify_payments_payouts`, not the approval-gated
+  `read_shopify_payments`), and does the test store have an account at all.
+
+  **DOCUMENTED (2026-11-09):** the query takes no arguments and returns a
+  nullable `ShopifyPaymentsAccount`. Its own page names only the
+  approval-gated scope: "Requires the `read_shopify_payments` approval
+  scope." The object page also accepts `read_shopify_payments_accounts`. What
+  it returns on a store without Shopify Payments isn't documented.
+
+  **VERIFIED (2026-11-09):** Shopify accepts the query from the test app,
+  which holds `read_shopify_payments_accounts` and
+  `read_shopify_payments_payouts` but not `read_shopify_payments`. The store
+  has an account, `gid://shopify/ShopifyPaymentsAccount/999005447548973`,
+  with `activated: false`: Shopify Payments was never set up. So a store
+  without Shopify Payments still returns an account, whose payouts and
+  balance transactions are empty (`Payments / payouts`). Requested cost 1.
+
+  **UNOBSERVABLE:** real payouts and balance transactions. Shopify Payments
+  isn't activated here, and Shopify staff say development stores can't
+  generate payouts ([forum](https://community.shopify.dev/t/how-can-i-set-up-a-dev-store-to-generate-payouts/26476)).
+  The connector's handling of them rests on Shopify's docs and unit-test
+  fixtures shaped like them.
+
+  **UNOBSERVABLE:** whether the account query works with
+  `read_shopify_payments_payouts` alone, since the test app also holds
+  `read_shopify_payments_accounts`.
+
+examples:
+  - name: 200 - account exists, not activated
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "shopifyPaymentsAccount": {
+                "id": "gid://shopify/ShopifyPaymentsAccount/999005447548973",
+                "activated": false,
+                "onboardable": true,
+                "country": "US",
+                "defaultCurrency": "USD"
+              }
+            },
+            "extensions": {
+              "cost": {
+                "requestedQueryCost": 1,
+                "actualQueryCost": 1,
+                "throttleStatus": {
+                  "maximumAvailable": 2000,
+                  "currentlyAvailable": 1999,
+                  "restoreRate": 100
+                }
+              }
+            }
+          }

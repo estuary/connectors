@@ -1,0 +1,101 @@
+info:
+  name: schema
+  type: graphql
+  seq: 7
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query PaymentsSchema {
+        account: __type(name: "ShopifyPaymentsAccount") {
+          fields(includeDeprecated: true) {
+            name
+            description
+            args { name description defaultValue type { ...TypeRef } }
+          }
+        }
+        payout: __type(name: "ShopifyPaymentsPayout") {
+          fields(includeDeprecated: true) {
+            name
+            description
+            isDeprecated
+            deprecationReason
+            type { ...TypeRef }
+          }
+        }
+        balanceTransaction: __type(name: "ShopifyPaymentsBalanceTransaction") {
+          fields(includeDeprecated: true) {
+            name
+            description
+            isDeprecated
+            deprecationReason
+            type { ...TypeRef }
+          }
+        }
+        associatedPayout: __type(name: "ShopifyPaymentsBalanceTransactionAssociatedPayout") {
+          fields { name description type { ...TypeRef } }
+        }
+      }
+
+      fragment TypeRef on __Type {
+        kind
+        name
+        ofType { kind name ofType { kind name ofType { kind name } } }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [GraphQL Admin API](https://shopify.dev/docs/api/admin-graphql/2026-01) (introspection is standard GraphQL)
+
+  **WHY:** the docs pages leave three things undocumented that the
+  `balance_transactions` design depends on: what the `payments_transfer_id`
+  and `payout_date` filters match, and how `associatedPayout` is typed. The
+  schema Shopify serves is the source those pages are built from. Its
+  argument descriptions sometimes say more than the pages do. Answers: what
+  the live 2026-01 schema says about the payout and balance-transaction
+  fields and the two connections' arguments.
+
+  **VERIFIED (2026-11-09):** the schema matches the docs pages and adds
+  nothing to them. `payments_transfer_id` (type `id`) and `payout_date`
+  (type `time`) have no description. `issuedAt` and `transactionDate` are
+  `DateTime!`. `associatedPayout` is a non-null object whose `id` and
+  `status` are both nullable. `bankAccount` and `gross` are deprecated, for
+  `destinationAccount` and `net`.
+
+examples:
+  - name: "200 - filter tables (projection: the two query arguments)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "payouts.query": [
+              "default | string", "amount | float", "bank_account | string",
+              "currency | string", "id | id", "issued_at | time",
+              "ledger_type | string", "status | string", "transaction_dates | time"
+            ],
+            "balanceTransactions.query": [
+              "default | string", "available_on | time", "created_at | time",
+              "credit_card_last4 | string", "currency | string", "id | id",
+              "payment_method_name | string", "payments_transfer_id | id",
+              "payout_date | time", "payout_status | string", "processed_at | time",
+              "tax_reporting_exempt | boolean", "transaction_type | string"
+            ]
+          }
