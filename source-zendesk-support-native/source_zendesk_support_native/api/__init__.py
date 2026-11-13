@@ -35,6 +35,7 @@ from .talk import (
     backfill_talk_incremental_export_resources,
 )
 from .cursor_exports import (
+    cursor_export_cursor_to_dt,
     fetch_incremental_cursor_export_resources,
     backfill_incremental_cursor_export_resources,
 )
@@ -66,6 +67,7 @@ __all__ = [
     "backfill_side_conversations",
     "backfill_ticket_child_resources",
     "backfill_ticket_metrics",
+    "cursor_export_cursor_to_dt",
     "fetch_audit_logs",
     "fetch_client_side_incremental_offset_paginated_resources",
     "fetch_client_side_incremental_cursor_paginated_resources",
