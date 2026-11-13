@@ -1,0 +1,42 @@
+info:
+  name: organizations paged by one
+  type: http
+  seq: 10
+
+http:
+  method: GET
+  url: "{{base_url}}/organizations?sort=updated_at&page[size]=1"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Pass the previous page's after_cursor as --env-var org_page_after=<cursor>
+        // to read the next page. Without it, this reads the first page.
+        const after = bru.getEnvVar('org_page_after');
+        if (after) {
+          req.setUrl(`${req.getUrl()}&page[after]=${after}`);
+        }
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [List Organizations](https://developer.zendesk.com/api-reference/ticketing/organizations/organizations/#list-organizations)
+
+  **WHY:** Whether `/organizations?sort=updated_at` returns several organizations in
+  `(updated_at, id)` order, and whether following each page's `after_cursor` with
+  `page[size]=1` visits every organization exactly once. The keyset sweep follows
+  Zendesk's `after_cursor` unchanged, so this is the paging it relies on. Needs
+  `Seeding / H1 - Create keyset test organizations` first, since the account
+  otherwise has one live organization.
+
+  **VERIFIED (2026-11-13):** with four live organizations, following `after_cursor`
+  one page at a time returned the 2024 organization first, then the three seeded ones
+  in ascending id order. The three share the same `updated_at` second, so two page
+  boundaries fell inside one second, and each organization appeared exactly once. The
+  last page had `has_more: false`.

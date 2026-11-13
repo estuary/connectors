@@ -1,0 +1,47 @@
+info:
+  name: H1 - Create keyset test organizations
+  type: http
+  seq: 19
+
+http:
+  method: POST
+  url: "{{base_url}}/organizations/create_many"
+  body:
+    type: json
+    data: |-
+      {
+        "organizations": [
+          { "name": "Bruno probe keyset organization 1" },
+          { "name": "Bruno probe keyset organization 2" },
+          { "name": "Bruno probe keyset organization 3" }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [Create Many Organizations](https://developer.zendesk.com/api-reference/ticketing/organizations/organizations/#create-many-organizations)
+
+  SEEDING REQUEST: only the user runs this; never the assistant.
+
+  **WHY:** The account had one live organization, so `/organizations` ordering and
+  paging across several organizations couldn't be observed. This creates three more
+  in one background job. `Keyset Cursors / organizations paged by one` then checks that
+  `sort=updated_at` returns them in `(updated_at, id)` order and that following
+  `after_cursor` one record at a time visits each exactly once. If the job creates
+  two of them in the same second, that also checks the id tie-break across a page
+  boundary.
+
+  The response is a `job_status`, not the organizations. Organization names are
+  unique, so running this again fails each item with a duplicate-name error in the
+  job's results. The capture snapshot keeps only the lowest-id organization, so these
+  don't change it.
+
+  **Outcome:** Ran 2026-11-13. Created organizations 55618972248468, 55619057669268,
+  and 55619304843668, all with `updated_at` 2026-11-13T18:48:41Z. Used in
+  `Keyset Cursors / organizations paged by one`.
