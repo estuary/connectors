@@ -82,7 +82,7 @@ async def test_list_reports_follows_next_token_as_the_only_parameter(monkeypatch
     fake = fake_with(*[(f"r{i}", NOW - timedelta(days=i + 1), 1) for i in range(5)])
     request_params = {"reportTypes": SettlementReportRow.REPORT_TYPE, "processingStatuses": "DONE"}
 
-    listed = await list_reports(client_for(fake), request_params, Priority.INCREMENTAL, LOG)
+    listed = await list_reports(LOG, client_for(fake), request_params, Priority.INCREMENTAL)
 
     assert sorted(r.reportId for r in listed) == ["r0", "r1", "r2", "r3", "r4"]
     assert fake.report_requests[0] == {**request_params, "pageSize": 2}
@@ -360,7 +360,7 @@ async def test_document_url_is_fetched_fresh_for_every_download():
 async def test_an_expired_url_fails():
     fake = fake_with(("r1", NOW - DAY, 1))
     client = client_for(fake)
-    doc = await reports.fetch_report_document(client, "doc-r1", Priority.INCREMENTAL, LOG)
+    doc = await reports.fetch_report_document(LOG, client, "doc-r1", Priority.INCREMENTAL)
     fake.now += timedelta(minutes=6)
     with pytest.raises(HTTPError) as raised:
         await client.download(LOG, doc.url, "report document doc-r1")
@@ -414,10 +414,10 @@ async def test_document_is_streamed_not_read_whole(compressed: bool, content_typ
     fake.documents["doc-r1"] = FakeDocument(content, compressed=compressed, content_type=content_type)
     fake.download_chunk_size = 64
     listed = await list_reports(
-        client_for(fake), {"reportTypes": SettlementReportRow.REPORT_TYPE}, Priority.BACKFILL, LOG
+        LOG, client_for(fake), {"reportTypes": SettlementReportRow.REPORT_TYPE}, Priority.BACKFILL
     )
 
-    gen = read_report(client_for(fake), listed[0], Priority.BACKFILL, LOG)
+    gen = read_report(LOG, client_for(fake), listed[0], Priority.BACKFILL)
     await anext(gen)  # the summary row
     first = await anext(gen)
     served_for_first_rows = fake.chunks_served
@@ -462,7 +462,7 @@ async def test_reading_a_report_that_is_not_done_fails(status: str):
     unfinished = Report.model_validate(report("r1", NOW - DAY, status=status))
 
     with pytest.raises(ValueError, match="not DONE"):
-        await collect(read_report(client_for(fake), unfinished, Priority.INCREMENTAL, LOG))
+        await collect(read_report(LOG, client_for(fake), unfinished, Priority.INCREMENTAL))
     assert fake.document_requests == []
 
 
@@ -819,3 +819,43 @@ async def test_backfill_from_the_initial_state_skips_reports_just_before_start_d
         backfill_settlement_reports(client, RecentReports(), start, LOG, state.backfill.next_page, state.backfill.cutoff)
     )
     assert {k[0] for k in keys(out)} == {"at-start"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fraction", [0, 500000])
+async def test_initial_backfill_includes_start_once_across_resume(fraction: int):
+    start = (NOW - 10 * DAY).replace(microsecond=fraction)
+    fake = fake_with(
+        ("before", start - timedelta(microseconds=1), 1),
+        ("at-start-a", start, 1),
+        ("at-start-b", start, 1),
+        ("after", start + DAY, 1),
+    )
+    for entry, created in zip(fake.reports, (
+        start - timedelta(microseconds=1), start, start, start + DAY,
+    ), strict=True):
+        entry["createdTime"] = created.isoformat()
+    client = client_for(fake)
+    config = make_config(["ATVPDKIKX0DER"], start_date=start.isoformat())
+    state = resources.settlement_reports(LOG, client, config).initial_state
+    assert state.backfill.next_page is None
+    out = []
+    async for item in backfill_settlement_reports(
+        client, RecentReports(), start, LOG, state.backfill.next_page,
+        state.backfill.cutoff,
+    ):
+        if isinstance(item, str):
+            assert datetime.fromisoformat(item) == start
+            page = item
+            break
+        out.append(item)
+    else:
+        pytest.fail("expected a checkpoint after both start-boundary reports")
+    # A new process has no cache of reports already read.
+    out.extend(await collect(backfill_settlement_reports(
+        client, RecentReports(), start, LOG, page, state.backfill.cutoff,
+    )))
+    expected = [(report_id, row) for report_id in ("at-start-a", "at-start-b", "after")
+                for row in (1, 2)]
+    assert keys(out) == expected
+    assert "doc-before" not in fake.document_requests

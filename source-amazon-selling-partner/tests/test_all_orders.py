@@ -185,10 +185,10 @@ async def test_incremental_window_spans_at_most_the_maximum_range():
     # The fake refuses a longer range.
     with pytest.raises(HTTPError, match="limited to 30 days"):
         await create_report(
+            LOG,
             client,
             request_for(start, start + MAX_ORDER_REPORT_RANGE + timedelta(seconds=1)),
             Priority.INCREMENTAL,
-            LOG,
         )
 
 
@@ -280,7 +280,7 @@ async def test_never_reuses_a_cancelled_or_aborted_report_or_another_request():
     ]
     client, _ = client_with(fake)
 
-    report = await request_report(client, request, Priority.INCREMENTAL, LOG)
+    report = await request_report(LOG, client, request, Priority.INCREMENTAL)
 
     assert report is not None and report.reportId == "requested-1"
     assert len(fake.create_requests) == 1
@@ -302,14 +302,14 @@ async def test_created_report_with_missing_echo_proceeds_once_warned(monkeypatch
         fake.reports.append(earlier)
     get_report = reports.get_report
 
-    async def without_echo(*args: *tuple[SPAPIClient, str, Priority, logging.Logger]):
+    async def without_echo(*args: *tuple[logging.Logger, SPAPIClient, str, Priority]):
         report = await get_report(*args)
         return report.model_copy(update={name: None for name in missing})
 
     monkeypatch.setattr(reports, "get_report", without_echo)
     client, _ = client_with(fake)
 
-    report = await request_report(client, request, Priority.INCREMENTAL, LOG)
+    report = await request_report(LOG, client, request, Priority.INCREMENTAL)
 
     assert report is not None and report.reportId == "requested-1"
     assert report.marketplaceIds == list(request.marketplace_ids)
@@ -368,7 +368,7 @@ async def test_created_report_missing_echo_still_rejects_a_different_start(monke
     fake = FakeAmazon(now=NOW, orders=[])
     get_report = reports.get_report
 
-    async def changed_echo(*args: *tuple[SPAPIClient, str, Priority, logging.Logger]):
+    async def changed_echo(*args: *tuple[logging.Logger, SPAPIClient, str, Priority]):
         report = await get_report(*args)
         update: dict[str, Any] = {"marketplaceIds": None}
         if len(fake.get_report_requests) == 2:
@@ -379,7 +379,7 @@ async def test_created_report_missing_echo_still_rejects_a_different_start(monke
     client, _ = client_with(fake)
 
     with pytest.raises(ReportMismatch, match="requested-1"):
-        await request_report(client, request, Priority.INCREMENTAL, LOG)
+        await request_report(LOG, client, request, Priority.INCREMENTAL)
 
     assert fake.get_report_requests == ["requested-1", "requested-1"]
 
@@ -390,7 +390,7 @@ async def test_created_report_missing_echo_still_rejects_different_marketplaces(
     fake = FakeAmazon(now=NOW, orders=[])
     get_report = reports.get_report
 
-    async def changed_echo(*args: *tuple[SPAPIClient, str, Priority, logging.Logger]):
+    async def changed_echo(*args: *tuple[logging.Logger, SPAPIClient, str, Priority]):
         report = await get_report(*args)
         return report.model_copy(update={
             "marketplaceIds": [MARKETPLACES[0]],
@@ -402,7 +402,7 @@ async def test_created_report_missing_echo_still_rejects_different_marketplaces(
     client, _ = client_with(fake)
 
     with pytest.raises(ReportMismatch, match="requested-1"):
-        await request_report(client, request, Priority.INCREMENTAL, LOG)
+        await request_report(LOG, client, request, Priority.INCREMENTAL)
 
     assert len(fake.create_requests) == 1
     assert fake.get_report_requests == ["requested-1"]
@@ -414,14 +414,14 @@ async def test_created_report_missing_end_still_counts_cancellations(monkeypatch
     fake = FakeAmazon(now=NOW, orders=[], lifecycles=[["CANCELLED"], ["CANCELLED"]])
     get_report = reports.get_report
 
-    async def without_end(*args: *tuple[SPAPIClient, str, Priority, logging.Logger]):
+    async def without_end(*args: *tuple[logging.Logger, SPAPIClient, str, Priority]):
         report = await get_report(*args)
         return report.model_copy(update={"dataEndTime": None})
 
     monkeypatch.setattr(reports, "get_report", without_end)
     client, _ = client_with(fake)
 
-    assert await request_report(client, request, Priority.INCREMENTAL, LOG) is None
+    assert await request_report(LOG, client, request, Priority.INCREMENTAL) is None
     assert len(fake.create_requests) == 2
 
 
@@ -445,7 +445,7 @@ async def test_never_reuses_a_report_seen_cancelled_while_still_listed_in_progre
     fake.reports.append(requested("stale", request, "IN_PROGRESS", NOW - timedelta(hours=1)))
     client, _ = client_with(fake)
 
-    report = await request_report(client, request, Priority.INCREMENTAL, LOG)
+    report = await request_report(LOG, client, request, Priority.INCREMENTAL)
 
     assert report is not None and report.reportId == "requested-1"
     assert fake.get_report_requests.count("stale") == 1
@@ -484,7 +484,7 @@ async def test_reuses_the_newest_matching_report_whatever_the_marketplace_order(
     fake.script("newer", ["DONE"])
     client, _ = client_with(fake)
 
-    report = await request_report(client, request, Priority.INCREMENTAL, LOG)
+    report = await request_report(LOG, client, request, Priority.INCREMENTAL)
 
     assert report is not None and report.reportId == "newer"
     assert fake.create_requests == []
@@ -633,7 +633,7 @@ async def test_an_aborted_report_whose_diagnostic_is_corrupt_still_fails_as_abor
     fake.fatal_document = FakeDocument(b"error", compressed=True, served=served)
     if case == "malformed document":
 
-        async def malformed(*args: *tuple[SPAPIClient, str, Priority, logging.Logger]):
+        async def malformed(*args: *tuple[logging.Logger, SPAPIClient, str, Priority]):
             return ReportDocument.model_validate_json(b"{}")
 
         monkeypatch.setattr(reports, "fetch_report_document", malformed)
@@ -669,7 +669,7 @@ async def test_create_report_is_paced_by_its_own_bucket(priority: Priority, rese
     client, time = client_with(fake, SteppingTime())
 
     for _ in range(2):
-        await create_report(client, request_for(HORIZON - DAY, HORIZON), priority, LOG)
+        await create_report(LOG, client, request_for(HORIZON - DAY, HORIZON), priority)
 
     assert len(fake.create_requests) == 2
     assert list(client.buckets) == [Operation.CREATE_REPORT]

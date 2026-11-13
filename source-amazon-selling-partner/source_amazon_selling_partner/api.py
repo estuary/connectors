@@ -160,11 +160,11 @@ class PaginationTokenRejected(RuntimeError):
 
 
 async def _search_orders(
+    log: Logger,
     client: SPAPIClient,
     marketplace_ids: list[str],
     request_params: dict[str, str],
     priority: Priority,
-    log: Logger,
 ) -> AsyncGenerator[Order | SearchOrdersResponse, None]:
     """
     Yields every order matching `request_params` across all pages, then the
@@ -200,7 +200,7 @@ async def _search_orders(
 
         processor = IncrementalJsonProcessor(
             body(),
-            "orders.item",
+            Order.ITEMS_PREFIX,
             Order,
             SearchOrdersResponse,
         )
@@ -229,16 +229,16 @@ async def fetch_orders(
     Rejected pagination tokens halve the window, down to a one-hour floor.
 
     ```
-          cursor+1s−overlap  cursor+1s        window_end ≤ horizon
-    ──────────────┼──────────────┼────────────────────┼──▶ time (1s ticks)
-                  │              │                    │
-    lastUpdatedAfter ════════════╪════════════════════╪═══▶
-    lastUpdatedBefore ═══════════╪════════════════════]
-    emitted ──────[══════════════╪════════════════════]
-                  │              │                    └─ new cursor
-                  │              └─ first tick no earlier poll covered
-                  └─ re-reads the overlap, for orders Amazon makes
-                     searchable after their lastUpdatedTime
+                      since       cursor+1s        window_end ≤ horizon
+    ────────────────────┼──────────────┼────────────────────┼──▶ time (1s)
+                        │              │                    │
+    lastUpdatedAfter ───[══════════════╪════════════════════╪══▶
+    lastUpdatedBefore ══╪══════════════╪════════════════════]
+    emitted ────────────[══════════════╪════════════════════]
+                        │              │                    └─ new cursor
+                        │              └─ first tick no earlier poll covered
+                        └─ cursor+1s−overlap; re-reads orders made
+                           searchable after their lastUpdatedTime
     ```
 
     Both bounds are inclusive. `horizon` is the last whole second at least
@@ -256,7 +256,7 @@ async def fetch_orders(
 
     window_end = min(cursor + window_size, horizon)
     async for item in _orders_updated_window(
-        client, marketplace_ids, cursor, window_end, overlap, Priority.INCREMENTAL, log
+        log, client, marketplace_ids, cursor, window_end, overlap, Priority.INCREMENTAL
     ):
         if isinstance(item, datetime):
             window_end = item
@@ -266,27 +266,27 @@ async def fetch_orders(
 
 
 async def _orders_updated_window(
+    log: Logger,
     client: SPAPIClient,
     marketplace_ids: list[str],
     cursor: datetime,
     window_end: datetime,
     overlap: timedelta,
     priority: Priority,
-    log: Logger,
 ) -> AsyncGenerator[Order | datetime, None]:
-    """Read a complete updated-time window, shrinking rejected token windows."""
+    """Yields a complete updated-time window and its inclusive end."""
     while True:
         # Time only the attempt that finished, so a rejected one doesn't skew the rate.
         started = monotonic()
         request_params = {
-            "lastUpdatedAfter": to_iso(cursor + TICK - overlap),
-            "lastUpdatedBefore": to_iso(window_end),
+            Order.SINCE_PARAM: to_iso(cursor + TICK - overlap),
+            Order.BEFORE_PARAM: to_iso(window_end),
         }
 
         count = 0
         try:
             async for item in _search_orders(
-                client, marketplace_ids, request_params, priority, log
+                log, client, marketplace_ids, request_params, priority
             ):
                 if isinstance(item, Order):
                     count += 1
@@ -340,11 +340,10 @@ async def fetch_orders_sweep(
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Order | LogCursor, None]:
     """
-    Re-read each update once it is at least lookback old, at BACKFILL priority.
-    The datetime cursor records inclusive coverage. Run when at least a day
-    of updates has aged past lookback, chaining windows from covered + TICK.
-    Checkpoint after each complete window so a restart resumes there; the
-    horizon may extend forward on restart without leaving a gap.
+    Re-reads updates at least lookback old, at BACKFILL priority, once at
+    least a day of updates is due. The datetime cursor records inclusive
+    coverage; complete windows remain covered across restarts, even as
+    more updates become due.
 
     ```
                   covered  covered+1s           end = now−lookback
@@ -368,8 +367,8 @@ async def fetch_orders_sweep(
 
     while covered < end:
         async for item in _orders_updated_window(
-            client, marketplace_ids, covered, min(covered + window_size, end),
-            timedelta(), Priority.BACKFILL, log,
+            log, client, marketplace_ids, covered,
+            min(covered + window_size, end), timedelta(), Priority.BACKFILL,
         ):
             if isinstance(item, datetime):
                 covered = item
@@ -451,14 +450,14 @@ async def backfill_orders(
     while True:
         started = monotonic()
         request_params = {
-            "createdAfter": to_iso(window_start),
-            "createdBefore": to_iso(window_end),
+            Order.CREATED_SINCE_PARAM: to_iso(window_start),
+            Order.CREATED_BEFORE_PARAM: to_iso(window_end),
         }
 
         count = 0
         try:
             async for item in _search_orders(
-                client, marketplace_ids, request_params, Priority.BACKFILL, log
+                log, client, marketplace_ids, request_params, Priority.BACKFILL
             ):
                 if isinstance(item, Order):
                     count += 1
@@ -503,10 +502,10 @@ async def backfill_orders(
 
 
 async def _list_transactions(
+    log: Logger,
     client: SPAPIClient,
     request_params: dict[str, str],
     priority: Priority,
-    log: Logger,
 ) -> AsyncGenerator[FinancialTransaction, None]:
     """
     Yields every transaction matching `request_params` across all pages,
@@ -553,11 +552,11 @@ async def _list_transactions(
 
 
 async def _transactions_window(
+    log: Logger,
     client: SPAPIClient,
     window_start: datetime,
     window_end: datetime,
     priority: Priority,
-    log: Logger,
 ) -> AsyncGenerator[FinancialTransaction, None]:
     assert window_end - window_start <= MAX_TRANSACTIONS_WINDOW
     request_params = {
@@ -566,7 +565,7 @@ async def _transactions_window(
     }
 
     count = 0
-    async for transaction in _list_transactions(client, request_params, priority, log):
+    async for transaction in _list_transactions(log, client, request_params, priority):
         count += 1
         yield transaction
 
@@ -634,7 +633,7 @@ async def fetch_financial_transactions(
     while True:
         try:
             async for transaction in _transactions_window(
-                client, cursor, window_end, Priority.INCREMENTAL, log
+                log, client, cursor, window_end, Priority.INCREMENTAL
             ):
                 yield transaction
         except PaginationTokenRejected:
@@ -691,6 +690,7 @@ async def backfill_financial_transactions(
     to the late and lookback subtasks, which start their passes their lag
     before the cutoff.
     """
+    # Window retry/checkpoint pattern: source_amazon_selling_partner/api.py:380.
     assert isinstance(cutoff, datetime)
 
     if page is None:
@@ -718,7 +718,7 @@ async def backfill_financial_transactions(
         count = 0
         try:
             async for transaction in _transactions_window(
-                client, window_start, window_end, Priority.BACKFILL, log
+                log, client, window_start, window_end, Priority.BACKFILL
             ):
                 count += 1
                 yield transaction
@@ -758,12 +758,12 @@ def _retention_floor() -> datetime:
 
 
 async def _done_reports(
+    log: Logger,
     client: SPAPIClient,
     report_type: str,
     since: datetime,
     until: datetime,
     priority: Priority,
-    log: Logger,
 ) -> list[Report]:
     """
     Returns the DONE reports of `report_type` created from `since` through
@@ -778,7 +778,7 @@ async def _done_reports(
         Report.SINCE_PARAM: to_iso(since),
         Report.BEFORE_PARAM: to_iso(ceil_to_tick(until)),
     }
-    reports = await list_reports(client, request_params, priority, log)
+    reports = await list_reports(log, client, request_params, priority)
     return sorted(
         (r for r in reports if since <= r.createdTime <= until),
         key=lambda r: (r.createdTime, r.reportId),
@@ -786,11 +786,11 @@ async def _done_reports(
 
 
 async def _report_rows(
+    log: Logger,
     client: SPAPIClient,
     report: Report,
     own_fields: Iterable[str],
     priority: Priority,
-    log: Logger,
     empty_is_routine: bool = False,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """
@@ -801,7 +801,7 @@ async def _report_rows(
     """
     row_number = 0
     async for document, cells in read_report(
-        client, report, priority, log, empty_is_routine=empty_is_routine
+        log, client, report, priority, empty_is_routine=empty_is_routine
     ):
         row_number += 1
         if row_number == 1:
@@ -825,13 +825,13 @@ async def _report_rows(
 
 
 async def _settlement_rows(
+    log: Logger,
     client: SPAPIClient,
     report: Report,
     priority: Priority,
-    log: Logger,
 ) -> AsyncGenerator[SettlementReportRow, None]:
     async for fields in _report_rows(
-        client, report, SettlementReportRow.model_fields, priority, log
+        log, client, report, SettlementReportRow.model_fields, priority
     ):
         yield SettlementReportRow.model_validate(
             {**fields, "summaryRow": fields["rowNumber"] == 1}
@@ -899,14 +899,14 @@ async def fetch_settlement_reports(
         since = floor
 
     reports = await _done_reports(
-        client, SettlementReportRow.REPORT_TYPE, since, horizon, Priority.INCREMENTAL, log
+        log, client, SettlementReportRow.REPORT_TYPE, since, horizon, Priority.INCREMENTAL
     )
     recent.forget_before(since)
 
     for report in reports:
         if report in recent:
             continue
-        async for row in _settlement_rows(client, report, Priority.INCREMENTAL, log):
+        async for row in _settlement_rows(log, client, report, Priority.INCREMENTAL):
             yield row
         recent.add(report)
 
@@ -927,20 +927,21 @@ async def backfill_settlement_reports(
     string, through which every listed report has been read in full.
 
     ```
-                   since      watermark          cutoff−1s  cutoff
-    ─────────────────┼────────────┼──────────────────┼─────────┼──▶ time
-                     │            │                  │         │
-    createdSince ────[════════════╪══════════════════╪═════════╪═▶
-    createdUntil ════╪════════════╪══════════════════]         │
-    emitted ─────────┼────────────(══════════════════]         │
-                     │            │                  │         └─ incremental
-                     │            │                  │            starts here
-                     │            │                  └─ last createdTime read
-                     │            └─ the page cursor; on the first call,
-                     │               every report from since is read
-                     └─ start_date, 90 days ago if later, or
+                   since   watermark  first unread  cutoff−1s  cutoff
+    ─────────────────┼─────────┼──────────┼────────────┼────────┼──▶ time
+                     │         │          │            │        │
+    createdSince ────[═════════╪══════════╪════════════╪════════╪═▶
+    createdUntil ════╪═════════╪══════════╪════════════]        │
+    emitted ─────────┼─────────┼──────────[════════════]        │
+                     │         │          │            │        └─ inc starts
+                     │         │          └─ since on the first call;
+                     │         │             first report after watermark
+                     │         └─ every report through here was read
+                     └─ start_date, retention floor if later, or
                         the watermark floored to the second
     ```
+
+    Listing bounds are inclusive here; a resume watermark is exclusive.
 
     Reports are read oldest first. A cursor is saved only once every
     report sharing a createdTime is read, so resuming after it, by an
@@ -954,7 +955,7 @@ async def backfill_settlement_reports(
 
     watermark: datetime | None = None
     if page is None:
-        since = floor_to_tick(start_date)
+        since = start_date
     else:
         assert isinstance(page, str)
         watermark = datetime.fromisoformat(page)
@@ -965,14 +966,14 @@ async def backfill_settlement_reports(
         return
 
     reports = await _done_reports(
-        client, SettlementReportRow.REPORT_TYPE, since, last_tick, Priority.BACKFILL, log
+        log, client, SettlementReportRow.REPORT_TYPE, since, last_tick, Priority.BACKFILL
     )
     if watermark is not None:
         reports = [r for r in reports if r.createdTime > watermark]
 
     for i, report in enumerate(reports):
         if report not in recent:
-            async for row in _settlement_rows(client, report, Priority.BACKFILL, log):
+            async for row in _settlement_rows(log, client, report, Priority.BACKFILL):
                 yield row
             recent.add(report)
 
@@ -987,11 +988,11 @@ async def backfill_settlement_reports(
 
 
 async def _all_orders_window(
+    log: Logger,
     client: SPAPIClient,
     request: ReportRequest,
     report: Report | None,
     priority: Priority,
-    log: Logger,
 ) -> AsyncGenerator[AllOrdersRow, None]:
     """
     Yields every row of `report`, the order report `request_report` gave
@@ -1004,7 +1005,7 @@ async def _all_orders_window(
     count = 0
     if report is not None:
         async for fields in _report_rows(
-            client, report, AllOrdersRow.model_fields, priority, log, empty_is_routine=True
+            log, client, report, AllOrdersRow.model_fields, priority, empty_is_routine=True
         ):
             count += 1
             # Every column is kept, the buyer's ship-city, ship-state,
@@ -1071,8 +1072,8 @@ async def fetch_all_orders(
         min(window_start + ALL_ORDERS_MAX_WINDOW, horizon),
         data_end_after=cursor,
     )
-    report = await request_report(client, request, Priority.INCREMENTAL, log)
-    async for row in _all_orders_window(client, request, report, Priority.INCREMENTAL, log):
+    report = await request_report(log, client, request, Priority.INCREMENTAL)
+    async for row in _all_orders_window(log, client, request, report, Priority.INCREMENTAL):
         yield row
 
     # A reused report may end before the request does. Its end is the new
@@ -1153,8 +1154,8 @@ async def backfill_all_orders(
         window_start,
         min(window_start + ALL_ORDERS_MAX_WINDOW, cutoff),
     )
-    report = await request_report(client, request, Priority.BACKFILL, log)
-    async for row in _all_orders_window(client, request, report, Priority.BACKFILL, log):
+    report = await request_report(log, client, request, Priority.BACKFILL)
+    async for row in _all_orders_window(log, client, request, report, Priority.BACKFILL):
         yield row
 
     if request.data_end < cutoff:
@@ -1182,11 +1183,11 @@ class _ChunkReader:
 
 
 async def _sales_and_traffic_rows(
+    log: Logger,
     client: SPAPIClient,
     request: ReportRequest,
     report: Report,
     priority: Priority,
-    log: Logger,
 ) -> list[SalesAndTrafficByDate]:
     """
     The by-date entries of `report`, the Sales and Traffic report
@@ -1195,11 +1196,9 @@ async def _sales_and_traffic_rows(
     from getReports can, or that has a day twice, fails before any entry is
     returned, as does one without a salesAndTrafficByDate section.
 
-    Only the specification and the by-date entries are kept. The rest of the
-    document, mostly the by-ASIN section, which grows with the seller's
-    catalog, is skipped as it is read.
+    Memory use is independent of the by-ASIN section's size.
     """
-    document = await read_json_report(client, report, priority, log)
+    document = await read_json_report(log, client, report, priority)
     # ijson directly rather than IncrementalJsonProcessor, which keeps
     # everything outside its prefix, the by-ASIN section included, in memory
     # for get_remainder().
@@ -1255,12 +1254,12 @@ async def _sales_and_traffic_rows(
 
 
 async def _sales_and_traffic_window(
+    log: Logger,
     client: SPAPIClient,
     marketplace_ids: list[str],
     start: datetime,
     end: datetime,
     priority: Priority,
-    log: Logger,
 ) -> AsyncGenerator[SalesAndTrafficByDate, None]:
     """
     Yields every by-date entry of the UTC days from `start` up to `end`,
@@ -1276,11 +1275,11 @@ async def _sales_and_traffic_window(
             end - DAY,
             report_options=SalesAndTrafficByDate.REPORT_OPTIONS,
         )
-        report = await request_report(client, request, priority, log)
+        report = await request_report(log, client, request, priority)
         rows = (
             []
             if report is None
-            else await _sales_and_traffic_rows(client, request, report, priority, log)
+            else await _sales_and_traffic_rows(log, client, request, report, priority)
         )
         for row in rows:
             yield row
@@ -1353,7 +1352,7 @@ async def fetch_sales_and_traffic_by_date(
     # Only a cursor more than two years old leaves no day to read.
     if start < end:
         async for row in _sales_and_traffic_window(
-            client, marketplace_ids, start, end, Priority.INCREMENTAL, log
+            log, client, marketplace_ids, start, end, Priority.INCREMENTAL
         ):
             yield row
 
@@ -1421,7 +1420,7 @@ async def backfill_sales_and_traffic_by_date(
 
     window_end = min(window_start + SALES_AND_TRAFFIC_WINDOW, cutoff)
     async for row in _sales_and_traffic_window(
-        client, marketplace_ids, window_start, window_end, Priority.BACKFILL, log
+        log, client, marketplace_ids, window_start, window_end, Priority.BACKFILL
     ):
         yield row
 
@@ -1430,8 +1429,8 @@ async def backfill_sales_and_traffic_by_date(
 
 
 async def fetch_marketplace_participations(
-    client: SPAPIClient,
     log: Logger,
+    client: SPAPIClient,
 ) -> MarketplaceParticipationsResponse:
     _, body = await client.get(
         log,
@@ -1491,24 +1490,24 @@ async def fetch_catalog_items(
             report_options={"preferredReportDocumentLocale": "en_US"},
             earliest_created=earliest_created,
         )
-        report = await reuse_matching_report(client, request, Priority.INCREMENTAL, log)
+        report = await reuse_matching_report(log, client, request, Priority.INCREMENTAL)
         if report is None and previous_time > completed_bucket:
             previous_request = ReportRequest(
                 CatalogItem.REPORT_TYPE, (marketplace_id,), previous_time, previous_time,
                 earliest_created=earliest_created,
             )
-            report = await reuse_matching_report(client, previous_request, Priority.INCREMENTAL, log)
+            report = await reuse_matching_report(log, client, previous_request, Priority.INCREMENTAL)
         if report is None or report.processingStatus == ProcessingStatus.CANCELLED:
-            report = await request_report(client, request, Priority.INCREMENTAL, log)
+            report = await request_report(log, client, request, Priority.INCREMENTAL)
         listings: dict[str, tuple[set[str], str | None]] = {}
         # Amazon cancels reports with no data. Treat two cancellations as no listings
         # so empty marketplaces can finish without spending quota on every invocation.
         if report is not None:
             async for _, row in read_report(
+                log,
                 client,
                 report,
                 Priority.INCREMENTAL,
-                log,
                 required_columns=("asin1", "seller-sku", "status"),
             ):
                 asin = row["asin1"].strip()

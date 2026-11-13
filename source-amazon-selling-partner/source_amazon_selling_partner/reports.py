@@ -206,10 +206,10 @@ class ReportRequest:
 
 
 async def list_reports(
+    log: Logger,
     client: SPAPIClient,
     request_params: dict[str, Any],
     priority: Priority,
-    log: Logger,
 ) -> list[Report]:
     """
     Returns every report matching `request_params`, across all pages, in the
@@ -235,10 +235,10 @@ async def list_reports(
 
 
 async def fetch_report_document(
+    log: Logger,
     client: SPAPIClient,
     report_document_id: str,
     priority: Priority,
-    log: Logger,
 ) -> ReportDocument:
     _, body = await client.get(
         log,
@@ -251,10 +251,10 @@ async def fetch_report_document(
 
 
 async def get_report(
+    log: Logger,
     client: SPAPIClient,
     report_id: str,
     priority: Priority,
-    log: Logger,
 ) -> Report:
     _, body = await client.get(
         log, Operation.GET_REPORT, Report.PATH.format(reportId=report_id), {}, priority
@@ -263,10 +263,10 @@ async def get_report(
 
 
 async def create_report(
+    log: Logger,
     client: SPAPIClient,
     request: ReportRequest,
     priority: Priority,
-    log: Logger,
 ) -> str:
     """
     Requests a report and returns its id. A report type Amazon limits
@@ -307,10 +307,10 @@ async def create_report(
 
 
 async def _reusable_report(
+    log: Logger,
     client: SPAPIClient,
     request: ReportRequest,
     priority: Priority,
-    log: Logger,
     skip: frozenset[str] = frozenset(),
 ) -> Report | None:
     """
@@ -325,7 +325,7 @@ async def _reusable_report(
         "processingStatuses": ",".join(REUSABLE_STATUSES),
         Report.SINCE_PARAM: _iso(earliest),
     }
-    reports = await list_reports(client, request_params, priority, log)
+    reports = await list_reports(log, client, request_params, priority)
     return max(
         (r for r in reports if request.made(r) and r.reportId not in skip),
         key=lambda r: (r.createdTime, r.reportId),
@@ -334,11 +334,11 @@ async def _reusable_report(
 
 
 async def _wait_for(
+    log: Logger,
     client: SPAPIClient,
     report_id: str,
     request: ReportRequest,
     priority: Priority,
-    log: Logger,
     *,
     created: bool = False,
 ) -> Report:
@@ -348,7 +348,7 @@ async def _wait_for(
     warned_missing = False
     while True:
         await client.sleep(next(delays, POLL_INTERVAL).total_seconds())
-        report = await get_report(client, report_id, priority, log)
+        report = await get_report(log, client, report_id, priority)
         if not request.made(report, allow_missing=created):
             raise ReportMismatch(
                 f"Amazon lists report {report_id} as {report.reportType} "
@@ -388,11 +388,11 @@ async def _wait_for(
 
 
 async def _fatal_error(
+    log: Logger,
     client: SPAPIClient,
     report: Report,
     request: ReportRequest,
     priority: Priority,
-    log: Logger,
 ) -> ReportFailed:
     """The error for a FATAL report, quoting its diagnostic document if any."""
     message = f"Amazon aborted report {report.reportId} ({request}) with status FATAL."
@@ -403,7 +403,7 @@ async def _fatal_error(
     # FATAL.
     try:
         document, headers, stream = await _download_document(
-            client, report.reportDocumentId, priority, log
+            log, client, report.reportDocumentId, priority
         )
         content = b"".join([chunk async for chunk in stream])
         encoding = charset_encoding(headers.get("Content-Type")) or DEFAULT_ENCODING
@@ -419,30 +419,30 @@ async def _fatal_error(
 
 
 async def reuse_matching_report(
+    log: Logger,
     client: SPAPIClient,
     request: ReportRequest,
     priority: Priority,
-    log: Logger,
     skip: frozenset[str] = frozenset(),
 ) -> Report | None:
-    """The report _reusable_report finds, run to terminal status; FATAL raises."""
-    report = await _reusable_report(client, request, priority, log, skip)
+    """Returns a matching terminal report, or None; an aborted report fails."""
+    report = await _reusable_report(log, client, request, priority, skip)
     if report is not None and report.processingStatus != ProcessingStatus.DONE:
         log.info(
             "waiting on a report requested earlier",
             {"report_id": report.reportId, "report_type": request.report_type},
         )
-        report = await _wait_for(client, report.reportId, request, priority, log)
+        report = await _wait_for(log, client, report.reportId, request, priority)
     if report is not None and report.processingStatus == ProcessingStatus.FATAL:
-        raise await _fatal_error(client, report, request, priority, log)
+        raise await _fatal_error(log, client, report, request, priority)
     return report
 
 
 async def request_report(
+    log: Logger,
     client: SPAPIClient,
     request: ReportRequest,
     priority: Priority,
-    log: Logger,
 ) -> Report | None:
     """
     Runs `request` to a terminal status and returns its DONE report, or None
@@ -462,7 +462,7 @@ async def request_report(
     created_ids: set[str] = set()
     seen_cancelled: set[str] = set()
     retry_after_cancel = False
-    report = await reuse_matching_report(client, request, priority, log)
+    report = await reuse_matching_report(log, client, request, priority)
     while report is None or report.processingStatus == ProcessingStatus.CANCELLED:
         if report is not None:
             # A reused report that ends before the request does covers only
@@ -474,7 +474,7 @@ async def request_report(
             # Look for a reusable report again: Amazon may have cancelled this
             # one as too soon because a report of the same request was in flight.
             report = await reuse_matching_report(
-                client, request, priority, log, frozenset(seen_cancelled)
+                log, client, request, priority, frozenset(seen_cancelled)
             )
             continue
         if len(cancelled) >= 2:
@@ -490,14 +490,14 @@ async def request_report(
             return None
         if retry_after_cancel:
             await client.sleep(CANCELLED_RETRY_DELAY.total_seconds())
-        report_id = await create_report(client, request, priority, log)
+        report_id = await create_report(log, client, request, priority)
         created_ids.add(report_id)
         # Only a report requested before may end short of the request.
         exact = replace(request, data_end_after=None)
-        report = await _wait_for(client, report_id, exact, priority, log, created=True)
+        report = await _wait_for(log, client, report_id, exact, priority, created=True)
 
     if report.processingStatus == ProcessingStatus.FATAL:
-        raise await _fatal_error(client, report, request, priority, log)
+        raise await _fatal_error(log, client, report, request, priority)
 
     return report
 
@@ -550,15 +550,15 @@ async def gunzip(stream: AsyncIterator[bytes]) -> AsyncGenerator[bytes, None]:
 
 
 async def _download_document(
+    log: Logger,
     client: SPAPIClient,
     report_document_id: str,
     priority: Priority,
-    log: Logger,
 ) -> tuple[ReportDocument, Headers, AsyncGenerator[bytes, None]]:
     """Starts downloading a report document, returning its decompressed bytes as a stream."""
     # The URL expires five minutes after it is issued, so it's requested
     # immediately before every download and never kept.
-    document = await fetch_report_document(client, report_document_id, priority, log)
+    document = await fetch_report_document(log, client, report_document_id, priority)
     headers, body = await client.download(
         log, document.url, f"report document {document.reportDocumentId}"
     )
@@ -610,10 +610,10 @@ async def _listing_document(
 
 
 async def read_report(
+    log: Logger,
     client: SPAPIClient,
     report: Report,
     priority: Priority,
-    log: Logger,
     empty_is_routine: bool = False,
     required_columns: tuple[str, ...] = (),
 ) -> AsyncGenerator[tuple[ReportDocument, dict[str, str]], None]:
@@ -627,12 +627,12 @@ async def read_report(
     can't be fetched, ends early or isn't text in that encoding, fails
     rather than reading as empty, short or garbled. A document with no data
     rows is logged, as a warning unless `empty_is_routine`. All Listings
-    documents without a charset are spooled to disk to try UTF-8, cp1252,
-    then latin-1. All Listings rows with a different width are skipped, up to
-    MAX_SKIPPED_LISTING_ROWS or MAX_SKIPPED_LISTING_SHARE of data rows.
+    documents without a charset use the first valid encoding among UTF-8,
+    cp1252 and latin-1. All Listings rows with a different width are skipped,
+    up to MAX_SKIPPED_LISTING_ROWS or MAX_SKIPPED_LISTING_SHARE of data rows.
     """
     document, headers, stream = await _download_document(
-        client, _done_document_id(report), priority, log
+        log, client, _done_document_id(report), priority
     )
     log_fields = {
         "report_id": report.reportId,
@@ -742,10 +742,10 @@ async def _as_utf8(
 
 
 async def read_json_report(
+    log: Logger,
     client: SPAPIClient,
     report: Report,
     priority: Priority,
-    log: Logger,
 ) -> AsyncGenerator[bytes, None]:
     """
     Starts reading a DONE report's JSON document, returning it as a stream
@@ -757,7 +757,7 @@ async def read_json_report(
     can't be fetched, ends early or isn't text in that encoding, fails.
     """
     document, headers, stream = await _download_document(
-        client, _done_document_id(report), priority, log
+        log, client, _done_document_id(report), priority
     )
     content_type = headers.get("Content-Type")
     encoding = charset_encoding(content_type) or DEFAULT_ENCODING

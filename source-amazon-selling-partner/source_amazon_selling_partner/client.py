@@ -166,10 +166,10 @@ class SPAPIClient:
         log: Logger,
         operation: Operation,
         path: str,
-        params: dict[str, Any],
+        request_params: dict[str, Any],
         priority: Priority,
     ) -> tuple[Headers, BodyGeneratorFunction]:
-        return await self._request(log, operation, path, priority, params=params)
+        return await self._request(log, operation, path, priority, params=request_params)
 
     async def post(
         self,
@@ -194,8 +194,8 @@ class SPAPIClient:
         **kwargs: Any,
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """
-        Sends a request once its operation's bucket admits it, and then
-        `pace`, if given, so requests leave in the order `pace` admits them.
+        Sends requests within the operation's rate limit and `pace`, if
+        given, preserving the order in which `pace` admits them.
         """
         await self.bucket(operation).acquire(priority)
         if pace is not None:

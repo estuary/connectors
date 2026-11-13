@@ -31,7 +31,7 @@ import logging
 import random
 from datetime import UTC, datetime, timedelta
 from time import perf_counter
-from typing import Any, AsyncGenerator, Callable, TypeVar, cast
+from typing import Any, AsyncGenerator, Callable, cast
 
 import pytest
 from estuary_cdk.http import HTTPError, HTTPSession
@@ -50,7 +50,6 @@ DAY = timedelta(days=1)
 LOOKBACK = 7 * DAY
 BUSY = START + 10 * DAY
 SEED = 270027
-CursorT = TypeVar("CursorT", str, datetime)
 
 
 class SimulationTime(FakeTime):
@@ -176,7 +175,7 @@ class Runtime:
     def new_client(self):
         return SPAPIClient(http=self.amazon, base_url="https://fake", clock=self.amazon.time.clock, sleep=self.amazon.time.sleep)  # type: ignore[arg-type]
 
-    async def invoke(self, factory: Callable[[CursorT], AsyncGenerator[Order | FinancialTransaction | LogCursor | PageCursor, None]], cursor: CursorT) -> tuple[CursorT, bool]:
+    async def invoke[CursorT: (str, datetime)](self, factory: Callable[[CursorT], AsyncGenerator[Order | FinancialTransaction | LogCursor | PageCursor, None]], cursor: CursorT) -> tuple[CursorT, bool]:
         self.invocations += 1
         assert self.invocations < 600, "simulation failed to converge"
         pending = []
@@ -233,7 +232,7 @@ async def test_fake_clock_backfill_then_incremental(kind: str, expected_count: i
     assert state.backfill.cutoff == cutoff
     page = cast(str, state.backfill.next_page)
 
-    async def invoke(factory: Callable[[CursorT], AsyncGenerator[Order | FinancialTransaction | LogCursor | PageCursor, None]], saved: CursorT) -> tuple[CursorT, bool]:
+    async def invoke[CursorT: (str, datetime)](factory: Callable[[CursorT], AsyncGenerator[Order | FinancialTransaction | LogCursor | PageCursor, None]], saved: CursorT) -> tuple[CursorT, bool]:
         # Independent harness check: a crash before a checkpoint commits nothing.
         # This allows replay duplicates after recovery, but prevents the oracle
         # from using rolled-back documents to conceal data loss.

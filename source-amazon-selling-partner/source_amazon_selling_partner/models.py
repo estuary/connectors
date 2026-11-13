@@ -252,6 +252,11 @@ class Order(
     },
 ):
     PATH: ClassVar[str] = "/orders/2026-01-01/orders"
+    ITEMS_PREFIX: ClassVar[str] = "orders.item"
+    SINCE_PARAM: ClassVar[str] = "lastUpdatedAfter"
+    BEFORE_PARAM: ClassVar[str] = "lastUpdatedBefore"
+    CREATED_SINCE_PARAM: ClassVar[str] = "createdAfter"
+    CREATED_BEFORE_PARAM: ClassVar[str] = "createdBefore"
     PAGE_SIZE: ClassVar[int] = 100
     # Extra order sections to request. BUYER and RECIPIENT are left out: they
     # carry buyer personal data, which Amazon only releases to applications
@@ -491,25 +496,6 @@ class CatalogItem(BaseDocument, extra="allow"):
 
     asin: str
     marketplaceId: str
-    brand: str | None = None
-    color: str | None = None
-    itemClassification: str | None = None
-    itemName: str | None = None
-    manufacturer: str | None = None
-    modelNumber: str | None = None
-    partNumber: str | None = None
-    size: str | None = None
-    style: str | None = None
-    websiteDisplayGroup: str | None = None
-    websiteDisplayGroupName: str | None = None
-    releaseDate: str | None = None
-    browseClassification: dict[str, Any] | None = None
-    packageQuantity: int | None = None
-    adultProduct: bool | None = None
-    autographed: bool | None = None
-    contributors: list[dict[str, Any]] | None = None
-    memorabilia: bool | None = None
-    tradeInEligible: bool | None = None
     listingStatus: str | None = None
     sellerSkus: list[str]
     refreshedAt: AwareDatetime

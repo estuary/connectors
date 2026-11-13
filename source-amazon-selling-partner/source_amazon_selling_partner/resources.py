@@ -89,7 +89,7 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
     client = _client(http, config)
 
     try:
-        participations = await fetch_marketplace_participations(client, log)
+        participations = await fetch_marketplace_participations(log, client)
     except HTTPError as err:
         # Login with Amazon rejects bad client credentials or refresh tokens
         # with 400 or 401; SP-API rejects an unauthorized application with 403.
@@ -350,12 +350,8 @@ def settlement_reports(
         open=open,
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=cutoff - TICK),
-            # The page is the createdTime of the last report read, and reports
-            # after it are read, so it starts just before start_date.
             backfill=ResourceState.Backfill(
-                next_page=(
-                    floor_to_tick(config.start_date) - timedelta(microseconds=1)
-                ).isoformat(),
+                next_page=None,
                 cutoff=cutoff,
             ),
         ),

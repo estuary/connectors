@@ -430,7 +430,7 @@ async def test_other_report_types_are_not_paced_and_send_no_options():
     )
 
     for _ in range(4):
-        await create_report(client, request, Priority.INCREMENTAL, LOG)
+        await create_report(LOG, client, request, Priority.INCREMENTAL)
 
     assert "reportOptions" not in request.body()
     assert all("reportOptions" not in r for r in fake.create_requests)
@@ -448,7 +448,7 @@ async def test_a_403_for_a_report_type_without_a_role_stays_an_http_error():
     )
 
     with pytest.raises(HTTPError) as err:
-        await create_report(client, request, Priority.INCREMENTAL, LOG)
+        await create_report(LOG, client, request, Priority.INCREMENTAL)
     assert err.value.code == 403
 
 
@@ -462,7 +462,7 @@ async def test_a_sales_and_traffic_create_also_spends_a_create_report_token():
     client, time = client_with(fake)
     client.bucket(Operation.CREATE_REPORT).tokens = 0
 
-    await create_report(client, st_request(TODAY - 5 * DAY, TODAY - DAY), Priority.INCREMENTAL, LOG)
+    await create_report(LOG, client, st_request(TODAY - 5 * DAY, TODAY - DAY), Priority.INCREMENTAL)
 
     # Its own type's bucket starts with a token, so the wait is createReport's
     # refill, about 60 seconds.
@@ -476,13 +476,13 @@ async def test_fake_create_report_checks_sales_and_traffic_arguments():
 
     with pytest.raises(HTTPError, match="invalid report option"):
         await create_report(
-            client, st_request(TODAY - 5 * DAY, TODAY - DAY, options={"dateGranularity": "HOUR"}), Priority.INCREMENTAL, LOG
+            LOG, client, st_request(TODAY - 5 * DAY, TODAY - DAY, options={"dateGranularity": "HOUR"}), Priority.INCREMENTAL
         )
     with pytest.raises(HTTPError, match="exactly one marketplace"):
-        await create_report(client, st_request(TODAY - 5 * DAY, TODAY - DAY, MARKETPLACES), Priority.INCREMENTAL, LOG)
+        await create_report(LOG, client, st_request(TODAY - 5 * DAY, TODAY - DAY, MARKETPLACES), Priority.INCREMENTAL)
 
     # A start more than two years back is cancelled, twice, and read as no data.
-    report = await request_report(client, st_request(TODAY - 731 * DAY, TODAY - 710 * DAY), Priority.INCREMENTAL, LOG)
+    report = await request_report(LOG, client, st_request(TODAY - 731 * DAY, TODAY - 710 * DAY), Priority.INCREMENTAL)
     assert report is None
     assert len(fake.create_requests) == 4
 

@@ -232,7 +232,7 @@ async def read_document(body: bytes, content_type: str | None, report_type: str 
     fake.documents["doc-r1"] = FakeDocument(body, content_type=content_type)
     fake.download_chunk_size = 3
     return await collect(reports.read_report(
-        client_for(fake), metadata, Priority.BACKFILL, LOG, required_columns=required_columns,
+        LOG, client_for(fake), metadata, Priority.BACKFILL, required_columns=required_columns,
     ))
 
 
