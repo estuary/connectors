@@ -6,14 +6,5 @@ captures:
         - python
         - -m
         - source_amazon_selling_partner
-        config:
-          credentials:
-            credentials_title: Login with Amazon
-            client_id: not_a_real_client_id
-            client_secret: not_a_real_client_secret
-            refresh_token: not_a_real_refresh_token
-          region: North America
-          marketplace_ids:
-          - ATVPDKIKX0DER
-          start_date: "2026-01-01T00:00:00Z"
+        config: config.yaml
     bindings: []
