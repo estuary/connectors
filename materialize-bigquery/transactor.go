@@ -62,12 +62,22 @@ type checkpointItem struct {
 type mergeBoundLiterals struct {
 	Lower string `json:",omitempty"`
 	Upper string `json:",omitempty"`
+	// Ranges are the sql.MergeBound's ranges, if its values split at gaps.
+	Ranges []mergeRangeLiterals `json:",omitempty"`
+}
+
+type mergeRangeLiterals struct {
+	Lower string
+	Upper string
 }
 
 func boundsLiterals(bounds []sql.MergeBound) []mergeBoundLiterals {
 	var out = make([]mergeBoundLiterals, len(bounds))
 	for i, b := range bounds {
 		out[i] = mergeBoundLiterals{Lower: b.LiteralLower, Upper: b.LiteralUpper}
+		for _, r := range b.Ranges {
+			out[i].Ranges = append(out[i].Ranges, mergeRangeLiterals{Lower: r.LiteralLower, Upper: r.LiteralUpper})
+		}
 	}
 	return out
 }
@@ -260,8 +270,9 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 		target:           target,
 		loadSchema:       loadSchema,
 		storeSchema:      storeSchema,
-		loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
-		storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
+		loadMergeBounds:  newMergeBoundsBuilder(target, dialect.Literal),
+		storeMergeBounds: newMergeBoundsBuilder(target, dialect.Literal),
+		timestampKeys:    timestampKeys(target),
 	}
 
 	if t.cfg.Advanced.NoFlowDocument {
@@ -426,7 +437,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("converting load key: %w", err)
 		} else if err = t.loadFiles.WriteRow(ctx, it.Binding, converted); err != nil {
 			return fmt.Errorf("writing normalized key to keyfile: %w", err)
-		} else if err := b.loadMergeBounds.NextKey(converted); err != nil {
+		} else if err := b.loadMergeBounds.NextKey(b.boundsKey(converted)); err != nil {
 			return fmt.Errorf("tracking Load key bounds for resource %s: %w", b.target.Path, err)
 		}
 	}
@@ -439,7 +450,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Build the queries of all documents across all bindings that were requested.
-	var subqueries []string
+	var subqueries []loadSubquery
 	// This is the map of external table references we will populate.
 	var edcTableDefs = make(map[string]bigquery.ExternalData)
 	var externalData = make(map[string][]string)
@@ -456,13 +467,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				loadTemplate = t.templates.loadQueryNoFlowDocument
 			}
 
-			if loadQuery, err := renderQueryTemplate(b.target, loadTemplate, b.loadMergeBounds.Build(), t.objAndArrayAsJson); err != nil {
-				return fmt.Errorf("rendering load query template: %w", err)
-			} else {
-				subqueries = append(subqueries, loadQuery)
-				edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
-				externalData[b.tempTableName] = uris
-			}
+			subqueries = append(subqueries, loadSubquery{table: b.target, tpl: loadTemplate, bounds: b.loadMergeBounds.Build()})
+			edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
+			externalData[b.tempTableName] = uris
 		}
 	}
 
@@ -471,7 +478,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Build the query across all tables.
-	queryStr := strings.Join(subqueries, "\nUNION ALL\n") + ";"
+	queryStr, err := renderLoadQuery(subqueries, maxLoadQueryLength, t.objAndArrayAsJson)
+	if err != nil {
+		return fmt.Errorf("rendering load query template: %w", err)
+	}
 	query := t.client.newQuery(queryStr)
 	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
 
@@ -558,7 +568,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		} else if err = t.storeFiles.WriteRow(ctx, it.Binding, append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
-		} else if err := b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)]); err != nil {
+		} else if err := b.storeMergeBounds.NextKey(b.boundsKey(converted[:len(b.target.Keys)])); err != nil {
 			return nil, fmt.Errorf("tracking Store key bounds for resource %s: %w", b.target.Path, err)
 		}
 	}
@@ -886,18 +896,68 @@ func (t *transactor) Destroy() {
 	_ = t.client.bigqueryClient.Close()
 }
 
+// maxLoadQueryLength is the longest load query, in bytes, which keeps the
+// split ranges of its merge bounds. BigQuery rejects a query whose text is
+// longer than 1,024,000 characters.
+const maxLoadQueryLength = 1_000_000
+
+// loadSubquery is one binding's part of a load query.
+type loadSubquery struct {
+	table  sql.Table
+	tpl    *template.Template
+	bounds []sql.MergeBound
+}
+
+// renderLoadQuery renders the UNION ALL of subqueries. A query longer than
+// limit is rendered with each merge bound as its one enclosing range, which
+// takes less text than its split ranges.
+func renderLoadQuery(subqueries []loadSubquery, limit int, objAndArrayAsJson bool) (string, error) {
+	var render = func(split bool) (string, error) {
+		var parts = make([]string, 0, len(subqueries))
+		for _, sq := range subqueries {
+			var bounds = sq.bounds
+			if !split {
+				bounds = slices.Clone(bounds)
+				for i := range bounds {
+					bounds[i].Ranges = nil
+				}
+			}
+			var part, err = renderQueryTemplate(sq.table, sq.tpl, bounds, objAndArrayAsJson)
+			if err != nil {
+				return "", err
+			}
+			parts = append(parts, part)
+		}
+		return strings.Join(parts, "\nUNION ALL\n") + ";", nil
+	}
+
+	if query, err := render(true); err != nil || len(query) <= limit {
+		return query, err
+	}
+	return render(false)
+}
+
 // combineBounds unions the per-key-column merge bounds of coalesced checkpoint
 // entries. A column keeps a bound only when every entry carries one, and
 // differing literals combine with LEAST/GREATEST cast to the column's type:
 // those functions compare in their operands' type, and comparing e.g.
-// timestamp literals as strings can pick the wrong extremum.
+// timestamp literals as strings can pick the wrong extremum. When any entry's
+// bound splits into ranges, the combined bound is the union of every entry's
+// ranges, taking an unsplit bound as a single range.
 func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound {
 	var out = make([]sql.MergeBound, len(keys))
 	for i, key := range keys {
 		out[i] = sql.MergeBound{Column: key}
 
-		var valid = true
+		var valid, split = true, false
 		var lowers, uppers []string
+		var ranges []sql.MergeRange
+		var addRange = func(lower, upper string) {
+			var r = sql.MergeRange{LiteralLower: lower, LiteralUpper: upper}
+			if !slices.Contains(ranges, r) {
+				ranges = append(ranges, r)
+			}
+		}
 		for _, item := range items {
 			if len(item.Bounds) != len(keys) || item.Bounds[i].Lower == "" || item.Bounds[i].Upper == "" {
 				valid = false
@@ -909,6 +969,13 @@ func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound 
 			if !slices.Contains(uppers, item.Bounds[i].Upper) {
 				uppers = append(uppers, item.Bounds[i].Upper)
 			}
+			if len(item.Bounds[i].Ranges) == 0 {
+				addRange(item.Bounds[i].Lower, item.Bounds[i].Upper)
+			}
+			for _, r := range item.Bounds[i].Ranges {
+				split = true
+				addRange(r.Lower, r.Upper)
+			}
 		}
 		if !valid {
 			continue
@@ -916,6 +983,9 @@ func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound 
 
 		out[i].LiteralLower = extremumExpr("LEAST", lowers, key)
 		out[i].LiteralUpper = extremumExpr("GREATEST", uppers, key)
+		if split {
+			out[i].Ranges = ranges
+		}
 	}
 	return out
 }

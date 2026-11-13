@@ -2,6 +2,16 @@
 
 ## 2026-11-11
 
+### Changed
+- Load and merge queries on tables with a `TIMESTAMP` key column bound it by
+  the transaction's exact key range, rather than whole days, and split that
+  range at wide gaps between the keys, so a few keys far from the rest no
+  longer widen the scan to everything in between.
+- Load and merge queries also split the range of a string key column at wide
+  gaps between the transaction's keys. Ids that don't increase in byte order,
+  such as Klaviyo's, which step from `z` to `A`, no longer widen the scan to
+  most of the table when a transaction holds ids from both sides of a step.
+
 ### Fixed
 - A materialization no longer fails to start when a selected field matches an
   existing column whose name differs only in capitalization.

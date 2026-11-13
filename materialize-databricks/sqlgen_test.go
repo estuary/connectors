@@ -263,7 +263,7 @@ func TestDatetimeKeyRanges(t *testing.T) {
 			table, err := sql.ResolveTable(shape, dialect)
 			require.NoError(t, err)
 
-			var builder = sql.NewMergeBoundsBuilder(table.Keys, dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges(maxBoundRanges))
+			var builder = sql.NewMergeBoundsBuilder(table.Keys, dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges())
 			for _, k := range keys {
 				converted, err := table.ConvertKey(k)
 				require.NoError(t, err)
