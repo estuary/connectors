@@ -609,6 +609,11 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
+	// The transaction begins at the first key, because the wait for that key
+	// is unbounded and a connection is only replaceable between transactions.
+	if !it.Next() {
+		return it.Err()
+	}
 	var txn, err = d.load.session.begin(ctx, d.tempTables(func(b *binding) string { return b.createLoadTableSQL }))
 	if err != nil {
 		return fmt.Errorf("DB.BeginTx: %w", err)
@@ -621,7 +626,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// consecutive keys of the same binding as a bulk insert to minimise roundtrips
 	var lastBinding = -1
 	var batch *stdsql.Stmt
-	for it.Next() {
+	for more := true; more; more = it.Next() {
 		var b = d.bindings[it.Binding]
 
 		if it.Binding != lastBinding {
