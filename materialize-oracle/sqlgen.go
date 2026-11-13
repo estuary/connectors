@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -375,24 +376,113 @@ func storeColumns(t *sql.Table) ([]*sql.Column, []int) {
 	return out, order
 }
 
-// insertSQL inserts one row per element of the bound arrays.
-func insertSQL(t *sql.Table) string {
-	var cols, _ = storeColumns(t)
-	var names, binds []string
-	for i, c := range cols {
-		names = append(names, c.Identifier)
-		binds = append(binds, bindExpr(c, fmt.Sprintf(":%d", i+1)))
+// A table's staged rows wait in a stage table beside it, which has the
+// table's columns and these two, until their transaction commits.
+const (
+	stageTokenColumn = "flow_token"
+	stageOpColumn    = "flow_op"
+	stagePrefix      = "flow_stage_"
+	// Oracle's limit on the length of a name.
+	maxIdentifierBytes = 128
+)
+
+// Operations of staged rows.
+const (
+	opInsert = "I" // a key the table doesn't have
+	opUpdate = "U" // replaces the row of an existing key
+	opDelete = "D" // deletes the row of an existing key, and has only the keys
+)
+
+// stagePath is the path of the stage table of the table at path.
+func stagePath(path []string) []string {
+	var table = path[len(path)-1]
+	var name = stagePrefix + table
+	if len(name) > maxIdentifierBytes {
+		var sum = sha256.Sum256([]byte(table))
+		var suffix = "_" + hex.EncodeToString(sum[:8])
+		name = name[:maxIdentifierBytes-len(suffix)]
+		for !utf8.ValidString(name) {
+			name = name[:len(name)-1]
+		}
+		name += suffix
 	}
-	return fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", t.Identifier, strings.Join(names, ", "), strings.Join(binds, ", "))
+	return append(slices.Clone(path[:len(path)-1]), name)
 }
 
-// deleteSQL deletes the row of each bound key.
-func deleteSQL(t *sql.Table) string {
-	var conds []string
-	for i, k := range t.Keys {
-		conds = append(conds, fmt.Sprintf("%s = %s", k.Identifier, bindExpr(&k, fmt.Sprintf(":%d", i+1))))
+// createStageSQL creates the stage table of t. Its columns take their types
+// from t's, but are nullable: CTAS doesn't carry NOT NULL to outer-joined
+// columns.
+func createStageSQL(t *sql.Table, stage string) string {
+	var cols = []string{
+		"CAST(NULL AS VARCHAR2(36)) " + stageTokenColumn,
+		"CAST(NULL AS CHAR(1)) " + stageOpColumn,
 	}
-	return fmt.Sprintf("DELETE FROM %s WHERE %s", t.Identifier, strings.Join(conds, " AND "))
+	for _, c := range t.Columns() {
+		cols = append(cols, "t."+c.Identifier)
+	}
+	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s AS SELECT %s FROM dual LEFT JOIN %s t ON 1 = 0 WHERE 1 = 0",
+		stage, strings.Join(cols, ", "), t.Identifier)
+}
+
+// stageInsertSQL inserts one row per element of the bound arrays into the
+// stage table: the token, the operation, then t's columns in storeColumns
+// order.
+func stageInsertSQL(t *sql.Table, stage string) string {
+	var cols, _ = storeColumns(t)
+	var names = []string{stageTokenColumn, stageOpColumn}
+	var binds = []string{":1", ":2"}
+	for i, c := range cols {
+		names = append(names, c.Identifier)
+		binds = append(binds, bindExpr(c, fmt.Sprintf(":%d", i+3)))
+	}
+	return fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", stage, strings.Join(names, ", "), strings.Join(binds, ", "))
+}
+
+// tokenBinds lists n placeholders, for tokens bound in order.
+func tokenBinds(n int) string {
+	var binds = make([]string, n)
+	for i := range binds {
+		binds[i] = fmt.Sprintf(":%d", i+1)
+	}
+	return strings.Join(binds, ", ")
+}
+
+// applyDeleteSQL deletes the rows of t whose keys are staged with op, by the
+// transactions of the bound tokens.
+func applyDeleteSQL(t *sql.Table, stage, op string, tokens int) string {
+	var conds []string
+	for _, k := range t.Keys {
+		conds = append(conds, fmt.Sprintf("s.%s = r.%s", k.Identifier, k.Identifier))
+	}
+	return fmt.Sprintf("DELETE FROM %s r WHERE EXISTS (SELECT 1 FROM %s s WHERE s.%s IN (%s) AND s.%s = '%s' AND %s)",
+		t.Identifier, stage, stageTokenColumn, tokenBinds(tokens), stageOpColumn, op, strings.Join(conds, " AND "))
+}
+
+// applyInsertSQL inserts into t the rows staged by the transactions of the
+// bound tokens, other than deletions.
+func applyInsertSQL(t *sql.Table, stage string, tokens int) string {
+	var names []string
+	for _, c := range t.Columns() {
+		names = append(names, c.Identifier)
+	}
+	var cols = strings.Join(names, ", ")
+	return fmt.Sprintf("INSERT INTO %s (%s) SELECT %s FROM %s WHERE %s IN (%s) AND %s <> '%s'",
+		t.Identifier, cols, cols, stage, stageTokenColumn, tokenBinds(tokens), stageOpColumn, opDelete)
+}
+
+// clearStageSQL deletes the rows staged by the transactions of the bound
+// tokens.
+func clearStageSQL(stage string, tokens int) string {
+	return fmt.Sprintf("DELETE FROM %s WHERE %s IN (%s)", stage, stageTokenColumn, tokenBinds(tokens))
+}
+
+// pruneStageSQL deletes the rows staged by any transaction but those of the
+// bound tokens.
+func pruneStageSQL(stage string, tokens int) string {
+	if tokens == 0 {
+		return "DELETE FROM " + stage
+	}
+	return fmt.Sprintf("DELETE FROM %s WHERE %s NOT IN (%s)", stage, stageTokenColumn, tokenBinds(tokens))
 }
 
 // keyKind is how a key column is sent to JSON_TABLE and compared to the

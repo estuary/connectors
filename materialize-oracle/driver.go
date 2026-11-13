@@ -1,16 +1,21 @@
 package connector
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	stdsql "database/sql"
 	"database/sql/driver"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -24,6 +29,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/invopop/jsonschema"
+	"github.com/google/uuid"
 	go_ora "github.com/sijms/go-ora/v2"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
@@ -93,7 +99,7 @@ type config struct {
 	User        string            `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Credentials credentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=2"`
 	Database    string            `json:"database" jsonschema:"title=Database,description=Service name of the database (pluggable database) to materialize to." jsonschema_extras:"order=3"`
-	Schema      string            `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 table. Defaults to the schema of the user." jsonschema_extras:"order=4"`
+	Schema      string            `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema for bound collection tables (unless overridden within the binding resource configuration). Defaults to the schema of the user." jsonschema_extras:"order=4"`
 	SSLMode     sslMode           `json:"sslmode" jsonschema:"title=SSL Mode,description=How to secure the connection. 'verify-full' connects over TLS (TCPS) and verifies the server certificate and host name. 'require' connects over TLS without verifying them. 'disable' connects over plain TCP and relies on an SSH tunnel or Oracle native network encryption for security.,enum=verify-full,enum=require,enum=disable,default=verify-full" jsonschema_extras:"order=5,nonsensitive=true"`
 	HardDelete  bool              `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=6,nonsensitive=true"`
 
@@ -307,18 +313,13 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				schema = translateIdentifier(schema)
 			}
 
-			var metaBase sql.TablePath
-			if cfg.Schema != "" {
-				metaBase = append(metaBase, cfg.Schema)
-			}
-
 			var dialect = newOracleDialect(schema)
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,
-				MetaCheckpoints:     sql.FlowCheckpointsTable(metaBase),
+				MetaCheckpoints:     nil,
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
@@ -340,13 +341,15 @@ const (
 )
 
 type binding struct {
-	target    sql.Table
-	insertSQL string
-	deleteSQL string
-	loadSQL   string
-	// order maps each INSERT bind position to its index in
-	// Table.ConvertAll's output, and lobStart is the first position of a LOB
-	// column.
+	target sql.Table
+	// stage is the identifier of the table's stage table.
+	stage          string
+	createStageSQL string
+	insertSQL      string
+	loadSQL        string
+	// order maps each column's INSERT bind position, after the token and
+	// operation, to its index in Table.ConvertAll's output, and lobStart is the
+	// first bind position of a LOB column.
 	order    []int
 	lobStart int
 
@@ -354,27 +357,29 @@ type binding struct {
 	// when truncateReason states why the table cannot be truncated.
 	truncateSQL    string
 	truncateReason error
+
+	// The transaction being staged, if any.
+	staged *stateItem
 }
 
 type transactor struct {
-	cfg      config
-	db       *stdsql.DB
-	bindings []*binding
-	be       *m.BindingEvents
+	cfg       config
+	db        *stdsql.DB
+	bindings  []*binding
+	be        *m.BindingEvents
+	loadConn  *stdsql.Conn
+	storeConn *stdsql.Conn
 
-	load struct {
-		conn *stdsql.Conn
-	}
-	store struct {
-		conn  *stdsql.Conn
-		fence sql.Fence
-	}
-
-	fenceSQL string
+	rangeKey string
+	// The shard whose key range begins at 0 applies every shard's staged
+	// rows; the others only stage.
+	primary bool
+	// The primary's staged transactions not yet applied, from every shard.
+	state connectorState
 
 	truncateAfterBackfill bool
 	// truncations maps a binding index to the boundary of a completed
-	// backfill, for deletion in this transaction's commit.
+	// backfill, for staging by Store.
 	truncations map[int]time.Time
 }
 
@@ -391,39 +396,37 @@ func newTransactor(
 	is *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
-	if err := boilerplate.RequireSingleShard(open); err != nil {
-		return nil, err
-	}
-
 	var t = &transactor{
 		cfg:                   ep.Config,
 		be:                    be,
+		rangeKey:              rangeKeyOf(fence.KeyBegin, fence.KeyEnd),
+		primary:               fence.KeyBegin == 0,
+		state:                 make(connectorState),
 		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
-	t.store.fence = fence
-	t.fenceSQL = updateFenceSQL(ep.Dialect, fence)
 
 	var err error
 	t.db = ep.Config.openDB()
-	if t.load.conn, err = t.db.Conn(ctx); err != nil {
+	if t.loadConn, err = t.db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("load db.Conn: %w", err)
 	}
-	if t.store.conn, err = t.db.Conn(ctx); err != nil {
+	if t.storeConn, err = t.db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("store db.Conn: %w", err)
 	}
 
 	for _, target := range bindings {
 		var b = &binding{
-			target:    target,
-			insertSQL: insertSQL(&target),
-			deleteSQL: deleteSQL(&target),
+			target: target,
+			stage:  ep.Dialect.Identifier(stagePath(target.Path)...),
 		}
+		b.createStageSQL = createStageSQL(&target, b.stage)
+		b.insertSQL = stageInsertSQL(&target, b.stage)
 		var cols []*sql.Column
 		cols, b.order = storeColumns(&target)
-		b.lobStart = len(cols)
+		b.lobStart = 2 + len(cols)
 		for i, c := range cols {
 			if isLOB(c) {
-				b.lobStart = i
+				b.lobStart = 2 + i
 				break
 			}
 		}
@@ -438,7 +441,44 @@ func newTransactor(
 		t.bindings = append(t.bindings, b)
 	}
 
+	if t.primary {
+		if t.state, err = parseState(open.StateJson); err != nil {
+			return nil, err
+		} else if err := t.prepareStages(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	return t, nil
+}
+
+// prepareStages creates the stage tables that don't exist, and deletes the
+// rows staged by transactions that aren't pending: those of a Store that
+// failed before its transaction committed, and of a binding's state key from
+// before a backfill. The other shards stage no rows until every shard has
+// opened.
+func (t *transactor) prepareStages(ctx context.Context) error {
+	for _, b := range t.bindings {
+		if _, err := t.db.ExecContext(ctx, b.createStageSQL); err != nil {
+			return fmt.Errorf("creating stage table %s: %w", b.stage, err)
+		}
+		var tokens []any
+		for _, e := range t.state[b.target.StateKey] {
+			tokens = append(tokens, e.Token)
+		}
+		res, err := t.db.ExecContext(ctx, pruneStageSQL(b.stage, len(tokens)), tokens...)
+		if err != nil {
+			return fmt.Errorf("deleting abandoned rows of stage table %s: %w", b.stage, err)
+		} else if n, err := res.RowsAffected(); err != nil {
+			return fmt.Errorf("deleting abandoned rows of stage table %s (rows affected): %w", b.stage, err)
+		} else if n > 0 {
+			log.WithFields(log.Fields{
+				"table": b.stage,
+				"rows":  n,
+			}).Info("deleted abandoned staged rows")
+		}
+	}
+	return nil
 }
 
 // addTruncation prepares b to delete the rows whose col is earlier than a
@@ -470,12 +510,50 @@ func truncateSQL(table, column, ddl string) string {
 }
 
 func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
-	return t.store.fence.Checkpoint, nil
+	return nil, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+// UnmarshalState is a no-op: newTransactor reads the state from Open, to
+// prune the stage tables before any shard stages rows.
+func (t *transactor) UnmarshalState(json.RawMessage) error { return nil }
 
+// mergePeerStatePatches folds the other shards' StartedCommit patches of the
+// just-committed transaction into the primary's state. StartCommit records
+// the primary's own entries, so their echo is skipped.
+func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
+	for _, patch := range patches {
+		if bytes.Equal(bytes.TrimSpace(patch), []byte("null")) {
+			// The runtime's encoding of a peer's full (non-merge-patch) state
+			// replacement, which no shard here ever produces.
+			return fmt.Errorf("unexpected state reset patch in aggregated shard state")
+		}
+		state, err := parseState(patch)
+		if err != nil {
+			return fmt.Errorf("parsing aggregated state patch: %w", err)
+		}
+		for sk, bucket := range state {
+			for rk, e := range bucket {
+				if rk == t.rangeKey {
+					continue
+				}
+				// The previous transaction's entry is applied before the next
+				// one's patch arrives, so a collision would lose staged rows.
+				if t.state[sk][rk] != nil {
+					return fmt.Errorf("shard %s staged a new transaction for %s while its previous one is still pending", rk, sk)
+				}
+				t.state.add(sk, rk, e)
+			}
+		}
+	}
+	return nil
+}
+
+// Flush records completed backfills on the primary only, since every shard
+// receives the same completions and only the primary applies staged rows.
 func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	if !t.primary {
+		return nil
+	}
 	t.truncations = make(map[int]time.Time, len(completes))
 	for binding, boundary := range completes {
 		var b = t.bindings[binding]
@@ -497,32 +575,21 @@ func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error
 	return nil
 }
 
-func (t *transactor) Acknowledge(context.Context, []json.RawMessage, []string) (*pf.ConnectorState, error) {
-	return nil, nil
-}
-
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 	var started bool
 
-	type pending struct {
-		buf  []byte
-		keys int
-	}
-	var batches = make(map[int]*pending)
-
-	query := func(binding int, p *pending) error {
+	query := func(binding int, keys []byte) error {
 		if !started {
 			// Load results may only be sent once the prior commit is
-			// acknowledged, and the query runs before the iterator drains.
+			// acknowledged, and the query may run before the iterator drains.
 			it.WaitForAcknowledged()
 			t.be.StartedEvaluatingLoads()
 			started = true
 		}
-		p.buf = append(p.buf, ']')
 		var b = t.bindings[binding]
 
-		rows, err := t.load.conn.QueryContext(ctx, b.loadSQL, go_ora.Clob{String: string(p.buf), Valid: true})
+		rows, err := t.loadConn.QueryContext(ctx, b.loadSQL, go_ora.Clob{String: string(keys), Valid: true})
 		if err != nil {
 			return fmt.Errorf("querying Load documents of %s: %w", b.target.Identifier, err)
 		}
@@ -539,8 +606,35 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if err := rows.Err(); err != nil {
 			return fmt.Errorf("reading Load documents of %s: %w", b.target.Identifier, err)
 		}
-		p.buf, p.keys = p.buf[:0], 0
 		return nil
+	}
+
+	// The primary applies the previous transaction's rows in its own
+	// Acknowledge, which the other shards' acknowledgements don't wait for.
+	// They hold their queries until the iterator ends at Flush, which follows
+	// every shard's acknowledgement.
+	var spill *loadSpill
+	if !t.primary {
+		spill = &loadSpill{}
+		defer spill.close()
+	}
+
+	type pending struct {
+		buf  []byte
+		keys int
+	}
+	var batches = make(map[int]*pending)
+
+	send := func(binding int, p *pending) error {
+		p.buf = append(p.buf, ']')
+		var err error
+		if spill != nil {
+			err = spill.add(binding, p.buf)
+		} else {
+			err = query(binding, p.buf)
+		}
+		p.buf, p.keys = p.buf[:0], 0
+		return err
 	}
 
 	for it.Next() {
@@ -566,7 +660,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		p.keys++
 
 		if p.keys >= loadBatchKeys || len(p.buf) >= loadBatchBytes {
-			if err := query(it.Binding, p); err != nil {
+			if err := send(it.Binding, p); err != nil {
 				return err
 			}
 		}
@@ -578,7 +672,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	for binding, p := range batches {
 		if p.keys == 0 {
 			continue
-		} else if err := query(binding, p); err != nil {
+		} else if err := send(binding, p); err != nil {
+			return err
+		}
+	}
+	if spill != nil {
+		if err := spill.replay(query); err != nil {
 			return err
 		}
 	}
@@ -588,22 +687,79 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	return nil
 }
 
-// storeBatch accumulates one binding's array-bound statements.
+// loadSpill holds the keys of Load queries in a temporary file until they can
+// run.
+type loadSpill struct {
+	f *os.File
+	w *bufio.Writer
+}
+
+func (s *loadSpill) add(binding int, keys []byte) error {
+	if s.f == nil {
+		var err error
+		if s.f, err = os.CreateTemp("", "load-keys-"); err != nil {
+			return fmt.Errorf("creating Load keys file: %w", err)
+		}
+		s.w = bufio.NewWriter(s.f)
+	}
+	var header [8]byte
+	binary.LittleEndian.PutUint32(header[:4], uint32(binding))
+	binary.LittleEndian.PutUint32(header[4:], uint32(len(keys)))
+	if _, err := s.w.Write(header[:]); err != nil {
+		return fmt.Errorf("writing Load keys file: %w", err)
+	} else if _, err := s.w.Write(keys); err != nil {
+		return fmt.Errorf("writing Load keys file: %w", err)
+	}
+	return nil
+}
+
+// replay calls fn with each query's binding and keys, in the order added.
+func (s *loadSpill) replay(fn func(binding int, keys []byte) error) error {
+	if s.f == nil {
+		return nil
+	} else if err := s.w.Flush(); err != nil {
+		return fmt.Errorf("writing Load keys file: %w", err)
+	} else if _, err := s.f.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("rewinding Load keys file: %w", err)
+	}
+	var r = bufio.NewReader(s.f)
+	var header [8]byte
+	var keys []byte
+	for {
+		if _, err := io.ReadFull(r, header[:]); err == io.EOF {
+			return nil
+		} else if err != nil {
+			return fmt.Errorf("reading Load keys file: %w", err)
+		}
+		var n = int(binary.LittleEndian.Uint32(header[4:]))
+		if cap(keys) < n {
+			keys = make([]byte, n)
+		}
+		keys = keys[:n]
+		if _, err := io.ReadFull(r, keys); err != nil {
+			return fmt.Errorf("reading Load keys file: %w", err)
+		} else if err := fn(int(binary.LittleEndian.Uint32(header[:4])), keys); err != nil {
+			return err
+		}
+	}
+}
+
+func (s *loadSpill) close() {
+	if s.f != nil {
+		s.f.Close()
+		os.Remove(s.f.Name())
+	}
+}
+
+// storeBatch accumulates one binding's rows for one array-bound insert into
+// its stage table, with one array per bind position.
 type storeBatch struct {
-	// inserts holds one array per INSERT bind position.
-	inserts [][]any
-	// replaces and deletes hold one array per key, for the rows to delete
-	// before re-inserting them and the rows to delete outright.
-	replaces, deletes [][]any
-	rows, bytes       int
+	columns     [][]any
+	rows, bytes int
 }
 
 func newStoreBatch(b *binding) *storeBatch {
-	return &storeBatch{
-		inserts:  make([][]any, len(b.order)),
-		replaces: make([][]any, len(b.target.Keys)),
-		deletes:  make([][]any, len(b.target.Keys)),
-	}
+	return &storeBatch{columns: make([][]any, 2+len(b.order))}
 }
 
 func valueSize(v any) int {
@@ -619,52 +775,29 @@ func valueSize(v any) int {
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
-	txn, err := t.store.conn.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("DB.BeginTx: %w", err)
-	}
-	var defuser = sql.NewTxDefuser(txn)
-	defer defuser.MaybeRollback()
-
 	var round = it.Round
 	var truncations = t.truncations
-	var stats = make(map[int]m.RowStats)
+	t.truncations = nil
 	var lastBinding = -1
 	var batch *storeBatch
 
+	// Staged rows do nothing until they are applied, so each batch commits on
+	// its own. The rows of a Store that fails are deleted at the next Open.
 	flush := func() error {
 		if batch == nil || batch.rows == 0 {
 			return nil
 		}
 		var b = t.bindings[lastBinding]
-		var s = stats[lastBinding]
-
-		var deleted, replaced int64
-		for _, del := range []struct {
-			args [][]any
-			n    *int64
-		}{{batch.deletes, &deleted}, {batch.replaces, &replaced}} {
-			if len(del.args[0]) == 0 {
-				continue
-			}
-			res, err := txn.ExecContext(ctx, b.deleteSQL, asArgs(del.args)...)
-			if err != nil {
-				return fmt.Errorf("deleting rows of %s: %w", b.target.Identifier, err)
-			} else if *del.n, err = res.RowsAffected(); err != nil {
-				return fmt.Errorf("deleting rows of %s (rows affected): %w", b.target.Identifier, err)
-			}
-		}
-
-		inserted, err := insertRows(ctx, txn, b.insertSQL, batch.inserts, b.lobStart)
+		txn, err := t.storeConn.BeginTx(ctx, nil)
 		if err != nil {
-			return fmt.Errorf("inserting rows of %s: %w", b.target.Identifier, err)
+			return fmt.Errorf("DB.BeginTx: %w", err)
 		}
-
-		stats[lastBinding] = m.ExactRowStats(
-			s.Inserted+inserted-replaced,
-			s.Updated+replaced,
-			s.Deleted+deleted,
-		)
+		defer txn.Rollback()
+		if _, err := insertRows(ctx, txn, b.insertSQL, batch.columns, b.lobStart); err != nil {
+			return fmt.Errorf("staging rows of %s: %w", b.target.Identifier, err)
+		} else if err := txn.Commit(); err != nil {
+			return fmt.Errorf("committing staged rows of %s: %w", b.target.Identifier, err)
+		}
 		batch = newStoreBatch(b)
 		return nil
 	}
@@ -676,31 +809,38 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 			lastBinding = it.Binding
 			batch = newStoreBatch(t.bindings[it.Binding])
-			if _, ok := stats[it.Binding]; !ok {
-				stats[it.Binding] = m.ExactRowStats(0, 0, 0)
-			}
 		}
 		var b = t.bindings[it.Binding]
+		if b.staged == nil {
+			b.staged = &stateItem{Token: uuid.NewString(), Round: round}
+		}
 
 		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
 
-		if it.Exists {
-			var dst = batch.replaces
-			if t.cfg.HardDelete && it.Delete {
-				dst = batch.deletes
-			}
-			for i := range b.target.Keys {
-				dst[i] = append(dst[i], converted[i])
-			}
+		var op string
+		switch {
+		case t.cfg.HardDelete && it.Delete:
+			op = opDelete
+			b.staged.Deletes++
+		case it.Exists:
+			op = opUpdate
+			b.staged.Updates++
+		default:
+			op = opInsert
+			b.staged.Inserts++
 		}
-		if !(t.cfg.HardDelete && it.Delete) {
-			for pos, idx := range b.order {
-				batch.inserts[pos] = append(batch.inserts[pos], converted[idx])
-				batch.bytes += valueSize(converted[idx])
+		batch.columns[0] = append(batch.columns[0], b.staged.Token)
+		batch.columns[1] = append(batch.columns[1], op)
+		for pos, idx := range b.order {
+			var v = converted[idx]
+			if op == opDelete && idx >= len(b.target.Keys) {
+				v = nil
 			}
+			batch.columns[2+pos] = append(batch.columns[2+pos], v)
+			batch.bytes += valueSize(v)
 		}
 		batch.rows++
 
@@ -717,59 +857,191 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, err
 	}
 
-	defuser.Defuse()
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		defer txn.Rollback()
-
+	return func(context.Context, *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		// The primary records its own entries here: Acknowledge skips their
+		// echo in the state patches.
+		var update = make(connectorState)
 		for i, b := range t.bindings {
-			var s, stored = stats[i]
-			var boundary, truncate = truncations[i]
-			if !stored && !truncate {
+			var e = b.staged
+			b.staged = nil
+			if boundary, ok := truncations[i]; ok {
+				if e == nil {
+					e = &stateItem{Token: uuid.NewString(), Round: round}
+				}
+				e.TruncateBefore = &boundary
+			}
+			if e == nil {
 				continue
-			} else if !stored {
-				s = m.ExactRowStats(0, 0, 0)
 			}
-			t.be.StartedResourceCommit(b.target.Path)
-
-			// The truncation follows the binding's stores, so it removes only
-			// the rows they did not rewrite.
-			if truncate {
-				res, err := txn.ExecContext(ctx, b.truncateSQL, boundary.UTC().Format(goTimestampFormat))
-				if err != nil {
-					return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err))
-				}
-				n, err := res.RowsAffected()
-				if err != nil {
-					return nil, m.FinishedOperation(fmt.Errorf("truncating %s after backfill (rows affected): %w", b.target.Identifier, err))
-				}
-				s = s.WithTruncated(n)
-				log.WithFields(log.Fields{
-					"table":    b.target.Identifier,
-					"boundary": boundary,
-					"deleted":  n,
-				}).Info("truncated rows published before the backfill")
+			update.add(b.target.StateKey, t.rangeKey, e)
+			if t.primary {
+				t.state.add(b.target.StateKey, t.rangeKey, e)
 			}
-			t.be.ReportRowStats(round, b.target.Path, s)
-			t.be.FinishedResourceCommit(b.target.Path)
+		}
+		if len(update) == 0 {
+			return nil, nil
 		}
 
-		var err error
-		if t.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
+		patch, err := json.Marshal(update)
+		if err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("marshalling staged transactions: %w", err))
 		}
-		if res, err := txn.ExecContext(ctx, t.fenceSQL, go_ora.Clob{String: encodeCheckpoint(t.store.fence.Checkpoint), Valid: true}); err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("updating flow checkpoint: %w", err))
-		} else if n, err := res.RowsAffected(); err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("updating flow checkpoint (rows affected): %w", err))
-		} else if n != 1 {
-			return nil, m.FinishedOperation(errors.New("this instance was fenced off by another"))
-		}
-
-		if err := txn.Commit(); err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("committing Store transaction: %w", err))
-		}
-		return nil, nil
+		return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
 	}, nil
+}
+
+func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	if !t.primary {
+		return nil, nil
+	} else if err := t.mergePeerStatePatches(statePatches); err != nil {
+		return nil, err
+	}
+
+	// Entries of a state key with no binding are left pending. Clearing an
+	// entry from the state is a null at its place.
+	var shouldProcess = m.StateKeyFilter(stateKeys)
+	var pending = make(map[*binding]map[string]*stateItem)
+	var clear = make(connectorState)
+	for _, b := range t.bindings {
+		var sk = b.target.StateKey
+		if !shouldProcess(sk) || len(t.state[sk]) == 0 {
+			continue
+		}
+		pending[b] = t.state[sk]
+		for rk := range t.state[sk] {
+			clear.add(sk, rk, nil)
+		}
+	}
+	if len(pending) == 0 {
+		return nil, nil
+	}
+
+	if err := t.apply(ctx, pending); err != nil {
+		return nil, err
+	}
+	for sk, bucket := range clear {
+		for rk := range bucket {
+			delete(t.state[sk], rk)
+		}
+		if len(t.state[sk]) == 0 {
+			delete(t.state, sk)
+		}
+	}
+
+	patch, err := json.Marshal(clear)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling state clearing patch: %w", err)
+	}
+	return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
+}
+
+// apply applies the pending entries of each binding in one transaction.
+//
+// Staged rows are deleted only by the transaction that applies them, so
+// applying an entry whose rows are gone does nothing, and one entry can be
+// applied any number of times. Each binding's stage table is locked first,
+// which makes any other instance applying the same entries wait, then find
+// the rows gone.
+func (t *transactor) apply(ctx context.Context, pending map[*binding]map[string]*stateItem) error {
+	txn, err := t.storeConn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("DB.BeginTx: %w", err)
+	}
+	defer txn.Rollback()
+
+	exec := func(query string, args ...any) (int64, error) {
+		res, err := txn.ExecContext(ctx, query, args...)
+		if err != nil {
+			return 0, err
+		}
+		return res.RowsAffected()
+	}
+
+	type report struct {
+		round int
+		path  []string
+		stats m.RowStats
+	}
+	var reports []report
+
+	for _, b := range t.bindings {
+		var entries = pending[b]
+		if entries == nil {
+			continue
+		}
+		t.be.StartedResourceCommit(b.target.Path)
+
+		var tokens []any
+		var staged stateItem
+		var round, hasRound = 0, false
+		for rk, e := range entries {
+			tokens = append(tokens, e.Token)
+			staged.Inserts += e.Inserts
+			staged.Updates += e.Updates
+			staged.Deletes += e.Deletes
+			if e.TruncateBefore != nil && (staged.TruncateBefore == nil || e.TruncateBefore.After(*staged.TruncateBefore)) {
+				staged.TruncateBefore = e.TruncateBefore
+			}
+			if rk == t.rangeKey || !hasRound {
+				round, hasRound = e.Round, true
+			}
+		}
+
+		var stats = m.ExactRowStats(0, 0, 0)
+		if staged.Inserts+staged.Updates+staged.Deletes > 0 {
+			var replaced, deleted, inserted int64
+			if _, err := txn.ExecContext(ctx, "LOCK TABLE "+b.stage+" IN EXCLUSIVE MODE"); err != nil {
+				return fmt.Errorf("locking stage table %s: %w", b.stage, err)
+			}
+			if staged.Updates > 0 {
+				if replaced, err = exec(applyDeleteSQL(&b.target, b.stage, opUpdate, len(tokens)), tokens...); err != nil {
+					return fmt.Errorf("deleting the replaced rows of %s: %w", b.target.Identifier, err)
+				}
+			}
+			if staged.Deletes > 0 {
+				if deleted, err = exec(applyDeleteSQL(&b.target, b.stage, opDelete, len(tokens)), tokens...); err != nil {
+					return fmt.Errorf("deleting rows of %s: %w", b.target.Identifier, err)
+				}
+			}
+			if staged.Inserts+staged.Updates > 0 {
+				if inserted, err = exec(applyInsertSQL(&b.target, b.stage, len(tokens)), tokens...); err != nil {
+					return fmt.Errorf("inserting rows of %s: %w", b.target.Identifier, err)
+				}
+			}
+			if _, err := exec(clearStageSQL(b.stage, len(tokens)), tokens...); err != nil {
+				return fmt.Errorf("deleting applied rows of stage table %s: %w", b.stage, err)
+			}
+			stats = m.ExactRowStats(inserted-replaced, replaced, deleted)
+		}
+
+		// The truncation follows the stores, so it removes only the rows they
+		// did not rewrite.
+		if boundary := staged.TruncateBefore; boundary == nil {
+			// Pass.
+		} else if b.truncateSQL == "" {
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, b.truncateReason))
+		} else if n, err := exec(b.truncateSQL, boundary.UTC().Format(goTimestampFormat)); err != nil {
+			return fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
+		} else {
+			stats = stats.WithTruncated(n)
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": *boundary,
+				"deleted":  n,
+			}).Info("truncated rows published before the backfill")
+		}
+
+		reports = append(reports, report{round, b.target.Path, stats})
+		t.be.FinishedResourceCommit(b.target.Path)
+	}
+
+	if err := txn.Commit(); err != nil {
+		return fmt.Errorf("committing staged rows: %w", err)
+	}
+	for _, r := range reports {
+		t.be.ReportRowStats(r.round, r.path, r.stats)
+	}
+	return nil
 }
 
 // lobSizeClass classes a value of a LOB column by the bind type it may take.
@@ -852,7 +1124,7 @@ func asArgs(arrays [][]any) []any {
 }
 
 func (t *transactor) Destroy() {
-	t.load.conn.Close()
-	t.store.conn.Close()
+	t.loadConn.Close()
+	t.storeConn.Close()
 	t.db.Close()
 }

@@ -37,13 +37,29 @@ CREATE TABLE IF NOT EXISTS delta_updates (
 	flow_published_at TIMESTAMP(9) WITH TIME ZONE NOT NULL
 )--- End delta_updates createTargetTable ---
 
---- Begin key_value insert ---
-INSERT INTO key_value (key1, key2, "key!binary", boolean, flow_published_at, "integer", integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, "number", stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, array, binary, field_with_projection, multiple, "nonAsciiκόσμε", numberCastToString, object, string, flow_document) VALUES (TO_NUMBER(:1), :2, :3, :4, TO_TIMESTAMP_TZ(:5, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM'), TO_NUMBER(:6), :7, :8, TO_NUMBER(:9), :10, TO_BINARY_DOUBLE(:11), TO_NUMBER(:12), TO_NUMBER(:13), TO_NUMBER(:14), :15, :16, :17, TO_BINARY_DOUBLE(:18), :19, :20, :21, :22, :23, :24, :25, :26, :27)
---- End key_value insert ---
+--- Begin key_value create stage ---
+CREATE TABLE IF NOT EXISTS flow_stage_key_value AS SELECT CAST(NULL AS VARCHAR2(36)) flow_token, CAST(NULL AS CHAR(1)) flow_op, t.key1, t.key2, t."key!binary", t.array, t.binary, t.boolean, t.field_with_projection, t.flow_published_at, t."integer", t.integerGt128Bit, t.integerGt256Bit, t.integerGt64Bit, t.integerWithUserDDL, t.multiple, t."nonAsciiκόσμε", t."number", t.numberCastToString, t.object, t.string, t.stringInteger, t.stringInteger18Chars, t.stringInteger38Chars, t.stringInteger39Chars, t.stringInteger66Chars, t.stringInteger77Chars, t.stringNumber, t.flow_document FROM dual LEFT JOIN key_value t ON 1 = 0 WHERE 1 = 0
+--- End key_value create stage ---
 
---- Begin key_value delete ---
-DELETE FROM key_value WHERE key1 = TO_NUMBER(:1) AND key2 = :2 AND "key!binary" = :3
---- End key_value delete ---
+--- Begin key_value stage insert ---
+INSERT INTO flow_stage_key_value (flow_token, flow_op, key1, key2, "key!binary", boolean, flow_published_at, "integer", integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, "number", stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, array, binary, field_with_projection, multiple, "nonAsciiκόσμε", numberCastToString, object, string, flow_document) VALUES (:1, :2, TO_NUMBER(:3), :4, :5, :6, TO_TIMESTAMP_TZ(:7, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM'), TO_NUMBER(:8), :9, :10, TO_NUMBER(:11), :12, TO_BINARY_DOUBLE(:13), TO_NUMBER(:14), TO_NUMBER(:15), TO_NUMBER(:16), :17, :18, :19, TO_BINARY_DOUBLE(:20), :21, :22, :23, :24, :25, :26, :27, :28, :29)
+--- End key_value stage insert ---
+
+--- Begin key_value apply update ---
+DELETE FROM key_value r WHERE EXISTS (SELECT 1 FROM flow_stage_key_value s WHERE s.flow_token IN (:1, :2) AND s.flow_op = 'U' AND s.key1 = r.key1 AND s.key2 = r.key2 AND s."key!binary" = r."key!binary")
+--- End key_value apply update ---
+
+--- Begin key_value apply insert ---
+INSERT INTO key_value (key1, key2, "key!binary", array, binary, boolean, field_with_projection, flow_published_at, "integer", integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, "nonAsciiκόσμε", "number", numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document) SELECT key1, key2, "key!binary", array, binary, boolean, field_with_projection, flow_published_at, "integer", integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, "nonAsciiκόσμε", "number", numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document FROM flow_stage_key_value WHERE flow_token IN (:1, :2) AND flow_op <> 'D'
+--- End key_value apply insert ---
+
+--- Begin key_value clear stage ---
+DELETE FROM flow_stage_key_value WHERE flow_token IN (:1, :2)
+--- End key_value clear stage ---
+
+--- Begin key_value prune stage ---
+DELETE FROM flow_stage_key_value WHERE flow_token NOT IN (:1)
+--- End key_value prune stage ---
 
 --- Begin key_value load ---
 SELECT /*+ LEADING(l r) USE_NL(r) INDEX(r) CARDINALITY(l 10) */ r.flow_document
@@ -51,15 +67,28 @@ FROM JSON_TABLE(:1, '$[*]' ERROR ON ERROR COLUMNS (k0 NUMBER PATH '$[0]' ERROR O
 JOIN key_value r ON r.key1 = l.k0 AND r.key2 = TO_BOOLEAN(l.k1) AND r."key!binary" = HEXTORAW(l.k2)
 --- End key_value load ---
 
---- Begin delta_updates insert ---
-INSERT INTO delta_updates (theKey, aValue, flow_published_at) VALUES (:1, TO_NUMBER(:2), TO_TIMESTAMP_TZ(:3, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM'))
---- End delta_updates insert ---
+--- Begin delta_updates create stage ---
+CREATE TABLE IF NOT EXISTS flow_stage_delta_updates AS SELECT CAST(NULL AS VARCHAR2(36)) flow_token, CAST(NULL AS CHAR(1)) flow_op, t.theKey, t.aValue, t.flow_published_at FROM dual LEFT JOIN delta_updates t ON 1 = 0 WHERE 1 = 0
+--- End delta_updates create stage ---
 
---- Begin delta_updates delete ---
-DELETE FROM delta_updates WHERE theKey = :1
---- End delta_updates delete ---
+--- Begin delta_updates stage insert ---
+INSERT INTO flow_stage_delta_updates (flow_token, flow_op, theKey, aValue, flow_published_at) VALUES (:1, :2, :3, TO_NUMBER(:4), TO_TIMESTAMP_TZ(:5, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM'))
+--- End delta_updates stage insert ---
 
---- Begin Fence Update ---
-UPDATE path."to".checkpoints SET checkpoint = :1 WHERE materialization = 'some/Materialization' AND key_begin = 1122867 AND key_end = 4293844428 AND fence = 123
---- End Fence Update ---
+--- Begin delta_updates apply update ---
+DELETE FROM delta_updates r WHERE EXISTS (SELECT 1 FROM flow_stage_delta_updates s WHERE s.flow_token IN (:1, :2) AND s.flow_op = 'U' AND s.theKey = r.theKey)
+--- End delta_updates apply update ---
+
+--- Begin delta_updates apply insert ---
+INSERT INTO delta_updates (theKey, aValue, flow_published_at) SELECT theKey, aValue, flow_published_at FROM flow_stage_delta_updates WHERE flow_token IN (:1, :2) AND flow_op <> 'D'
+--- End delta_updates apply insert ---
+
+--- Begin delta_updates clear stage ---
+DELETE FROM flow_stage_delta_updates WHERE flow_token IN (:1, :2)
+--- End delta_updates clear stage ---
+
+--- Begin delta_updates prune stage ---
+DELETE FROM flow_stage_delta_updates WHERE flow_token NOT IN (:1)
+--- End delta_updates prune stage ---
+
 

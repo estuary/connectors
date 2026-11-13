@@ -199,10 +199,17 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	var stmt = fmt.Sprintf("DROP TABLE %s", c.ep.Dialect.Identifier(path...))
-	return stmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, stmt)
-		return err
+	var stmts = []string{
+		fmt.Sprintf("DROP TABLE %s", c.ep.Dialect.Identifier(path...)),
+		fmt.Sprintf("DROP TABLE IF EXISTS %s", c.ep.Dialect.Identifier(stagePath(path)...)),
+	}
+	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
+		for _, stmt := range stmts {
+			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("executing %q: %w", stmt, err)
+			}
+		}
+		return nil
 	}, nil
 }
 
@@ -286,6 +293,12 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		stmts = append(stmts, steps...)
 	}
 
+	// Open recreates the stage table with the table's new columns. Apply has
+	// already applied the binding's staged rows.
+	if len(stmts) > 0 {
+		stmts = append(stmts, fmt.Sprintf("DROP TABLE IF EXISTS %s", c.ep.Dialect.Identifier(stagePath(ta.Path)...)))
+	}
+
 	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
 		for _, stmt := range stmts {
 			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
@@ -297,7 +310,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 }
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
-	return installFence(ctx, c.ep.Dialect, c.db, checkpoints, fence)
+	return fence, nil
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
@@ -308,33 +321,12 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 	return false, nil
 }
 
-func (c *client) checkpointsIdentifier() string {
-	return c.ep.Dialect.Identifier(c.ep.MetaCheckpoints.Path...)
-}
-
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
-	rows, err := c.db.QueryContext(ctx, fmt.Sprintf("SELECT %s FROM %s",
-		c.ep.Dialect.Identifier("materialization"), c.checkpointsIdentifier()))
-	if err != nil {
-		return nil, fmt.Errorf("querying materializations from checkpoints table: %w", err)
-	}
-	defer rows.Close()
-
-	var out []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
-		out = append(out, name)
-	}
-	return out, rows.Err()
+	return nil, nil
 }
 
 func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
-	_, err := c.db.ExecContext(ctx, fmt.Sprintf("DELETE FROM %s WHERE %s = :1",
-		c.checkpointsIdentifier(), c.ep.Dialect.Identifier("materialization")), taskName)
-	return err
+	return nil
 }
 
 // SnapshotTestTable names the columns of unquoted identifiers in lower case

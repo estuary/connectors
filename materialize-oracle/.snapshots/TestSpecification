@@ -61,7 +61,7 @@
       "schema": {
         "type": "string",
         "title": "Schema",
-        "description": "Schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 table. Defaults to the schema of the user.",
+        "description": "Schema for bound collection tables (unless overridden within the binding resource configuration). Defaults to the schema of the user.",
         "order": 4
       },
       "sslmode": {

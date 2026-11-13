@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,7 +19,8 @@ import (
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
-	go_ora "github.com/sijms/go-ora/v2"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -51,7 +53,7 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil,
-			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityExact})
+			sql.RuntimeConfig{Shards: 2, Fidelity: m.FidelityExact})
 	})
 
 	t.Run("truncate", func(t *testing.T) {
@@ -68,7 +70,7 @@ func TestIntegration(t *testing.T) {
 				"--name", task.Name,
 				"--source", task.SourcePath,
 				"--fixture", "testdata/truncate.fixture.json",
-				"--shards", "1",
+				"--shards", "2",
 				"--timeout", "5m",
 				"--network", "flow-test",
 			)
@@ -289,20 +291,43 @@ func TestIntegration(t *testing.T) {
 		sql.RunMigrationTest(t, NewDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 
-	t.Run("fence", func(t *testing.T) {
-		sql.RunFencingTest(
-			t,
-			NewDriver(),
-			"testdata/fence.flow.yaml",
-			makeResourceFn,
-			renderTemplates(newOracleDialect("FLOW")).createTargetTable,
-			func(ctx context.Context, c sql.Client, fence sql.Fence) error {
-				var cl = c.(*client)
-				_, err := cl.db.ExecContext(ctx, updateFenceSQL(cl.ep.Dialect, fence),
-					go_ora.Clob{String: encodeCheckpoint(fence.Checkpoint), Valid: true})
-				return err
-			},
-		)
+	t.Run("apply-drain", func(t *testing.T) {
+		testutil.RunTestAllTasks(t, "testdata/apply.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
+			var ctx = context.Background()
+			var tableName = fmt.Sprintf("applydrain%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix())
+			var res = makeResourceFn(tableName, false).WithDefaults(cfg)
+			var dialect = newOracleDialect("FLOW")
+			const token = "drain-token"
+
+			seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
+				var b = appliedSpec.Bindings[0]
+				var target = dialect.Identifier(b.ResourcePath...)
+				var stage = dialect.Identifier(stagePath(b.ResourcePath)...)
+				var db = cfg.openDB()
+				defer db.Close()
+
+				_, err := db.ExecContext(ctx, fmt.Sprintf(
+					"CREATE TABLE %s AS SELECT CAST(NULL AS VARCHAR2(36)) %s, CAST(NULL AS CHAR(1)) %s, t.* FROM dual LEFT JOIN %s t ON 1 = 0 WHERE 1 = 0",
+					stage, stageTokenColumn, stageOpColumn, target))
+				require.NoError(t, err)
+
+				var insert = sql.DrainSeedInsertQuery(t, NewDriver(), cfg, appliedSpec, "'{}'")
+				insert = strings.Replace(insert, "INSERT INTO "+target+" (", fmt.Sprintf("INSERT INTO %s (%s, %s, ", stage, stageTokenColumn, stageOpColumn), 1)
+				insert = strings.Replace(insert, ") SELECT ", fmt.Sprintf(") SELECT '%s', '%s', ", token, opInsert), 1)
+				_, err = db.ExecContext(ctx, insert)
+				require.NoError(t, err)
+
+				state, err := json.Marshal(connectorState{b.StateKey: {rangeKeyOf(0, math.MaxUint32): {Token: token, Inserts: 1}}})
+				require.NoError(t, err)
+				return state
+			}
+
+			verifyDrained := func(t *testing.T, _ *pf.MaterializationSpec, _ []string, rows [][]any) {
+				require.Len(t, rows, 1, "the staged row must have been applied")
+			}
+
+			sql.RunApplyDrainTest(t, NewDriver(), cfg, res, seedPending, verifyDrained)
+		})
 	})
 }
 

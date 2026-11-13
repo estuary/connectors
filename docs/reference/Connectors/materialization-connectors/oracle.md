@@ -31,8 +31,9 @@ ALTER USER flow_materialize QUOTA UNLIMITED ON USERS;
 
    To materialize into another schema, grant the user privileges on it instead,
    for example `CREATE ANY TABLE`, `ALTER ANY TABLE`, `DROP ANY TABLE`,
-   `SELECT ANY TABLE`, `INSERT ANY TABLE`, `UPDATE ANY TABLE` and
-   `DELETE ANY TABLE`. The connector doesn't create schemas.
+   `SELECT ANY TABLE`, `INSERT ANY TABLE`, `UPDATE ANY TABLE`,
+   `DELETE ANY TABLE` and `LOCK ANY TABLE`. The connector doesn't create
+   schemas.
 
 2. Allow secure connection to Estuary from your hosting environment. Either:
 
@@ -62,7 +63,7 @@ Use the below properties to configure an Oracle materialization, which will dire
 | **`/credentials/auth_type`** | Auth Type     | Method to use for authentication.                                                                                                   | string  | `UserPassword`   |
 | **`/credentials/password`**  | Password      | Password for the user.                                                                                                              | string  | Required         |
 | **`/database`**              | Database      | Service name of the database (pluggable database) to materialize to.                                                                | string  | Required         |
-| `/schema`                    | Schema        | Schema for bound collection tables and the `flow_checkpoints_v1` table. Defaults to the schema of the user.                         | string  |                  |
+| `/schema`                    | Schema        | Schema for bound collection tables. Defaults to the schema of the user.                                                             | string  |                  |
 | **`/sslmode`**               | SSL Mode      | `verify-full` connects over TLS (TCPS) and verifies the server's certificate and host name. `require` connects over TLS without verifying them. `disable` connects over plain TCP. | string | Required, `verify-full` |
 | `/hardDelete`                | Hard Delete   | Delete rows from the destination when their documents are deleted in the source. Otherwise `_meta/op` marks deleted documents.      | boolean | `false`          |
 
@@ -106,12 +107,6 @@ authorities and the host of the address, also through an SSH tunnel. Use
 configured on the server, which the connector accepts when the server requests
 it.
 
-### Changing the schema
-
-The `flow_checkpoints_v1` table records the progress of the materialization in
-the endpoint's schema. Changing the endpoint's schema starts it over from a new,
-empty `flow_checkpoints_v1` table.
-
 ## Table and column names
 
 Oracle stores unquoted names in upper case. A table or field name that is a
@@ -150,10 +145,20 @@ Oracle has no year 0, so dates and date-times in year 0 are stored as
 
 ## Transactions
 
-Each transaction of the materialization writes all of its rows in one Oracle
-transaction, so the database's undo tablespace must hold a whole transaction.
-The first backfill of a large collection, or the deletion of the rows published
-before a completed backfill, can make for a large transaction.
+The connector writes each transaction of the materialization in two steps:
+
+1. It stages the transaction's rows in a stage table beside each table, named
+   `flow_stage_` followed by the table's name.
+2. Once the transaction commits, it applies the staged rows to every table in
+   one Oracle transaction, and deletes them from the stage tables.
+
+Queries therefore see each transaction's changes all at once. The database's
+undo tablespace must hold the application of a whole transaction. The first
+backfill of a large collection, or the deletion of the rows published before a
+completed backfill, can make for a large transaction.
+
+The connector drops a stage table with its table, and recreates it when the
+table's columns change. Don't write to stage tables.
 
 ## Delta updates
 
