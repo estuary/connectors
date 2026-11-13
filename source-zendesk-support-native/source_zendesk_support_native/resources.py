@@ -59,6 +59,7 @@ from .api import (
     fetch_audit_logs,
     fetch_client_side_incremental_offset_paginated_resources,
     fetch_client_side_incremental_cursor_paginated_resources,
+    fetch_deleted_users,
     fetch_incremental_time_export_resources,
     fetch_incremental_keyset_paginated_resources,
     fetch_incremental_cursor_export_resources,
@@ -802,6 +803,11 @@ def users(
                     "users",
                     UsersListResponse,
                 ),
+                "deleted_users": functools.partial(
+                    fetch_deleted_users,
+                    http,
+                    config.subdomain,
+                ),
             },
             fetch_page=functools.partial(
                 backfill_incremental_keyset_paginated_resources,
@@ -822,7 +828,10 @@ def users(
         model=TimestampedResource,
         open=open,
         initial_state=ResourceState(
-            inc={"users": ResourceState.Incremental(cursor=cutoff)},
+            inc={
+                "users": ResourceState.Incremental(cursor=cutoff),
+                "deleted_users": ResourceState.Incremental(cursor=cutoff),
+            },
             backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
         ),
         initial_config=ResourceConfig(
