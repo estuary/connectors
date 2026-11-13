@@ -437,6 +437,43 @@ async def test_an_echo_at_the_window_edge_raises_or_advances_one_tick():
 
 
 @pytest.mark.asyncio
+async def test_a_short_echo_on_an_early_page_ends_the_window():
+    updated = NOW - timedelta(minutes=30)
+    fake = FakeAmazon(
+        now=NOW,
+        orders=[order(f"o{i}", updated - timedelta(days=1), updated) for i in range(3)],
+        page_size=1,
+        echoed_bound_shortfall=timedelta(minutes=5),
+    )
+    real_respond = fake._respond
+
+    def first_page_only(body):
+        if "pagination" not in body:
+            body.pop("lastUpdatedBefore", None)
+        return real_respond(body)
+
+    fake._respond = first_page_only
+    cursor = NOW - timedelta(hours=1)
+    items = await collect(fetch_orders(client_for(fake), MARKETPLACES, timedelta(days=1), timedelta(), LOG, cursor))
+    assert items[-1] == api.floor_to_tick(NOW - api.SEARCH_LAG) - timedelta(minutes=5)
+
+
+@pytest.mark.asyncio
+async def test_a_fixed_echo_shortfall_stops_the_backfill_at_its_last_window():
+    # Known limit: if Amazon always echoes a bound short of the request, the last
+    # window can never be confirmed. The first-contact probe checks the echo first.
+    start = NOW - timedelta(days=2)
+    cutoff = NOW - timedelta(hours=1)
+    fake = FakeAmazon(now=NOW, orders=[], echoed_bound_shortfall=timedelta(minutes=5))
+    page = None
+    with pytest.raises(RuntimeError, match="before the window start"):
+        for _ in range(10):
+            items = await collect(backfill_orders(client_for(fake), MARKETPLACES, start, timedelta(days=3), LOG, page, cutoff))
+            page = items[-1]
+    assert page.split("|")[0] == api.to_iso(cutoff - api.TICK - timedelta(minutes=5) + api.TICK)
+
+
+@pytest.mark.asyncio
 async def test_a_fractional_echo_rounds_down_so_the_next_window_reads_again():
     cursor = NOW - timedelta(hours=1)
     horizon = api.floor_to_tick(NOW - api.SEARCH_LAG)

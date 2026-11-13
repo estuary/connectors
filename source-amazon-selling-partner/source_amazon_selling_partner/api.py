@@ -167,8 +167,8 @@ async def _search_orders(
     priority: Priority,
 ) -> AsyncGenerator[Order | SearchOrdersResponse, None]:
     """
-    Yields every order matching `request_params` across all pages, then the
-    remainder of the final page, whose window bounds Amazon echoes back.
+    Yields every order matching `request_params` across all pages, each page
+    followed by its remainder, whose window bounds Amazon echoes back.
     """
     params: dict[str, Any] = {
         **request_params,
@@ -208,9 +208,10 @@ async def _search_orders(
             yield order
 
         remainder = processor.get_remainder()
+        # Every page's echo is checked, in case only some pages carry it.
+        yield remainder
         next_token = remainder.pagination.nextToken if remainder.pagination else None
         if not next_token:
-            yield remainder
             return
 
         params["paginationToken"] = next_token
