@@ -12,6 +12,7 @@ from typing import (
     ClassVar,
     Generic,
     Literal,
+    Protocol,
     TypeVar,
 )
 
@@ -450,6 +451,20 @@ class StoreCapabilities:
     # Whether the store is on a Shopify Plus or Advanced plan or a partner dev store.
     # Some fields are only queryable on these tiers regardless of granted scopes.
     is_plus_or_advanced: bool = False
+
+
+class QueryBuilder(Protocol):
+    """Builds the query for one page of a paged stream, with the signature of
+    `ShopifyGraphQLResource.build_query`."""
+
+    def __call__(
+        self,
+        start: datetime,
+        end: datetime,
+        first: int | None = None,
+        after: str | None = None,
+        capabilities: "StoreCapabilities | None" = None,
+    ) -> str: ...
 
 
 @dataclass(slots=True)
