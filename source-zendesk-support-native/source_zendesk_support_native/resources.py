@@ -271,13 +271,28 @@ def ticket_metrics(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> common.Resource:
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        migrated = _migrate_keyset_cursor_to_export(state)
+
+        if migrated is not None:
+            state.inc = migrated.inc
+            if migrated.backfill is not None:
+                state.backfill = migrated.backfill
+
+            task.log.info("Migrated state from the keyset sweep to the cursor-based export.", {
+                "resource": binding.resourceConfig.name,
+                "migrated_state": migrated.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: migrated}),
+            )
+
         common.open_binding(
             binding,
             binding_index,
@@ -1228,6 +1243,29 @@ def _migrate_keyset_state_to_export(state: ResourceState) -> CursorExportStatePa
     return patch
 
 
+def _migrate_keyset_cursor_to_export(state: ResourceState) -> ResourceState | None:
+    """
+    Returns the state to checkpoint when `state` holds the keyset sweep's
+    datetime cursor, or None when it already holds a cursor-based export cursor.
+    """
+    assert isinstance(state.inc, ResourceState.Incremental)
+
+    if not isinstance(state.inc.cursor, datetime):
+        return None
+
+    migrated = ResourceState(
+        inc=ResourceState.Incremental(cursor=(str(dt_to_s(state.inc.cursor)),)),
+    )
+
+    if isinstance(state.backfill, ResourceState.Backfill) and isinstance(state.backfill.next_page, int):
+        migrated.backfill = ResourceState.Backfill(
+            cutoff=state.backfill.cutoff,
+            next_page=str(state.backfill.next_page),
+        )
+
+    return migrated
+
+
 def incremental_cursor_export_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -1307,7 +1345,7 @@ def ticket_child_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
-    def open(
+    async def open(
         path: str,
         response_model: type[IncrementalCursorPaginatedResponse],
         binding: CaptureBinding[ResourceConfig],
@@ -1316,6 +1354,21 @@ def ticket_child_resources(
         task: Task,
         all_bindings,
     ):
+        migrated = _migrate_keyset_cursor_to_export(state)
+
+        if migrated is not None:
+            state.inc = migrated.inc
+            if migrated.backfill is not None:
+                state.backfill = migrated.backfill
+
+            task.log.info("Migrated state from the keyset sweep to the cursor-based export.", {
+                "resource": binding.resourceConfig.name,
+                "migrated_state": migrated.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: migrated}),
+            )
+
         common.open_binding(
             binding,
             binding_index,
@@ -1368,13 +1421,28 @@ def side_conversations(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> common.Resource:
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        migrated = _migrate_keyset_cursor_to_export(state)
+
+        if migrated is not None:
+            state.inc = migrated.inc
+            if migrated.backfill is not None:
+                state.backfill = migrated.backfill
+
+            task.log.info("Migrated state from the keyset sweep to the cursor-based export.", {
+                "resource": binding.resourceConfig.name,
+                "migrated_state": migrated.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: migrated}),
+            )
+
         common.open_binding(
             binding,
             binding_index,
