@@ -1,0 +1,114 @@
+info:
+  name: balance transactions
+  type: graphql
+  seq: 3
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query BalanceTransactions {
+        shopifyPaymentsAccount {
+          balanceTransactions(
+            first: 250
+            sortKey: PROCESSED_AT
+            query: "processed_at:>='2016-01-01T00:00:00Z' AND processed_at:<='2026-11-09T00:00:00Z'"
+          ) {
+            edges {
+              node {
+                id
+                transactionDate
+                type
+                sourceType
+                sourceId
+                sourceOrderTransactionId
+                test
+                adjustmentReason
+                amount { ...MoneyFields }
+                fee { ...MoneyFields }
+                net { ...MoneyFields }
+                associatedOrder { id }
+                associatedPayout { id }
+              }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }
+
+      fragment MoneyFields on MoneyV2 {
+        amount
+        currencyCode
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [ShopifyPaymentsAccount.balanceTransactions](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ShopifyPaymentsAccount) and [ShopifyPaymentsBalanceTransaction](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ShopifyPaymentsBalanceTransaction)
+
+  **WHY:** the `balance_transactions` stream's query for new transactions: a
+  full page of 250, filtered on a `processed_at` window. Related entities are
+  referenced by id only. The stream sends no sort key; `sortKey:
+  PROCESSED_AT` checks that Shopify accepts one. Answers: does Shopify accept
+  the sort key and filter, and what does a full page request.
+
+  **DOCUMENTED (2026-11-09):** `balanceTransactions` filters on
+  `processed_at`, `created_at`, `payout_date`, `payout_status`,
+  `payments_transfer_id`, `id` (range) and others, and sorts by
+  `BalanceTransactionSortKeys` (default `PROCESSED_AT`).
+  `transactionDate` is "The date and time when the balance transaction was
+  processed." A transaction's `associatedPayout` starts empty: `PENDING` is
+  "The transaction has not been assigned a payout yet."
+
+  **VERIFIED (2026-11-09):** Shopify accepts the sort key and the
+  `processed_at` filter with no search warning. A full page requests 36
+  points (actual 3). The list is empty because the account isn't activated
+  (`Payments / account`).
+
+  **UNOBSERVABLE:** real transactions, whether `transactionDate` is the
+  value `processed_at` filters on, and when a transaction gets its payout.
+  See `Payments / account`.
+
+examples:
+  - name: "200 - accepted, empty, requested 36 (projection: data and cost totals)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "shopifyPaymentsAccount": {
+                "balanceTransactions": {
+                  "edges": [],
+                  "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": null
+                  }
+                }
+              }
+            },
+            "extensions": {
+              "cost": {
+                "requestedQueryCost": 36,
+                "actualQueryCost": 3
+              }
+            }
+          }

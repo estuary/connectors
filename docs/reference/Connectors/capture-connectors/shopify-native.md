@@ -11,6 +11,7 @@ This connector captures data from [Shopify's GraphQL Admin API](https://shopify.
 The following data resources are supported through the Shopify API:
 
 * [Abandoned Checkouts](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/abandonedCheckouts?example=Retrieves+a+list+of+abandoned+checkouts)
+* [Balance Transactions](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ShopifyPaymentsBalanceTransaction)
 * [Custom Collections](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/collections?example=Retrieves+a+list+of+custom+collections)
    * Custom Collection Metafields
 * [Customers](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/customers)
@@ -31,6 +32,7 @@ The following data resources are supported through the Shopify API:
    * Order Risks
    * Order Shipping Lines
    * Order Transactions
+* [Payouts](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ShopifyPaymentsPayout)
 * [Product Variants](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/productvariants)
 * [Products](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/products)
    * Product Media
@@ -83,7 +85,9 @@ When authenticating with an access token or client credentials, ensure the follo
 * `read_products`
 * `read_publications`
 * `read_returns`
+* `read_shopify_payments_accounts`
 * `read_shopify_payments_disputes`
+* `read_shopify_payments_payouts`
 * `read_users`
 * `read_own_subscription_contracts`
 

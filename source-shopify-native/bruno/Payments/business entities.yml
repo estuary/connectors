@@ -1,0 +1,121 @@
+info:
+  name: business entities
+  type: graphql
+  seq: 8
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query BusinessEntities {
+        shopifyPaymentsAccount {
+          id
+        }
+        primary: businessEntity {
+          id
+        }
+        businessEntities {
+          id
+          displayName
+          primary
+          archived
+          shopifyPaymentsAccount {
+            id
+            activated
+            payouts(first: 1) {
+              edges { node { id businessEntity { id } } }
+            }
+          }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [businessEntities](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/businessEntities), [BusinessEntity](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/BusinessEntity) and [multiple legal entities](https://shopify.dev/docs/apps/build/markets/multiple-entities)
+
+  **WHY:** the `payouts` and `balance_transactions` streams read the
+  shop-level `shopifyPaymentsAccount`, but a shop with several business
+  entities can have a Shopify Payments account per entity. Answers: how many
+  entities the test store has, whether the shop-level account is the primary
+  entity's, and whether Shopify accepts reading payouts through an entity's
+  account with the scopes the test app holds.
+
+  **DOCUMENTED (2026-11-10):** "Every shop must have one primary business
+  entity", and each entity "can be associated with its own
+  ShopifyPaymentsAccount". Per the multiple-entities guide, only Plus stores
+  and partner development stores can have more than one, one per country,
+  and adding one "can only be completed by contacting Shopify". Each entity
+  "can onboard its own Shopify Payments account", and the guide reads a
+  non-primary entity's account "by querying through a `BusinessEntity`". No
+  page says which account the shop-level `shopifyPaymentsAccount` returns
+  when a shop has several (`Payments / entity schema`).
+
+  **VERIFIED (2026-11-10):** the test store has one entity, `United States`,
+  primary and not archived. Its account is the shop-level one,
+  `gid://shopify/ShopifyPaymentsAccount/999005447548973`. Shopify accepts
+  reading payouts through an entity's account with the test app's scopes,
+  though the guide names the approval-gated `read_shopify_payments`, which
+  the app doesn't hold. Requested cost 8.
+
+  **UNOBSERVABLE:** which account the shop-level query returns in a shop
+  with more than one entity, and so whether the streams miss a non-primary
+  entity's payouts and balance transactions. Adding an entity needs
+  Shopify's help. The connector reads the same fields at start and warns,
+  with an observable log, when more than one entity has an account.
+
+examples:
+  - name: "200 - one primary entity, its account is the shop's (projection: data and cost totals)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "shopifyPaymentsAccount": {
+                "id": "gid://shopify/ShopifyPaymentsAccount/999005447548973"
+              },
+              "primary": {
+                "id": "gid://shopify/BusinessEntity/MTY2MzQwMDYxMjI5"
+              },
+              "businessEntities": [
+                {
+                  "id": "gid://shopify/BusinessEntity/MTY2MzQwMDYxMjI5",
+                  "displayName": "United States",
+                  "primary": true,
+                  "archived": false,
+                  "shopifyPaymentsAccount": {
+                    "id": "gid://shopify/ShopifyPaymentsAccount/999005447548973",
+                    "activated": false,
+                    "payouts": {
+                      "edges": []
+                    }
+                  }
+                }
+              ]
+            },
+            "extensions": {
+              "cost": {
+                "requestedQueryCost": 8,
+                "actualQueryCost": 6
+              }
+            }
+          }

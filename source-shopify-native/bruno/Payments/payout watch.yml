@@ -1,0 +1,109 @@
+info:
+  name: payout watch
+  type: graphql
+  seq: 5
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query PayoutWatch {
+        shopifyPaymentsAccount {
+          window: payouts(
+            first: 250
+            sortKey: ID
+            query: "issued_at:>='2026-10-10T00:00:00Z'"
+          ) {
+            edges { node { id legacyResourceId issuedAt status } }
+            pageInfo { hasNextPage endCursor }
+          }
+          byIds: payouts(first: 250, sortKey: ID, query: "id:1 OR id:2") {
+            edges { node { id legacyResourceId issuedAt status } }
+            pageInfo { hasNextPage endCursor }
+          }
+          open: payouts(first: 250, sortKey: ID, query: "status:scheduled") {
+            edges { node { id legacyResourceId issuedAt status } }
+            pageInfo { hasNextPage endCursor }
+          }
+          control: payouts(first: 1, query: "not_a_filter:1") {
+            edges { node { id } }
+          }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [ShopifyPaymentsAccount.payouts](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ShopifyPaymentsAccount), [PayoutSortKeys](https://shopify.dev/docs/api/admin-graphql/2026-01/enums/PayoutSortKeys) and [search syntax](https://shopify.dev/docs/api/usage/search-syntax)
+
+  **WHY:** a payout's status changes after its date, so once a day both
+  streams read the payouts dated within 30 days of now again. Answers: does
+  Shopify accept the reads that could select those payouts, and what do they
+  cost. The reads are payouts issued since a date with no upper bound, since a
+  scheduled payout's date can be its future send date (`window`); payouts by
+  id, joined with `OR` (`byIds`); and the open payouts (`open`). The streams
+  use a window with a 30-day upper bound. `not_a_filter` is a control: Shopify
+  should warn about it and about nothing else.
+
+  **VERIFIED (2026-11-09):** Shopify accepts all three reads and warns only
+  about the control (`invalid_field`). Reading `id`, `legacyResourceId`,
+  `issuedAt` and `status`, a 250-row page requests 13 points; the `payouts`
+  stream's full field set requests 36. Every list is empty because the
+  account isn't activated.
+
+  **UNOBSERVABLE:** how long after its `issuedAt` a payout can still change
+  status. Shopify staff say a paid payout can take up to 10 business days to
+  come back as failed (https://community.shopify.com/t/47794). Needs a store
+  with payouts; see `Payments / account`.
+
+examples:
+  - name: "200 - only the control warns (projection: lists, cost, search warnings)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "shopifyPaymentsAccount": {
+                "window": { "edges": [], "pageInfo": { "hasNextPage": false, "endCursor": null } },
+                "byIds": { "edges": [], "pageInfo": { "hasNextPage": false, "endCursor": null } },
+                "open": { "edges": [], "pageInfo": { "hasNextPage": false, "endCursor": null } },
+                "control": { "edges": [] }
+              }
+            },
+            "extensions": {
+              "cost": { "requestedQueryCost": 43, "actualQueryCost": 9 },
+              "search": [
+                {
+                  "path": ["shopifyPaymentsAccount", "control"],
+                  "query": "not_a_filter:1",
+                  "parsed": { "field": "not_a_filter", "match_all": "1" },
+                  "warnings": [
+                    {
+                      "field": "not_a_filter",
+                      "message": "Invalid search field for this query.",
+                      "code": "invalid_field"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
