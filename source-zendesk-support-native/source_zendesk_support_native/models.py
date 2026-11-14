@@ -19,6 +19,7 @@ from estuary_cdk.capture.common import (
     LogCursor,
     Logger,
 )
+from estuary_cdk.feature_flags import FeatureFlagsConfig, FlagDefault
 from estuary_cdk.http import HTTPSession
 
 from pydantic import AfterValidator, AwareDatetime, BaseModel, Field, RootModel, ValidationInfo, model_validator
@@ -127,6 +128,16 @@ class EndpointConfig(BaseModel):
     credentials: OAuth2Credentials | ApiToken | DeprecatedOAuthCredentials = Field(
         discriminator="credentials_title",
         title="Authentication",
+    )
+
+    class Advanced(FeatureFlagsConfig):
+        FEATURE_FLAG_DEFAULTS: ClassVar[dict[str, FlagDefault]] = {}
+
+    advanced: Advanced = Field(
+        default_factory=Advanced, #type: ignore
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
     )
 
     # Zendesk is updating their OAuth to expire access tokens, meaning this connector
