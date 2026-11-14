@@ -75,6 +75,7 @@ from .api import (
     fetch_incremental_cursor_paginated_resources,
     fetch_post_child_resources,
     fetch_post_comment_votes,
+    fetch_metric_events_of_tickets,
     fetch_metric_sets_of_tickets,
     fetch_satisfaction_ratings,
     fetch_side_conversations,
@@ -1182,6 +1183,60 @@ def incremental_keyset_paginated_ticket_child_resources(
             functools.partial(fetch_metric_sets_of_tickets, http, config.subdomain),
         ),
     ]
+
+
+# Nothing calls this yet. A later PR adds the feature flag that switches
+# ticket_metric_events from its incremental export to this resource (#5357).
+def incremental_keyset_paginated_ticket_metric_events(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> common.Resource:
+
+    fetch_children = functools.partial(fetch_metric_events_of_tickets, http, config.subdomain)
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_incremental_keyset_paginated_ticket_children,
+                http,
+                config.subdomain,
+                fetch_children,
+                TICKET_METRIC_EVENTS_LAG,
+            ),
+            fetch_page=functools.partial(
+                backfill_incremental_keyset_paginated_ticket_children,
+                http,
+                config.subdomain,
+                fetch_children,
+                config.start_date,
+            )
+        )
+
+    cutoff = (datetime.now(tz=UTC) - TICKET_METRIC_EVENTS_LAG).replace(microsecond=0)
+
+    return common.Resource(
+        name="ticket_metric_events",
+        key=["/id"],
+        model=ZendeskResource,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+        ),
+        initial_config=ResourceConfig(
+            name="ticket_metric_events", interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
 
 
 def talk_incremental_export_resources(

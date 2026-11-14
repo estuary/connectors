@@ -9,6 +9,7 @@ from source_zendesk_support_native.api.shared import INCREMENTAL_LAG, dt_to_s
 from source_zendesk_support_native.api.ticket_children import (
     backfill_incremental_keyset_paginated_ticket_children,
     fetch_incremental_keyset_paginated_ticket_children,
+    fetch_metric_events_of_tickets,
     fetch_metric_sets_of_tickets,
 )
 
@@ -127,7 +128,7 @@ class RecordingHTTP:
         self.params: list[dict[str, Any]] = []
 
     async def request(self, log: Any, url: str, **kwargs: Any) -> bytes:
-        self.params.append(dict(kwargs["params"]))
+        self.params.append(dict(kwargs.get("params") or {}))
         return json.dumps(self._bodies.pop(0)).encode()
 
 
@@ -151,3 +152,20 @@ async def test_metric_sets_are_fetched_100_tickets_at_a_time() -> None:
         ",".join(str(i) for i in range(1, 101)),
         ",".join(str(i) for i in range(101, 151)),
     ]
+
+
+@pytest.mark.asyncio
+async def test_metric_events_of_a_ticket_are_flattened() -> None:
+    http = RecordingHTTP({
+        "reply_time": [{"id": 1, "ticket_id": 7, "metric": "reply_time"}, {"id": 2, "ticket_id": 7, "metric": "reply_time"}],
+        "resolution_time": [{"id": 3, "ticket_id": 7, "metric": "resolution_time"}],
+    })
+
+    results = [
+        r async for r in fetch_metric_events_of_tickets(
+            http,  # type: ignore[arg-type]
+            "example", [7], log,
+        )
+    ]
+
+    assert [r.id for r in results] == [1, 2, 3]
