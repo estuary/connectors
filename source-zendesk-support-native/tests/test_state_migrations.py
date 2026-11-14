@@ -19,6 +19,7 @@ from source_zendesk_support_native.resources import (
     _migrate_export_state_to_keyset,
     _migrate_keyset_cursor_to_export,
     _migrate_keyset_state_to_export,
+    _restart_backfill_with_other_page_type,
 )
 
 USERS_SUBTASKS = ("users", "deleted_users")
@@ -207,3 +208,24 @@ async def test_ticket_child_backfill_resumes_from_a_plain_epoch_page() -> None:
     assert results == []
     assert http.params[0]["start_time"] == 1758999700
     assert "cursor" not in http.params[0]
+
+
+def test_backfill_with_the_other_page_type_restarts() -> None:
+    cutoff = datetime(2026, 10, 1, 12, 0, 0, 500_000, tzinfo=UTC)
+    inc = ResourceState.Incremental(cursor=datetime(2026, 10, 7, tzinfo=UTC))
+
+    # An export page reaching the keyset resource, and a keyset page reaching the export.
+    for page, page_type in (("opaque-export-cursor", int), (1759000000, str)):
+        state = ResourceState(inc=inc, backfill=ResourceState.Backfill(cutoff=cutoff, next_page=page))
+
+        migrated = _restart_backfill_with_other_page_type(state, page_type)
+        assert migrated is not None
+
+        saved = _saved_after(state, migrated)
+        assert saved.inc == inc
+        assert saved.backfill == ResourceState.Backfill(cutoff=cutoff, next_page=None)
+
+        assert _restart_backfill_with_other_page_type(saved, page_type) is None
+
+    state = ResourceState(inc=inc, backfill=ResourceState.Backfill(cutoff=cutoff, next_page=1759000000))
+    assert _restart_backfill_with_other_page_type(state, int) is None
