@@ -175,6 +175,10 @@ async def backfill_ticket_child_resources(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
+    if page is not None and is_timestamp(page):
+        start_date = s_to_dt(int(page))
+        page = None
+
     tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page, log)
 
     tickets: list[AbbreviatedTicket] = []
@@ -298,6 +302,10 @@ async def backfill_side_conversations(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
+    if page is not None and is_timestamp(page):
+        start_date = s_to_dt(int(page))
+        page = None
+
     tickets_generator = _fetch_incremental_cursor_export_resources(
         http, subdomain, "tickets", start_date, page, log
     )
@@ -378,6 +386,10 @@ async def backfill_ticket_metrics(
     if page is not None:
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
+
+    if page is not None and is_timestamp(page):
+        start_date = s_to_dt(int(page))
+        page = None
 
     sideload_params = {
         "include": "metric_sets"
