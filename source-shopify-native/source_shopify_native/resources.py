@@ -186,6 +186,7 @@ PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {
 FULL_REFRESH_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.StaffMembers,
     gql.Markets,
+    gql.PriceLists,
 ]
 
 
