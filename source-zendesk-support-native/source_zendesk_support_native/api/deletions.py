@@ -7,10 +7,13 @@ from estuary_cdk.http import HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from ..models import (
+    DeletedTicket,
+    DeletedTicketsResponse,
     DeletedUsersResponse,
     TimestampedResource,
 )
 
+from .incremental_keyset_paginated import fetch_incremental_keyset_paginated_window
 from .shared import (
     CURSOR_PAGINATION_PAGE_SIZE,
     url_base,
@@ -20,8 +23,9 @@ from .shared import (
 # settle which records are deleted.
 DELETION_LAG = timedelta(minutes=30)
 
-# Each run of the user deletion subtask reads every page of /deleted_users, so
-# a run only happens once its window covers an hour.
+# Each run of the user deletion subtask reads every page of /deleted_users,
+# and /deleted_tickets allows only 10 requests per minute. So a run only
+# happens once its window covers an hour.
 MIN_DELETION_WINDOW_SIZE = timedelta(hours=1)
 
 
@@ -85,5 +89,50 @@ async def fetch_deleted_users(
             break
 
         params["page[after]"] = remainder.meta.after_cursor
+
+    yield horizon
+
+
+async def fetch_deleted_tickets(
+    http: HTTPSession,
+    subdomain: str,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[DeletedTicket | LogCursor, None]:
+    """
+    Yields a deletion document for each ticket deleted after `log_cursor` and
+    at or before the horizon, in ascending deletion order, then the horizon.
+    Yielded datetimes before the horizon are the keyset sweep's checkpoints.
+
+              log_cursor      log_cursor + 1s       horizon
+    ───────────────┼─────────────────┼──────────────────┼──────▶ time (1s ticks)
+                   │                 │                  │
+    page[after] ───┼─────────────────[══════════════════╪══════▶
+    emitted ───────┼─────────────────[══════════════════]
+                   │                 │                  └─ now - 30 minutes.
+                   │                 │                     Later deletions wait
+                   │                 │                     for a later run
+                   │                 └─ seek (log_cursor + 1s, 0)
+                   └─ deletions at or before this second
+                      were emitted by an earlier run
+
+    /deleted_tickets only lists about 30 days of deletions, so a run whose
+    window starts earlier than that misses the older ones.
+    """
+    assert isinstance(log_cursor, datetime)
+
+    horizon = (datetime.now(tz=UTC) - DELETION_LAG).replace(microsecond=0)
+
+    if horizon - log_cursor < MIN_DELETION_WINDOW_SIZE:
+        return
+
+    generator = fetch_incremental_keyset_paginated_window(
+        http, subdomain, "deleted_tickets", "deleted_tickets", DeletedTicketsResponse, DeletedTicket, log_cursor, horizon, log,
+    )
+
+    async for result in generator:
+        if isinstance(result, DeletedTicket):
+            result.meta_ = DeletedTicket.Meta(op="d")
+        yield result
 
     yield horizon

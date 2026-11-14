@@ -63,6 +63,7 @@ from .api import (
     fetch_audit_logs,
     fetch_client_side_incremental_offset_paginated_resources,
     fetch_client_side_incremental_cursor_paginated_resources,
+    fetch_deleted_tickets,
     fetch_deleted_users,
     fetch_incremental_time_export_resources,
     fetch_incremental_keyset_paginated_resources,
@@ -929,6 +930,11 @@ def tickets(
                     "tickets",
                     TicketsListResponse,
                 ),
+                "deleted_tickets": functools.partial(
+                    fetch_deleted_tickets,
+                    http,
+                    config.subdomain,
+                ),
             },
             fetch_page=functools.partial(
                 backfill_incremental_keyset_paginated_resources,
@@ -949,7 +955,10 @@ def tickets(
         model=ZendeskResource,
         open=open,
         initial_state=ResourceState(
-            inc={"tickets": ResourceState.Incremental(cursor=cutoff)},
+            inc={
+                "tickets": ResourceState.Incremental(cursor=cutoff),
+                "deleted_tickets": ResourceState.Incremental(cursor=cutoff),
+            },
             backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
         ),
         initial_config=ResourceConfig(

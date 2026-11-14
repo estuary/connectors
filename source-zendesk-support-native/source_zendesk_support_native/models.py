@@ -382,6 +382,22 @@ class TicketsListResponse(IncrementalKeysetPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="tickets")
 
 
+class DeletedTicket(IncrementalResource):
+    deleted_at: AwareDatetime
+
+    # Deleted tickets have no updated_at. /deleted_tickets sorts them by
+    # deletion time, which they carry as deleted_at.
+    @override
+    def get_cursor(self) -> AwareDatetime:
+        return self.deleted_at
+
+
+class DeletedTicketsResponse(IncrementalKeysetPaginatedResponse):
+    REQUEST_PARAMS: ClassVar[dict[str, str]] = ALL_SUPPORT_TYPES
+
+    resources: list[DeletedTicket] = Field(alias="deleted_tickets")
+
+
 class DeletedUsersResponse(BaseModel, extra="allow"):
     meta: FullRefreshCursorPaginatedResponse.Meta
     resources: list[TimestampedResource] = Field(alias="deleted_users")
