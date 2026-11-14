@@ -188,6 +188,11 @@ class TimestampedResource(ZendeskResource):
     updated_at: AwareDatetime
 
 
+class IdAndUpdatedAt(BaseModel, extra="ignore"):
+    id: int
+    updated_at: AwareDatetime
+
+
 class IncrementalTimeExportResponse(BaseModel, extra="allow"):
     next_page: str | None
     count: int
