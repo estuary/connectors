@@ -43,6 +43,7 @@ from .models import (
     TALK_INCREMENTAL_EXPORT_RESOURCES,
     OAUTH2_SPEC,
     TICKET_CHILD_RESOURCES,
+    TicketMetricEventsResponse,
     POST_CHILD_RESOURCES,
     TicketsListResponse,
     UsersListResponse,
@@ -652,16 +653,14 @@ def incremental_cursor_paginated_resources(
     resources: list[common.Resource] = []
 
     for (name, path, filter_param, cursor_field, response_model) in INCREMENTAL_CURSOR_PAGINATED_RESOURCES:
-        lag = TICKET_METRIC_EVENTS_LAG if name == "ticket_metric_events" else INCREMENTAL_LAG
-
-        cutoff = datetime.now(tz=UTC) - max(lag, TIME_PARAMETER_DELAY)
+        cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
 
         resources.append(
             common.Resource(
                 name=name,
                 key=["/id"],
                 model=ZendeskResource,
-                open=functools.partial(open, path, filter_param, cursor_field, response_model, lag),
+                open=functools.partial(open, path, filter_param, cursor_field, response_model, INCREMENTAL_LAG),
                 initial_state=ResourceState(
                     inc=ResourceState.Incremental(cursor=cutoff),
                     backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
@@ -674,6 +673,62 @@ def incremental_cursor_paginated_resources(
         )
 
     return resources
+
+
+def ticket_metric_events(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> common.Resource:
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_incremental_cursor_paginated_resources,
+                http,
+                config.subdomain,
+                "incremental/ticket_metric_events",
+                FilterParam.START_TIME,
+                "time",
+                TicketMetricEventsResponse,
+                TICKET_METRIC_EVENTS_LAG,
+            ),
+            fetch_page=functools.partial(
+                backfill_incremental_cursor_paginated_resources,
+                http,
+                config.subdomain,
+                "incremental/ticket_metric_events",
+                FilterParam.START_TIME,
+                "time",
+                TicketMetricEventsResponse,
+                config.start_date,
+            )
+        )
+
+    cutoff = datetime.now(tz=UTC) - max(TICKET_METRIC_EVENTS_LAG, TIME_PARAMETER_DELAY)
+
+    return common.Resource(
+        name="ticket_metric_events",
+        key=["/id"],
+        model=ZendeskResource,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+        ),
+        initial_config=ResourceConfig(
+            name="ticket_metric_events", interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
 
 
 def incremental_time_export_resources(
@@ -1557,6 +1612,7 @@ def _generate_resources(
         *client_side_filtered_cursor_paginated_resources(log, http, config),
         satisfaction_ratings(log, http, config),
         *incremental_cursor_paginated_resources(log, http, config),
+        ticket_metric_events(log, http, config),
         *incremental_time_export_resources(log, http, config),
         *talk_incremental_export_resources(log, http, config),
         *incremental_cursor_export_resources(log, http, config),
