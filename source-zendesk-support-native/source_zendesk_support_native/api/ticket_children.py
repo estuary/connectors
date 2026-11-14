@@ -16,6 +16,7 @@ from ..models import (
     SideConversation,
     SideConversationsResponse,
     TicketChildResourceValidationContext,
+    TicketMetricEventsByMetric,
     TicketsListResponse,
     TicketsShowManyResponse,
 )
@@ -457,6 +458,33 @@ async def fetch_metric_sets_of_tickets(
 
         for metric_set in response.metric_sets:
             yield metric_set
+
+
+async def _fetch_metric_events_of_ticket(
+    http: HTTPSession,
+    subdomain: str,
+    ticket_id: int,
+    log: Logger,
+) -> AsyncGenerator[ZendeskResource, None]:
+    url = f"{url_base(subdomain)}/tickets/{ticket_id}/metric_events"
+    response = TicketMetricEventsByMetric.model_validate_json(await http.request(log, url))
+
+    for events in response.root.values():
+        for event in events:
+            yield event
+
+
+async def fetch_metric_events_of_tickets(
+    http: HTTPSession,
+    subdomain: str,
+    ticket_ids: list[int],
+    log: Logger,
+) -> AsyncGenerator[ZendeskResource, None]:
+    async for event in _fetch_ticket_children_concurrently(
+        ticket_ids,
+        functools.partial(_fetch_metric_events_of_ticket, http, subdomain, log=log),
+    ):
+        yield event
 
 
 async def fetch_incremental_keyset_paginated_ticket_children[ChildT](
