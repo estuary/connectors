@@ -347,12 +347,16 @@ func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerpl
 // a way to use `flowctl` commands instead of generating the binary spec files -
 // the main blocker for this is that there is not a way to simulate a previously
 // applied materialization spec via `flowctl raw preview-next` etc.
+//
+// Only the ExtraFeatureFlags and ConfigOverrides of runtime apply, to the
+// endpoint config of each task.
 func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	driver boilerplate.Connector,
 	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
+	runtime RuntimeConfig,
 ) {
 	SkipRuntimeV1(t)
 
@@ -363,7 +367,7 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	for _, taskName := range taskNames(bundled) {
-		cfg := decryptConfig[EC](t, bundled, taskName)
+		cfg := decryptConfig[EC](t, applyConfigOverrides(t, bundled, taskName, runtime), taskName)
 		materializer, err := newMaterializer(ctx, taskName, cfg, harnessFlags(t, cfg))
 		require.NoError(t, err)
 
@@ -488,12 +492,16 @@ func RunApplyTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 // The binding in the materialization task(s) can use field configuration to
 // exclude fields where migration is not supported. Materializations should
 // strive to support all of these migrations though.
+//
+// Only the ExtraFeatureFlags and ConfigOverrides of runtime apply, to the
+// endpoint config of each task.
 func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
+	runtime RuntimeConfig,
 ) {
 	SkipRuntimeV1(t)
 
@@ -505,7 +513,7 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 
 	for _, taskName := range taskNames(bundled) {
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
-		snap.WriteString(runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn, actionDescSanitizers))
+		snap.WriteString(runMigrationTestForTask(t, ctx, newMaterializer, taskName, applyConfigOverrides(t, bundled, taskName, runtime), suffix, makeResourceFn, actionDescSanitizers))
 	}
 
 	snapshotT(t, snap.String())

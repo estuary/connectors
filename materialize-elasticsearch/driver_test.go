@@ -29,7 +29,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, "testdata/apply.flow.yaml", makeResourceFn)
+		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, "testdata/apply.flow.yaml", makeResourceFn, boilerplate.RuntimeConfig{})
 	})
 
 	// OpenSearch is an API-compatible fork of Elasticsearch. The same connector
@@ -44,7 +44,7 @@ func TestIntegration(t *testing.T) {
 		})
 
 		t.Run("apply", func(t *testing.T) {
-			boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, "testdata/apply.opensearch.flow.yaml", makeResourceFn)
+			boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, "testdata/apply.opensearch.flow.yaml", makeResourceFn, boilerplate.RuntimeConfig{})
 		})
 	})
 

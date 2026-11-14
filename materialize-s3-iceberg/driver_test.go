@@ -191,7 +191,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, "testdata/apply.flow.yaml", makeResourceFn)
+		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, "testdata/apply.flow.yaml", makeResourceFn, boilerplate.RuntimeConfig{})
 	})
 
 	t.Run("apply-drain", func(t *testing.T) {
@@ -328,7 +328,7 @@ func TestIntegration(t *testing.T) {
 	// Migration test is skipped because Iceberg does not support the type
 	// migrations exercised by the test (e.g. long→string).
 	//t.Run("migrate", func(t *testing.T) {
-	//	boilerplate.RunMigrationTest(t, NewMaterializer, "testdata/migrate.flow.yaml", makeResourceFn, nil)
+	//	boilerplate.RunMigrationTest(t, NewMaterializer, "testdata/migrate.flow.yaml", makeResourceFn, nil, boilerplate.RuntimeConfig{})
 	//})
 }
 
@@ -376,7 +376,7 @@ func TestIntegrationGlue(t *testing.T) {
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, "testdata/apply-glue.flow.yaml", makeResourceFn)
+		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, "testdata/apply-glue.flow.yaml", makeResourceFn, boilerplate.RuntimeConfig{})
 	})
 
 	t.Run("ts-overflow-regression", func(t *testing.T) {
