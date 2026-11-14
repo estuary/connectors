@@ -685,17 +685,51 @@ def incremental_cursor_paginated_resources(
     return resources
 
 
+def _restart_backfill_with_other_page_type(state: ResourceState, expected_page_type: type) -> ResourceState | None:
+    """
+    Returns a state that restarts an in-progress backfill from start_date when
+    its page isn't an `expected_page_type`, or None otherwise. The incremental
+    ticket metric events export pages with an opaque cursor that the keyset
+    sweep can't convert to or from.
+    """
+    backfill = state.backfill
+
+    if (
+        not isinstance(backfill, ResourceState.Backfill) or
+        backfill.next_page is None or
+        isinstance(backfill.next_page, expected_page_type)
+    ):
+        return None
+
+    return ResourceState(
+        backfill=ResourceState.Backfill(cutoff=backfill.cutoff, next_page=None),
+    )
+
+
 def ticket_metric_events(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> common.Resource:
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        restarted = _restart_backfill_with_other_page_type(state, str)
+
+        if restarted is not None:
+            state.backfill = restarted.backfill
+
+            task.log.info("Restarted an in-progress backfill whose page came from the other code path.", {
+                "resource": binding.resourceConfig.name,
+                "migrated_state": restarted.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: restarted}),
+            )
+
         common.open_binding(
             binding,
             binding_index,
@@ -1145,13 +1179,26 @@ def incremental_keyset_paginated_ticket_metric_events(
 
     fetch_children = functools.partial(fetch_metric_events_of_tickets, http, config.subdomain)
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        restarted = _restart_backfill_with_other_page_type(state, int)
+
+        if restarted is not None:
+            state.backfill = restarted.backfill
+
+            task.log.info("Restarted an in-progress backfill whose page came from the other code path.", {
+                "resource": binding.resourceConfig.name,
+                "migrated_state": restarted.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: restarted}),
+            )
+
         common.open_binding(
             binding,
             binding_index,
