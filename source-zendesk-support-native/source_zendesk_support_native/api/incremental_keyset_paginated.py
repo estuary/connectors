@@ -3,7 +3,7 @@ from datetime import datetime, UTC
 import json
 from logging import Logger
 import struct
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Protocol
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
@@ -34,6 +34,52 @@ def _build_seek_cursor(lower_bound: datetime) -> str:
     keyset = b"d" + struct.pack("<q", dt_to_s(lower_bound) + 1) + b"i" + struct.pack("<q", 0)
     cursor = {"o": "updated_at,id", "v": base64.b64encode(keyset).decode()}
     return base64.b64encode(json.dumps(cursor, separators=(",", ":")).encode()).decode()
+
+
+class _KeysetRecord(Protocol):
+    id: int
+
+    def get_cursor(self) -> datetime: ...
+
+
+class _KeysetWindow:
+    """
+    A keyset sweep's progress through the records whose cursor is after
+    `lower_bound` and at or before `upper_bound`.
+    """
+
+    def __init__(self, name: str, lower_bound: datetime, upper_bound: datetime) -> None:
+        self.name = name
+        self.lower_bound = lower_bound
+        self.upper_bound = upper_bound
+        self.last_seen_dt = lower_bound
+        self.count = 0
+
+    def advance(self, resource: _KeysetRecord) -> tuple[bool, datetime | None]:
+        """
+        Returns whether `resource` is past the window, which ends the sweep,
+        and the checkpoint to yield before `resource`, if any.
+        """
+        cursor = resource.get_cursor()
+
+        if cursor > self.upper_bound:
+            return True, None
+
+        if cursor <= self.lower_bound or cursor < self.last_seen_dt:
+            raise RuntimeError(f"Received {self.name} record {resource.id} with cursor {cursor} out of order after {self.last_seen_dt}.")
+
+        checkpoint: datetime | None = None
+        if (
+            cursor > self.last_seen_dt and
+            self.last_seen_dt != self.lower_bound and
+            self.count >= CHECKPOINT_INTERVAL
+        ):
+            checkpoint = self.last_seen_dt
+            self.count = 0
+
+        self.count += 1
+        self.last_seen_dt = cursor
+        return False, checkpoint
 
 
 async def fetch_incremental_keyset_paginated_window[ResourceT: IncrementalResource](
@@ -75,8 +121,7 @@ async def fetch_incremental_keyset_paginated_window[ResourceT: IncrementalResour
         **response_model.REQUEST_PARAMS,
     }
 
-    last_seen_dt = lower_bound
-    count = 0
+    window = _KeysetWindow(name, lower_bound, upper_bound)
 
     while True:
         _, body = await http.request_stream(log, url, params=params)
@@ -88,25 +133,14 @@ async def fetch_incremental_keyset_paginated_window[ResourceT: IncrementalResour
         )
 
         async for resource in processor:
-            cursor = resource.get_cursor()
-
-            if cursor > upper_bound:
+            is_past_window, checkpoint = window.advance(resource)
+            if is_past_window:
                 return
 
-            if cursor <= lower_bound or cursor < last_seen_dt:
-                raise RuntimeError(f"Received {name} record {resource.id} with cursor {cursor} out of order after {last_seen_dt}.")
-
-            if (
-                cursor > last_seen_dt and
-                last_seen_dt != lower_bound and
-                count >= CHECKPOINT_INTERVAL
-            ):
-                yield last_seen_dt
-                count = 0
+            if checkpoint is not None:
+                yield checkpoint
 
             yield resource
-            count += 1
-            last_seen_dt = cursor
 
         remainder = processor.get_remainder()
 
