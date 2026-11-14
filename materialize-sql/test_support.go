@@ -70,7 +70,7 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, 
 	sourcePath string,
 	makeResourceFn func(string, bool) RC,
 ) {
-	testutil.RunApplyTest(t, driver, driver.NewMaterializer, sourcePath, makeResourceFn)
+	testutil.RunApplyTest(t, driver, driver.NewMaterializer, sourcePath, makeResourceFn, testutil.RuntimeConfig{})
 }
 
 // RunApplyDrainTest verifies the two-iteration Apply drain of a post-commit
@@ -159,7 +159,7 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[
 	makeResourceFn func(string, bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
-	testutil.RunMigrationTest(t, driver.NewMaterializer, sourcePath, makeResourceFn, actionDescSanitizers)
+	testutil.RunMigrationTest(t, driver.NewMaterializer, sourcePath, makeResourceFn, actionDescSanitizers, testutil.RuntimeConfig{})
 }
 
 // RunKeyChangeMigrationTest verifies that a KeyChangeInPlace endpoint keeps

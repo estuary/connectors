@@ -217,7 +217,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		bptest.RunApplyTest(t, &driver{}, newMaterializerUnderTest, "testdata/apply.flow.yaml", makeResourceFn)
+		bptest.RunApplyTest(t, &driver{}, newMaterializerUnderTest, "testdata/apply.flow.yaml", makeResourceFn, bptest.RuntimeConfig{})
 	})
 }
 

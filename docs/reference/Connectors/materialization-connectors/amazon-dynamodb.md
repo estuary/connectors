@@ -15,6 +15,7 @@ To use this connector, you'll need:
   - `BatchGetItem` on all resources
   - `BatchWriteItem` on all resources
   - `CreateTable` on all resources
+  - `DeleteTable` on all resources
   - `DescribeTable` on all resources
 
   These permissions should be specified with the `dynamodb:` prefix in an IAM policy document. For
