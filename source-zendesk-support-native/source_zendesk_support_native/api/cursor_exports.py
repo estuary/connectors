@@ -33,6 +33,13 @@ def _base64_encode(decoded: str) -> str:
     return base64.b64encode(decoded.encode("utf-8")).decode("utf-8")
 
 
+def cursor_export_cursor_to_dt(cursor: str) -> datetime:
+    # A decoded export cursor starts with the epoch seconds of the last exported
+    # record, as in "1791388325.0||54337475674900|". The stored cursor is a plain
+    # epoch string until the export returns its first page.
+    return s_to_dt(int(float(cursor.split("||", 1)[0])))
+
+
 def _is_upstream_timeout(status: int, body: str) -> bool:
     return status == 504 and "upstream request timeout" in body
 
@@ -194,6 +201,12 @@ async def backfill_incremental_cursor_export_resources(
     if page is not None:
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
+
+    # A binding that switched back from the keyset sweep resumes from a plain
+    # epoch page.
+    if page is not None and is_timestamp(page):
+        start_date = s_to_dt(int(page))
+        page = None
 
     generator = _fetch_incremental_cursor_export_resources(
         http, subdomain, name, start_date, page, log

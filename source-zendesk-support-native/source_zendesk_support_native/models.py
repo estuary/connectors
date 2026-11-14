@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal, TYPE_CHECKING, override
 from estuary_cdk.capture.common import (
     BasicAuth,
     BaseDocument,
+    BaseResourceState,
     LongLivedClientCredentialsOAuth2Credentials,
     RotatingOAuth2Credentials,
     OAuth2Spec,
@@ -162,6 +163,18 @@ class EndpointConfig(BaseModel):
         return schema
 
 ConnectorState = GenericConnectorState[ResourceState]
+
+
+class CursorExportStatePatch(BaseResourceState):
+    """
+    A checkpoint that moves a binding from the keyset sweep's subtask cursors
+    back to the cursor-based export's single cursor. ResourceState can't express
+    it, because one merge patch has to set `inc.cursor` to the export's cursor
+    and every subtask key to None.
+    """
+
+    inc: dict[str, tuple[str] | None]
+    backfill: ResourceState.Backfill | None = None
 
 
 class FullRefreshResource(BaseDocument, extra="allow"):
@@ -350,6 +363,15 @@ class IncrementalKeysetPaginatedResponse(BaseModel, extra="allow"):
 
 class OrganizationsListResponse(IncrementalKeysetPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="organizations")
+
+
+class UsersListResponse(IncrementalKeysetPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="users")
+
+
+class DeletedUsersResponse(BaseModel, extra="allow"):
+    meta: FullRefreshCursorPaginatedResponse.Meta
+    resources: list[TimestampedResource] = Field(alias="deleted_users")
 
 
 # Resources read by sweeping a list endpoint in ascending updated_at order.
