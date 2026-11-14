@@ -18,10 +18,16 @@ from source_shopify_native.models import (
     StoreCapabilities,
     StoreValidationContext,
     TShopifyGraphQLResource,
+    create_response_data_model,
 )
 
 from .graphql.client import ShopifyGraphQLClient
 from .graphql.nested_resolver import NESTED_CONNECTION_CONCURRENCY, resolve_document
+from .graphql.price_lists import (
+    PriceListPrices,
+    PriceLists,
+    PriceListValidationContext,
+)
 from .utils import dt_to_str, str_to_dt
 
 CHECKPOINT_INTERVAL = 1_000
@@ -378,3 +384,44 @@ async def backfill_incremental_unsorted(
     page_info = data.page_info
     if page_info.hasNextPage:
         yield page_info.endCursor
+
+
+async def snapshot_price_list_prices(
+    client: ShopifyGraphQLClient,
+    data_model: type[BaseResponseData[PriceListPrices]],
+    store: str,
+    capabilities: StoreCapabilities,
+    log: Logger,
+) -> AsyncGenerator[PriceListPrices, None]:
+    """Every price on every price list, one price list at a time in id order. Each price
+    carries its price list's id. A price list deleted after it was listed reads as an empty
+    page, so it is skipped."""
+    price_list_ids = [
+        price_list.id
+        async for price_list in fetch_snapshot(
+            client,
+            PriceLists,
+            create_response_data_model(PriceLists),
+            store,
+            capabilities,
+            log,
+        )
+    ]
+
+    for price_list_id in price_list_ids:
+        ctx = PriceListValidationContext(store=store, price_list_id=price_list_id)
+        after: str | None = None
+        while True:
+            data = await client.request(
+                PriceListPrices.build_query_for_price_list(price_list_id, PAGE_SIZE, after),
+                data_model,
+                log,
+                context=ctx,
+            )
+            for doc in data.nodes:
+                yield doc
+
+            page_info = data.page_info
+            if not page_info.hasNextPage:
+                break
+            after = page_info.endCursor
