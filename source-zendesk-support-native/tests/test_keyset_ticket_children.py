@@ -9,6 +9,7 @@ from source_zendesk_support_native.api.shared import INCREMENTAL_LAG, dt_to_s
 from source_zendesk_support_native.api.ticket_children import (
     backfill_incremental_keyset_paginated_ticket_children,
     fetch_incremental_keyset_paginated_ticket_children,
+    fetch_metric_sets_of_tickets,
 )
 
 log = logging.getLogger(__name__)
@@ -116,3 +117,37 @@ async def test_empty_sweep_yields_nothing() -> None:
 
     assert results == []
     assert children.batches == []
+
+
+class RecordingHTTP:
+    """Returns queued JSON bodies from http.request and records each request's params."""
+
+    def __init__(self, *bodies: dict[str, Any]) -> None:
+        self._bodies = list(bodies)
+        self.params: list[dict[str, Any]] = []
+
+    async def request(self, log: Any, url: str, **kwargs: Any) -> bytes:
+        self.params.append(dict(kwargs["params"]))
+        return json.dumps(self._bodies.pop(0)).encode()
+
+
+@pytest.mark.asyncio
+async def test_metric_sets_are_fetched_100_tickets_at_a_time() -> None:
+    ticket_ids = list(range(1, 151))
+    http = RecordingHTTP(
+        {"tickets": [], "metric_sets": [{"id": i, "ticket_id": i} for i in range(1, 101)], "next_page": None},
+        {"tickets": [], "metric_sets": [{"id": i, "ticket_id": i} for i in range(101, 151)], "next_page": None},
+    )
+
+    results = [
+        r async for r in fetch_metric_sets_of_tickets(
+            http,  # type: ignore[arg-type]
+            "example", ticket_ids, log,
+        )
+    ]
+
+    assert [r.id for r in results] == ticket_ids
+    assert [p["ids"] for p in http.params] == [
+        ",".join(str(i) for i in range(1, 101)),
+        ",".join(str(i) for i in range(101, 151)),
+    ]

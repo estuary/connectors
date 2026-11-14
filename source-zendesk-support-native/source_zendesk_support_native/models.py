@@ -390,6 +390,11 @@ class TicketsListResponse(IncrementalKeysetPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="tickets")
 
 
+class TicketsShowManyResponse(BaseModel, extra="ignore"):
+    metric_sets: list[ZendeskResource]
+    next_page: str | None
+
+
 class DeletedTicket(IncrementalResource):
     deleted_at: AwareDatetime
 

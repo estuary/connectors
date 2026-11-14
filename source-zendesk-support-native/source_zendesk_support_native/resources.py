@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, UTC
 import functools
 from logging import Logger
-from typing import Any
+from typing import Any, AsyncGenerator, Callable
 
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.capture import common, Task
@@ -52,6 +52,7 @@ from .api import (
     backfill_audit_logs,
     backfill_incremental_time_export_resources,
     backfill_incremental_keyset_paginated_resources,
+    backfill_incremental_keyset_paginated_ticket_children,
     backfill_incremental_cursor_export_resources,
     backfill_incremental_cursor_paginated_resources,
     backfill_satisfaction_ratings,
@@ -61,18 +62,22 @@ from .api import (
     backfill_ticket_metrics,
     cursor_export_cursor_to_dt,
     fetch_audit_logs,
+    fetch_child_resources_of_tickets,
     fetch_client_side_incremental_offset_paginated_resources,
     fetch_client_side_incremental_cursor_paginated_resources,
     fetch_deleted_tickets,
     fetch_deleted_users,
     fetch_incremental_time_export_resources,
     fetch_incremental_keyset_paginated_resources,
+    fetch_incremental_keyset_paginated_ticket_children,
     fetch_incremental_cursor_export_resources,
     fetch_incremental_cursor_paginated_resources,
     fetch_post_child_resources,
     fetch_post_comment_votes,
+    fetch_metric_sets_of_tickets,
     fetch_satisfaction_ratings,
     fetch_side_conversations,
+    fetch_side_conversations_of_tickets,
     fetch_talk_incremental_export_resources,
     fetch_ticket_child_resources,
     fetch_ticket_metrics,
@@ -986,6 +991,85 @@ def tickets(
         ),
         schema_inference=True,
     )
+
+
+# Nothing calls this yet. A later PR adds the feature flag that switches the
+# ticket child streams from the cursor-based export to these resources (#5357).
+def incremental_keyset_paginated_ticket_child_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+        fetch_children: Callable[[list[int], Logger], AsyncGenerator[Any, None]],
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_incremental_keyset_paginated_ticket_children,
+                http,
+                config.subdomain,
+                fetch_children,
+                INCREMENTAL_LAG,
+            ),
+            fetch_page=functools.partial(
+                backfill_incremental_keyset_paginated_ticket_children,
+                http,
+                config.subdomain,
+                fetch_children,
+                config.start_date,
+            )
+        )
+
+    cutoff = (datetime.now(tz=UTC) - INCREMENTAL_LAG).replace(microsecond=0)
+
+    def resource(
+        name: str,
+        model: type[FullRefreshResource],
+        fetch_children: Callable[[list[int], Logger], AsyncGenerator[Any, None]],
+    ) -> common.Resource:
+        return common.Resource(
+            name=name,
+            key=["/id"],
+            model=model,
+            open=functools.partial(open, fetch_children),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=cutoff),
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+
+    return [
+        *(
+            resource(
+                name,
+                ZendeskResource,
+                functools.partial(fetch_child_resources_of_tickets, http, config.subdomain, path, response_model),
+            )
+            for (name, path, response_model) in TICKET_CHILD_RESOURCES
+        ),
+        resource(
+            "side_conversations",
+            SideConversation,
+            functools.partial(fetch_side_conversations_of_tickets, http, config.subdomain),
+        ),
+        resource(
+            "ticket_metrics",
+            ZendeskResource,
+            functools.partial(fetch_metric_sets_of_tickets, http, config.subdomain),
+        ),
+    ]
 
 
 def talk_incremental_export_resources(

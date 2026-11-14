@@ -17,6 +17,7 @@ from ..models import (
     SideConversationsResponse,
     TicketChildResourceValidationContext,
     TicketsListResponse,
+    TicketsShowManyResponse,
 )
 
 from .shared import (
@@ -36,6 +37,9 @@ from .incremental_keyset_paginated import fetch_incremental_keyset_paginated_ids
 # Zendesk's rate limit is shared account-wide with the customer's other integrations,
 # so each binding keeps only a few per-ticket requests in flight.
 TICKET_CHILD_CONCURRENCY = 5
+
+# Zendesk documents that /tickets/show_many accepts up to 100 ids.
+SHOW_MANY_MAX_IDS = 100
 
 
 async def _fetch_ticket_child_resources(
@@ -387,6 +391,60 @@ async def backfill_ticket_metrics(
                 yield ZendeskResource.model_validate(metrics)
         else:
             return
+
+
+async def fetch_child_resources_of_tickets(
+    http: HTTPSession,
+    subdomain: str,
+    path: str,
+    response_model: type[IncrementalCursorPaginatedResponse],
+    ticket_ids: list[int],
+    log: Logger,
+) -> AsyncGenerator[ZendeskResource, None]:
+    async for child in _fetch_ticket_children_concurrently(
+        ticket_ids,
+        functools.partial(_fetch_ticket_child_resources, http, subdomain, path, response_model, log=log),
+    ):
+        yield child
+
+
+async def fetch_side_conversations_of_tickets(
+    http: HTTPSession,
+    subdomain: str,
+    ticket_ids: list[int],
+    log: Logger,
+) -> AsyncGenerator[SideConversation, None]:
+    async for side_conversation in _fetch_ticket_children_concurrently(
+        ticket_ids,
+        functools.partial(_fetch_side_conversations, http, subdomain, log=log),
+    ):
+        yield side_conversation
+
+
+async def fetch_metric_sets_of_tickets(
+    http: HTTPSession,
+    subdomain: str,
+    ticket_ids: list[int],
+    log: Logger,
+) -> AsyncGenerator[ZendeskResource, None]:
+    url = f"{url_base(subdomain)}/tickets/show_many"
+
+    for start in range(0, len(ticket_ids), SHOW_MANY_MAX_IDS):
+        batch = ticket_ids[start:start + SHOW_MANY_MAX_IDS]
+        response = TicketsShowManyResponse.model_validate_json(
+            await http.request(log, url, params={
+                "ids": ",".join(str(ticket_id) for ticket_id in batch),
+                "include": "metric_sets",
+            })
+        )
+
+        # show_many returns every requested ticket on one page, so we can't
+        # assume metric sets past a next page would ever be read.
+        if response.next_page is not None:
+            raise RuntimeError(f"/tickets/show_many returned a next page for {len(batch)} ids.")
+
+        for metric_set in response.metric_sets:
+            yield metric_set
 
 
 async def fetch_incremental_keyset_paginated_ticket_children[ChildT](
