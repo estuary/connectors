@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-11-12
+
+### Added
+- New `omit_table_location` feature flag. When enabled, tables are created
+  without an explicit storage location and the catalog assigns one. This is
+  required for catalogs that reject explicit locations, such as Snowflake
+  Horizon with Snowflake-managed Iceberg tables. The configured Prefix is not
+  used for new tables, since the catalog picks the full path; the startup
+  access check still tests writes under the Prefix, so make sure the
+  credentials can also write to the catalog's storage location. That location
+  must be in the configured bucket; if it is not, publishing a new table fails
+  and the task fails at startup, with an error naming both buckets.
+
 ## 2026-11-03
 
 ### Changed

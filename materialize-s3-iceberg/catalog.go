@@ -33,9 +33,10 @@ type catalog struct {
 	cfg           *config
 	locationStyle LocationStyle
 	cat           icebergcatalog.Catalog
+	omitLocation  bool
 }
 
-func newCatalog(ctx context.Context, cfg config, locationStyle LocationStyle) (*catalog, error) {
+func newCatalog(ctx context.Context, cfg config, locationStyle LocationStyle, omitLocation bool) (*catalog, error) {
 	cfg.normalizeCredentials()
 
 	var cat icebergcatalog.Catalog
@@ -56,6 +57,7 @@ func newCatalog(ctx context.Context, cfg config, locationStyle LocationStyle) (*
 		cfg:           &cfg,
 		locationStyle: locationStyle,
 		cat:           cat,
+		omitLocation:  omitLocation,
 	}, nil
 }
 
@@ -396,8 +398,6 @@ func (c *catalog) createNamespace(ctx context.Context, namespace string) error {
 }
 
 func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_Binding, res resource) (string, boilerplate.ActionApplyFn, error) {
-	location := tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)
-
 	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, *c.cfg)
 	if err != nil {
 		return "", nil, err
@@ -452,15 +452,41 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 			props[k] = v
 		}
 
-		if _, err := c.cat.CreateTable(ctx, b.ResourcePath, schema,
-			icebergcatalog.WithLocation(location),
-			icebergcatalog.WithProperties(props),
-		); err != nil {
+		opts := []icebergcatalog.CreateTableOpt{icebergcatalog.WithProperties(props)}
+		if !c.omitLocation {
+			location := tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)
+			opts = append(opts, icebergcatalog.WithLocation(location))
+		}
+
+		tbl, err := c.cat.CreateTable(ctx, b.ResourcePath, schema, opts...)
+		if err != nil {
+			// Some catalogs (e.g. Glue) can't assign a location themselves.
+			if c.omitLocation {
+				return fmt.Errorf("creating table %q without a location (omit_table_location is enabled; the catalog must be able to assign a default table location, otherwise disable the flag): %w", fqn, err)
+			}
 			return fmt.Errorf("creating table %q: %w", fqn, err)
+		}
+
+		// Fail at publish time on a bucket mismatch; the table is left in place.
+		if c.omitLocation {
+			if err := checkTableLocationBucket(fqn, tbl.Location(), c.cfg.Bucket); err != nil {
+				return fmt.Errorf("%w (table %q was created in the catalog and was not removed: drop it or keep it once Bucket is corrected)", err, fqn)
+			}
 		}
 
 		return nil
 	}, nil
+}
+
+// checkTableLocationBucket errors if a table's location is outside the
+// configured bucket, where data files are written.
+func checkTableLocationBucket(fqn, location, bucket string) error {
+	if got := bucketFromS3Path(location); got != bucket {
+		return fmt.Errorf(
+			"table %q has storage location %q in bucket %q, but data files are written to the configured bucket %q: set Bucket to the bucket of the catalog's storage location",
+			fqn, location, got, bucket)
+	}
+	return nil
 }
 
 func (c *catalog) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
