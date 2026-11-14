@@ -13,6 +13,7 @@ from estuary_cdk.http import HTTPMixin
 from source_shopify_native.graphql.bulk_job_manager import BulkJobManager
 from source_shopify_native.models import (
     BaseResponseData,
+    QueryBuilder,
     ShopifyGraphQLResource,
     StoreCapabilities,
     StoreValidationContext,
@@ -96,7 +97,12 @@ async def _paginate_through_resources(
     store: str,
     capabilities: StoreCapabilities,
     log: Logger,
+    build_query: QueryBuilder | None = None,
 ) -> AsyncGenerator[TShopifyGraphQLResource, None]:
+    # A stream whose query depends on the config passes a `build_query` with those
+    # arguments bound; every other stream builds its query with the model's own.
+    if build_query is None:
+        build_query = model.build_query
     after: str | None = None
     ctx = StoreValidationContext(store=store)
     # Shared across all pages of this fetch so total concurrent nested re-queries stay bounded.
@@ -105,7 +111,7 @@ async def _paginate_through_resources(
     page_size = model.OUTER_PAGE_SIZE or PAGE_SIZE
 
     while True:
-        query = model.build_query(
+        query = build_query(
             start=start,
             end=end,
             first=page_size,
@@ -191,6 +197,8 @@ async def fetch_incremental_unsorted(
     capabilities: StoreCapabilities,
     log: Logger,
     log_cursor: LogCursor,
+    *,
+    build_query: QueryBuilder | None = None,
 ) -> AsyncGenerator[TShopifyGraphQLResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     end = datetime.now(tz=UTC)
@@ -206,6 +214,7 @@ async def fetch_incremental_unsorted(
         store=store,
         capabilities=capabilities,
         log=log,
+        build_query=build_query,
     ):
         cursor_value = doc.get_cursor_value()
         if cursor_value > log_cursor:
@@ -323,13 +332,36 @@ async def backfill_incremental_unsorted(
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
+    *,
+    build_query: QueryBuilder | None = None,
 ) -> AsyncGenerator[TShopifyGraphQLResource | PageCursor, None]:
+    """Reads the resources last updated between `start_date` and `cutoff`, one page per call.
+    The page cursor is Shopify's `endCursor` for the page.
+
+               start_date                      cutoff
+    ────────────────┼─────────────────────────────┼───────▶ updated_at
+                    │                             │
+    updated_at:>= ──[═════════════════════════════╪═══════▶
+    updated_at:<= ══╪═════════════════════════════]
+    emitted ────────[═════════════════════════════]
+                    │                             └─ later edits are the
+                    │                                incremental task's
+                    └─ a resource last updated before this is
+                       never read
+
+    The incremental task emits resources updated after `cutoff`, so the two meet without a gap.
+    A stream whose query depends on the config passes a `build_query` with those arguments bound.
+    It's keyword-only because the CDK treats a `fetch_page` that accepts a fourth positional
+    argument as a recurring backfill and passes it a bool.
+    """
     assert isinstance(cutoff, datetime)
 
     if page is not None:
         assert isinstance(page, str)
 
-    query = model.build_query(
+    if build_query is None:
+        build_query = model.build_query
+    query = build_query(
         start_date,
         cutoff,
         first=PAGE_SIZE,
