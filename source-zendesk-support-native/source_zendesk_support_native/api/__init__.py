@@ -40,6 +40,8 @@ from .cursor_exports import (
     backfill_incremental_cursor_export_resources,
 )
 from .ticket_children import (
+    fetch_incremental_keyset_paginated_ticket_children,
+    backfill_incremental_keyset_paginated_ticket_children,
     fetch_ticket_child_resources,
     backfill_ticket_child_resources,
     fetch_side_conversations,
@@ -66,6 +68,7 @@ __all__ = [
     "backfill_incremental_cursor_export_resources",
     "backfill_incremental_cursor_paginated_resources",
     "backfill_incremental_keyset_paginated_resources",
+    "backfill_incremental_keyset_paginated_ticket_children",
     "backfill_satisfaction_ratings",
     "backfill_talk_incremental_export_resources",
     "backfill_side_conversations",
@@ -81,6 +84,7 @@ __all__ = [
     "fetch_incremental_cursor_export_resources",
     "fetch_incremental_cursor_paginated_resources",
     "fetch_incremental_keyset_paginated_resources",
+    "fetch_incremental_keyset_paginated_ticket_children",
     "fetch_post_child_resources",
     "fetch_post_comment_votes",
     "fetch_satisfaction_ratings",

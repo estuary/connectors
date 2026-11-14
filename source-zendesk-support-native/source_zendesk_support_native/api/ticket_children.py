@@ -1,7 +1,7 @@
 import asyncio
 import functools
 import itertools
-from datetime import datetime
+from datetime import datetime, timedelta, UTC
 from logging import Logger
 from typing import AsyncGenerator, Callable, TypeVar
 
@@ -16,11 +16,14 @@ from ..models import (
     SideConversation,
     SideConversationsResponse,
     TicketChildResourceValidationContext,
+    TicketsListResponse,
 )
 
 from .shared import (
     CURSOR_PAGINATION_PAGE_SIZE,
+    MIN_INCREMENTAL_WINDOW_SIZE,
     url_base,
+    dt_to_s,
     s_to_dt,
     is_timestamp,
 )
@@ -28,6 +31,7 @@ from .shared import (
 from .cursor_exports import (
     _fetch_incremental_cursor_export_resources,
 )
+from .incremental_keyset_paginated import fetch_incremental_keyset_paginated_ids_by_page
 
 # Zendesk's rate limit is shared account-wide with the customer's other integrations,
 # so each binding keeps only a few per-ticket requests in flight.
@@ -383,3 +387,100 @@ async def backfill_ticket_metrics(
                 yield ZendeskResource.model_validate(metrics)
         else:
             return
+
+
+async def fetch_incremental_keyset_paginated_ticket_children[ChildT](
+    http: HTTPSession,
+    subdomain: str,
+    fetch_children: Callable[[list[int], Logger], AsyncGenerator[ChildT, None]],
+    lag: timedelta,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[ChildT | LogCursor, None]:
+    """
+    Yields the children of every ticket updated after `log_cursor` and at or
+    before the horizon, then the last of those tickets' updated_at. A yielded
+    datetime means the children of every ticket updated at or before it have
+    been yielded.
+
+              log_cursor      log_cursor + 1s       horizon
+    ───────────────┼─────────────────┼──────────────────┼──────▶ time (1s ticks)
+                   │                 │                  │
+    page[after] ───┼─────────────────[══════════════════╪══════▶
+    tickets ───────┼─────────────────[══════════════════]
+                   │                 │                  └─ now - lag
+                   │                 └─ seek (log_cursor + 1s, 0)
+                   └─ the children of every ticket updated at or
+                      before this second were already emitted
+
+    A changed ticket's children are all fetched and emitted again. Each page of
+    tickets is read completely before any children are fetched, so no
+    response stays open while they are.
+    """
+    assert isinstance(log_cursor, datetime)
+
+    horizon = (datetime.now(tz=UTC) - lag).replace(microsecond=0)
+
+    if horizon - log_cursor < MIN_INCREMENTAL_WINDOW_SIZE:
+        return
+
+    generator = fetch_incremental_keyset_paginated_ids_by_page(
+        http, subdomain, "tickets", "tickets", TicketsListResponse.REQUEST_PARAMS, log_cursor, horizon, log,
+    )
+
+    ticket_ids: list[int] = []
+    last_seen_dt: datetime | None = None
+
+    async for result in generator:
+        if isinstance(result, datetime):
+            async for child in fetch_children(ticket_ids, log):
+                yield child
+            ticket_ids = []
+            yield result
+        else:
+            ticket_ids.append(result.id)
+            last_seen_dt = result.updated_at
+
+    if ticket_ids:
+        async for child in fetch_children(ticket_ids, log):
+            yield child
+
+    if last_seen_dt is not None:
+        yield last_seen_dt
+
+
+async def backfill_incremental_keyset_paginated_ticket_children[ChildT](
+    http: HTTPSession,
+    subdomain: str,
+    fetch_children: Callable[[list[int], Logger], AsyncGenerator[ChildT, None]],
+    start_date: datetime,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[ChildT | PageCursor, None]:
+    assert isinstance(cutoff, datetime)
+
+    if page is None:
+        lower_bound = start_date
+    else:
+        assert isinstance(page, int)
+        lower_bound = s_to_dt(page)
+
+    generator = fetch_incremental_keyset_paginated_ids_by_page(
+        http, subdomain, "tickets", "tickets", TicketsListResponse.REQUEST_PARAMS, lower_bound, cutoff, log,
+    )
+
+    ticket_ids: list[int] = []
+
+    async for result in generator:
+        if isinstance(result, datetime):
+            async for child in fetch_children(ticket_ids, log):
+                yield child
+            ticket_ids = []
+            yield dt_to_s(result)
+        else:
+            ticket_ids.append(result.id)
+
+    if ticket_ids:
+        async for child in fetch_children(ticket_ids, log):
+            yield child
