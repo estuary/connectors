@@ -44,6 +44,7 @@ from .models import (
     OAUTH2_SPEC,
     TICKET_CHILD_RESOURCES,
     POST_CHILD_RESOURCES,
+    TicketsListResponse,
     UsersListResponse,
     update_oauth_spec,
 )
@@ -62,6 +63,7 @@ from .api import (
     fetch_audit_logs,
     fetch_client_side_incremental_offset_paginated_resources,
     fetch_client_side_incremental_cursor_paginated_resources,
+    fetch_deleted_tickets,
     fetch_deleted_users,
     fetch_incremental_time_export_resources,
     fetch_incremental_keyset_paginated_resources,
@@ -111,6 +113,13 @@ TALK_STREAMS = [
 SIDE_CONVERSATION_STREAMS = [
     "side_conversations",
 ]
+
+
+# The ticket export orders tickets by generated_timestamp and the keyset sweep
+# orders them by updated_at, so switching from one to the other isn't exact.
+# Starting the sweep 30 minutes before the export's cursor is a hedge against
+# missing data.
+TICKET_EXPORT_MIGRATION_MARGIN = timedelta(minutes=30)
 
 
 async def _is_enterprise_account(
@@ -813,7 +822,7 @@ def _migrate_export_cursor_to_keyset_subtasks(
 
 
 # Nothing calls this yet. A later PR adds the feature flag that switches
-# users from the cursor-based export to these resources (#5357).
+# users and tickets from the cursor-based export to these resources (#5357).
 def incremental_keyset_paginated_resources_with_deletions(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -903,6 +912,7 @@ def incremental_keyset_paginated_resources_with_deletions(
         # The export's cursor can stop partway through a second, so the sweep
         # starts a second earlier and reads that whole second again.
         resource("users", UsersListResponse, fetch_deleted_users, timedelta(seconds=1)),
+        resource("tickets", TicketsListResponse, fetch_deleted_tickets, TICKET_EXPORT_MIGRATION_MARGIN),
     ]
 
 

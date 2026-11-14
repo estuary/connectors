@@ -374,6 +374,14 @@ class UsersListResponse(IncrementalKeysetPaginatedResponse):
 ALL_SUPPORT_TYPES = {"support_type_scope": "all"}
 
 
+class TicketsListResponse(IncrementalKeysetPaginatedResponse):
+    PATH: ClassVar[str] = "tickets"
+    ITEMS_KEY: ClassVar[str] = "tickets"
+    REQUEST_PARAMS: ClassVar[dict[str, str]] = ALL_SUPPORT_TYPES
+
+    resources: list[TimestampedResource] = Field(alias=ITEMS_KEY)
+
+
 class DeletedTicket(ZendeskResource):
     deleted_at: AwareDatetime
 
