@@ -372,6 +372,16 @@ class TicketsListResponse(IncrementalKeysetPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="tickets")
 
 
+class DeletedTicket(ZendeskResource):
+    deleted_at: AwareDatetime
+
+
+class DeletedTicketsResponse(IncrementalKeysetPaginatedResponse):
+    REQUEST_PARAMS: ClassVar[dict[str, str]] = ALL_SUPPORT_TYPES
+
+    resources: list[DeletedTicket] = Field(alias="deleted_tickets")
+
+
 class DeletedUsersResponse(BaseModel, extra="allow"):
     meta: FullRefreshCursorPaginatedResponse.Meta
     resources: list[TimestampedResource] = Field(alias="deleted_users")
