@@ -7,6 +7,14 @@
   the discount that produced each allocation, with its `index`, type, value,
   and `code` or `title`. The `index` matches the order's `discountApplications`
   entry, except for discounts added by an order edit, which that list omits.
+- New `product_variant_contextual_pricing` stream captures each product variant's price and
+  compare-at price in the countries listed in the new `Contextual Pricing Countries` advanced
+  setting.
+- New `price_lists` stream captures the store's price lists.
+- New `price_list_prices` stream captures each product variant's price on each price list.
+
+### Changed
+- The `markets` stream captures the countries each market covers.
 
 ## 2026-11-16
 
