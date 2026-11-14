@@ -3,6 +3,19 @@
     "protocol": 3032023,
     "configSchema": {
       "$defs": {
+        "Advanced": {
+          "properties": {
+            "feature_flags": {
+              "default": "",
+              "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+              "nonsensitive": true,
+              "title": "Feature Flags",
+              "type": "string"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
         "ApiToken": {
           "properties": {
             "credentials_title": {
@@ -138,6 +151,12 @@
             }
           ],
           "title": "Authentication"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
         }
       },
       "required": [
