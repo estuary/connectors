@@ -67,7 +67,7 @@ MAX_CONCURRENT_BULK_OPS = 5
 
 # Each country adds a 1-point field to every variant in a 250-variant page, which Shopify prices
 # at (2 + countries) x 11 + 2 points against its 1,000-point query ceiling. 88 countries is the
-# most that fits; 50 leaves headroom.
+# most that fits (Bruno `Pricing / cost over ceiling`); 50 leaves headroom.
 MAX_CONTEXTUAL_PRICING_COUNTRIES = 50
 
 # TODO(justin): OAuth support is temporarily removed for multi-store. Will revisit once the

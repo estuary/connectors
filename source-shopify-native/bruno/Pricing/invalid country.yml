@@ -1,0 +1,80 @@
+info:
+  name: invalid country
+  type: graphql
+  seq: 3
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query InvalidCountry {
+        productVariants(first: 1) {
+          nodes {
+            id
+            contextualPricing(context: { country: UK }) {
+              price { amount currencyCode }
+            }
+          }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [ContextualPricingContext](https://shopify.dev/docs/api/admin-graphql/2026-01/input-objects/ContextualPricingContext)
+
+  **WHY:** what a capture sees when a configured country isn't a
+  `CountryCode` value, if nothing validates it first.
+
+  **LIMITATION (VERIFIED 2026-11-13):** an invalid country fails the whole
+  query with `argumentLiteralsIncompatible` and returns no data. One bad
+  configured country would fail every poll, so configured countries must be
+  checked before they reach a query (`Pricing / country codes`).
+
+examples:
+  - name: "200 - UK rejected, no data"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "errors": [
+              {
+                "message": "Argument 'country' on InputObject 'ContextualPricingContext' has an invalid value (UK). Expected type 'CountryCode'.",
+                "locations": [
+                  {
+                    "line": 5,
+                    "column": 34
+                  }
+                ],
+                "path": [
+                  "query InvalidCountry",
+                  "productVariants",
+                  "nodes",
+                  "contextualPricing",
+                  "context",
+                  "country"
+                ],
+                "extensions": {
+                  "code": "argumentLiteralsIncompatible",
+                  "typeName": "InputObject",
+                  "argumentName": "country"
+                }
+              }
+            ]
+          }

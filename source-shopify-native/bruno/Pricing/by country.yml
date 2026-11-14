@@ -1,0 +1,419 @@
+info:
+  name: by country
+  type: graphql
+  seq: 4
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query ContextualPricingByCountry {
+        productVariants(first: 20, sortKey: ID) {
+          nodes {
+            id
+            legacyResourceId
+            updatedAt
+            price
+            compareAtPrice
+            product { id isGiftCard }
+            US: contextualPricing(context: { country: US }) { ...Prices }
+            MX: contextualPricing(context: { country: MX }) { ...Prices }
+            GB: contextualPricing(context: { country: GB }) { ...Prices }
+            DE: contextualPricing(context: { country: DE }) { ...Prices }
+            CH: contextualPricing(context: { country: CH }) { ...Prices }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+
+      fragment Prices on ProductVariantContextualPricing {
+        price { amount currencyCode }
+        compareAtPrice { amount currencyCode }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [ProductVariant.contextualPricing](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ProductVariant) and [ProductVariantContextualPricing](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ProductVariantContextualPricing)
+
+  **WHY:** the shape a per-country price stream reads, one alias per
+  configured country. Countries, from `Pricing / markets`:
+  - US: primary market, USD.
+  - MX: Mexico market, converted to MXN, rounding on, a -5% price list with
+    one fixed price.
+  - GB, DE and CH: International market, USD, no price list. DE is in the
+    EEA; GB and CH aren't.
+
+  Shows whether a market's adjustment, conversion and rounding reach `price`
+  and `compareAtPrice`. `product.isGiftCard` is there because gift cards
+  price differently (below).
+
+  **VERIFIED (2026-11-17):**
+  - Each country gets the price a buyer there sees, in that market's
+    currency. MX converts 699.95 USD to 12436.0 MXN: -5%, converted, then
+    rounded up to a whole peso. Converted amounts follow the exchange rate,
+    so they change between runs.
+  - Gift cards aren't rounded. The store's four gift card variants are -5%
+    and converted only: the 10.00 USD one (43217823334445) is 177.66 MXN.
+  - A fixed price on the market's price list wins. Variant 43217823760429 is
+    11000.0 / 15000.0 MXN in MX, its `Mexico Buyers` fixed price.
+  - Rounding changes the markdown. 9.95 / 14.95 USD (33.44% off) becomes
+    177.0 / 266.0 MXN (33.46% off).
+  - GB and CH (International, USD, no price list) get the base price.
+  - Requested cost 37 at 20 variants and 5 countries.
+
+  **DOCUMENTED (2026-11-17):** "Rounding rules don't apply to gift cards." —
+  https://help.shopify.com/en/manual/international/pricing/rounding
+
+  **LIMITATION (VERIFIED 2026-11-17):** `compareAtPrice` is null in DE but
+  present in CH and GB for the same variant, so the stream must allow a null
+  `compareAtPrice`.
+
+  **UNOBSERVABLE:** why DE hides it. The ProductVariant docs don't say. It
+  matches hiding derived compare-at prices in EEA countries for a store
+  whose primary market (here the US) is outside the EEA. A store with an EEA
+  primary market can't be tested here. The stream passes Shopify's value
+  through either way.
+
+examples:
+  - name: "200 - 1 of 20 variants as returned (cost totals only)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "productVariants": {
+                "nodes": [
+                  {
+                    "id": "gid://shopify/ProductVariant/43217823596589",
+                    "legacyResourceId": "43217823596589",
+                    "updatedAt": "2026-09-02T09:40:53Z",
+                    "price": "699.95",
+                    "compareAtPrice": "799.95",
+                    "product": {
+                      "id": "gid://shopify/Product/8086707994669",
+                      "isGiftCard": false
+                    },
+                    "US": {
+                      "price": {
+                        "amount": "699.95",
+                        "currencyCode": "USD"
+                      },
+                      "compareAtPrice": {
+                        "amount": "799.95",
+                        "currencyCode": "USD"
+                      }
+                    },
+                    "MX": {
+                      "price": {
+                        "amount": "12436.0",
+                        "currencyCode": "MXN"
+                      },
+                      "compareAtPrice": {
+                        "amount": "14213.0",
+                        "currencyCode": "MXN"
+                      }
+                    },
+                    "GB": {
+                      "price": {
+                        "amount": "699.95",
+                        "currencyCode": "USD"
+                      },
+                      "compareAtPrice": {
+                        "amount": "799.95",
+                        "currencyCode": "USD"
+                      }
+                    },
+                    "DE": {
+                      "price": {
+                        "amount": "699.95",
+                        "currencyCode": "USD"
+                      },
+                      "compareAtPrice": null
+                    },
+                    "CH": {
+                      "price": {
+                        "amount": "699.95",
+                        "currencyCode": "USD"
+                      },
+                      "compareAtPrice": {
+                        "amount": "799.95",
+                        "currencyCode": "USD"
+                      }
+                    }
+                  }
+                ],
+                "pageInfo": {
+                  "hasNextPage": true,
+                  "endCursor": "eyJsYXN0X2lkIjo0MzIxNzgyMzk4OTgwNSwibGFzdF92YWx1ZSI6IjQzMjE3ODIzOTg5ODA1In0="
+                }
+              }
+            },
+            "extensions": {
+              "cost": {
+                "requestedQueryCost": 37,
+                "actualQueryCost": 37,
+                "throttleStatus": {
+                  "maximumAvailable": 2000,
+                  "currentlyAvailable": 1963,
+                  "restoreRate": 100
+                }
+              }
+            }
+          }
+  - name: "200 - gift card and compare-at variants (projection: 8 of 20, money as amount and currency)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "variants": [
+              {
+                "id": "gid://shopify/ProductVariant/43217823334445",
+                "updatedAt": "2025-08-29T12:12:00Z",
+                "isGiftCard": true,
+                "price": "10.00",
+                "compareAtPrice": null,
+                "US": {
+                  "price": "10.0 USD",
+                  "compareAtPrice": null
+                },
+                "MX": {
+                  "price": "177.66 MXN",
+                  "compareAtPrice": null
+                },
+                "GB": {
+                  "price": "10.0 USD",
+                  "compareAtPrice": null
+                },
+                "DE": {
+                  "price": "10.0 USD",
+                  "compareAtPrice": null
+                },
+                "CH": {
+                  "price": "10.0 USD",
+                  "compareAtPrice": null
+                }
+              },
+              {
+                "id": "gid://shopify/ProductVariant/43217823367213",
+                "updatedAt": "2025-04-10T17:43:00Z",
+                "isGiftCard": true,
+                "price": "25.00",
+                "compareAtPrice": null,
+                "US": {
+                  "price": "25.0 USD",
+                  "compareAtPrice": null
+                },
+                "MX": {
+                  "price": "444.16 MXN",
+                  "compareAtPrice": null
+                },
+                "GB": {
+                  "price": "25.0 USD",
+                  "compareAtPrice": null
+                },
+                "DE": {
+                  "price": "25.0 USD",
+                  "compareAtPrice": null
+                },
+                "CH": {
+                  "price": "25.0 USD",
+                  "compareAtPrice": null
+                }
+              },
+              {
+                "id": "gid://shopify/ProductVariant/43217823399981",
+                "updatedAt": "2025-04-10T17:43:00Z",
+                "isGiftCard": true,
+                "price": "50.00",
+                "compareAtPrice": null,
+                "US": {
+                  "price": "50.0 USD",
+                  "compareAtPrice": null
+                },
+                "MX": {
+                  "price": "888.32 MXN",
+                  "compareAtPrice": null
+                },
+                "GB": {
+                  "price": "50.0 USD",
+                  "compareAtPrice": null
+                },
+                "DE": {
+                  "price": "50.0 USD",
+                  "compareAtPrice": null
+                },
+                "CH": {
+                  "price": "50.0 USD",
+                  "compareAtPrice": null
+                }
+              },
+              {
+                "id": "gid://shopify/ProductVariant/43217823432749",
+                "updatedAt": "2025-01-14T15:10:14Z",
+                "isGiftCard": true,
+                "price": "100.00",
+                "compareAtPrice": null,
+                "US": {
+                  "price": "100.0 USD",
+                  "compareAtPrice": null
+                },
+                "MX": {
+                  "price": "1776.64 MXN",
+                  "compareAtPrice": null
+                },
+                "GB": {
+                  "price": "100.0 USD",
+                  "compareAtPrice": null
+                },
+                "DE": {
+                  "price": "100.0 USD",
+                  "compareAtPrice": null
+                },
+                "CH": {
+                  "price": "100.0 USD",
+                  "compareAtPrice": null
+                }
+              },
+              {
+                "id": "gid://shopify/ProductVariant/43217823596589",
+                "updatedAt": "2026-09-02T09:40:53Z",
+                "isGiftCard": false,
+                "price": "699.95",
+                "compareAtPrice": "799.95",
+                "US": {
+                  "price": "699.95 USD",
+                  "compareAtPrice": "799.95 USD"
+                },
+                "MX": {
+                  "price": "12436.0 MXN",
+                  "compareAtPrice": "14213.0 MXN"
+                },
+                "GB": {
+                  "price": "699.95 USD",
+                  "compareAtPrice": "799.95 USD"
+                },
+                "DE": {
+                  "price": "699.95 USD",
+                  "compareAtPrice": null
+                },
+                "CH": {
+                  "price": "699.95 USD",
+                  "compareAtPrice": "799.95 USD"
+                }
+              },
+              {
+                "id": "gid://shopify/ProductVariant/43217823629357",
+                "updatedAt": "2026-09-02T09:41:12Z",
+                "isGiftCard": false,
+                "price": "699.95",
+                "compareAtPrice": "699.95",
+                "US": {
+                  "price": "699.95 USD",
+                  "compareAtPrice": "699.95 USD"
+                },
+                "MX": {
+                  "price": "12436.0 MXN",
+                  "compareAtPrice": "12436.0 MXN"
+                },
+                "GB": {
+                  "price": "699.95 USD",
+                  "compareAtPrice": "699.95 USD"
+                },
+                "DE": {
+                  "price": "699.95 USD",
+                  "compareAtPrice": null
+                },
+                "CH": {
+                  "price": "699.95 USD",
+                  "compareAtPrice": "699.95 USD"
+                }
+              },
+              {
+                "id": "gid://shopify/ProductVariant/43217823760429",
+                "updatedAt": "2026-06-15T13:22:29Z",
+                "isGiftCard": false,
+                "price": "785.95",
+                "compareAtPrice": "885.95",
+                "US": {
+                  "price": "785.95 USD",
+                  "compareAtPrice": "885.95 USD"
+                },
+                "MX": {
+                  "price": "11000.0 MXN",
+                  "compareAtPrice": "15000.0 MXN"
+                },
+                "GB": {
+                  "price": "785.95 USD",
+                  "compareAtPrice": "885.95 USD"
+                },
+                "DE": {
+                  "price": "785.95 USD",
+                  "compareAtPrice": null
+                },
+                "CH": {
+                  "price": "785.95 USD",
+                  "compareAtPrice": "885.95 USD"
+                }
+              },
+              {
+                "id": "gid://shopify/ProductVariant/43217823989805",
+                "updatedAt": "2026-09-02T09:42:19Z",
+                "isGiftCard": false,
+                "price": "9.95",
+                "compareAtPrice": "14.95",
+                "US": {
+                  "price": "9.95 USD",
+                  "compareAtPrice": "14.95 USD"
+                },
+                "MX": {
+                  "price": "177.0 MXN",
+                  "compareAtPrice": "266.0 MXN"
+                },
+                "GB": {
+                  "price": "9.95 USD",
+                  "compareAtPrice": "14.95 USD"
+                },
+                "DE": {
+                  "price": "9.95 USD",
+                  "compareAtPrice": null
+                },
+                "CH": {
+                  "price": "9.95 USD",
+                  "compareAtPrice": "14.95 USD"
+                }
+              }
+            ],
+            "cost": {
+              "requestedQueryCost": 37,
+              "actualQueryCost": 37
+            }
+          }

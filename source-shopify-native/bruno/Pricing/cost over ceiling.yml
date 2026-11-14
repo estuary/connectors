@@ -1,0 +1,169 @@
+info:
+  name: cost over ceiling
+  type: graphql
+  seq: 8
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query CostOverCeiling {
+        productVariants(first: 250, sortKey: ID) {
+          nodes {
+            id
+            product { id }
+            AF: contextualPricing(context: { country: AF }) { ...Prices }
+            AX: contextualPricing(context: { country: AX }) { ...Prices }
+            AL: contextualPricing(context: { country: AL }) { ...Prices }
+            DZ: contextualPricing(context: { country: DZ }) { ...Prices }
+            AD: contextualPricing(context: { country: AD }) { ...Prices }
+            AO: contextualPricing(context: { country: AO }) { ...Prices }
+            AI: contextualPricing(context: { country: AI }) { ...Prices }
+            AG: contextualPricing(context: { country: AG }) { ...Prices }
+            AR: contextualPricing(context: { country: AR }) { ...Prices }
+            AM: contextualPricing(context: { country: AM }) { ...Prices }
+            AW: contextualPricing(context: { country: AW }) { ...Prices }
+            AU: contextualPricing(context: { country: AU }) { ...Prices }
+            AT: contextualPricing(context: { country: AT }) { ...Prices }
+            AZ: contextualPricing(context: { country: AZ }) { ...Prices }
+            BS: contextualPricing(context: { country: BS }) { ...Prices }
+            BH: contextualPricing(context: { country: BH }) { ...Prices }
+            BD: contextualPricing(context: { country: BD }) { ...Prices }
+            BB: contextualPricing(context: { country: BB }) { ...Prices }
+            BY: contextualPricing(context: { country: BY }) { ...Prices }
+            BE: contextualPricing(context: { country: BE }) { ...Prices }
+            BZ: contextualPricing(context: { country: BZ }) { ...Prices }
+            BJ: contextualPricing(context: { country: BJ }) { ...Prices }
+            BM: contextualPricing(context: { country: BM }) { ...Prices }
+            BT: contextualPricing(context: { country: BT }) { ...Prices }
+            BO: contextualPricing(context: { country: BO }) { ...Prices }
+            BA: contextualPricing(context: { country: BA }) { ...Prices }
+            BW: contextualPricing(context: { country: BW }) { ...Prices }
+            BV: contextualPricing(context: { country: BV }) { ...Prices }
+            BR: contextualPricing(context: { country: BR }) { ...Prices }
+            IO: contextualPricing(context: { country: IO }) { ...Prices }
+            BN: contextualPricing(context: { country: BN }) { ...Prices }
+            BG: contextualPricing(context: { country: BG }) { ...Prices }
+            BF: contextualPricing(context: { country: BF }) { ...Prices }
+            BI: contextualPricing(context: { country: BI }) { ...Prices }
+            KH: contextualPricing(context: { country: KH }) { ...Prices }
+            CA: contextualPricing(context: { country: CA }) { ...Prices }
+            CV: contextualPricing(context: { country: CV }) { ...Prices }
+            BQ: contextualPricing(context: { country: BQ }) { ...Prices }
+            KY: contextualPricing(context: { country: KY }) { ...Prices }
+            CF: contextualPricing(context: { country: CF }) { ...Prices }
+            TD: contextualPricing(context: { country: TD }) { ...Prices }
+            CL: contextualPricing(context: { country: CL }) { ...Prices }
+            CN: contextualPricing(context: { country: CN }) { ...Prices }
+            CX: contextualPricing(context: { country: CX }) { ...Prices }
+            CC: contextualPricing(context: { country: CC }) { ...Prices }
+            CO: contextualPricing(context: { country: CO }) { ...Prices }
+            KM: contextualPricing(context: { country: KM }) { ...Prices }
+            CG: contextualPricing(context: { country: CG }) { ...Prices }
+            CD: contextualPricing(context: { country: CD }) { ...Prices }
+            CK: contextualPricing(context: { country: CK }) { ...Prices }
+            CR: contextualPricing(context: { country: CR }) { ...Prices }
+            HR: contextualPricing(context: { country: HR }) { ...Prices }
+            CU: contextualPricing(context: { country: CU }) { ...Prices }
+            CW: contextualPricing(context: { country: CW }) { ...Prices }
+            CY: contextualPricing(context: { country: CY }) { ...Prices }
+            CZ: contextualPricing(context: { country: CZ }) { ...Prices }
+            CI: contextualPricing(context: { country: CI }) { ...Prices }
+            DK: contextualPricing(context: { country: DK }) { ...Prices }
+            DJ: contextualPricing(context: { country: DJ }) { ...Prices }
+            DM: contextualPricing(context: { country: DM }) { ...Prices }
+            DO: contextualPricing(context: { country: DO }) { ...Prices }
+            EC: contextualPricing(context: { country: EC }) { ...Prices }
+            EG: contextualPricing(context: { country: EG }) { ...Prices }
+            SV: contextualPricing(context: { country: SV }) { ...Prices }
+            GQ: contextualPricing(context: { country: GQ }) { ...Prices }
+            ER: contextualPricing(context: { country: ER }) { ...Prices }
+            EE: contextualPricing(context: { country: EE }) { ...Prices }
+            SZ: contextualPricing(context: { country: SZ }) { ...Prices }
+            ET: contextualPricing(context: { country: ET }) { ...Prices }
+            FK: contextualPricing(context: { country: FK }) { ...Prices }
+            FO: contextualPricing(context: { country: FO }) { ...Prices }
+            FJ: contextualPricing(context: { country: FJ }) { ...Prices }
+            FI: contextualPricing(context: { country: FI }) { ...Prices }
+            FR: contextualPricing(context: { country: FR }) { ...Prices }
+            GF: contextualPricing(context: { country: GF }) { ...Prices }
+            PF: contextualPricing(context: { country: PF }) { ...Prices }
+            TF: contextualPricing(context: { country: TF }) { ...Prices }
+            GA: contextualPricing(context: { country: GA }) { ...Prices }
+            GM: contextualPricing(context: { country: GM }) { ...Prices }
+            GE: contextualPricing(context: { country: GE }) { ...Prices }
+            DE: contextualPricing(context: { country: DE }) { ...Prices }
+            GH: contextualPricing(context: { country: GH }) { ...Prices }
+            GI: contextualPricing(context: { country: GI }) { ...Prices }
+            GR: contextualPricing(context: { country: GR }) { ...Prices }
+            GL: contextualPricing(context: { country: GL }) { ...Prices }
+            GD: contextualPricing(context: { country: GD }) { ...Prices }
+            GP: contextualPricing(context: { country: GP }) { ...Prices }
+            GT: contextualPricing(context: { country: GT }) { ...Prices }
+            GG: contextualPricing(context: { country: GG }) { ...Prices }
+            GN: contextualPricing(context: { country: GN }) { ...Prices }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+
+      fragment Prices on ProductVariantContextualPricing {
+        price { amount currencyCode }
+        compareAtPrice { amount currencyCode }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [GraphQL Admin API rate limits](https://shopify.dev/docs/apps/build/apis/graphql-admin/rate-limits): "A single query may not exceed a cost of 1,000 points"
+
+  **WHY:** the one-past-the-limit probe for the number of configured
+  countries. `Pricing / cost per country` gives a requested cost of
+  (2 + countries) x 11 + 2 at 250 variants, so 90 countries should request
+  1,014. Records how Shopify enforces the ceiling, which sets the connector's
+  cap on countries.
+
+  **LIMITATION (VERIFIED 2026-11-13):** 90 countries at 250 variants request
+  1,014 points, as predicted. Shopify rejects the query with
+  `MAX_COST_EXCEEDED` (`cost` 1014, `maxCost` 1000) and returns no data. The
+  ceiling is checked on the requested cost before anything runs. So the
+  connector must cap configured countries at 88 for a 250-variant page, or
+  shrink the page.
+
+examples:
+  - name: "200 - MAX_COST_EXCEEDED at 90 countries"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "errors": [
+              {
+                "message": "Query cost is 1014, which exceeds the single query max cost limit (1000).\n\nSee https://shopify.dev/docs/api/usage/rate-limits for more information on how the\ncost of a query is calculated.\n\nTo query larger amounts of data with fewer limits, bulk operations should be used instead.\nSee https://shopify.dev/docs/api/usage/bulk-operations/queries for usage details.\n",
+                "extensions": {
+                  "code": "MAX_COST_EXCEEDED",
+                  "cost": 1014,
+                  "maxCost": 1000,
+                  "documentation": "https://shopify.dev/api/usage/rate-limits"
+                }
+              }
+            ]
+          }

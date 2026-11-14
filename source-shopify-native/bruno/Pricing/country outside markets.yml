@@ -1,0 +1,118 @@
+info:
+  name: country outside markets
+  type: graphql
+  seq: 5
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query CountryOutsideMarkets {
+        markets(first: 10) {
+          nodes {
+            name
+            conditions {
+              regionsCondition {
+                regions(first: 90) {
+                  nodes { ... on MarketRegionCountry { code } }
+                  pageInfo { hasNextPage }
+                }
+              }
+            }
+          }
+        }
+        productVariants(first: 2, sortKey: ID) {
+          nodes {
+            id
+            price
+            compareAtPrice
+            BR: contextualPricing(context: { country: BR }) { ...Prices }
+            IN: contextualPricing(context: { country: IN }) { ...Prices }
+            ZA: contextualPricing(context: { country: ZA }) { ...Prices }
+          }
+        }
+      }
+
+      fragment Prices on ProductVariantContextualPricing {
+        price { amount currencyCode }
+        compareAtPrice { amount currencyCode }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [ProductVariant.contextualPricing](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ProductVariant): "As of API version 2025-04, only active markets are considered in the price resolution."
+
+  **WHY:** the docs don't say what a country outside every active market
+  gets. A user can configure any valid country, so the connector must know
+  whether that's an error, a null, or a fallback price. The markets block
+  lists every market's countries so the response shows which of BR, IN and
+  ZA are outside them.
+
+  **LIMITATION (VERIFIED 2026-11-13):** BR, IN and ZA are in no market. Each
+  gets the base price in the shop currency (10.0 USD for a 10.00 variant),
+  with no error and no null. A configured country outside every active
+  market silently returns base prices.
+
+examples:
+  - name: "200 - base price outside markets (projection)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "marketCountryCounts": {
+              "International": 27,
+              "Mexico": 1,
+              "United States": 1
+            },
+            "variants": [
+              {
+                "id": "gid://shopify/ProductVariant/43217823334445",
+                "price": "10.00",
+                "BR": {
+                  "price": "10.0 USD",
+                  "compareAtPrice": null
+                },
+                "IN": {
+                  "price": "10.0 USD",
+                  "compareAtPrice": null
+                },
+                "ZA": {
+                  "price": "10.0 USD",
+                  "compareAtPrice": null
+                }
+              },
+              {
+                "id": "gid://shopify/ProductVariant/43217823367213",
+                "price": "25.00",
+                "BR": {
+                  "price": "25.0 USD",
+                  "compareAtPrice": null
+                },
+                "IN": {
+                  "price": "25.0 USD",
+                  "compareAtPrice": null
+                },
+                "ZA": {
+                  "price": "25.0 USD",
+                  "compareAtPrice": null
+                }
+              }
+            ]
+          }

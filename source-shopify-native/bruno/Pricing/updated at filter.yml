@@ -1,0 +1,129 @@
+info:
+  name: updated at filter
+  type: graphql
+  seq: 9
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query UpdatedAtFilter {
+        since: productVariants(
+          first: 50
+          query: "updated_at:>='2026-06-11T17:29:58Z'"
+        ) {
+          nodes { legacyResourceId updatedAt }
+        }
+        sinceDefaultStart: productVariants(
+          first: 50
+          query: "updated_at:>='2026-10-14T00:00:00Z'"
+        ) {
+          nodes { legacyResourceId updatedAt }
+        }
+        future: productVariants(
+          first: 50
+          query: "updated_at:>='2030-01-01T00:00:00Z'"
+        ) {
+          nodes { legacyResourceId updatedAt }
+        }
+        until: productVariants(
+          first: 50
+          query: "updated_at:<='2026-06-11T17:29:58Z'"
+        ) {
+          nodes { legacyResourceId updatedAt }
+        }
+        untilSecondBefore: productVariants(
+          first: 50
+          query: "updated_at:<='2026-06-11T17:29:57Z'"
+        ) {
+          nodes { legacyResourceId updatedAt }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [productVariants](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/productVariants)
+
+  **WHY:** the incremental read filters `productVariants` on `updated_at`,
+  which the docs list but `Pricing / variant counts` shows the count query
+  ignoring. `since` and `until` use variant 43217823531053's exact
+  `updatedAt` (2026-06-11T17:29:58Z), so they show whether `>=` and `<=`
+  include that second; `untilSecondBefore` is the same `<=` one second
+  earlier. The backfill reads `<=` its cutoff and the incremental task reads
+  from it, so together they show whether the two meet without a gap.
+  `future` must return nothing if the filter is honored. `sinceDefaultStart`
+  is what a backfill bounded by the default `start_date` (30 days back)
+  would read.
+
+  **VERIFIED (2026-11-13):**
+  - `productVariants` honors `updated_at`. `future` returns nothing; `since`
+    returns 16 variants, all at or after the bound.
+  - `>=` includes the bound's own second: variant 43217823531053, updated
+    2026-06-11T17:29:58Z, is returned.
+  - `sinceDefaultStart` returns nothing. No variant on the store changed in
+    the last 30 days, so a backfill bounded by the default `start_date`
+    would read none of its 27 variants.
+
+  **VERIFIED (2026-11-17):** `<=` includes the bound's own second too.
+  `until` returns 12 variants, the latest being 43217823531053;
+  `untilSecondBefore` returns 11 without it. `since` (16) plus
+  `untilSecondBefore` (11) is all 27 variants, so a `<=` read and a `>=` read
+  from the same second overlap by that second and leave no gap.
+
+examples:
+  - name: "200 - filter honored (projection: counts, first 3 of since, latest of each until)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "since": {
+              "count": 16,
+              "first3": [
+                {
+                  "legacyResourceId": "43217823531053",
+                  "updatedAt": "2026-06-11T17:29:58Z"
+                },
+                {
+                  "legacyResourceId": "43217823596589",
+                  "updatedAt": "2026-09-02T09:40:53Z"
+                },
+                {
+                  "legacyResourceId": "43217823629357",
+                  "updatedAt": "2026-09-02T09:41:12Z"
+                }
+              ]
+            },
+            "sinceDefaultStart": [],
+            "future": [],
+            "until": {
+              "count": 12,
+              "latest": {
+                "legacyResourceId": "43217823531053",
+                "updatedAt": "2026-06-11T17:29:58Z"
+              }
+            },
+            "untilSecondBefore": {
+              "count": 11,
+              "latest": {
+                "legacyResourceId": "43217823825965",
+                "updatedAt": "2026-06-11T17:29:52Z"
+              }
+            }
+          }
