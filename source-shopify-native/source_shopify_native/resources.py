@@ -39,6 +39,7 @@ from .api import (
 from .models import (
     AccessScopes,
     ConnectorState,
+    CountryCodes,
     EndpointConfig,
     PlanName,
     ShopDetails,
@@ -153,6 +154,7 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.ProductMetafields,
     gql.ProductVariants,
     gql.ProductVariantMetafields,
+    gql.ProductVariantContextualPricing,
     gql.FulfillmentOrders,
     gql.Fulfillments,
     gql.Orders,
@@ -464,6 +466,34 @@ async def _get_granted_scopes(
     return scopes
 
 
+async def _get_country_codes(http: HTTPMixin, url: str, log: Logger) -> set[str]:
+    """The country codes the API version accepts, from its `CountryCode` enum."""
+    response = CountryCodes.model_validate_json(
+        await http.request(log, url, method="POST", json={"query": CountryCodes.query()})
+    )
+    return response.get_names()
+
+
+async def _validate_contextual_pricing_countries(
+    log: Logger,
+    store_contexts: dict[str, StoreContext],
+    countries: list[str],
+) -> None:
+    """Reject configured countries Shopify doesn't accept, such as `UK` for `GB`. One invalid
+    country fails every query that prices the variants, so it has to be caught before a poll."""
+    ctx = next(iter(store_contexts.values()))
+    accepted = await _get_country_codes(ctx.http, ctx.client.url, log)
+    invalid = sorted(set(countries) - accepted)
+    if invalid:
+        raise ValidationError(
+            [
+                f"Contextual Pricing Countries: {', '.join(invalid)} "
+                f"{'is not a country code' if len(invalid) == 1 else 'are not country codes'} "
+                "Shopify accepts. Use two-letter ISO 3166-1 codes, such as GB for the United Kingdom."
+            ]
+        )
+
+
 async def _validate_store(
     log: Logger,
     http: HTTPMixin,
@@ -532,12 +562,19 @@ def _build_incremental_resource(
     Collection key format depends on config.advanced.should_use_composite_key:
     - True: ["/_meta/store", "/id"]
     - False: ["/id"]
+    product_variant_contextual_pricing appends "/country" to either.
     """
     key = (
         ["/_meta/store", "/id"]
         if config.advanced.should_use_composite_key
         else ["/id"]
     )
+    document_model: type[ShopifyGraphQLResource] = ShopifyGraphQLResource
+    if model is gql.ProductVariantContextualPricing:
+        # One document per variant per configured country, so the key needs the country, and the
+        # discovered schema has to require it.
+        key = [*key, "/country"]
+        document_model = model
     use_backfill = not model.SHOULD_USE_BULK_QUERIES
     initial_state = _create_initial_state(
         stores_with_access, config.start_date, use_backfill
@@ -588,7 +625,33 @@ def _build_incremental_resource(
         for store_id in stores_with_access:
             ctx = store_contexts[store_id]
 
-            if model.SHOULD_USE_BULK_QUERIES:
+            if model is gql.ProductVariantContextualPricing:
+                build_query = functools.partial(
+                    gql.ProductVariantContextualPricing.build_query,
+                    countries=config.advanced.contextual_pricing_countries,
+                )
+                fetch_changes[store_id] = functools.partial(
+                    fetch_incremental_unsorted,
+                    ctx.client,
+                    model,
+                    gql.ProductVariantContextualPricingPage,
+                    store_id,
+                    ctx.capabilities,
+                    build_query=build_query,
+                )
+                # The backfill reads from the epoch, not the start date: a price is current
+                # state, so a variant unchanged for years still has one.
+                fetch_page[store_id] = functools.partial(
+                    backfill_incremental_unsorted,
+                    ctx.client,
+                    model,
+                    gql.ProductVariantContextualPricingPage,
+                    store_id,
+                    ctx.capabilities,
+                    datetime.fromtimestamp(0, tz=UTC),
+                    build_query=build_query,
+                )
+            elif model.SHOULD_USE_BULK_QUERIES:
                 fetch_changes[store_id] = functools.partial(
                     bulk_fetch_incremental,
                     ctx.http,
@@ -648,7 +711,7 @@ def _build_incremental_resource(
     return Resource(
         name=model.NAME,
         key=key,
-        model=ShopifyGraphQLResource,
+        model=document_model,
         open=open,
         initial_state=initial_state,
         schema_inference=True,
@@ -820,8 +883,16 @@ async def discovered_resources(
         log, http, config, should_cancel_ongoing_job=False
     )
 
+    countries = config.advanced.contextual_pricing_countries
+    if countries:
+        await _validate_contextual_pricing_countries(log, store_contexts, countries)
+
     resources: list[Resource] = []
     for model in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES:
+        # The stream prices variants in the configured countries, so it needs at least one.
+        if model is gql.ProductVariantContextualPricing and not countries:
+            continue
+
         stores_with_access = _stores_with_access_to(model, store_contexts)
         if stores_with_access:
             resources.append(
@@ -858,6 +929,16 @@ async def bound_resources(
             log.warning(
                 f"No initialized store can serve bound stream '{model.NAME}'. Its binding will be idle."
             )
+        elif model is gql.ProductVariantContextualPricing:
+            countries = config.advanced.contextual_pricing_countries
+            if countries:
+                await _validate_contextual_pricing_countries(log, store_contexts, countries)
+            else:
+                log.warning(
+                    f"Bound stream '{model.NAME}' has no Contextual Pricing Countries to price "
+                    "variants in. Its binding will be idle."
+                )
+                stores_with_access = []
 
         resources.append(
             _build_resource(model, stores_with_access, store_contexts, config)

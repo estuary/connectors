@@ -47,6 +47,17 @@
               "nonsensitive": true,
               "title": "Max Concurrent Bulk Operations",
               "type": "integer"
+            },
+            "contextual_pricing_countries": {
+              "description": "Two-letter country codes, such as GB, to capture each product variant's price and compare-at price in. Listing a country adds the product_variant_contextual_pricing stream. Up to 50 countries.",
+              "items": {
+                "pattern": "^[A-Z]{2}$",
+                "type": "string"
+              },
+              "maxItems": 50,
+              "title": "Contextual Pricing Countries",
+              "type": "array",
+              "uniqueItems": true
             }
           },
           "title": "Advanced",
