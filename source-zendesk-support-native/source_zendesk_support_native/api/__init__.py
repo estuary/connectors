@@ -41,6 +41,7 @@ from .cursor_exports import (
 )
 from .ticket_children import (
     fetch_child_resources_of_tickets,
+    fetch_metric_events_of_tickets,
     fetch_side_conversations_of_tickets,
     fetch_incremental_keyset_paginated_ticket_children,
     backfill_incremental_keyset_paginated_ticket_children,
@@ -92,6 +93,7 @@ __all__ = [
     "fetch_incremental_keyset_paginated_resources",
     "fetch_incremental_keyset_paginated_ticket_children",
     "fetch_incremental_keyset_paginated_ticket_metrics",
+    "fetch_metric_events_of_tickets",
     "fetch_post_child_resources",
     "fetch_post_comment_votes",
     "fetch_satisfaction_ratings",
