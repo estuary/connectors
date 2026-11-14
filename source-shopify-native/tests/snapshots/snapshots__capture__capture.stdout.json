@@ -6921,5 +6921,30 @@
       "status": "ACTIVE",
       "type": "REGION"
     }
+  ],
+  [
+    "acmeCo/price_lists",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "store": "estuary-alex-testing",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "catalog": null,
+      "currency": "USD",
+      "fixedPricesCount": 0,
+      "id": "gid://shopify/PriceList/27592196141",
+      "name": "Price List example Buyers",
+      "parent": {
+        "adjustment": {
+          "type": "PERCENTAGE_DECREASE",
+          "value": 5.0
+        },
+        "settings": {
+          "compareAtMode": "ADJUSTED"
+        }
+      }
+    }
   ]
 ]

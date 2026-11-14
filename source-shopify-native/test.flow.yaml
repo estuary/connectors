@@ -156,3 +156,7 @@ captures:
         name: markets
         interval: PT15M
       target: acmeCo/markets
+    - resource:
+        name: price_lists
+        interval: PT15M
+      target: acmeCo/price_lists
