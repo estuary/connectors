@@ -20,7 +20,7 @@ from estuary_cdk.capture.common import (
 )
 from estuary_cdk.http import HTTPSession
 
-from pydantic import AfterValidator, AwareDatetime, BaseModel, Field, ValidationInfo, model_validator
+from pydantic import AfterValidator, AwareDatetime, BaseModel, Field, RootModel, ValidationInfo, model_validator
 
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
@@ -331,6 +331,10 @@ class TicketSkipsResponse(IncrementalCursorPaginatedResponse):
 
 class TicketMetricEventsResponse(IncrementalCursorPaginatedResponse):
     resources: list[ZendeskResource] = Field(alias="ticket_metric_events")
+
+
+class TicketMetricEventsByMetric(RootModel[dict[str, list[ZendeskResource]]]):
+    pass
 
 
 class TicketActivitiesResponse(IncrementalCursorPaginatedResponse):
