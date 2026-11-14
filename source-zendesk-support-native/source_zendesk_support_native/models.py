@@ -198,6 +198,14 @@ class TimestampedResource(IncrementalResource):
         return self.updated_at
 
 
+class IdAndUpdatedAt(BaseModel, extra="ignore"):
+    id: int
+    updated_at: AwareDatetime
+
+    def get_cursor(self) -> AwareDatetime:
+        return self.updated_at
+
+
 class IncrementalTimeExportResponse(BaseModel, extra="allow"):
     next_page: str | None
     count: int
