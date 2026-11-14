@@ -7,9 +7,10 @@ import pytest
 
 from source_zendesk_support_native.api.deletions import (
     DELETION_LAG,
+    fetch_deleted_tickets,
     fetch_deleted_users,
 )
-from source_zendesk_support_native.models import TimestampedResource
+from source_zendesk_support_native.api.incremental_keyset_paginated import _build_seek_cursor
 
 log = logging.getLogger(__name__)
 
@@ -18,9 +19,13 @@ def _user(id: int, updated_at: datetime) -> dict[str, Any]:
     return {"id": id, "updated_at": updated_at.strftime("%Y-%m-%dT%H:%M:%SZ"), "active": False}
 
 
-def _page(users: list[dict[str, Any]], after_cursor: str | None) -> dict[str, Any]:
+def _deleted_ticket(id: int, deleted_at: datetime) -> dict[str, Any]:
+    return {"id": id, "subject": "Deleted ticket", "deleted_at": deleted_at.strftime("%Y-%m-%dT%H:%M:%SZ")}
+
+
+def _page(key: str, records: list[dict[str, Any]], after_cursor: str | None) -> dict[str, Any]:
     return {
-        "deleted_users": users,
+        key: records,
         "meta": {"has_more": after_cursor is not None, "after_cursor": after_cursor, "before_cursor": None},
     }
 
@@ -42,14 +47,9 @@ class MockHTTP:
         return {}, stream
 
 
-async def _fetch_changes(http: MockHTTP, log_cursor: datetime) -> tuple[list[TimestampedResource | Any], datetime, datetime]:
+async def _fetch_changes(fetch: Callable[..., AsyncGenerator[Any, None]], http: MockHTTP, log_cursor: datetime) -> tuple[list[Any], datetime, datetime]:
     before = (datetime.now(tz=UTC) - DELETION_LAG).replace(microsecond=0)
-    results = [
-        r async for r in fetch_deleted_users(
-            http,  # type: ignore[arg-type]
-            "example", log, log_cursor,
-        )
-    ]
+    results = [r async for r in fetch(http, "example", log, log_cursor)]
     after = (datetime.now(tz=UTC) - DELETION_LAG).replace(microsecond=0)
     return results, before, after
 
@@ -60,11 +60,11 @@ async def test_emits_deletions_in_window() -> None:
     log_cursor = now - timedelta(hours=2)
 
     http = MockHTTP(
-        _page([_user(1, log_cursor), _user(2, log_cursor + timedelta(seconds=1))], after_cursor="c1"),
-        _page([_user(3, now - timedelta(hours=1)), _user(4, now)], after_cursor=None),
+        _page("deleted_users", [_user(1, log_cursor), _user(2, log_cursor + timedelta(seconds=1))], after_cursor="c1"),
+        _page("deleted_users", [_user(3, now - timedelta(hours=1)), _user(4, now)], after_cursor=None),
     )
 
-    results, before, after = await _fetch_changes(http, log_cursor)
+    results, before, after = await _fetch_changes(fetch_deleted_users, http, log_cursor)
 
     deletions, horizon = results[:-1], results[-1]
     assert [d.id for d in deletions] == [2, 3]
@@ -81,9 +81,32 @@ async def test_emits_deletions_in_window() -> None:
 async def test_empty_read_still_checkpoints() -> None:
     log_cursor = datetime.now(tz=UTC).replace(microsecond=0) - timedelta(hours=2)
 
-    http = MockHTTP(_page([], after_cursor=None))
+    http = MockHTTP(_page("deleted_users", [], after_cursor=None))
 
-    results, before, after = await _fetch_changes(http, log_cursor)
+    results, before, after = await _fetch_changes(fetch_deleted_users, http, log_cursor)
 
     assert len(results) == 1
     assert before <= results[0] <= after
+
+
+@pytest.mark.asyncio
+async def test_emits_deleted_tickets_in_window() -> None:
+    now = datetime.now(tz=UTC).replace(microsecond=0)
+    log_cursor = now - timedelta(hours=2)
+
+    http = MockHTTP(
+        _page("deleted_tickets", [_deleted_ticket(1, log_cursor + timedelta(seconds=1)), _deleted_ticket(2, now - timedelta(hours=1))], after_cursor="c1"),
+        _page("deleted_tickets", [_deleted_ticket(3, now)], after_cursor=None),
+    )
+
+    results, before, after = await _fetch_changes(fetch_deleted_tickets, http, log_cursor)
+
+    deletions, horizon = results[:-1], results[-1]
+    assert [d.id for d in deletions] == [1, 2]
+    assert all(d.meta_ is not None and d.meta_.op == "d" for d in deletions)
+    assert before <= horizon <= after
+
+    assert http.params == [
+        {"sort": "updated_at", "page[size]": 100, "page[after]": _build_seek_cursor(log_cursor), "support_type_scope": "all"},
+        {"sort": "updated_at", "page[size]": 100, "page[after]": "c1", "support_type_scope": "all"},
+    ]

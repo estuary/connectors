@@ -72,6 +72,7 @@ async def fetch_incremental_keyset_paginated_window[ResourceT: IncrementalResour
         "sort": "updated_at",
         "page[size]": CURSOR_PAGINATION_PAGE_SIZE,
         "page[after]": _build_seek_cursor(lower_bound),
+        **response_model.REQUEST_PARAMS,
     }
 
     last_seen_dt = lower_bound

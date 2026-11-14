@@ -44,6 +44,7 @@ from .models import (
     OAUTH2_SPEC,
     TICKET_CHILD_RESOURCES,
     POST_CHILD_RESOURCES,
+    TicketsListResponse,
     UsersListResponse,
     update_oauth_spec,
 )
@@ -62,6 +63,7 @@ from .api import (
     fetch_audit_logs,
     fetch_client_side_incremental_offset_paginated_resources,
     fetch_client_side_incremental_cursor_paginated_resources,
+    fetch_deleted_tickets,
     fetch_deleted_users,
     fetch_incremental_time_export_resources,
     fetch_incremental_keyset_paginated_resources,
@@ -885,7 +887,7 @@ def users(
     return common.Resource(
         name="users",
         key=["/id"],
-        model=TimestampedResource,
+        model=ZendeskResource,
         open=open,
         initial_state=ResourceState(
             inc={
@@ -896,6 +898,91 @@ def users(
         ),
         initial_config=ResourceConfig(
             name="users", interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
+
+
+# Nothing calls this yet. A later PR adds the feature flag that switches
+# tickets from the cursor-based export to this resource (#5357).
+def tickets(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> common.Resource:
+
+    async def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        # The export orders tickets by generated_timestamp, which can be later
+        # than a change's updated_at. So a ticket updated before the export's
+        # cursor may not have been exported yet, and the sweep starts
+        # INCREMENTAL_LAG earlier.
+        migrated = _migrate_export_state_to_keyset(
+            state, ("tickets", "deleted_tickets"), INCREMENTAL_LAG,
+        )
+
+        if migrated is not None:
+            state.inc = migrated.inc
+            if migrated.backfill is not None:
+                state.backfill = migrated.backfill
+
+            task.log.info("Migrated tickets state from the cursor-based export to the keyset sweep.", {
+                "migrated_state": migrated.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: migrated}),
+            )
+
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes={
+                "tickets": functools.partial(
+                    fetch_incremental_keyset_paginated_resources,
+                    http,
+                    config.subdomain,
+                    "tickets",
+                    "tickets",
+                    TicketsListResponse,
+                ),
+                "deleted_tickets": functools.partial(
+                    fetch_deleted_tickets,
+                    http,
+                    config.subdomain,
+                ),
+            },
+            fetch_page=functools.partial(
+                backfill_incremental_keyset_paginated_resources,
+                http,
+                config.subdomain,
+                "tickets",
+                "tickets",
+                TicketsListResponse,
+                config.start_date,
+            )
+        )
+
+    cutoff = (datetime.now(tz=UTC) - INCREMENTAL_LAG).replace(microsecond=0)
+
+    return common.Resource(
+        name="tickets",
+        key=["/id"],
+        model=ZendeskResource,
+        open=open,
+        initial_state=ResourceState(
+            inc={
+                "tickets": ResourceState.Incremental(cursor=cutoff),
+                "deleted_tickets": ResourceState.Incremental(cursor=cutoff),
+            },
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+        ),
+        initial_config=ResourceConfig(
+            name="tickets", interval=timedelta(minutes=5)
         ),
         schema_inference=True,
     )
@@ -1052,7 +1139,7 @@ def incremental_cursor_export_resources(
             common.Resource(
             name=name,
             key=["/id"],
-            model=TimestampedResource,
+            model=ZendeskResource,
             open=functools.partial(open, name),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=initial_state),
