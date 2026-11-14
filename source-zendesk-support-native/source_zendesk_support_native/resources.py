@@ -993,13 +993,42 @@ def tickets(
     )
 
 
+def _migrate_export_cursor_to_keyset(state: ResourceState, margin: timedelta) -> ResourceState | None:
+    """
+    Returns the state to checkpoint when `state` holds a cursor-based export
+    cursor, or None when it already holds the keyset sweep's datetime. The
+    cursor and an in-progress backfill start `margin` before the export's.
+    """
+    assert isinstance(state.inc, ResourceState.Incremental)
+
+    if isinstance(state.inc.cursor, datetime):
+        return None
+
+    assert isinstance(state.inc.cursor, tuple)
+    export_cursor = state.inc.cursor[0]
+    assert isinstance(export_cursor, str)
+
+    migrated = ResourceState(
+        inc=ResourceState.Incremental(cursor=cursor_export_cursor_to_dt(export_cursor) - margin),
+    )
+
+    if isinstance(state.backfill, ResourceState.Backfill) and isinstance(state.backfill.next_page, str):
+        page = cursor_export_cursor_to_dt(state.backfill.next_page) - margin
+        migrated.backfill = ResourceState.Backfill(
+            cutoff=state.backfill.cutoff,
+            next_page=dt_to_s(page),
+        )
+
+    return migrated
+
+
 # Nothing calls this yet. A later PR adds the feature flag that switches the
 # ticket child streams from the cursor-based export to these resources (#5357).
 def incremental_keyset_paginated_ticket_child_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
-    def open(
+    async def open(
         fetch_children: Callable[[list[int], Logger], AsyncGenerator[Any, None]],
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -1007,6 +1036,20 @@ def incremental_keyset_paginated_ticket_child_resources(
         task: Task,
         all_bindings,
     ):
+        migrated = _migrate_export_cursor_to_keyset(state, INCREMENTAL_LAG)
+
+        if migrated is not None:
+            state.inc = migrated.inc
+            if migrated.backfill is not None:
+                state.backfill = migrated.backfill
+
+            task.log.info("Migrated state from the cursor-based export to the keyset sweep.", {
+                "migrated_state": migrated.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: migrated}),
+            )
+
         common.open_binding(
             binding,
             binding_index,
