@@ -198,6 +198,14 @@ class TimestampedResource(IncrementalResource):
         return self.updated_at
 
 
+class IdAndUpdatedAt(BaseModel, extra="ignore"):
+    id: int
+    updated_at: AwareDatetime
+
+    def get_cursor(self) -> AwareDatetime:
+        return self.updated_at
+
+
 class IncrementalTimeExportResponse(BaseModel, extra="allow"):
     next_page: str | None
     count: int
@@ -380,6 +388,11 @@ class TicketsListResponse(IncrementalKeysetPaginatedResponse):
     REQUEST_PARAMS: ClassVar[dict[str, str]] = ALL_SUPPORT_TYPES
 
     resources: list[TimestampedResource] = Field(alias="tickets")
+
+
+class TicketsShowManyResponse(BaseModel, extra="ignore"):
+    metric_sets: list[ZendeskResource]
+    next_page: str | None
 
 
 class DeletedTicket(IncrementalResource):
