@@ -44,6 +44,7 @@ from .models import (
     OAUTH2_SPEC,
     TICKET_CHILD_RESOURCES,
     POST_CHILD_RESOURCES,
+    TicketsListResponse,
     UsersListResponse,
     update_oauth_spec,
 )
@@ -896,6 +897,63 @@ def users(
         ),
         initial_config=ResourceConfig(
             name="users", interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
+
+
+# Nothing calls this yet. A later PR adds the feature flag that switches
+# tickets from the cursor-based export to this resource (#5357).
+def tickets(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> common.Resource:
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes={
+                "tickets": functools.partial(
+                    fetch_incremental_keyset_paginated_resources,
+                    http,
+                    config.subdomain,
+                    "tickets",
+                    "tickets",
+                    TicketsListResponse,
+                ),
+            },
+            fetch_page=functools.partial(
+                backfill_incremental_keyset_paginated_resources,
+                http,
+                config.subdomain,
+                "tickets",
+                "tickets",
+                TicketsListResponse,
+                config.start_date,
+            )
+        )
+
+    cutoff = (datetime.now(tz=UTC) - INCREMENTAL_LAG).replace(microsecond=0)
+
+    return common.Resource(
+        name="tickets",
+        key=["/id"],
+        model=ZendeskResource,
+        open=open,
+        initial_state=ResourceState(
+            inc={"tickets": ResourceState.Incremental(cursor=cutoff)},
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+        ),
+        initial_config=ResourceConfig(
+            name="tickets", interval=timedelta(minutes=5)
         ),
         schema_inference=True,
     )
