@@ -72,7 +72,7 @@ async def graphql_request(
 AUTHORIZED_PREFIXES_QUERY = """
 query AuthorizedPrefixes {
   prefixes(by: { minCapability: read }) {
-    edges { node { prefix capabilities } }
+    edges { node { prefix capabilityBits } }
   }
 }
 """
@@ -110,7 +110,7 @@ async def resolve_scopes(
     extra capabilities, is skipped for that stream.
     """
     authorized = await fetch_authorized_prefixes(log, http)
-    holders = [a.prefix for a in authorized if required <= set(a.capabilities)]
+    holders = [a.prefix for a in authorized if required <= set(a.capabilityBits)]
 
     if not prefixes:
         return _prune_nested(set(holders))
