@@ -13,6 +13,8 @@ from source_zendesk_support_native.api import (
 from source_zendesk_support_native.api.shared import s_to_dt
 from source_zendesk_support_native.models import ResourceState
 from source_zendesk_support_native.resources import (
+    TICKET_EXPORT_MIGRATION_MARGIN,
+    _migrate_export_cursor_to_keyset,
     _migrate_export_cursor_to_keyset_subtasks,
     _migrate_keyset_subtasks_to_export,
 )
@@ -149,3 +151,20 @@ async def test_export_backfill_resumes_from_a_plain_epoch_page() -> None:
     assert results == []
     assert http.params[0]["start_time"] == 1758999999
     assert "cursor" not in http.params[0]
+
+
+def test_migrates_export_cursor_to_keyset() -> None:
+    cutoff = datetime(2026, 10, 1, 12, 0, 0, 500_000, tzinfo=UTC)
+    state = ResourceState(
+        inc=ResourceState.Incremental(cursor=("1790201555.0||47|",)),
+        backfill=ResourceState.Backfill(cutoff=cutoff, next_page="1759000000.0||12|"),
+    )
+
+    migrated = _migrate_export_cursor_to_keyset(state, TICKET_EXPORT_MIGRATION_MARGIN)
+    assert migrated is not None
+
+    saved = _saved_after(state, migrated)
+    assert saved.inc == ResourceState.Incremental(cursor=s_to_dt(1790201555 - 1800))
+    assert saved.backfill == ResourceState.Backfill(cutoff=cutoff, next_page=1759000000 - 1800)
+
+    assert _migrate_export_cursor_to_keyset(saved, TICKET_EXPORT_MIGRATION_MARGIN) is None
