@@ -65,6 +65,11 @@ scopes = [
 # See: https://shopify.dev/docs/api/usage/bulk-operations/queries#limitations
 MAX_CONCURRENT_BULK_OPS = 5
 
+# Each country adds a 1-point field to every variant in a 250-variant page, which Shopify prices
+# at (2 + countries) x 11 + 2 points against its 1,000-point query ceiling. 88 countries is the
+# most that fits; 50 leaves headroom.
+MAX_CONTEXTUAL_PRICING_COUNTRIES = 50
+
 # TODO(justin): OAuth support is temporarily removed for multi-store. Will revisit once the
 # OAuth app is approved and UI/runtime is ready to support OAuth inside array items with credentials.
 # See git history for the previous OAUTH2_SPEC implementation.
@@ -161,6 +166,20 @@ class EndpointConfig(BaseModel):
                 "other systems that submit bulk queries through the same app."
             ),
             json_schema_extra={"nonsensitive": True},
+        )
+        contextual_pricing_countries: list[
+            Annotated[str, Field(pattern="^[A-Z]{2}$")]
+        ] = Field(
+            default_factory=list,
+            max_length=MAX_CONTEXTUAL_PRICING_COUNTRIES,
+            title="Contextual Pricing Countries",
+            description=(
+                "Two-letter country codes, such as GB, to capture each product variant's "
+                "price and compare-at price in. Listing a country adds the "
+                f"product_variant_contextual_pricing stream. Up to "
+                f"{MAX_CONTEXTUAL_PRICING_COUNTRIES} countries."
+            ),
+            json_schema_extra={"uniqueItems": True},
         )
 
     advanced: Advanced = Field(
@@ -426,6 +445,36 @@ class AccessScopes(BaseModel, extra="allow"):
 
     def get_scope_handles(self) -> set[str]:
         return {s.handle for s in self.data.currentAppInstallation.accessScopes}
+
+
+class CountryCodes(BaseModel, extra="allow"):
+    """Model for introspecting the `CountryCode` enum: the country codes the API version accepts."""
+
+    class Data(BaseModel, extra="forbid"):
+        class Type(BaseModel, extra="forbid"):
+            class EnumValue(BaseModel, extra="forbid"):
+                name: str
+
+            enumValues: list[EnumValue]
+
+        type_: Type = Field(alias="__type")
+
+    data: Data
+
+    @staticmethod
+    def query() -> str:
+        return """
+        {
+            __type(name: "CountryCode") {
+                enumValues(includeDeprecated: true) {
+                    name
+                }
+            }
+        }
+        """
+
+    def get_names(self) -> set[str]:
+        return {v.name for v in self.data.type_.enumValues}
 
 
 class SortKey(StrEnum):

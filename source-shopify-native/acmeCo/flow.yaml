@@ -114,6 +114,12 @@ collections:
     key:
     - /_meta/store
     - /id
+  acmeCo/product_variant_contextual_pricing:
+    schema: product_variant_contextual_pricing.schema.yaml
+    key:
+    - /_meta/store
+    - /id
+    - /country
   acmeCo/product_variant_metafields:
     schema: product_variant_metafields.schema.yaml
     key:

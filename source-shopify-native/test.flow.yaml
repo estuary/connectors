@@ -53,6 +53,11 @@ captures:
         schedule: ''
       target: acmeCo/product_variant_metafields
     - resource:
+        name: product_variant_contextual_pricing
+        interval: PT5M
+        schedule: 55 23 * * *
+      target: acmeCo/product_variant_contextual_pricing
+    - resource:
         name: fulfillment_orders
         interval: PT5M
         schedule: ''
