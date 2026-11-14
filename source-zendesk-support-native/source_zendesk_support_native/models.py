@@ -1,4 +1,4 @@
-from datetime import datetime, UTC, timedelta
+from datetime import date, datetime, UTC, timedelta
 from enum import StrEnum
 import json
 from typing import Annotated, Any, ClassVar, Literal, TYPE_CHECKING
@@ -18,7 +18,7 @@ from estuary_cdk.capture.common import (
     LogCursor,
     Logger,
 )
-from estuary_cdk.feature_flags import FLAG_DISABLED, FeatureFlagsConfig, FlagDefault
+from estuary_cdk.feature_flags import FeatureFlagsConfig, FlagDefault
 from estuary_cdk.http import HTTPSession
 
 from pydantic import AfterValidator, AwareDatetime, BaseModel, Field, RootModel, ValidationInfo, model_validator
@@ -136,7 +136,7 @@ class EndpointConfig(BaseModel):
         FEATURE_FLAG_DEFAULTS: ClassVar[dict[str, FlagDefault]] = {
             # Zendesk is ending the incremental exports that some streams read,
             # so use_list_endpoints reads those streams from its list endpoints.
-            USE_LIST_ENDPOINTS: FLAG_DISABLED,
+            USE_LIST_ENDPOINTS: FlagDefault.enabled_for_tasks_created_after(date(2026, 12, 1)),
         }
 
     advanced: Advanced = Field(

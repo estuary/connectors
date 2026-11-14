@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-12-01
+
+### Changed
+- FEATURE FLAG SWITCH: Starting 2026-12-01 the feature flag use_list_endpoints will be on by default for new tasks, while existing tasks created at or before 2026-11-30 will keep their existing behaviour. `organizations`, `users`, `tickets`, `ticket_audits`, `ticket_comments`, `side_conversations`, `ticket_metrics`, and `ticket_metric_events` read from Zendesk's list endpoints instead of its incremental exports, which Zendesk is ending for third-party apps.
+- Deleted tickets and users arrive as deletion documents instead of `status: "deleted"` tickets and `active: false` users when `use_list_endpoints` is on.
+- Deleted tickets and users arrive up to about 1.5 hours after they're deleted when `use_list_endpoints` is on.
+- `ticket_audits` documents arrive about 30 minutes after their ticket changes when `use_list_endpoints` is on.
+- Archived tickets and their child records, organization deletes, and the `fields` property of `tickets` documents aren't captured when `use_list_endpoints` is on.
+- Each change to a ticket emits all of its `ticket_metric_events` again when `use_list_endpoints` is on.
+
 ## 2026-11-06
 
 ### Changed
