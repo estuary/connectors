@@ -26,7 +26,7 @@ operations {
 """
 
 # Selection for each region of a Market. Every region is a country: MarketRegionCountry is
-# MarketRegion's only type.
+# MarketRegion's only type (Bruno `Pricing / market regions`).
 _MARKET_REGION_SELECTION = """
 id
 name
@@ -103,15 +103,16 @@ class Markets(ShopifyGraphQLResource):
             parent_typename="RegionsCondition",
             field_name="regions",
             node_selection=_MARKET_REGION_SELECTION,
-            # Every region is a country and Shopify has 245 country codes, so one page holds all
-            # of a market's regions. That matters because RegionsCondition is not a Node: an
-            # overflow would have no id to page from, and the resolver raises instead.
+            # Every region is a country and Shopify has 245 country codes (Bruno `Pricing /
+            # country codes`), so one page holds all of a market's regions. That matters because
+            # RegionsCondition is not a Node: an overflow would have no id to page from, and the
+            # resolver raises instead.
             page_size=250,
         ),
     ]
-    # Shopify requests 260 points for a page of 25 markets with both connections inline, leaving
-    # headroom under its 1000 point per-query ceiling. MAX_COST_EXCEEDED is fatal, so the margin
-    # is deliberate.
+    # Shopify requests 260 points for a page of 25 markets with both connections inline (Bruno
+    # `Pricing / markets query cost`), leaving headroom under its 1000 point per-query ceiling.
+    # MAX_COST_EXCEEDED is fatal, so the margin is deliberate.
     OUTER_PAGE_SIZE = 25
 
     @staticmethod

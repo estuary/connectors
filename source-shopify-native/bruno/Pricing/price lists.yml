@@ -1,0 +1,140 @@
+info:
+  name: price lists
+  type: graphql
+  seq: 13
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query PriceLists {
+        priceLists(first: 50, sortKey: ID) {
+          nodes {
+            id
+            name
+            currency
+            fixedPricesCount
+            createdAt
+            parent {
+              adjustment { type value }
+              settings { compareAtMode }
+            }
+            catalog { __typename id title status }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [priceLists](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/priceLists) and [PriceList](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/PriceList)
+
+  **WHY:** the fields a `price_lists` document would carry, which catalog
+  types own a price list, whether a price list can have no catalog, and the
+  cost of a page.
+
+  **VERIFIED (2026-11-13):** the store has three price lists:
+  - `Mexico Buyers` (MXN, 1 fixed price) belongs to the `Mexico`
+    MarketCatalog.
+  - `Snowdevil B2B (test)` (USD, 1 fixed price, created 2026-10-27) belongs
+    to a CompanyLocationCatalog.
+  - `Price List example Buyers` (USD) has `catalog: null`.
+
+  All three are `PERCENTAGE_DECREASE` (5 or 10) with `compareAtMode:
+  ADJUSTED`. A price list can exist without a catalog. Requested cost 37 at
+  50 lists.
+
+examples:
+  - name: "200 - three price lists (projection: nodes and cost totals)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "priceLists": [
+              {
+                "id": "gid://shopify/PriceList/27592196141",
+                "name": "Price List example Buyers",
+                "currency": "USD",
+                "fixedPricesCount": 0,
+                "createdAt": "2025-01-14T15:10:02Z",
+                "parent": {
+                  "adjustment": {
+                    "type": "PERCENTAGE_DECREASE",
+                    "value": 5
+                  },
+                  "settings": {
+                    "compareAtMode": "ADJUSTED"
+                  }
+                },
+                "catalog": null
+              },
+              {
+                "id": "gid://shopify/PriceList/27592228909",
+                "name": "Mexico Buyers",
+                "currency": "MXN",
+                "fixedPricesCount": 1,
+                "createdAt": "2025-01-14T15:10:14Z",
+                "parent": {
+                  "adjustment": {
+                    "type": "PERCENTAGE_DECREASE",
+                    "value": 5
+                  },
+                  "settings": {
+                    "compareAtMode": "ADJUSTED"
+                  }
+                },
+                "catalog": {
+                  "__typename": "MarketCatalog",
+                  "id": "gid://shopify/MarketCatalog/63489638445",
+                  "title": "Mexico",
+                  "status": "ACTIVE"
+                }
+              },
+              {
+                "id": "gid://shopify/PriceList/28232679469",
+                "name": "Snowdevil B2B (test) - 3fcd770b-0bf4-4fd9-8294-00e42eb7dfcb",
+                "currency": "USD",
+                "fixedPricesCount": 1,
+                "createdAt": "2026-10-27T10:35:11Z",
+                "parent": {
+                  "adjustment": {
+                    "type": "PERCENTAGE_DECREASE",
+                    "value": 10
+                  },
+                  "settings": {
+                    "compareAtMode": "ADJUSTED"
+                  }
+                },
+                "catalog": {
+                  "__typename": "CompanyLocationCatalog",
+                  "id": "gid://shopify/CompanyLocationCatalog/114289672237",
+                  "title": "Snowdevil B2B (test)",
+                  "status": "ACTIVE"
+                }
+              }
+            ],
+            "cost": {
+              "requestedQueryCost": 37,
+              "actualQueryCost": 5
+            }
+          }

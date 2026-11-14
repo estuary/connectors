@@ -1,0 +1,189 @@
+info:
+  name: pricing schema
+  type: graphql
+  seq: 19
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query PricingSchema {
+        context: __type(name: "ContextualPricingContext") {
+          inputFields { name type { ...TypeRef } }
+        }
+        contextualPricing: __type(name: "ProductVariantContextualPricing") {
+          fields { name }
+        }
+        market: __type(name: "Market") {
+          interfaces { name }
+          fields(includeDeprecated: true) { name isDeprecated deprecationReason type { ...TypeRef } }
+        }
+        regionsCondition: __type(name: "RegionsCondition") {
+          interfaces { name }
+          fields { name }
+        }
+        marketCatalog: __type(name: "MarketCatalog") {
+          fields(includeDeprecated: true) { name isDeprecated type { ...TypeRef } }
+        }
+        priceListPrice: __type(name: "PriceListPrice") {
+          fields { name }
+        }
+        priceList: __type(name: "PriceList") {
+          fields { name args { name } }
+        }
+        resolvedValues: __type(name: "MarketsResolvedValues") {
+          fields { name type { ...TypeRef } }
+        }
+        buyerSignal: __type(name: "BuyerSignalInput") {
+          inputFields { name type { ...TypeRef } }
+        }
+        queryRoot: __type(name: "QueryRoot") {
+          fields { name args { name } }
+        }
+      }
+
+      fragment TypeRef on __Type {
+        kind
+        name
+        ofType { kind name ofType { kind name ofType { kind name } } }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [ContextualPricingContext](https://shopify.dev/docs/api/admin-graphql/2026-01/input-objects/ContextualPricingContext) and [Market](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/Market)
+
+  **WHY:** checks what else the schema offers for tying a price to a country,
+  market or catalog, before settling the design of the `Pricing` streams.
+
+  **VERIFIED (2026-11-17):**
+  - `ContextualPricingContext` takes `country`, `companyLocationId` and
+    `locationId`. A variant can't be priced by market or by catalog.
+  - `Market.regions` exists on the `Market` node but is deprecated in favour
+    of `conditions.regionsCondition.regions`. `RegionsCondition` implements
+    no interface, so it isn't a `Node`.
+  - `marketsResolvedValues(buyerSignal: { countryCode })` returns the
+    catalogs and currency Shopify resolves for a buyer in a country
+    (`Pricing / markets resolved values`).
+  - `catalogs` is a query root. `MarketCatalog` has `markets` and
+    `priceList`.
+  - `PriceList` has no `updatedAt`. `prices` takes `originType` and `query`.
+
+examples:
+  - name: "200 - introspection (projection: the fields the design relies on)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "ContextualPricingContext.inputFields": {
+              "country": "CountryCode",
+              "companyLocationId": "ID",
+              "locationId": "ID"
+            },
+            "Market.interfaces": [
+              "HasMetafieldDefinitions",
+              "HasMetafields",
+              "Node"
+            ],
+            "Market.regions": {
+              "isDeprecated": true,
+              "deprecationReason": "This field is deprecated and will be removed in the future. Use `conditions.regionConditions` instead."
+            },
+            "RegionsCondition": {
+              "interfaces": [],
+              "fields": [
+                "applicationLevel",
+                "regions"
+              ]
+            },
+            "MarketCatalog.fields": [
+              "id",
+              "markets",
+              "marketsCount",
+              "operations",
+              "priceList",
+              "publication",
+              "status",
+              "title"
+            ],
+            "PriceList.fields": {
+              "catalog": [],
+              "createdAt": [],
+              "currency": [],
+              "fixedPricesCount": [],
+              "id": [],
+              "name": [],
+              "parent": [],
+              "prices": [
+                "originType",
+                "first",
+                "after",
+                "last",
+                "before",
+                "reverse",
+                "query"
+              ],
+              "quantityRules": [
+                "originType",
+                "first",
+                "after",
+                "last",
+                "before",
+                "reverse"
+              ]
+            },
+            "MarketsResolvedValues.fields": [
+              "catalogs",
+              "currencyCode",
+              "priceInclusivity",
+              "webPresences"
+            ],
+            "BuyerSignalInput.inputFields": {
+              "countryCode": "NON_NULL(CountryCode)"
+            },
+            "QueryRoot (pricing fields)": {
+              "catalog": [
+                "id"
+              ],
+              "catalogs": [
+                "type",
+                "first",
+                "after",
+                "last",
+                "before",
+                "reverse",
+                "sortKey",
+                "query"
+              ],
+              "marketsResolvedValues": [
+                "buyerSignal"
+              ],
+              "priceList": [
+                "id"
+              ],
+              "priceLists": [
+                "first",
+                "after",
+                "last",
+                "before",
+                "reverse",
+                "sortKey"
+              ]
+            }
+          }

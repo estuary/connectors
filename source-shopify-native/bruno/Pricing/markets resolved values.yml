@@ -1,0 +1,130 @@
+info:
+  name: markets resolved values
+  type: graphql
+  seq: 20
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query MarketsResolvedValues {
+        MX: marketsResolvedValues(buyerSignal: { countryCode: MX }) { ...Resolved }
+        DE: marketsResolvedValues(buyerSignal: { countryCode: DE }) { ...Resolved }
+        US: marketsResolvedValues(buyerSignal: { countryCode: US }) { ...Resolved }
+        BR: marketsResolvedValues(buyerSignal: { countryCode: BR }) { ...Resolved }
+      }
+
+      fragment Resolved on MarketsResolvedValues {
+        currencyCode
+        catalogs(first: 5) {
+          nodes {
+            id
+            title
+            status
+            priceList { id currency }
+          }
+          pageInfo { hasNextPage }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [marketsResolvedValues](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/marketsResolvedValues)
+
+  **WHY:** an alternative to joining a country to a catalog through each
+  market's regions: ask Shopify which catalogs and currency apply to a buyer
+  in a country.
+
+  **VERIFIED (2026-11-17):**
+  - MX resolves to MXN and the `Mexico` catalog, with price list
+    27592228909.
+  - DE (International market), US (United States market) and BR (in no
+    market) all resolve to USD and no catalog.
+  - Four countries request 36 points, 9 each.
+
+examples:
+  - name: "200 - four countries (cost totals only)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "MX": {
+                "currencyCode": "MXN",
+                "catalogs": {
+                  "nodes": [
+                    {
+                      "id": "gid://shopify/MarketCatalog/63489638445",
+                      "title": "Mexico",
+                      "status": "ACTIVE",
+                      "priceList": {
+                        "id": "gid://shopify/PriceList/27592228909",
+                        "currency": "MXN"
+                      }
+                    }
+                  ],
+                  "pageInfo": {
+                    "hasNextPage": false
+                  }
+                }
+              },
+              "DE": {
+                "currencyCode": "USD",
+                "catalogs": {
+                  "nodes": [],
+                  "pageInfo": {
+                    "hasNextPage": false
+                  }
+                }
+              },
+              "US": {
+                "currencyCode": "USD",
+                "catalogs": {
+                  "nodes": [],
+                  "pageInfo": {
+                    "hasNextPage": false
+                  }
+                }
+              },
+              "BR": {
+                "currencyCode": "USD",
+                "catalogs": {
+                  "nodes": [],
+                  "pageInfo": {
+                    "hasNextPage": false
+                  }
+                }
+              }
+            },
+            "extensions": {
+              "cost": {
+                "requestedQueryCost": 36,
+                "actualQueryCost": 23,
+                "throttleStatus": {
+                  "maximumAvailable": 2000,
+                  "currentlyAvailable": 1977,
+                  "restoreRate": 100
+                }
+              }
+            }
+          }

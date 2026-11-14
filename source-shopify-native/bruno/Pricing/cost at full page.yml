@@ -1,0 +1,81 @@
+info:
+  name: cost at full page
+  type: graphql
+  seq: 7
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query CostAtFullPage {
+        productVariants(first: 250, sortKey: ID) {
+          nodes {
+            id
+            legacyResourceId
+            updatedAt
+            product { id }
+            US: contextualPricing(context: { country: US }) { ...Prices }
+            MX: contextualPricing(context: { country: MX }) { ...Prices }
+            GB: contextualPricing(context: { country: GB }) { ...Prices }
+            CA: contextualPricing(context: { country: CA }) { ...Prices }
+            DE: contextualPricing(context: { country: DE }) { ...Prices }
+            FR: contextualPricing(context: { country: FR }) { ...Prices }
+            JP: contextualPricing(context: { country: JP }) { ...Prices }
+            AU: contextualPricing(context: { country: AU }) { ...Prices }
+            CH: contextualPricing(context: { country: CH }) { ...Prices }
+            NO: contextualPricing(context: { country: NO }) { ...Prices }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+
+      fragment Prices on ProductVariantContextualPricing {
+        price { amount currencyCode }
+        compareAtPrice { amount currencyCode }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [GraphQL Admin API rate limits](https://shopify.dev/docs/apps/build/apis/graphql-admin/rate-limits)
+
+  **WHY:** the selection of `Pricing / cost per country` at the 250-variant
+  page maximum: the page a per-country price stream would read.
+
+  **VERIFIED (2026-11-13):** 250 variants with 10 countries request 134
+  points (12 x 11 + 2), 13% of the ceiling. The actual cost is 18 for the
+  store's 27 variants, in about 0.6 s. A paged stream can read full
+  250-variant pages for up to 88 countries (`Pricing / cost over ceiling`).
+
+examples:
+  - name: "200 - 10 countries at 250 variants (projection: cost and count)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "variantCount": 27,
+            "hasNextPage": false,
+            "cost": {
+              "requestedQueryCost": 134,
+              "actualQueryCost": 18
+            }
+          }

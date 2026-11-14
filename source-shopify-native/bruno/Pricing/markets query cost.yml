@@ -1,0 +1,113 @@
+info:
+  name: markets query cost
+  type: graphql
+  seq: 16
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query MarketsQueryCost {
+        markets(first: 25) {
+          edges {
+            node {
+              id
+              name
+              handle
+              status
+              type
+              catalogsCount { count precision }
+              currencySettings {
+                baseCurrency { currencyCode currencyName enabled manualRate rateUpdatedAt }
+                localCurrencies
+                roundingEnabled
+              }
+              priceInclusions { inclusiveDutiesPricingStrategy inclusiveTaxPricingStrategy }
+              conditions {
+                conditionTypes
+                regionsCondition {
+                  regions(first: 250) {
+                    edges {
+                      node {
+                        id
+                        name
+                        ... on MarketRegionCountry { code }
+                      }
+                    }
+                    pageInfo { hasNextPage endCursor }
+                  }
+                }
+              }
+              catalogs(first: 5) {
+                edges {
+                  node {
+                    id
+                    title
+                    status
+                    publication { id }
+                    operations { id processedRowCount rowCount { count exceedsMax } status }
+                  }
+                }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [markets](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/markets) and [GraphQL Admin API rate limits](https://shopify.dev/docs/apps/build/apis/graphql-admin/rate-limits)
+
+  **WHY:** sizes the `markets` stream's query. Shopify rejects a query that
+  requests over 1,000 points (`MAX_COST_EXCEEDED`). This is the connector's
+  query at its page size: 25 markets, each with `catalogs(first: 5)` and
+  `regionsCondition.regions(first: 250)` inline.
+
+  **VERIFIED (2026-11-16):**
+  - The query requests 260 points (19 actual, on 3 markets). Without
+    `regionsCondition.regions` it requested 176, so the regions add 14 per
+    market: 1 for `regionsCondition` and 13 for `regions`.
+  - Shopify charges connections well under `first` x node cost:
+    `regions(first: 250)` requests 13 and `catalogs(first: 5)` 14.
+
+examples:
+  - name: "200 - requested cost with and without regions (projection)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "withoutRegions": {
+              "requestedQueryCost": 176,
+              "actualQueryCost": 16
+            },
+            "withRegions": {
+              "requestedQueryCost": 260,
+              "actualQueryCost": 19,
+              "perMarket": 43,
+              "regionsCondition": 14,
+              "regions": 13,
+              "catalogs": 14
+            }
+          }

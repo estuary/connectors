@@ -135,7 +135,7 @@ def test_incremental_query_filters_on_updated_at_unsorted():
 def test_page_yields_one_document_per_variant_per_country():
     us = {"price": _money("699.95", "USD"), "compareAtPrice": _money("799.95", "USD")}
     mx = {"price": _money("12501.0", "MXN"), "compareAtPrice": _money("14287.0", "MXN")}
-    # Shopify hides some compare-at prices: DE returns null.
+    # Shopify hides some compare-at prices (Bruno `Pricing / by country`): DE returns null.
     de = {"price": _money("699.95", "USD"), "compareAtPrice": None}
     page = _page([_variant(1, {"US": us, "MX": mx, "DE": de}), _variant(2, {"US": us})], False)
 

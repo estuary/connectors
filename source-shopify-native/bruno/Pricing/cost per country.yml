@@ -1,0 +1,213 @@
+info:
+  name: cost per country
+  type: graphql
+  seq: 6
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query CostPerCountry {
+        productVariants(first: 25, sortKey: ID) {
+          nodes {
+            id
+            legacyResourceId
+            updatedAt
+            product { id }
+            US: contextualPricing(context: { country: US }) { ...Prices }
+            MX: contextualPricing(context: { country: MX }) { ...Prices }
+            GB: contextualPricing(context: { country: GB }) { ...Prices }
+            CA: contextualPricing(context: { country: CA }) { ...Prices }
+            DE: contextualPricing(context: { country: DE }) { ...Prices }
+            FR: contextualPricing(context: { country: FR }) { ...Prices }
+            JP: contextualPricing(context: { country: JP }) { ...Prices }
+            AU: contextualPricing(context: { country: AU }) { ...Prices }
+            CH: contextualPricing(context: { country: CH }) { ...Prices }
+            NO: contextualPricing(context: { country: NO }) { ...Prices }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+
+      fragment Prices on ProductVariantContextualPricing {
+        price { amount currencyCode }
+        compareAtPrice { amount currencyCode }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [GraphQL Admin API rate limits](https://shopify.dev/docs/apps/build/apis/graphql-admin/rate-limits)
+
+  **WHY:** each configured country adds a `contextualPricing` alias to every
+  variant, so the page size a paged stream can use under the 1,000-point
+  ceiling depends on the number of countries. Measures the requested cost
+  per variant and per country, at 10 countries and 25 variants.
+
+  **VERIFIED (2026-11-13):** each `contextualPricing` alias costs 1 point per
+  variant, the same as `product { id }`. `price` and `compareAtPrice` cost 0.
+  With C countries a variant costs 2 + C.
+
+  The connection multiplies that by far less than `first`: 4 at 10, 5 at
+  20, 6 at 25 and 11 at 250. That makes 74 here (12 x 6 + 2). The rule is
+  in the collection docs' API constraints.
+
+examples:
+  - name: "200 - 10 countries at 25 variants (projection: cost only)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "cost": {
+              "requestedQueryCost": 74,
+              "actualQueryCost": 74
+            },
+            "fields": [
+              {
+                "path": [
+                  "productVariants",
+                  "nodes",
+                  "product"
+                ],
+                "definedCost": 1,
+                "requestedTotalCost": 1,
+                "requestedChildrenCost": 0
+              },
+              {
+                "path": [
+                  "productVariants",
+                  "nodes",
+                  "US"
+                ],
+                "definedCost": 1,
+                "requestedTotalCost": 1,
+                "requestedChildrenCost": 0
+              },
+              {
+                "path": [
+                  "productVariants",
+                  "nodes",
+                  "MX"
+                ],
+                "definedCost": 1,
+                "requestedTotalCost": 1,
+                "requestedChildrenCost": 0
+              },
+              {
+                "path": [
+                  "productVariants",
+                  "nodes",
+                  "GB"
+                ],
+                "definedCost": 1,
+                "requestedTotalCost": 1,
+                "requestedChildrenCost": 0
+              },
+              {
+                "path": [
+                  "productVariants",
+                  "nodes",
+                  "CA"
+                ],
+                "definedCost": 1,
+                "requestedTotalCost": 1,
+                "requestedChildrenCost": 0
+              },
+              {
+                "path": [
+                  "productVariants",
+                  "nodes",
+                  "DE"
+                ],
+                "definedCost": 1,
+                "requestedTotalCost": 1,
+                "requestedChildrenCost": 0
+              },
+              {
+                "path": [
+                  "productVariants",
+                  "nodes",
+                  "FR"
+                ],
+                "definedCost": 1,
+                "requestedTotalCost": 1,
+                "requestedChildrenCost": 0
+              },
+              {
+                "path": [
+                  "productVariants",
+                  "nodes",
+                  "JP"
+                ],
+                "definedCost": 1,
+                "requestedTotalCost": 1,
+                "requestedChildrenCost": 0
+              },
+              {
+                "path": [
+                  "productVariants",
+                  "nodes",
+                  "AU"
+                ],
+                "definedCost": 1,
+                "requestedTotalCost": 1,
+                "requestedChildrenCost": 0
+              },
+              {
+                "path": [
+                  "productVariants",
+                  "nodes",
+                  "CH"
+                ],
+                "definedCost": 1,
+                "requestedTotalCost": 1,
+                "requestedChildrenCost": 0
+              },
+              {
+                "path": [
+                  "productVariants",
+                  "nodes",
+                  "NO"
+                ],
+                "definedCost": 1,
+                "requestedTotalCost": 1,
+                "requestedChildrenCost": 0
+              },
+              {
+                "path": [
+                  "productVariants",
+                  "nodes"
+                ],
+                "definedCost": 1,
+                "requestedTotalCost": 12,
+                "requestedChildrenCost": 11
+              },
+              {
+                "path": [
+                  "productVariants"
+                ],
+                "definedCost": null,
+                "requestedTotalCost": 74,
+                "requestedChildrenCost": 12
+              }
+            ]
+          }

@@ -1,0 +1,128 @@
+info:
+  name: catalogs
+  type: graphql
+  seq: 15
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query Catalogs {
+        catalogs(first: 50) {
+          nodes {
+            __typename
+            id
+            title
+            status
+            priceList { id currency }
+            publication { id }
+          }
+          pageInfo { hasNextPage }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [catalogs](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/catalogs) and [Catalog](https://shopify.dev/docs/api/admin-graphql/2026-01/interfaces/Catalog)
+
+  **WHY:** whether `price_lists` can carry its catalog inline or a separate
+  `catalogs` stream is needed: how many catalogs of each type exist, and how
+  many have no price list (which `price_lists` alone would never show).
+
+  **VERIFIED (2026-11-13):** the store has five catalogs:
+  - three AppCatalogs (Online Store, Shop, Point of Sale), with no price
+    list;
+  - the `Mexico` MarketCatalog and the `Snowdevil B2B (test)`
+    CompanyLocationCatalog, each with its price list.
+
+  Every catalog with a price list is reachable from that list's `catalog`
+  field. So `price_lists` can carry its catalog inline, and a `catalogs`
+  stream would only add catalogs with no prices.
+
+examples:
+  - name: "200 - five catalogs (data only)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "catalogs": {
+              "nodes": [
+                {
+                  "__typename": "AppCatalog",
+                  "id": "gid://shopify/AppCatalog/63489409069",
+                  "title": "Channel Catalog 148054310957 for Online Store",
+                  "status": "ACTIVE",
+                  "priceList": null,
+                  "publication": {
+                    "id": "gid://shopify/Publication/148054310957"
+                  }
+                },
+                {
+                  "__typename": "AppCatalog",
+                  "id": "gid://shopify/AppCatalog/63489474605",
+                  "title": "Channel Catalog 148054376493 for Shop",
+                  "status": "ACTIVE",
+                  "priceList": null,
+                  "publication": {
+                    "id": "gid://shopify/Publication/148054376493"
+                  }
+                },
+                {
+                  "__typename": "AppCatalog",
+                  "id": "gid://shopify/AppCatalog/63489507373",
+                  "title": "Channel Catalog 148054409261 for Point of Sale",
+                  "status": "ACTIVE",
+                  "priceList": null,
+                  "publication": {
+                    "id": "gid://shopify/Publication/148054409261"
+                  }
+                },
+                {
+                  "__typename": "MarketCatalog",
+                  "id": "gid://shopify/MarketCatalog/63489638445",
+                  "title": "Mexico",
+                  "status": "ACTIVE",
+                  "priceList": {
+                    "id": "gid://shopify/PriceList/27592228909",
+                    "currency": "MXN"
+                  },
+                  "publication": {
+                    "id": "gid://shopify/Publication/148054573101"
+                  }
+                },
+                {
+                  "__typename": "CompanyLocationCatalog",
+                  "id": "gid://shopify/CompanyLocationCatalog/114289672237",
+                  "title": "Snowdevil B2B (test)",
+                  "status": "ACTIVE",
+                  "priceList": {
+                    "id": "gid://shopify/PriceList/28232679469",
+                    "currency": "USD"
+                  },
+                  "publication": {
+                    "id": "gid://shopify/Publication/216329158701"
+                  }
+                }
+              ],
+              "pageInfo": {
+                "hasNextPage": false
+              }
+            }
+          }

@@ -1,0 +1,71 @@
+info:
+  name: variant counts
+  type: graphql
+  seq: 12
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query VariantCounts {
+        all: productVariantsCount(limit: null) { count precision }
+        updatedSinceDefaultStart: productVariantsCount(
+          limit: null
+          query: "updated_at:>='2026-10-14T00:00:00Z'"
+        ) { count precision }
+        updatedInFuture: productVariantsCount(
+          limit: null
+          query: "updated_at:>='2030-01-01T00:00:00Z'"
+        ) { count precision }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [productVariantsCount](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/productVariantsCount)
+
+  **WHY:** the total variant count, which `Pricing / price list prices`
+  compares a price list's rows against, and a check that the count query
+  honors `updated_at` like `productVariants` does.
+
+  **LIMITATION (VERIFIED 2026-11-13):** `productVariantsCount` ignores
+  `updated_at`: the 2030 bound still counts all 27 variants. Its docs list
+  only `created_at`. Count changed variants with `Pricing / updated at
+  filter` instead. `all` (27; `limit: null` lifts the default 10,000 cap) is
+  the count `Pricing / price list prices` compares against.
+
+examples:
+  - name: "200 - updated_at ignored (data only)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "all": {
+              "count": 27,
+              "precision": "EXACT"
+            },
+            "updatedSinceDefaultStart": {
+              "count": 27,
+              "precision": "EXACT"
+            },
+            "updatedInFuture": {
+              "count": 27,
+              "precision": "EXACT"
+            }
+          }

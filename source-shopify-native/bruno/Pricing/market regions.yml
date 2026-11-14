@@ -1,0 +1,141 @@
+info:
+  name: market regions
+  type: graphql
+  seq: 17
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query MarketRegions {
+        regionTypes: __type(name: "MarketRegion") {
+          kind
+          fields { name }
+          possibleTypes { name }
+        }
+        conditionsType: __type(name: "MarketConditions") {
+          fields { name type { kind name ofType { name } } }
+        }
+        marketConditionsField: __type(name: "Market") {
+          fields { name type { kind name ofType { name } } }
+        }
+        markets(first: 25) {
+          nodes {
+            name
+            conditions {
+              conditionTypes
+              regionsCondition {
+                regions(first: 250) {
+                  nodes {
+                    __typename
+                    id
+                    name
+                    ... on MarketRegionCountry { code }
+                  }
+                  pageInfo { hasNextPage }
+                }
+              }
+            }
+          }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [MarketConditions](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/MarketConditions) and [MarketRegionCountry](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/MarketRegionCountry)
+
+  **WHY:** the `markets` stream captures each market's countries from
+  `conditions.regionsCondition.regions`. `RegionsCondition` isn't a Node, so
+  the connector can't page past the first page. This checks that one page
+  always holds every region, and which fields on the way can be null.
+
+  **VERIFIED (2026-11-16):**
+  - `MarketRegion`'s only type is `MarketRegionCountry`, so every region is a
+    country. Shopify has 245 country codes (`Pricing / country codes`), so
+    `regions(first: 250)` holds all of a market's regions.
+  - `Market.conditions` and `MarketConditions.regionsCondition` are both
+    nullable.
+  - International covers 27 countries, Mexico only MX and United States only
+    US. None reports `hasNextPage`.
+
+examples:
+  - name: "200 - region types, nullability and counts (projection)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "MarketRegion.possibleTypes": [
+              "MarketRegionCountry"
+            ],
+            "Market.conditions": {
+              "kind": "OBJECT",
+              "name": "MarketConditions",
+              "ofType": null
+            },
+            "MarketConditions.regionsCondition": {
+              "kind": "OBJECT",
+              "name": "RegionsCondition",
+              "ofType": null
+            },
+            "markets": [
+              {
+                "name": "International",
+                "conditionTypes": [
+                  "REGION"
+                ],
+                "regionCount": 27,
+                "hasNextPage": false,
+                "firstRegion": {
+                  "__typename": "MarketRegionCountry",
+                  "id": "gid://shopify/MarketRegionCountry/2739687292973",
+                  "name": "United Arab Emirates",
+                  "code": "AE"
+                }
+              },
+              {
+                "name": "Mexico",
+                "conditionTypes": [
+                  "REGION"
+                ],
+                "regionCount": 1,
+                "hasNextPage": false,
+                "firstRegion": {
+                  "__typename": "MarketRegionCountry",
+                  "id": "gid://shopify/MarketRegionCountry/2739688210477",
+                  "name": "Mexico",
+                  "code": "MX"
+                }
+              },
+              {
+                "name": "United States",
+                "conditionTypes": [
+                  "REGION"
+                ],
+                "regionCount": 1,
+                "hasNextPage": false,
+                "firstRegion": {
+                  "__typename": "MarketRegionCountry",
+                  "id": "gid://shopify/MarketRegionCountry/2739687260205",
+                  "name": "United States",
+                  "code": "US"
+                }
+              }
+            ]
+          }

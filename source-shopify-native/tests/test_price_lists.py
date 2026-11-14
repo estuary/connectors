@@ -78,7 +78,7 @@ async def test_price_lists_snapshot_reads_every_page(log):
     client = _MockClient(
         [
             _page([_price_list(1, market_catalog)], end_cursor="c1"),
-            # A price list can have no catalog.
+            # A price list can have no catalog (Bruno `Pricing / price lists`).
             _page([_price_list(2, None)]),
         ]
     )
@@ -144,7 +144,7 @@ def test_price_list_prices_query_pages_one_price_list():
 @pytest.mark.asyncio
 async def test_price_list_prices_reads_every_price_of_every_list(log):
     fixed = _price(7, "FIXED", _money("11000.0", "MXN"), _money("15000.0", "MXN"))
-    # RELATIVE prices stay in the store's currency.
+    # RELATIVE prices stay in the store's currency (Bruno `Pricing / price list prices`).
     relative = _price(9, "RELATIVE", _money("9.5", "USD"), None)
     client = _MockClient(
         [
