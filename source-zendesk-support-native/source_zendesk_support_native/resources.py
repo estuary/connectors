@@ -43,6 +43,7 @@ from .models import (
     TALK_INCREMENTAL_EXPORT_RESOURCES,
     OAUTH2_SPEC,
     TICKET_CHILD_RESOURCES,
+    USE_LIST_ENDPOINTS,
     TicketMetricEventsResponse,
     POST_CHILD_RESOURCES,
     TicketsListResponse,
@@ -829,8 +830,6 @@ def incremental_time_export_resources(
     return resources
 
 
-# Nothing calls this yet. A later PR adds the feature flag that switches
-# organizations from the time-based export to these resources (#5357).
 def incremental_keyset_paginated_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -931,8 +930,6 @@ def _migrate_export_state_to_keyset(
     return migrated
 
 
-# Nothing calls this yet. A later PR adds the feature flag that switches
-# users from the cursor-based export to this resource (#5357).
 def users(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> common.Resource:
@@ -1015,8 +1012,6 @@ def users(
     )
 
 
-# Nothing calls this yet. A later PR adds the feature flag that switches
-# tickets from the cursor-based export to this resource (#5357).
 def tickets(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> common.Resource:
@@ -1130,8 +1125,6 @@ def _migrate_export_cursor_to_keyset(state: ResourceState, margin: timedelta) ->
     return migrated
 
 
-# Nothing calls this yet. A later PR adds the feature flag that switches the
-# ticket child streams from the cursor-based export to these resources (#5357).
 def incremental_keyset_paginated_ticket_child_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -1239,8 +1232,6 @@ def incremental_keyset_paginated_ticket_child_resources(
     ]
 
 
-# Nothing calls this yet. A later PR adds the feature flag that switches
-# ticket_metric_events from its incremental export to this resource (#5357).
 def incremental_keyset_paginated_ticket_metric_events(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> common.Resource:
@@ -1727,9 +1718,27 @@ def post_comment_votes(
 def _generate_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig,
 ) -> list[common.Resource]:
+    # The streams whose incremental exports Zendesk is ending.
+    if config.advanced.flag(USE_LIST_ENDPOINTS):
+        affected_resources = [
+            *incremental_keyset_paginated_resources(log, http, config),
+            users(log, http, config),
+            tickets(log, http, config),
+            *incremental_keyset_paginated_ticket_child_resources(log, http, config),
+            incremental_keyset_paginated_ticket_metric_events(log, http, config),
+        ]
+    else:
+        affected_resources = [
+            *incremental_time_export_resources(log, http, config),
+            *incremental_cursor_export_resources(log, http, config),
+            *ticket_child_resources(log, http, config),
+            side_conversations(log, http, config),
+            ticket_metrics(log, http, config),
+            ticket_metric_events(log, http, config),
+        ]
+
     return [
         audit_logs(log, http, config),
-        ticket_metrics(log, http, config),
         *full_refresh_resources(log, http, config),
         *full_refresh_offset_paginated_resources(log, http, config),
         *full_refresh_cursor_paginated_resources(log, http, config),
@@ -1737,14 +1746,10 @@ def _generate_resources(
         *client_side_filtered_cursor_paginated_resources(log, http, config),
         satisfaction_ratings(log, http, config),
         *incremental_cursor_paginated_resources(log, http, config),
-        ticket_metric_events(log, http, config),
-        *incremental_time_export_resources(log, http, config),
         *talk_incremental_export_resources(log, http, config),
-        *incremental_cursor_export_resources(log, http, config),
-        *ticket_child_resources(log, http, config),
-        side_conversations(log, http, config),
         *post_child_resources(log, http, config),
         post_comment_votes(log, http, config),
+        *affected_resources,
     ]
 
 
