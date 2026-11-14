@@ -31,7 +31,10 @@ The following data resources are supported through the Shopify API:
    * Order Risks
    * Order Shipping Lines
    * Order Transactions
+* [Price Lists](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/priceLists)
+   * Price List Prices
 * [Product Variants](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/productvariants)
+   * Product Variant Contextual Pricing
 * [Products](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/products)
    * Product Media
    * Product Metafields
@@ -114,6 +117,7 @@ you'll sign in directly and won't need the access token.
 | `/advanced/window_size` | Window Size | Window size for incremental streams in ISO 8601 format (e.g., P30D means 30 days, PT6H means 6 hours). | string | P30D |
 | `/advanced/should_use_composite_key` | Use Composite Key | Include store identifier (`/_meta/store`) in collection keys. Enabled by default for new captures. Set to `true` and backfill all bindings before adding stores to a legacy capture. | boolean | `true` (new) / `false` (legacy) |
 | `/advanced/max_concurrent_bulk_ops` | Max Concurrent Bulk Operations | Maximum number of bulk query operations the connector runs at the same time for each store, from 1 to 5. Lower it to leave slots free for other systems that submit bulk queries through the same app. See [Bulk Query Operation Limitations](#bulk-query-operation-limitations). | integer | 5 |
+| `/advanced/contextual_pricing_countries` | Contextual Pricing Countries | Two-letter country codes, such as `GB`, to capture each product variant's price and compare-at price in. Listing a country adds the `product_variant_contextual_pricing` stream. Up to 50 countries. | array | `[]` |
 
 **Credential properties for Private App Credentials:**
 
