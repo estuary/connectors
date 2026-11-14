@@ -4,6 +4,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from logging import Logger
+from typing import cast
 
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import (
@@ -35,9 +36,11 @@ from .api import (
     fetch_incremental,
     fetch_incremental_unsorted,
     fetch_snapshot,
+    snapshot_price_list_prices,
 )
 from .models import (
     AccessScopes,
+    BaseResponseData,
     ConnectorState,
     CountryCodes,
     EndpointConfig,
@@ -187,6 +190,7 @@ FULL_REFRESH_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.StaffMembers,
     gql.Markets,
     gql.PriceLists,
+    gql.PriceListPrices,
 ]
 
 
@@ -749,7 +753,15 @@ def _build_snapshot_resource(
         tombstones: dict[str, ShopifyDocument] = {}
         for store_id in stores_with_access:
             ctx = store_contexts[store_id]
-            if model.SHOULD_USE_BULK_QUERIES:
+            if model is gql.PriceListPrices:
+                fetch_snapshot_fns[store_id] = functools.partial(
+                    snapshot_price_list_prices,
+                    ctx.client,
+                    cast(type[BaseResponseData[gql.PriceListPrices]], data_model),
+                    store_id,
+                    ctx.capabilities,
+                )
+            elif model.SHOULD_USE_BULK_QUERIES:
                 fetch_snapshot_fns[store_id] = functools.partial(
                     bulk_fetch_snapshot,
                     ctx.http,
