@@ -664,6 +664,8 @@ class ShopifyGraphQLResource(ShopifyDocument):
     QUALIFYING_SCOPES: ClassVar[set[str]] = set()
     # Cron expression driving a periodic re-initialization of this stream's binding.
     BACKFILL_SCHEDULE: ClassVar[str] = ""
+    # Default interval between snapshots of a full-refresh stream.
+    SNAPSHOT_INTERVAL: ClassVar[timedelta] = timedelta(minutes=15)
     # Some resources are only queryable on Shopify Plus / Advanced plans or
     # partner dev stores regardless of granted scopes.
     REQUIRES_PLUS_OR_ADVANCED_PLAN: ClassVar[bool] = False

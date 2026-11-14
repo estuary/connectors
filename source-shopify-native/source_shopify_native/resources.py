@@ -792,7 +792,7 @@ def _build_snapshot_resource(
         open=open,
         initial_config=ResourceConfigWithSchedule(
             name=model.NAME,
-            interval=timedelta(minutes=15)
+            interval=model.SNAPSHOT_INTERVAL,
         ),
     )
 
