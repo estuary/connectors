@@ -167,6 +167,9 @@ class Orders(ShopifyGraphQLResource):
                 ... on AutomaticDiscountApplication {
                     title
                 }
+                ... on DiscountCodeApplication {
+                    code
+                }
                 ... on ManualDiscountApplication {
                     title
                 }
