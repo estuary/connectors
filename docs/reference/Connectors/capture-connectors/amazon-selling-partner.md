@@ -76,6 +76,7 @@ Schema inference fills in other fields.
 - `catalog_items` gets ASINs from the All Listings Report (`GET_MERCHANT_LISTINGS_ALL_DATA`) for each marketplace.
   It looks up catalog summaries with `searchCatalogItems` and includes seller SKUs, listing status and refresh time.
   It refreshes daily by default, and its interval must be at least three hours.
+  At about 3 million listed ASINs across marketplaces, a refresh can exceed the daily 24-hour restart and repeatedly lose its progress, because it is checkpointed only when complete.
   ASINs the catalog lookup does not return are not captured.
   An ASIN that drops out of the All Listings Report is not deleted: its document keeps the values from its last refresh.
 - Sandbox mode skips the marketplace participation check after testing credentials.
@@ -154,7 +155,7 @@ The values and sample below provide configuration details for this connector.
 | **`/credentials/refresh_token`**                   | Refresh Token                    | The refresh token issued when the selling account authorized the application.                                                               | string  | Required         |
 | **`/region`**                                      | Region                           | The SP-API region of the selling account: `North America`, `Europe` or `Far East`.                                                          | string  | Required         |
 | **`/marketplace_ids`**                             | Marketplace IDs                  | 1 to 50 unique marketplace IDs, such as `ATVPDKIKX0DER` for Amazon.com. All must belong to the selected region. `all_orders` allows at most 25.                           | array   | Required         |
-| `/start_date`                                      | Start Date                       | UTC date and time for historical capture. If omitted, UTC midnight 30 days before each stream first starts backfilling. Catalog refreshes do not use it.          | string  | 30 days ago      |
+| `/start_date`                                      | Start Date                       | UTC date and time bounding the backfill; older records that change after the capture starts are still captured. If omitted, UTC midnight 30 days before each stream first starts backfilling. Catalog refreshes do not use it.          | string  | 30 days ago      |
 | `/advanced/window_size`                            | Window Size                      | Date window size for orders and financial transactions. ISO 8601 duration from `PT1H` to `P30D`, inclusive.                                        | string  | P1D              |
 | `/advanced/overlap`                                | Incremental Overlap              | How far incremental order requests reach back to catch late search results. ISO 8601 duration from zero (`PT0S`) to `PT1H`, inclusive.                   | string  | PT10M            |
 | `/advanced/orders_lookback`                        | Orders Lookback                  | How old each order update must be before the daily orders sweep reads it again, to catch orders Amazon makes searchable late. ISO 8601 duration of at least `PT1H`. | string  | PT48H            |

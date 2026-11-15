@@ -80,3 +80,21 @@ async def test_client_ignores_garbled_rate_header():
 
     await client.get(LOG, Operation.GET_MARKETPLACE_PARTICIPATIONS, "/sellers/v1/marketplaceParticipations", {}, Priority.INCREMENTAL)
     assert client.bucket(Operation.GET_MARKETPLACE_PARTICIPATIONS).rate == pytest.approx(0.016)
+
+
+@pytest.mark.asyncio
+async def test_download_has_no_total_timeout(monkeypatch: pytest.MonkeyPatch):
+    from unittest.mock import AsyncMock
+    from math import isfinite
+
+    fake = FakeAmazon(now=NOW, orders=[])
+    client = SPAPIClient(http=fake, base_url="https://fake")  # type: ignore[arg-type]
+    request = AsyncMock(return_value=({}, None))
+    monkeypatch.setattr(fake, "request_stream", request)
+    await client.download(LOG, "https://fake/report", "report")
+    kwargs = request.call_args.kwargs
+    assert kwargs["with_token"] is False
+    timeout = kwargs["timeout"]
+    assert timeout.total is None
+    assert timeout.sock_connect == 60
+    assert timeout.sock_read > 0 and isfinite(timeout.sock_read)

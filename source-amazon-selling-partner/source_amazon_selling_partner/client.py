@@ -6,6 +6,8 @@ from logging import Logger
 from typing import Any, Awaitable, Callable
 from urllib.parse import urlsplit
 
+import aiohttp
+
 from estuary_cdk.http import BodyGeneratorFunction, Headers, HTTPError, HTTPSession
 
 
@@ -241,7 +243,10 @@ class SPAPIClient:
         # reaches here, and can't be told not to. Only the URL's expiry,
         # five minutes after it is issued, limits that exposure.
         try:
-            return await self.http.request_stream(log, url, with_token=False)
+            return await self.http.request_stream(
+                log, url, with_token=False,
+                timeout=aiohttp.ClientTimeout(total=None, sock_connect=60, sock_read=300),
+            )
         except HTTPError as err:
             parts = urlsplit(url)
             raise HTTPError(

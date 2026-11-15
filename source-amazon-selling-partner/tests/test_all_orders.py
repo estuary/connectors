@@ -251,11 +251,9 @@ async def test_a_restart_reads_the_done_report_again_without_requesting_another(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("echoed_shift", ["echoed_start_shift", "echoed_end_shift"])
-@pytest.mark.parametrize("seconds", [1, -1])
+@pytest.mark.parametrize("echoed_shift,seconds", [("echoed_start_shift", 1), ("echoed_end_shift", -1)])
 async def test_a_report_amazon_lists_with_another_range_fails(echoed_shift: str, seconds: int):
-    # A report this call created must end where it was asked to, even
-    # though a report requested before may end short of the request.
+    # A created report must cover the full requested range.
     shift: dict[str, Any] = {echoed_shift: timedelta(seconds=seconds)}
     fake = FakeAmazon(now=NOW, orders=[], lifecycles=[["CANCELLED"]] * 3, **shift)
     client, _ = client_with(fake)
@@ -987,3 +985,39 @@ async def test_all_orders_refuses_an_interval_under_an_hour(monkeypatch: pytest.
         await validate(monkeypatch, MARKETPLACES, OrdersResourceConfig(name="all_orders", interval=timedelta(minutes=5)))
 
     await validate(monkeypatch, MARKETPLACES, OrdersResourceConfig(name="all_orders", interval=DAY))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("created", [True, False])
+@pytest.mark.parametrize("start_delta,end_delta", [(-1, 1), (1, -1), (1, 1), (-1, -1)])
+async def test_report_echo_range(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, created: bool, start_delta: int, end_delta: int):
+    request = request_for(HORIZON - DAY, HORIZON)
+    fake = FakeAmazon(now=NOW, orders=[])
+    fake.reports.append(requested("echo", request, "IN_PROGRESS", NOW))
+    fake.script("echo", ["IN_PROGRESS", "DONE"])
+    get_report = reports.get_report
+
+    async def normalized_echo(*args: *tuple[logging.Logger, SPAPIClient, str, Priority]):
+        report = await get_report(*args)
+        return report.model_copy(update={
+            "dataStartTime": request.data_start + timedelta(hours=start_delta),
+            "dataEndTime": request.data_end + timedelta(hours=end_delta),
+        })
+
+    monkeypatch.setattr(reports, "get_report", normalized_echo)
+    client, _ = client_with(fake)
+    if created and start_delta < 0 and end_delta > 0:
+        report = await reports._wait_for(LOG, client, "echo", request, Priority.INCREMENTAL, created=created)  # pyright: ignore[reportPrivateUsage]
+        # The returned bounds stay at the request, so cursors don't jump ahead.
+        assert (report.dataStartTime, report.dataEndTime) == (request.data_start, request.data_end)
+        [warning] = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert warning.message == "created report echoes a wider date range than requested"
+        assert warning.args == {
+            "report_id": "echo", "requested_start": request.data_start, "requested_end": request.data_end,
+            "echoed_start": request.data_start - timedelta(hours=1),
+            "echoed_end": request.data_end + timedelta(hours=1),
+        }
+        assert len(fake.get_report_requests) == 2
+    else:
+        with pytest.raises(ReportMismatch):
+            await reports._wait_for(LOG, client, "echo", request, Priority.INCREMENTAL, created=created)  # pyright: ignore[reportPrivateUsage]

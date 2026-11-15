@@ -703,3 +703,48 @@ async def test_backfill_single_page_growth_requires_at_most_half_a_page(count: i
     out = await collect(backfill_orders(client_for(fake), MARKETPLACES, start, timedelta(days=1), LOG, None, NOW - timedelta(days=1)))
     assert len(fake.requests) == 1
     assert out[-1].split("|")[1] == str(timedelta(days=next_days).total_seconds())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("backfill", [True, False])
+@pytest.mark.parametrize("span", [timedelta(days=2), timedelta(minutes=90), timedelta(hours=1), timedelta(minutes=30)])
+async def test_orders_window_time_budget(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, backfill: bool, span: timedelta):
+    start = NOW - timedelta(days=3)
+    time = FakeTime()
+    fake = FakeAmazon(now=NOW, orders=[])
+    client = SPAPIClient(http=fake, base_url="https://fake", clock=time.clock, sleep=time.sleep)  # type: ignore[arg-type]
+    attempts: list[dict[str, str]] = []
+
+    async def slow_search(log: logging.Logger, client: SPAPIClient, marketplace_ids: list[str], params: dict[str, str], priority: api.Priority):
+        attempts.append(params)
+        yield Order.model_validate(order("first", start, start))
+        if len(attempts) == 1:
+            time.t += api.ORDERS_WINDOW_TIME_BUDGET.total_seconds() + 1
+        yield Order.model_validate(order("last", start, start))
+
+    monkeypatch.setattr(api, "_search_orders", slow_search)
+    gen = (backfill_orders(client, MARKETPLACES, start, span, LOG, None, NOW - timedelta(hours=1))
+           if backfill else fetch_orders(client, MARKETPLACES, span, timedelta(), LOG, start))
+    if span <= timedelta(hours=1):
+        with pytest.raises(RuntimeError, match="within.*budget; lower Window Size"):
+            await collect(gen)
+        assert len(attempts) == 1
+        return
+
+    out = await collect(gen)
+    end = start + span - (api.TICK if backfill else timedelta())
+    smaller_end = api.floor_to_tick(max(start + (end - start) / 2, start + timedelta(hours=1)))
+    assert "10:00:00 budget" in caplog.text
+    if backfill:
+        assert len(attempts) == 1
+        assert [o.orderId for o in out if isinstance(o, Order)] == ["first"]
+        assert out[-1] == f"{api.to_iso(start)}|{(smaller_end + api.TICK - start).total_seconds()}|{span.total_seconds()}"
+        resumed = await collect(backfill_orders(client, MARKETPLACES, start, span, LOG, out[-1], NOW - timedelta(hours=1)))
+        assert attempts[1][Order.CREATED_SINCE_PARAM] == api.to_iso(start)
+        assert attempts[1][Order.CREATED_BEFORE_PARAM] == api.to_iso(smaller_end)
+        assert [o.orderId for o in resumed if isinstance(o, Order)] == ["first", "last"]
+    else:
+        assert len(attempts) == 2
+        assert attempts[1][Order.BEFORE_PARAM] == api.to_iso(smaller_end)
+        assert [o.orderId for o in out if isinstance(o, Order)] == ["first", "first", "last"]
+        assert out[-1] == smaller_end

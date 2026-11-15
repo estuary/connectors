@@ -56,8 +56,9 @@ MIN_INCREMENTAL_WINDOW = timedelta(minutes=5)
 
 # At about 180s/page, a 24h token permits about 480 pages, or 48,000 orders
 # at Order.PAGE_SIZE (100, assumed). Grow only from windows with at most
-# half a page of orders, capped at 30 days; paging must finish within 24h.
+# half a page of orders, capped at 30 days; slower windows are halved.
 MAX_ORDERS_BACKFILL_WINDOW = timedelta(days=30)
+ORDERS_WINDOW_TIME_BUDGET = timedelta(hours=10)
 
 # How far behind the present the realtime pass over financial transactions
 # stays. Amazon says financial events may take up to 48 hours to appear; the
@@ -157,6 +158,10 @@ def to_iso(dt: datetime) -> str:
 
 class PaginationTokenRejected(RuntimeError):
     """Amazon rejected a pagination token, most likely because it expired."""
+
+
+class OrdersWindowTimedOut(RuntimeError):
+    """Paging an orders window exceeded ORDERS_WINDOW_TIME_BUDGET."""
 
 
 async def _search_orders(
@@ -278,7 +283,7 @@ async def _orders_updated_window(
     """Yields a complete updated-time window and its inclusive end."""
     while True:
         # Time only the attempt that finished, so a rejected one doesn't skew the rate.
-        started = monotonic()
+        started = client.clock()
         request_params = {
             Order.SINCE_PARAM: to_iso(cursor + TICK - overlap),
             Order.BEFORE_PARAM: to_iso(window_end),
@@ -289,6 +294,8 @@ async def _orders_updated_window(
             async for item in _search_orders(
                 log, client, marketplace_ids, request_params, priority
             ):
+                if client.clock() - started > ORDERS_WINDOW_TIME_BUDGET.total_seconds():
+                    raise OrdersWindowTimedOut
                 if isinstance(item, Order):
                     count += 1
                     yield item
@@ -305,14 +312,21 @@ async def _orders_updated_window(
                         {"requested_end": window_end, "searched_end": searched},
                     )
                     window_end = searched
-        except PaginationTokenRejected:
+        except (PaginationTokenRejected, OrdersWindowTimedOut) as err:
             if window_end - cursor <= timedelta(hours=1):
+                if isinstance(err, OrdersWindowTimedOut):
+                    raise RuntimeError(
+                        f"Orders window could not be paged within the {ORDERS_WINDOW_TIME_BUDGET} "
+                        "budget; lower Window Size."
+                    ) from err
                 raise
             smaller_end = floor_to_tick(max(
                 cursor + (window_end - cursor) / 2, cursor + timedelta(hours=1)
             ))
             log.warning(
-                "shrinking an orders window after Amazon rejected its pagination token",
+                (f"shrinking an orders window after exceeding the {ORDERS_WINDOW_TIME_BUDGET} budget"
+                 if isinstance(err, OrdersWindowTimedOut) else
+                 "shrinking an orders window after Amazon rejected its pagination token"),
                 {"window_start": cursor, "window_end": window_end, "new_window_end": smaller_end},
             )
             # Re-emitting orders is safe: the collection reduces by lastUpdatedTime.
@@ -334,7 +348,7 @@ async def _orders_updated_window(
                 "window_end": window_end,
                 "count": count,
                 "window_seconds": (window_end - cursor).total_seconds(),
-                "elapsed_seconds": monotonic() - started,
+                "elapsed_seconds": client.clock() - started,
             },
         )
     yield window_end
@@ -403,8 +417,8 @@ async def backfill_orders(
     ISO 8601 string uses window_size; a two-part cursor carries its size with
     the current configuration. Windows with at most half a page of orders
     double the size, capped at 30 days or the configured size if larger.
-    Denser windows keep it. Rejected pagination tokens
-    halve the window, down to a one-hour floor, and carry the shrunk size
+    Denser windows keep it. Rejected pagination tokens and attempts over
+    the time budget halve the window, down to a one-hour floor, and carry the shrunk size
     into the next invocation before allowing growth again.
 
     ```
@@ -422,8 +436,9 @@ async def backfill_orders(
 
     Both bounds are inclusive. Creation time never changes, so a window's
     membership is fixed and resuming from its start is safe. Nothing is
-    checkpointed until a window is fully paged, so a restart mid-window
-    re-requests it from its first page. Orders updated
+    checkpointed until a window is fully paged or exceeds the time budget;
+    exceeding the budget saves a smaller size at the same start and returns.
+    A restart mid-window re-requests it from its first page. Orders updated
     after the cutoff are captured again by the incremental task. A window can
     commit after the incremental task has committed a newer copy of one of its
     orders; the collection keeps the copy with the latest `lastUpdatedTime`,
@@ -457,7 +472,7 @@ async def backfill_orders(
         await asyncio.sleep(wait)
 
     while True:
-        started = monotonic()
+        started = client.clock()
         request_params = {
             Order.CREATED_SINCE_PARAM: to_iso(window_start),
             Order.CREATED_BEFORE_PARAM: to_iso(window_end),
@@ -468,6 +483,8 @@ async def backfill_orders(
             async for item in _search_orders(
                 log, client, marketplace_ids, request_params, Priority.BACKFILL
             ):
+                if client.clock() - started > ORDERS_WINDOW_TIME_BUDGET.total_seconds():
+                    raise OrdersWindowTimedOut
                 if isinstance(item, Order):
                     count += 1
                     yield item
@@ -484,19 +501,29 @@ async def backfill_orders(
                         {"requested_end": window_end, "searched_end": searched},
                     )
                     window_end = searched
-        except PaginationTokenRejected:
+        except (PaginationTokenRejected, OrdersWindowTimedOut) as err:
             if window_end - window_start <= timedelta(hours=1):
+                if isinstance(err, OrdersWindowTimedOut):
+                    raise RuntimeError(
+                        f"Orders window could not be paged within the {ORDERS_WINDOW_TIME_BUDGET} "
+                        "budget; lower Window Size."
+                    ) from err
                 raise
             smaller_end = floor_to_tick(max(
                 window_start + (window_end - window_start) / 2, window_start + timedelta(hours=1)
             ))
             log.warning(
-                "shrinking an orders window after Amazon rejected its pagination token",
+                (f"shrinking an orders window after exceeding the {ORDERS_WINDOW_TIME_BUDGET} budget"
+                 if isinstance(err, OrdersWindowTimedOut) else
+                 "shrinking an orders window after Amazon rejected its pagination token"),
                 {"window_start": window_start, "window_end": window_end, "new_window_end": smaller_end},
             )
             # Re-emitting orders is safe: the collection reduces by lastUpdatedTime.
             window_end = smaller_end
             current_size = window_end + TICK - window_start
+            if isinstance(err, OrdersWindowTimedOut):
+                yield f"{to_iso(window_start)}|{current_size.total_seconds()}|{window_size.total_seconds()}"
+                return
             shrunk = True
             continue
         break
@@ -508,7 +535,7 @@ async def backfill_orders(
             "window_end": window_end,
             "count": count,
             "window_seconds": (window_end + TICK - window_start).total_seconds(),
-            "elapsed_seconds": monotonic() - started,
+            "elapsed_seconds": client.clock() - started,
         },
     )
 

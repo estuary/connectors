@@ -346,10 +346,33 @@ async def _wait_for(
     started = client.clock()
     delays = iter(FIRST_POLL_DELAYS)
     warned_missing = False
+    warned_range = False
     while True:
         await client.sleep(next(delays, POLL_INTERVAL).total_seconds())
         report = await get_report(log, client, report_id, priority)
-        if not request.made(report, allow_missing=created):
+        matches = request.made(report, allow_missing=created)
+        if created and not matches:
+            covers = (
+                report.reportType == request.report_type
+                and (report.marketplaceIds is None or sorted(report.marketplaceIds) == sorted(request.marketplace_ids))
+                and (report.dataStartTime is None or report.dataStartTime <= request.data_start)
+                and (report.dataEndTime is None or report.dataEndTime >= request.data_end)
+            )
+            if covers:
+                matches = True
+                if not warned_range:
+                    log.warning(
+                        "created report echoes a wider date range than requested",
+                        {
+                            "report_id": report_id,
+                            "requested_start": request.data_start,
+                            "requested_end": request.data_end,
+                            "echoed_start": report.dataStartTime,
+                            "echoed_end": report.dataEndTime,
+                        },
+                    )
+                    warned_range = True
+        if report.reportType != request.report_type or not matches:
             raise ReportMismatch(
                 f"Amazon lists report {report_id} as {report.reportType} "
                 f"{report.marketplaceIds} {report.dataStartTime}..{report.dataEndTime}, "
@@ -378,6 +401,12 @@ async def _wait_for(
                     )
                     if getattr(report, name) is None
                 })
+                if warned_range:
+                    # Keep cursors at the requested end, not a wider echo.
+                    report = report.model_copy(update={
+                        "dataStartTime": request.data_start,
+                        "dataEndTime": request.data_end,
+                    })
             return report
         if client.clock() - started >= REPORT_TIMEOUT.total_seconds():
             raise ReportTimedOut(
