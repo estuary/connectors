@@ -281,8 +281,10 @@ async def _orders_updated_window(
     priority: Priority,
 ) -> AsyncGenerator[Order | datetime, None]:
     """Yields a complete updated-time window and its inclusive end."""
-    # Each retry gets half the previous budget, so all attempts fit in 20 hours.
+    # Each retry after an overrun gets half the previous budget, and all
+    # attempts, token rejections included, end within twice the budget.
     budget = ORDERS_WINDOW_TIME_BUDGET.total_seconds()
+    deadline = client.clock() + 2 * budget
     while True:
         # Time only the attempt that finished, so a rejected one doesn't skew the rate.
         started = client.clock()
@@ -296,6 +298,11 @@ async def _orders_updated_window(
             async for item in _search_orders(
                 log, client, marketplace_ids, request_params, priority
             ):
+                if client.clock() > deadline:
+                    raise RuntimeError(
+                        f"Orders window retries took over {2 * ORDERS_WINDOW_TIME_BUDGET}; "
+                        "lower Window Size, to PT1H if needed."
+                    )
                 if client.clock() - started > budget:
                     raise OrdersWindowTimedOut
                 if isinstance(item, Order):
@@ -319,7 +326,7 @@ async def _orders_updated_window(
                 if isinstance(err, OrdersWindowTimedOut):
                     raise RuntimeError(
                         f"Orders window could not be paged within the {timedelta(seconds=budget)} "
-                        "budget; lower Window Size."
+                        "budget; lower Window Size, to PT1H if needed."
                     ) from err
                 raise
             # Over budget, quarter the window as the budget halves, so an
@@ -338,6 +345,9 @@ async def _orders_updated_window(
             window_end = smaller_end
             if isinstance(err, OrdersWindowTimedOut):
                 budget /= 2
+            if window_end - cursor <= timedelta(hours=1):
+                # The one-hour floor gets what is left of the deadline.
+                budget = max(budget, deadline - client.clock())
             continue
         break
 

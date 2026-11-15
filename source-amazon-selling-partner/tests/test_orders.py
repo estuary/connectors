@@ -780,3 +780,60 @@ async def test_realtime_retries_fit_an_evenly_busy_window(monkeypatch: pytest.Mo
         max(api.floor_to_tick(start + (prev - start) / 4) - start, timedelta(hours=1))
         for prev in attempts[:-1]
     ]
+
+
+@pytest.mark.asyncio
+async def test_realtime_token_rejections_count_against_the_deadline(monkeypatch: pytest.MonkeyPatch):
+    # Slow attempts ending in token rejections stop at the 20-hour deadline.
+    start = NOW - timedelta(days=3)
+    time = FakeTime()
+    fake = FakeAmazon(now=NOW, orders=[])
+    client = SPAPIClient(http=fake, base_url="https://fake", clock=time.clock, sleep=time.sleep)  # type: ignore[arg-type]
+    step = 9 * 3600 / 100
+    attempts: list[dict[str, str]] = []
+
+    async def rejecting_search(log: logging.Logger, client: SPAPIClient, marketplace_ids: list[str], params: dict[str, str], priority: api.Priority):
+        attempts.append(params)
+        for _ in range(100):
+            yield Order.model_validate(order("o", start, start))
+            time.t += step
+        raise api.PaginationTokenRejected("expired")
+
+    monkeypatch.setattr(api, "_search_orders", rejecting_search)
+    with pytest.raises(RuntimeError, match="retries took over 20:00:00; lower Window Size"):
+        await collect(fetch_orders(client, MARKETPLACES, timedelta(days=4), timedelta(), LOG, start))
+    assert len(attempts) == 3
+    assert time.t <= 2 * api.ORDERS_WINDOW_TIME_BUDGET.total_seconds() + step
+
+
+@pytest.mark.asyncio
+async def test_realtime_dense_first_hour_asks_for_pt1h(monkeypatch: pytest.MonkeyPatch):
+    # The first hour is dense (4h to page), the rest sparse (0.3h per hour).
+    start = NOW - timedelta(days=3)
+    time = FakeTime()
+    fake = FakeAmazon(now=NOW, orders=[])
+    client = SPAPIClient(http=fake, base_url="https://fake", clock=time.clock, sleep=time.sleep)  # type: ignore[arg-type]
+    attempts: list[datetime] = []
+
+    async def skewed_search(log: logging.Logger, client: SPAPIClient, marketplace_ids: list[str], params: dict[str, str], priority: api.Priority):
+        end = datetime.fromisoformat(params[Order.BEFORE_PARAM].replace("Z", "+00:00"))
+        attempts.append(end)
+        hours = (end - start) / timedelta(hours=1)
+        total = 4 * 3600 + max(hours - 1, 0) * 0.3 * 3600
+        for _ in range(100):
+            yield Order.model_validate(order("o", start, start))
+            time.t += total / 100
+
+    monkeypatch.setattr(api, "_search_orders", skewed_search)
+    # Halving can't fit this window; the error says how to fix it.
+    with pytest.raises(RuntimeError, match="lower Window Size, to PT1H if needed"):
+        await collect(fetch_orders(client, MARKETPLACES, timedelta(days=4), timedelta(), LOG, start))
+    assert attempts[-1] - start == timedelta(hours=1)
+    assert time.t <= 2 * api.ORDERS_WINDOW_TIME_BUDGET.total_seconds() + 4 * 3600 / 100
+
+    # With Window Size PT1H the first attempt has the full budget and finishes.
+    time.t = 0
+    attempts.clear()
+    out = await collect(fetch_orders(client, MARKETPLACES, timedelta(hours=1), timedelta(), LOG, start))
+    assert len(attempts) == 1
+    assert out[-1] == attempts[0]
