@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-16
+
+### Added
+- `orders` discount applications from discount codes now include `code`, the
+  discount code that was applied to the order.
+
 ## 2026-11-02
 
 ### Added
