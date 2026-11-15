@@ -164,6 +164,20 @@ class OrdersWindowTimedOut(RuntimeError):
     """Paging an orders window exceeded ORDERS_WINDOW_TIME_BUDGET."""
 
 
+def _more_pages(item: "Order | SearchOrdersResponse") -> bool:
+    """Whether paging continues after `item`; the last page's remainder is past the work."""
+    return isinstance(item, Order) or (
+        item.pagination is not None and item.pagination.nextToken is not None
+    )
+
+
+def _hour_too_dense(limit: timedelta) -> RuntimeError:
+    return RuntimeError(
+        f"One hour of orders could not be paged within {limit}; "
+        "Amazon's searchOrders rate is too low for this order volume."
+    )
+
+
 async def _search_orders(
     log: Logger,
     client: SPAPIClient,
@@ -285,6 +299,10 @@ async def _orders_updated_window(
     # attempts, token rejections included, end within twice the budget.
     budget = ORDERS_WINDOW_TIME_BUDGET.total_seconds()
     deadline = client.clock() + 2 * budget
+    # A window that starts at the one-hour floor can't shrink, so it gets all of it.
+    started_small = window_end - cursor <= timedelta(hours=1)
+    if started_small:
+        budget = 2 * budget
     while True:
         # Time only the attempt that finished, so a rejected one doesn't skew the rate.
         started = client.clock()
@@ -298,12 +316,14 @@ async def _orders_updated_window(
             async for item in _search_orders(
                 log, client, marketplace_ids, request_params, priority
             ):
-                if client.clock() > deadline:
+                if _more_pages(item) and client.clock() > deadline:
+                    if started_small:
+                        raise _hour_too_dense(2 * ORDERS_WINDOW_TIME_BUDGET)
                     raise RuntimeError(
                         f"Orders window retries took over {2 * ORDERS_WINDOW_TIME_BUDGET}; "
-                        "lower Window Size, to PT1H if needed."
+                        "set Window Size to PT1H so a one-hour window gets all of it."
                     )
-                if client.clock() - started > budget:
+                if _more_pages(item) and client.clock() - started > budget:
                     raise OrdersWindowTimedOut
                 if isinstance(item, Order):
                     count += 1
@@ -324,9 +344,12 @@ async def _orders_updated_window(
         except (PaginationTokenRejected, OrdersWindowTimedOut) as err:
             if window_end - cursor <= timedelta(hours=1):
                 if isinstance(err, OrdersWindowTimedOut):
+                    if started_small:
+                        raise _hour_too_dense(timedelta(seconds=budget)) from err
                     raise RuntimeError(
-                        f"Orders window could not be paged within the {timedelta(seconds=budget)} "
-                        "budget; lower Window Size, to PT1H if needed."
+                        f"Orders window retries took over {timedelta(seconds=budget)} at one hour; "
+                        "set Window Size to PT1H so a one-hour window gets "
+                        f"{2 * ORDERS_WINDOW_TIME_BUDGET}."
                     ) from err
                 raise
             # Over budget, quarter the window as the budget halves, so an
@@ -480,6 +503,10 @@ async def backfill_orders(
 
     window_end = min(window_start + current_size - TICK, last_tick)
     shrunk = False
+    # A window at the one-hour floor can't shrink, so it gets twice the budget.
+    budget = ORDERS_WINDOW_TIME_BUDGET.total_seconds()
+    if window_end + TICK - window_start <= timedelta(hours=1):
+        budget = 2 * budget
 
     # A cutoff from the last few minutes is too recent for searchOrders' upper
     # bound. Wait it out instead of narrowing the window. The wait can't be
@@ -500,7 +527,7 @@ async def backfill_orders(
             async for item in _search_orders(
                 log, client, marketplace_ids, request_params, Priority.BACKFILL
             ):
-                if client.clock() - started > ORDERS_WINDOW_TIME_BUDGET.total_seconds():
+                if _more_pages(item) and client.clock() - started > budget:
                     raise OrdersWindowTimedOut
                 if isinstance(item, Order):
                     count += 1
@@ -521,10 +548,7 @@ async def backfill_orders(
         except (PaginationTokenRejected, OrdersWindowTimedOut) as err:
             if window_end - window_start <= timedelta(hours=1):
                 if isinstance(err, OrdersWindowTimedOut):
-                    raise RuntimeError(
-                        f"Orders window could not be paged within the {ORDERS_WINDOW_TIME_BUDGET} "
-                        "budget; lower Window Size."
-                    ) from err
+                    raise _hour_too_dense(timedelta(seconds=budget)) from err
                 raise
             smaller_end = floor_to_tick(max(
                 window_start + (window_end - window_start) / 2, window_start + timedelta(hours=1)

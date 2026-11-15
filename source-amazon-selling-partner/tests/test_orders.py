@@ -15,7 +15,7 @@ from source_amazon_selling_partner.api import (
     fetch_orders,
 )
 from source_amazon_selling_partner.client import SPAPIClient
-from source_amazon_selling_partner.models import EndpointConfig, Order
+from source_amazon_selling_partner.models import EndpointConfig, Order, SearchOrdersResponse
 
 from .fake_amazon import FakeAmazon, order
 
@@ -719,14 +719,15 @@ async def test_orders_window_time_budget(monkeypatch: pytest.MonkeyPatch, caplog
         attempts.append(params)
         yield Order.model_validate(order("first", start, start))
         if len(attempts) == 1:
-            time.t += api.ORDERS_WINDOW_TIME_BUDGET.total_seconds() + 1
+            # A one-hour window can't shrink, so it gets twice the budget.
+            time.t += api.ORDERS_WINDOW_TIME_BUDGET.total_seconds() * (2 if span <= timedelta(hours=1) else 1) + 1
         yield Order.model_validate(order("last", start, start))
 
     monkeypatch.setattr(api, "_search_orders", slow_search)
     gen = (backfill_orders(client, MARKETPLACES, start, span, LOG, None, NOW - timedelta(hours=1))
            if backfill else fetch_orders(client, MARKETPLACES, span, timedelta(), LOG, start))
     if span <= timedelta(hours=1):
-        with pytest.raises(RuntimeError, match="within.*budget; lower Window Size"):
+        with pytest.raises(RuntimeError, match="One hour of orders could not be paged within 20:00:00"):
             await collect(gen)
         assert len(attempts) == 1
         return
@@ -800,7 +801,7 @@ async def test_realtime_token_rejections_count_against_the_deadline(monkeypatch:
         raise api.PaginationTokenRejected("expired")
 
     monkeypatch.setattr(api, "_search_orders", rejecting_search)
-    with pytest.raises(RuntimeError, match="retries took over 20:00:00; lower Window Size"):
+    with pytest.raises(RuntimeError, match="retries took over 20:00:00; set Window Size to PT1H"):
         await collect(fetch_orders(client, MARKETPLACES, timedelta(days=4), timedelta(), LOG, start))
     assert len(attempts) == 3
     assert time.t <= 2 * api.ORDERS_WINDOW_TIME_BUDGET.total_seconds() + step
@@ -826,7 +827,7 @@ async def test_realtime_dense_first_hour_asks_for_pt1h(monkeypatch: pytest.Monke
 
     monkeypatch.setattr(api, "_search_orders", skewed_search)
     # Halving can't fit this window; the error says how to fix it.
-    with pytest.raises(RuntimeError, match="lower Window Size, to PT1H if needed"):
+    with pytest.raises(RuntimeError, match="set Window Size to PT1H"):
         await collect(fetch_orders(client, MARKETPLACES, timedelta(days=4), timedelta(), LOG, start))
     assert attempts[-1] - start == timedelta(hours=1)
     assert time.t <= 2 * api.ORDERS_WINDOW_TIME_BUDGET.total_seconds() + 4 * 3600 / 100
@@ -837,3 +838,54 @@ async def test_realtime_dense_first_hour_asks_for_pt1h(monkeypatch: pytest.Monke
     out = await collect(fetch_orders(client, MARKETPLACES, timedelta(hours=1), timedelta(), LOG, start))
     assert len(attempts) == 1
     assert out[-1] == attempts[0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("backfill", [True, False])
+async def test_one_hour_window_gets_twice_the_budget(monkeypatch: pytest.MonkeyPatch, backfill: bool):
+    start = NOW - timedelta(days=3)
+    time = FakeTime()
+    fake = FakeAmazon(now=NOW, orders=[])
+    client = SPAPIClient(http=fake, base_url="https://fake", clock=time.clock, sleep=time.sleep)  # type: ignore[arg-type]
+    attempts: list[dict[str, str]] = []
+
+    async def slow_search(log: logging.Logger, client: SPAPIClient, marketplace_ids: list[str], params: dict[str, str], priority: api.Priority):
+        attempts.append(params)
+        for _ in range(100):
+            yield Order.model_validate(order("o", start, start))
+            time.t += 12 * 3600 / 100
+
+    monkeypatch.setattr(api, "_search_orders", slow_search)
+    gen = (backfill_orders(client, MARKETPLACES, start, timedelta(hours=1), LOG, None, NOW - timedelta(hours=1))
+           if backfill else fetch_orders(client, MARKETPLACES, timedelta(hours=1), timedelta(), LOG, start))
+    await collect(gen)
+    assert len(attempts) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("backfill", [True, False])
+async def test_last_page_remainder_past_the_budget_finishes(monkeypatch: pytest.MonkeyPatch, backfill: bool):
+    # Every order is out once the last page's remainder arrives.
+    start = NOW - timedelta(days=3)
+    time = FakeTime()
+    fake = FakeAmazon(now=NOW, orders=[])
+    client = SPAPIClient(http=fake, base_url="https://fake", clock=time.clock, sleep=time.sleep)  # type: ignore[arg-type]
+    attempts: list[dict[str, str]] = []
+
+    async def search(log: logging.Logger, client: SPAPIClient, marketplace_ids: list[str], params: dict[str, str], priority: api.Priority):
+        attempts.append(params)
+        yield Order.model_validate(order("o", start, start))
+        time.t += 2 * api.ORDERS_WINDOW_TIME_BUDGET.total_seconds() + 1
+        yield SearchOrdersResponse(orders=[])
+
+    monkeypatch.setattr(api, "_search_orders", search)
+    gen = (backfill_orders(client, MARKETPLACES, start, timedelta(days=1), LOG, None, NOW - timedelta(hours=1))
+           if backfill else fetch_orders(client, MARKETPLACES, timedelta(days=1), timedelta(), LOG, start))
+    out = await collect(gen)
+    assert len(attempts) == 1
+    assert [o.orderId for o in out if isinstance(o, Order)] == ["o"]
+    # The window completed: the checkpoint moved on rather than shrinking in place.
+    if backfill:
+        assert out[-1].split("|")[0] == api.to_iso(start + timedelta(days=1))
+    else:
+        assert out[-1] == start + timedelta(days=1)
