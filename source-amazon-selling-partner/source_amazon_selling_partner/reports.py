@@ -327,7 +327,12 @@ async def _reusable_report(
     }
     reports = await list_reports(log, client, request_params, priority)
     return max(
-        (r for r in reports if request.made(r) and r.reportId not in skip),
+        # With data_end_after, the reused report's end becomes the cursor. One
+        # ending after it was created has a widened echo and holds rows only
+        # up to its creation, so reusing it would move the cursor too far.
+        (r for r in reports if request.made(r) and r.reportId not in skip
+         and (request.data_end_after is None or r.dataEndTime is None
+              or r.dataEndTime <= r.createdTime)),
         key=lambda r: (r.createdTime, r.reportId),
         default=None,
     )

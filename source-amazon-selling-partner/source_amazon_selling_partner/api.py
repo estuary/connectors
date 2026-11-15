@@ -281,6 +281,8 @@ async def _orders_updated_window(
     priority: Priority,
 ) -> AsyncGenerator[Order | datetime, None]:
     """Yields a complete updated-time window and its inclusive end."""
+    # Each retry gets half the previous budget, so all attempts fit in 20 hours.
+    budget = ORDERS_WINDOW_TIME_BUDGET.total_seconds()
     while True:
         # Time only the attempt that finished, so a rejected one doesn't skew the rate.
         started = client.clock()
@@ -294,7 +296,7 @@ async def _orders_updated_window(
             async for item in _search_orders(
                 log, client, marketplace_ids, request_params, priority
             ):
-                if client.clock() - started > ORDERS_WINDOW_TIME_BUDGET.total_seconds():
+                if client.clock() - started > budget:
                     raise OrdersWindowTimedOut
                 if isinstance(item, Order):
                     count += 1
@@ -316,21 +318,26 @@ async def _orders_updated_window(
             if window_end - cursor <= timedelta(hours=1):
                 if isinstance(err, OrdersWindowTimedOut):
                     raise RuntimeError(
-                        f"Orders window could not be paged within the {ORDERS_WINDOW_TIME_BUDGET} "
+                        f"Orders window could not be paged within the {timedelta(seconds=budget)} "
                         "budget; lower Window Size."
                     ) from err
                 raise
+            # Over budget, quarter the window as the budget halves, so an
+            # evenly busy window gains slack on each retry.
+            divisor = 4 if isinstance(err, OrdersWindowTimedOut) else 2
             smaller_end = floor_to_tick(max(
-                cursor + (window_end - cursor) / 2, cursor + timedelta(hours=1)
+                cursor + (window_end - cursor) / divisor, cursor + timedelta(hours=1)
             ))
             log.warning(
-                (f"shrinking an orders window after exceeding the {ORDERS_WINDOW_TIME_BUDGET} budget"
+                (f"shrinking an orders window after exceeding the {timedelta(seconds=budget)} budget"
                  if isinstance(err, OrdersWindowTimedOut) else
                  "shrinking an orders window after Amazon rejected its pagination token"),
                 {"window_start": cursor, "window_end": window_end, "new_window_end": smaller_end},
             )
             # Re-emitting orders is safe: the collection reduces by lastUpdatedTime.
             window_end = smaller_end
+            if isinstance(err, OrdersWindowTimedOut):
+                budget /= 2
             continue
         break
 

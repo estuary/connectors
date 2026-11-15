@@ -1021,3 +1021,17 @@ async def test_report_echo_range(monkeypatch: pytest.MonkeyPatch, caplog: pytest
     else:
         with pytest.raises(ReportMismatch):
             await reports._wait_for(LOG, client, "echo", request, Priority.INCREMENTAL, created=created)  # pyright: ignore[reportPrivateUsage]
+
+
+@pytest.mark.asyncio
+async def test_a_report_ending_after_its_creation_is_not_reused():
+    # Such a report has a widened echo and holds rows only up to its creation.
+    request = ReportRequest(ALL_ORDERS_REPORT_TYPE, tuple(MARKETPLACES), HORIZON - DAY, HORIZON, data_end_after=HORIZON - DAY)
+    fake = FakeAmazon(now=NOW, orders=[])
+    fake.reports.append(requested("widened", request, "DONE", HORIZON - timedelta(hours=1)))
+    fake.reports.append(requested("exact", request, "DONE", NOW - timedelta(minutes=5)))
+    client, _ = client_with(fake)
+    report = await reports._reusable_report(LOG, client, request, Priority.INCREMENTAL)  # pyright: ignore[reportPrivateUsage]
+    assert report is not None and report.reportId == "exact"
+    fake.reports.pop()
+    assert await reports._reusable_report(LOG, client, request, Priority.INCREMENTAL) is None  # pyright: ignore[reportPrivateUsage]

@@ -744,7 +744,39 @@ async def test_orders_window_time_budget(monkeypatch: pytest.MonkeyPatch, caplog
         assert attempts[1][Order.CREATED_BEFORE_PARAM] == api.to_iso(smaller_end)
         assert [o.orderId for o in resumed if isinstance(o, Order)] == ["first", "last"]
     else:
+        # Over budget, realtime quarters the window rather than halving it.
+        smaller_end = api.floor_to_tick(max(start + (end - start) / 4, start + timedelta(hours=1)))
         assert len(attempts) == 2
         assert attempts[1][Order.BEFORE_PARAM] == api.to_iso(smaller_end)
         assert [o.orderId for o in out if isinstance(o, Order)] == ["first", "first", "last"]
         assert out[-1] == smaller_end
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("full_window_hours", [11.25, 30])
+async def test_realtime_retries_fit_an_evenly_busy_window(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, full_window_hours: float):
+    # Paging time grows with the window. Quartering it as the budget halves
+    # gains slack on each retry, and all attempts fit in 20 hours.
+    start = NOW - timedelta(days=3)
+    span = timedelta(days=1)
+    time = FakeTime()
+    fake = FakeAmazon(now=NOW, orders=[])
+    client = SPAPIClient(http=fake, base_url="https://fake", clock=time.clock, sleep=time.sleep)  # type: ignore[arg-type]
+    attempts: list[datetime] = []
+
+    async def even_search(log: logging.Logger, client: SPAPIClient, marketplace_ids: list[str], params: dict[str, str], priority: api.Priority):
+        end = datetime.fromisoformat(params[Order.BEFORE_PARAM].replace("Z", "+00:00"))
+        attempts.append(end)
+        pages = 100
+        for _ in range(pages):
+            yield Order.model_validate(order("o", start, start))
+            time.t += full_window_hours * 3600 * ((end - start) / span) / pages
+
+    monkeypatch.setattr(api, "_search_orders", even_search)
+    out = await collect(fetch_orders(client, MARKETPLACES, span, timedelta(), LOG, start))
+    assert time.t < 20 * 3600
+    assert out[-1] == attempts[-1]
+    assert [end - start for end in attempts[1:]] == [
+        max(api.floor_to_tick(start + (prev - start) / 4) - start, timedelta(hours=1))
+        for prev in attempts[:-1]
+    ]
