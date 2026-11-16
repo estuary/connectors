@@ -395,6 +395,10 @@ func newTransactor(
 		return nil, err
 	}
 
+	if err := d.dropStreamV2NotNulls(ctx, is); err != nil {
+		return nil, err
+	}
+
 	if err := d.syncClustering(ctx, bindings, open); err != nil {
 		return nil, fmt.Errorf("syncing clustering keys: %w", err)
 	}

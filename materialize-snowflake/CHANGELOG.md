@@ -6,6 +6,9 @@
 - High-performance Snowpipe Streaming transactions no longer wait 5–25 seconds
   for Snowflake to commit. The connector now checks for the commit after
   100 ms and backs off to every 2 seconds, instead of checking every 5 seconds.
+- High-performance Snowpipe Streaming bindings no longer have rows rejected
+  just after a field first allows null values. Their tables now have their
+  `NOT NULL` constraints dropped when the task starts.
 
 ## 2026-11-13
 
