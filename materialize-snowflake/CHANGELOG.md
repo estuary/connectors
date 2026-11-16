@@ -1,5 +1,10 @@
 # materialize-snowflake
 
+## 2026-11-16
+
+### Fixed
+- Large transactions no longer run out of memory while loading existing rows.
+
 ## 2026-11-13
 
 ### Fixed
