@@ -353,3 +353,13 @@ func TestShardedStateRuntimeV2Shards(t *testing.T) {
 	require.Equal(t, []string{"t2-u-a", "t2-l-b"}, applied)
 	require.JSONEq(t, `{"a.v1": {}, "b.v1": {}}`, string(doc))
 }
+
+func TestShardedEntriesSorted(t *testing.T) {
+	var entries = make(ShardedEntries[*testEntry])
+	entries.add("a", upperRange, te("peer"))
+	entries.add("a", lowerRange, te("primary"))
+	entries.add("b", upperRange, te("other"))
+
+	require.Equal(t, []*testEntry{te("primary"), te("peer")}, entries.Sorted("a"))
+	require.Empty(t, entries.Sorted("missing"))
+}

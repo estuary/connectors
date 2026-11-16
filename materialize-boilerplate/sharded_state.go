@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 
 	m "github.com/estuary/connectors/go/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -33,6 +34,16 @@ func (s ShardedEntries[E]) Len() int {
 		n += len(bucket)
 	}
 	return n
+}
+
+// Sorted is a state key's entries in range key order, so the primary's come
+// first.
+func (s ShardedEntries[E]) Sorted(stateKey string) []E {
+	var out []E
+	for _, rk := range slices.Sorted(maps.Keys(s[stateKey])) {
+		out = append(out, s[stateKey][rk])
+	}
+	return out
 }
 
 // ShardedState is the staged-but-unapplied work of a materialization that
