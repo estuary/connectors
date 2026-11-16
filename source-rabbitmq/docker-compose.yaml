@@ -1,0 +1,23 @@
+services:
+  db:
+    image: rabbitmq:4.1-management
+    environment:
+      RABBITMQ_DEFAULT_USER: test
+      RABBITMQ_DEFAULT_PASS: test
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+    ports:
+      - 5673:5672
+      - 15673:15672
+    networks:
+      flow-test:
+        aliases:
+          - source-rabbitmq-db.flow-test
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true

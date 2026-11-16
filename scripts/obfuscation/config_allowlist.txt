@@ -137,6 +137,7 @@ priority
 node_id
 page_size
 search_page_size
+prefetchCount
 max_batch_size
 max_concurrent_bulk_ops
 incremental_limit

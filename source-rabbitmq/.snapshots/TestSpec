@@ -1,0 +1,194 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-rabbitmq/config",
+    "if": {
+      "required": [
+        "authMechanism"
+      ],
+      "properties": {
+        "authMechanism": {
+          "const": "EXTERNAL"
+        }
+      }
+    },
+    "then": {
+      "required": [
+        "tls",
+        "tlsConfig"
+      ],
+      "properties": {
+        "tls": {
+          "const": true
+        },
+        "tlsConfig": {
+          "required": [
+            "ssl_client_cert",
+            "ssl_client_key"
+          ]
+        }
+      }
+    },
+    "else": {
+      "required": [
+        "username",
+        "password"
+      ]
+    },
+    "properties": {
+      "host": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Host",
+        "description": "Hostname or IP address of your RabbitMQ server.",
+        "order": 1
+      },
+      "port": {
+        "type": "integer",
+        "maximum": 65535,
+        "minimum": 1,
+        "title": "Port",
+        "description": "AMQP port of your RabbitMQ server.",
+        "default": 5672,
+        "order": 2
+      },
+      "virtualHost": {
+        "type": "string",
+        "title": "Virtual Host",
+        "description": "RabbitMQ virtual host containing your queues.",
+        "default": "/",
+        "order": 3
+      },
+      "username": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Username",
+        "description": "Username for PLAIN authentication and management API discovery. Optional for EXTERNAL captures.",
+        "order": 4
+      },
+      "password": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Password",
+        "description": "Password for PLAIN authentication and management API discovery. Optional for EXTERNAL captures.",
+        "order": 5,
+        "secret": true
+      },
+      "tls": {
+        "type": "boolean",
+        "title": "TLS",
+        "description": "Use TLS for AMQP connections and HTTPS for queue discovery.",
+        "default": false,
+        "order": 6
+      },
+      "managementPort": {
+        "type": "integer",
+        "maximum": 65535,
+        "minimum": 1,
+        "title": "Management Port",
+        "description": "RabbitMQ management API port used for queue discovery.",
+        "default": 15672,
+        "order": 7
+      },
+      "authMechanism": {
+        "type": "string",
+        "enum": [
+          "PLAIN",
+          "EXTERNAL"
+        ],
+        "title": "Authentication Mechanism",
+        "description": "AMQP SASL authentication mechanism. EXTERNAL uses your TLS client certificate and requires RabbitMQ's rabbitmq_auth_mechanism_ssl plugin.",
+        "default": "PLAIN",
+        "order": 8
+      },
+      "tlsConfig": {
+        "properties": {
+          "ssl_server_ca": {
+            "type": "string",
+            "title": "SSL Server CA",
+            "description": "PEM-encoded CA bundle the server certificates must chain to. Omit to trust system certificate authorities.",
+            "multiline": true,
+            "order": 1,
+            "secret": true
+          },
+          "ssl_client_cert": {
+            "type": "string",
+            "title": "SSL Client Certificate",
+            "description": "PEM-encoded client certificate chain for mutual TLS.",
+            "multiline": true,
+            "order": 2,
+            "secret": true
+          },
+          "ssl_client_key": {
+            "type": "string",
+            "title": "SSL Client Key",
+            "description": "PEM-encoded private key for the client certificate.",
+            "multiline": true,
+            "order": 3,
+            "secret": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TLS Settings",
+        "description": "Optional PEM certificates for AMQP and HTTPS discovery. Requires TLS to be enabled.",
+        "advanced": true,
+        "order": 9
+      },
+      "prefetchCount": {
+        "type": "integer",
+        "maximum": 65535,
+        "minimum": 1,
+        "title": "Prefetch Count",
+        "description": "Maximum unacknowledged messages per queue. Larger values can improve throughput when commit latency is limiting but increase memory use.",
+        "default": 10,
+        "advanced": true,
+        "order": 10
+      }
+    },
+    "type": "object",
+    "required": [
+      "host"
+    ],
+    "title": "Source RabbitMQ Spec"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-rabbitmq/resource",
+    "properties": {
+      "queue": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Queue",
+        "description": "Name of the RabbitMQ queue to capture."
+      },
+      "queueType": {
+        "type": "string",
+        "enum": [
+          "classic",
+          "quorum",
+          "stream"
+        ],
+        "title": "Queue Type",
+        "description": "Queue type reported by discovery. When omitted the connector probes for stream support.",
+        "advanced": true
+      },
+      "streamStartOffset": {
+        "type": "string",
+        "title": "Stream Start Offset",
+        "description": "Initial stream position: first (first retained message), last (last chunk), next (new messages only), an RFC3339 timestamp, or an interval such as 7D or 12h. Saved offsets take precedence. Used only for stream queues.",
+        "default": "first",
+        "advanced": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "queue"
+    ],
+    "title": "Resource"
+  },
+  "documentation_url": "https://go.estuary.dev/source-rabbitmq",
+  "resource_path_pointers": [
+    "/queue"
+  ]
+}
