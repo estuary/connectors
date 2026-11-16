@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-04
+
+### Fixed
+- A HubSpot server error while creating records can no longer create the same
+  records twice.
+
 ## 2026-11-03
 
 ### Changed

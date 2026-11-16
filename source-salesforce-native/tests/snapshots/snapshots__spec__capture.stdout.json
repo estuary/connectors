@@ -217,9 +217,6 @@
               "$ref": "#/$defs/_OAuth2Credentials"
             },
             {
-              "$ref": "#/$defs/UserPass"
-            },
-            {
               "$ref": "#/$defs/SalesforceClientCredentials"
             }
           ],

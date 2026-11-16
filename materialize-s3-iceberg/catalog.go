@@ -8,7 +8,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/apache/iceberg-go"
 	icebergcatalog "github.com/apache/iceberg-go/catalog"
@@ -19,6 +18,7 @@ import (
 	icebergtable "github.com/apache/iceberg-go/table"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/estuary/connectors/filesink"
+	"github.com/estuary/connectors/go/retry"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -720,25 +720,18 @@ func (c *catalog) appendFiles(
 	})
 	logger.Info("append_files: starting")
 
-	const maxAttempts = 3
-	for attempt := 1; ; attempt++ {
+	var attempt int
+	return appendRetry.Do(ctx, "append files to "+fqn, func(ctx context.Context) error {
+		attempt++
 		tbl, err := c.cat.LoadTable(ctx, tablePath)
 		if err != nil {
-			err = fmt.Errorf("loading table %q: %w", fqn, err)
-			if attempt >= maxAttempts {
-				return err
-			}
-			logger.WithError(err).WithField("attempt", attempt).Warn("append_files: retrying")
-			if err := sleepCtx(ctx, time.Duration(attempt*2)*time.Second); err != nil {
-				return err
-			}
-			continue
+			return fmt.Errorf("loading table %q: %w", fqn, err)
 		}
 
 		checkpoints := map[string]string{}
 		if raw, ok := tbl.Properties()[flowCheckpointsKey]; ok && raw != "" {
 			if err := json.Unmarshal([]byte(raw), &checkpoints); err != nil {
-				return fmt.Errorf("parsing %s on %q: %w", flowCheckpointsKey, fqn, err)
+				return retry.Permanent(fmt.Errorf("parsing %s on %q: %w", flowCheckpointsKey, fqn, err))
 			}
 		}
 
@@ -750,7 +743,7 @@ func (c *catalog) appendFiles(
 		checkpoints[materialization] = nextCheckpoint
 		newProps, err := json.Marshal(checkpoints)
 		if err != nil {
-			return fmt.Errorf("marshaling checkpoints: %w", err)
+			return retry.Permanent(fmt.Errorf("marshaling checkpoints: %w", err))
 		}
 
 		tx := tbl.NewTransaction()
@@ -760,41 +753,16 @@ func (c *catalog) appendFiles(
 		// above is the guard against replaying an already-recorded append,
 		// matching the pyiceberg 0.7.0 behavior this connector shipped with.
 		if err := tx.AddFiles(ctx, filePaths, nil, true); err != nil {
-			err = fmt.Errorf("staging files for %q: %w", fqn, err)
-			if attempt >= maxAttempts {
-				return err
-			}
-			logger.WithError(err).WithField("attempt", attempt).Warn("append_files: retrying")
-			if err := sleepCtx(ctx, time.Duration(attempt*2)*time.Second); err != nil {
-				return err
-			}
-			continue
+			return fmt.Errorf("staging files for %q: %w", fqn, err)
 		}
 		if err := tx.SetProperties(iceberg.Properties{flowCheckpointsKey: string(newProps)}); err != nil {
-			return fmt.Errorf("setting %s on %q: %w", flowCheckpointsKey, fqn, err)
+			return retry.Permanent(fmt.Errorf("setting %s on %q: %w", flowCheckpointsKey, fqn, err))
 		}
 		if _, err := tx.Commit(ctx); err != nil {
-			err = fmt.Errorf("committing append on %q: %w", fqn, err)
-			if attempt >= maxAttempts {
-				return err
-			}
-			logger.WithError(err).WithField("attempt", attempt).Warn("append_files: retrying")
-			if err := sleepCtx(ctx, time.Duration(attempt*2)*time.Second); err != nil {
-				return err
-			}
-			continue
+			return fmt.Errorf("committing append on %q: %w", fqn, err)
 		}
 
 		logger.WithField("attempt", attempt).Info("append_files: committed")
 		return nil
-	}
-}
-
-func sleepCtx(ctx context.Context, d time.Duration) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-time.After(d):
-		return nil
-	}
+	})
 }

@@ -28,6 +28,9 @@ source-*/source-*
 # top-level directory where we put flow binaries downloaded from the latest flow release
 /flow-bin/
 
+# Credentials google-github-actions/auth writes into the checkout in CI.
+gha-creds-*.json
+
 # Python type-checkingr, virtual environment, and cached bytecode.
 /.mypy_cache
 .pytest_cache

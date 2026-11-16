@@ -4,11 +4,13 @@ import (
 	"context"
 	stdsql "database/sql"
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/estuary/connectors/go/retry"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 
@@ -266,19 +268,19 @@ func TestCommitConflictRetriesGiveUp(t *testing.T) {
 	var ctx = context.Background()
 	c, connector := newInjectingClient(t)
 
-	var savedDelay = retryBaseDelay
-	retryBaseDelay = time.Millisecond
-	t.Cleanup(func() { retryBaseDelay = savedDelay })
+	var saved = ddlRetry
+	ddlRetry.InitialBackoff = time.Millisecond
+	t.Cleanup(func() { ddlRetry = saved })
 
 	var conflicts []error
-	for range maxAttempts + 5 {
+	for range ddlRetry.MaxAttempts + 5 {
 		conflicts = append(conflicts, duckLakeConflictErr)
 	}
 	connector.inject(conflicts...)
 
 	err := c.CreateTable(ctx, sql.TableCreate{TableCreateSql: "CREATE TABLE memory.main.target (a INTEGER);"})
 	require.ErrorIs(t, err, duckLakeConflictErr)
-	require.Equal(t, maxAttempts, connector.attemptedCommits())
+	require.Equal(t, ddlRetry.MaxAttempts, connector.attemptedCommits())
 }
 
 func TestOtherErrorsAreNotRetried(t *testing.T) {
@@ -294,4 +296,64 @@ func TestOtherErrorsAreNotRetried(t *testing.T) {
 	err := c.CreateTable(ctx, sql.TableCreate{TableCreateSql: "CREATE TABLE memory.main.target (a INTEGER);"})
 	require.ErrorIs(t, err, catalogErr)
 	require.Equal(t, 1, connector.attemptedCommits())
+}
+
+func TestClassifyCommit(t *testing.T) {
+	var connectionErr = &duckdb.Error{
+		Type: duckdb.ErrorTypeConnection,
+		Msg:  "Connection Error: connection to MotherDuck lost",
+	}
+	var catalogErr = &duckdb.Error{Type: duckdb.ErrorTypeCatalog, Msg: "Catalog Error: no such table"}
+
+	for _, tc := range []struct {
+		name string
+		err  error
+		ddl  retry.Outcome
+		txn  retry.Outcome
+	}{
+		{
+			name: "conflict before COMMIT",
+			err:  fmt.Errorf("executing store query: %w", duckLakeConflictErr),
+			ddl:  retry.Retryable,
+			txn:  retry.Retryable,
+		},
+		{
+			name: "conflict at COMMIT",
+			err:  fmt.Errorf("committing store transaction: %w", &commitError{duckLakeConflictErr}),
+			ddl:  retry.Retryable,
+			txn:  retry.Retryable,
+		},
+		{
+			// The transaction rolled back, so running it again is safe.
+			name: "connection error before COMMIT",
+			err:  fmt.Errorf("executing store query: %w", connectionErr),
+			ddl:  retry.Ambiguous,
+			txn:  retry.Retryable,
+		},
+		{
+			// The transaction may have committed.
+			name: "connection error at COMMIT",
+			err:  fmt.Errorf("committing store transaction: %w", &commitError{connectionErr}),
+			ddl:  retry.Ambiguous,
+			txn:  retry.Ambiguous,
+		},
+		{
+			name: "catalog error",
+			err:  &commitError{catalogErr},
+			ddl:  retry.Fatal,
+			txn:  retry.Fatal,
+		},
+		{
+			name: "not a duckdb error",
+			err:  errors.New("boom"),
+			ddl:  retry.Fatal,
+			txn:  retry.Fatal,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.ddl, classify(tc.err))
+			require.Equal(t, tc.txn, classifyCommit(tc.err))
+		})
+	}
+	require.False(t, commitRetry.RetryAmbiguous)
 }

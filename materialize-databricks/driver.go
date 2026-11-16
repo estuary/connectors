@@ -57,9 +57,6 @@ const maxConcurrentLoads = 5
 // default of 10 for a single query.
 const maxDownloadThreads = 2
 
-// maxBoundRanges is the most ranges a date-time key's merge bound splits into.
-const maxBoundRanges = 8
-
 const sweepAge = 24 * time.Hour
 
 type tableConfig struct {
@@ -387,7 +384,7 @@ func newTransactor(
 	} else {
 		d.localStagingPath = tempDir
 	}
-	d.profiler = newQueryProfiler(wsClient.QueryHistory, d.bindings)
+	d.profiler = newQueryProfiler(wsClient.QueryHistory, wsClient.Warehouses, cfg.warehouseID(), d.bindings, d.openDB)
 
 	return d, nil
 }
@@ -462,8 +459,8 @@ func (t *transactor) addBinding(target sql.Table) error {
 	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, t.stagingPrefix, append(translatedFieldNames(target.ColumnNames()), "_flow_delete"), t.files)
 	b.loadSchema = stagedSchemaDDL(target.KeyPtrs(), false)
 	b.storeSchema = stagedSchemaDDL(target.Columns(), true)
-	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges(maxBoundRanges))
-	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges(maxBoundRanges))
+	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges())
+	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal, sql.WithExactDatetimeBounds(isTimestampColumn), sql.WithDatetimeRanges())
 
 	if col, err := target.PublishedAtColumn(); err == nil {
 		b.truncateSQL = fmt.Sprintf("DELETE FROM %s WHERE %s < ?;", target.Identifier, col.Identifier)
@@ -495,8 +492,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("converting Load key: %w", err)
 		} else if err := b.loadFile.writeRow(converted); err != nil {
 			return fmt.Errorf("writing row for load: %w", err)
-		} else {
-			b.loadMergeBounds.NextKey(converted)
+		} else if err := b.loadMergeBounds.NextKey(converted); err != nil {
+			return fmt.Errorf("tracking Load key bounds for resource %s: %w", b.target.Path, err)
 		}
 	}
 
@@ -984,10 +981,10 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	defer db.Close()
 
 	var stagingTableCopies = make(map[int]chan error)
-	var copyIntoStaging = func(idx int) {
+	var copyIntoStaging = func(idx int, last bool) {
 		var done = make(chan error, 1)
 		stagingTableCopies[idx] = done
-		go func() { done <- d.copyIntoStagingTable(ctx, db, idx, d.bindings[idx]) }()
+		go func() { done <- d.copyIntoStagingTable(ctx, db, idx, d.bindings[idx], last) }()
 	}
 
 	var lastBinding = -1
@@ -998,7 +995,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// Store requests are ordered by binding, so the previous binding has all of its rows. Its
 		// files are uploaded and copied into its staging table while later bindings are written.
 		if lastBinding != -1 && lastBinding != it.Binding {
-			copyIntoStaging(lastBinding)
+			copyIntoStaging(lastBinding, false)
 		}
 		if _, ok := stagingTableCopies[it.Binding]; ok {
 			return nil, fmt.Errorf("store requests for binding[%d] are not contiguous", it.Binding)
@@ -1012,8 +1009,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		} else if err := b.storeFile.writeRow(append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing row for store: %w", err)
-		} else {
-			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
+		} else if err := b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)]); err != nil {
+			return nil, fmt.Errorf("tracking Store key bounds for resource %s: %w", b.target.Path, err)
 		}
 
 		if it.Exists {
@@ -1021,7 +1018,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 	}
 	if lastBinding != -1 {
-		copyIntoStaging(lastBinding)
+		copyIntoStaging(lastBinding, true)
 	}
 
 	// Upload the staged files and record in the checkpoint everything needed to commit them into
@@ -1073,14 +1070,23 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}, nil
 }
 
+// minStagingTableBytes is the fewest uncompressed bytes of a binding's store
+// files that are copied into a staging table before their MERGE.
+const minStagingTableBytes = 1_000_000_000
+
 // copyIntoStagingTable waits for the binding's store files to upload and, if
-// they need a MERGE, copies them into a Delta table. The MERGE reads that table rather than
-// the JSON files, so Databricks doesn't materialize the files during MERGE time. The table lives
-// in the staging volume by path and isn't registered in the catalog.
-func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, idx int, b *binding) error {
+// they need a large MERGE, copies them into a Delta table. The MERGE reads that
+// table rather than the JSON files, so Databricks doesn't materialize the files
+// during MERGE time. The table lives in the staging volume by path and isn't
+// registered in the catalog.
+//
+// A copy pays off only while later bindings are still uploading, so the last
+// binding stored never copies: nothing hides its copy, which takes longer than
+// it saves the MERGE.
+func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, idx int, b *binding, last bool) error {
 	if err := b.storeFile.wait(); err != nil {
 		return err
-	} else if b.target.DeltaUpdates || !b.needsMerge {
+	} else if last || b.target.DeltaUpdates || !b.needsMerge || b.storeFile.uncompressed < minStagingTableBytes {
 		return nil
 	}
 
@@ -1428,58 +1434,21 @@ func isMissingError(err error) bool {
 	})
 }
 
-// retriableErrorClasses are the Databricks error classes of a commit query
-// which succeeds when re-run once the conflicting activity has finished.
-//
-// COPY_INTO_DUPLICATED_FILES_COPY_NOT_ALLOWED: another COPY INTO into the same
-// table committed some of the same files, which usually means a previous
-// primary shard was killed mid-Acknowledge. We retry until that orphaned query
-// has finished, at which point our query skips the already-copied files.
-var retriableErrorClasses = []string{
-	"COPY_INTO_DUPLICATED_FILES_COPY_NOT_ALLOWED",
-}
-
-const maxQueryRetries = 5
-
-// queryRetryDelay is the wait before retry number attempt+1: 15s, 30s, 1m,
-// 2m, 4m.
-var queryRetryDelay = func(attempt int) time.Duration {
-	return time.Duration(1<<attempt) * 15 * time.Second
-}
-
-func isRetriableError(err error) bool {
-	var text = err.Error()
-	return slices.ContainsFunc(retriableErrorClasses, func(class string) bool {
-		return strings.Contains(text, class)
-	})
-}
-
 // execQuery runs a commit query of the binding, profiled as the binding's, and
 // returns the row counts of its result row.
 func (d *transactor) execQuery(ctx context.Context, db *stdsql.DB, profile *boilerplate.QueryProfile, binding int, query string, args ...any) (m.RowStats, error) {
-	for attempt := 0; ; attempt++ {
+	var stats m.RowStats
+	var err = commitQueryRetry.Do(ctx, "commit query", func(ctx context.Context) error {
 		var queryCtx, trace = profile.Trace(ctx, binding, boilerplate.StatementKind(query))
 		var rows, err = db.QueryContext(queryCtx, query, args...)
 		trace.Finish(err)
-		if err == nil {
-			return scanRowStats(rows), nil
-		} else if !isRetriableError(err) || attempt >= maxQueryRetries {
-			return m.RowStats{}, err
+		if err != nil {
+			return err
 		}
-
-		var delay = queryRetryDelay(attempt)
-		log.WithFields(log.Fields{
-			"attempt": attempt + 1,
-			"delay":   delay.String(),
-			"err":     err,
-		}).Warn("query failed with a retriable error; retrying")
-
-		select {
-		case <-ctx.Done():
-			return m.RowStats{}, ctx.Err()
-		case <-time.After(delay):
-		}
-	}
+		stats = scanRowStats(rows)
+		return nil
+	})
+	return stats, err
 }
 
 // scanRowStats reads the result row of MERGE INTO (num_affected_rows,

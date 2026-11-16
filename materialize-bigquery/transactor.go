@@ -48,6 +48,11 @@ type checkpointItem struct {
 	// attributing its commit's row stats. Recovered and peer entries are
 	// reported outside of round pairing, so theirs is left zero.
 	round int
+	// rangeFirst marks an entry recovered from {rangeKey: {stateKey: entry}},
+	// the layout earlier versions wrote, which is where it is cleared.
+	// TODO(#5681): remove three months after the release that stopped
+	// writing that layout has rolled out.
+	rangeFirst bool
 }
 
 // mergeBoundLiterals is the serialized form of a key column's sql.MergeBound:
@@ -57,20 +62,39 @@ type checkpointItem struct {
 type mergeBoundLiterals struct {
 	Lower string `json:",omitempty"`
 	Upper string `json:",omitempty"`
+	// Ranges are the sql.MergeBound's ranges, if its values split at gaps.
+	Ranges []mergeRangeLiterals `json:",omitempty"`
+}
+
+type mergeRangeLiterals struct {
+	Lower string
+	Upper string
 }
 
 func boundsLiterals(bounds []sql.MergeBound) []mergeBoundLiterals {
 	var out = make([]mergeBoundLiterals, len(bounds))
 	for i, b := range bounds {
 		out[i] = mergeBoundLiterals{Lower: b.LiteralLower, Upper: b.LiteralUpper}
+		for _, r := range b.Ranges {
+			out[i].Ranges = append(out[i].Ranges, mergeRangeLiterals{Lower: r.LiteralLower, Upper: r.LiteralUpper})
+		}
 	}
 	return out
 }
 
-type checkpoint = map[string]*checkpointItem  // keyed by bare StateKey
-type rangeCheckpoints = map[string]checkpoint // keyed by "%08x-%08x"
+// checkpoints holds entries by binding StateKey, then by the range key
+// ("%08x-%08x") of the shard that staged them, which is how they persist.
+type checkpoints map[string]map[string]*checkpointItem
+
+func (c checkpoints) add(stateKey, rangeKey string, item *checkpointItem) {
+	if c[stateKey] == nil {
+		c[stateKey] = make(map[string]*checkpointItem)
+	}
+	c[stateKey][rangeKey] = item
+}
 
 // legacyRangeKey holds entries written before range-scoping (bare StateKey).
+// TODO(#5681): remove after 2026-12-02.
 const legacyRangeKey = ""
 
 var rangeKeyRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{8}$`)
@@ -121,13 +145,12 @@ type transactor struct {
 
 	bindings []*binding
 	be       *m.BindingEvents
-	cp       checkpoint
-	// peerShardsCheckpoints holds pending entries of other shards, and of
-	// sessions predating the range-scoped checkpoint format (legacyRangeKey).
-	// Only the primary shard tracks and executes these.
-	peerShardsCheckpoints rangeCheckpoints
-	primaryShard          bool
-	rangeKey              string
+	// cp holds this shard's entries under its own range key. The primary
+	// shard also holds, and alone executes, the pending entries of other
+	// shards and of sessions predating range-scoping (legacyRangeKey).
+	cp           checkpoints
+	primaryShard bool
+	rangeKey     string
 	// truncateAfterBackfill permits deleting the rows published before a
 	// completed backfill.
 	truncateAfterBackfill bool
@@ -191,8 +214,7 @@ func prepareNewTransactor(
 			skipCleanup:           featureFlags["skip_cleanup"],
 			client:                client,
 			be:                    be,
-			cp:                    make(checkpoint, 0),
-			peerShardsCheckpoints: make(rangeCheckpoints),
+			cp:                    make(checkpoints),
 			primaryShard:          primaryShard,
 			rangeKey:              fmt.Sprintf("%08x-%08x", keyBegin, keyEnd),
 			truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
@@ -220,12 +242,7 @@ func prepareNewTransactor(
 				"schemaJson": schema,
 			}).Debug("bigquery schema for table")
 
-			fieldSchemas := make(map[string]*bigquery.FieldSchema)
-			for _, f := range schema {
-				fieldSchemas[f.Name] = f
-			}
-
-			if err = t.addBinding(binding, fieldSchemas, &ep.Dialect); err != nil {
+			if err = t.addBinding(binding, fieldSchemasByName(schema), &ep.Dialect); err != nil {
 				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 			}
 		}
@@ -253,8 +270,9 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 		target:           target,
 		loadSchema:       loadSchema,
 		storeSchema:      storeSchema,
-		loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
-		storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
+		loadMergeBounds:  newMergeBoundsBuilder(target, dialect.Literal),
+		storeMergeBounds: newMergeBoundsBuilder(target, dialect.Literal),
+		timestampKeys:    timestampKeys(target),
 	}
 
 	if t.cfg.Advanced.NoFlowDocument {
@@ -293,11 +311,23 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 	return nil
 }
 
+// fieldSchemasByName indexes a table's field schemas by lowercased column
+// name, because BigQuery column names are case-insensitive.
+func fieldSchemasByName(schema bigquery.Schema) map[string]*bigquery.FieldSchema {
+	out := make(map[string]*bigquery.FieldSchema, len(schema))
+	for _, f := range schema {
+		out[strings.ToLower(f.Name)] = f
+	}
+	return out
+}
+
+// schemaForCols returns the temp/external table schema for cols, looking each
+// column up in fieldSchemas as built by fieldSchemasByName.
 func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSchema) ([]*bigquery.FieldSchema, error) {
 	s := make([]*bigquery.FieldSchema, 0, len(cols))
 
 	for idx, col := range cols {
-		schema, ok := fieldSchemas[translateFlowIdentifier(col.Field)]
+		schema, ok := fieldSchemas[strings.ToLower(translateFlowIdentifier(col.Field))]
 		if !ok {
 			return nil, fmt.Errorf("could not find metadata for field '%s'", col.Field)
 		}
@@ -337,41 +367,64 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 		return nil
 	}
 
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(state, &raw); err != nil {
-		return fmt.Errorf("unmarshaling checkpoint state: %w", err)
+	cp, err := parseCheckpoints(state)
+	if err != nil {
+		return err
 	}
-
-	for key, val := range raw {
-		if rangeKeyRe.MatchString(key) {
-			var bucket checkpoint
-			if err := json.Unmarshal(val, &bucket); err != nil {
-				return fmt.Errorf("unmarshaling checkpoint range %q: %w", key, err)
-			}
-			if key == t.rangeKey {
-				t.cp = bucket
-			} else {
-				t.peerShardsCheckpoints[key] = bucket
-			}
-			continue
-		}
-
-		// A bare StateKey: an entry from before range-scoping was added.
-		var item checkpointItem
-		if err := json.Unmarshal(val, &item); err != nil {
-			return fmt.Errorf("unmarshaling checkpoint entry %q: %w", key, err)
-		}
-		t.legacyBucket()[key] = &item
-	}
+	t.cp = cp
 
 	return nil
 }
 
-func (t *transactor) legacyBucket() checkpoint {
-	if t.peerShardsCheckpoints[legacyRangeKey] == nil {
-		t.peerShardsCheckpoints[legacyRangeKey] = make(checkpoint)
+// parseCheckpoints decodes a checkpoint, persisted as {stateKey: {rangeKey:
+// entry}}. Entries that earlier versions wrote as {rangeKey: {stateKey:
+// entry}} are marked rangeFirst, and entries from before range-scoping are
+// held under legacyRangeKey.
+func parseCheckpoints(state json.RawMessage) (checkpoints, error) {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(state, &raw); err != nil {
+		return nil, fmt.Errorf("unmarshaling checkpoint state: %w", err)
 	}
-	return t.peerShardsCheckpoints[legacyRangeKey]
+
+	var out = make(checkpoints)
+	for key, val := range raw {
+		var nested map[string]*checkpointItem
+		var err = json.Unmarshal(val, &nested)
+
+		if rangeKeyRe.MatchString(key) {
+			if err != nil {
+				return nil, fmt.Errorf("unmarshaling checkpoint range %q: %w", key, err)
+			}
+			for stateKey, item := range nested {
+				if item != nil {
+					item.rangeFirst = true
+				}
+				out.add(stateKey, key, item)
+			}
+		} else if err == nil && allRangeKeys(nested) {
+			for rangeKey, item := range nested {
+				out.add(key, rangeKey, item)
+			}
+		} else {
+			// A bare StateKey: an entry from before range-scoping was added.
+			var item checkpointItem
+			if err := json.Unmarshal(val, &item); err != nil {
+				return nil, fmt.Errorf("unmarshaling checkpoint entry %q: %w", key, err)
+			}
+			out.add(key, legacyRangeKey, &item)
+		}
+	}
+
+	return out, nil
+}
+
+func allRangeKeys(nested map[string]*checkpointItem) bool {
+	for key := range nested {
+		if !rangeKeyRe.MatchString(key) {
+			return false
+		}
+	}
+	return true
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
@@ -384,8 +437,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("converting load key: %w", err)
 		} else if err = t.loadFiles.WriteRow(ctx, it.Binding, converted); err != nil {
 			return fmt.Errorf("writing normalized key to keyfile: %w", err)
-		} else {
-			b.loadMergeBounds.NextKey(converted)
+		} else if err := b.loadMergeBounds.NextKey(b.boundsKey(converted)); err != nil {
+			return fmt.Errorf("tracking Load key bounds for resource %s: %w", b.target.Path, err)
 		}
 	}
 	if it.Err() != nil {
@@ -397,7 +450,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Build the queries of all documents across all bindings that were requested.
-	var subqueries []string
+	var subqueries []loadSubquery
 	// This is the map of external table references we will populate.
 	var edcTableDefs = make(map[string]bigquery.ExternalData)
 	var externalData = make(map[string][]string)
@@ -414,13 +467,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				loadTemplate = t.templates.loadQueryNoFlowDocument
 			}
 
-			if loadQuery, err := renderQueryTemplate(b.target, loadTemplate, b.loadMergeBounds.Build(), t.objAndArrayAsJson); err != nil {
-				return fmt.Errorf("rendering load query template: %w", err)
-			} else {
-				subqueries = append(subqueries, loadQuery)
-				edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
-				externalData[b.tempTableName] = uris
-			}
+			subqueries = append(subqueries, loadSubquery{table: b.target, tpl: loadTemplate, bounds: b.loadMergeBounds.Build()})
+			edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
+			externalData[b.tempTableName] = uris
 		}
 	}
 
@@ -429,7 +478,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Build the query across all tables.
-	queryStr := strings.Join(subqueries, "\nUNION ALL\n") + ";"
+	queryStr, err := renderLoadQuery(subqueries, maxLoadQueryLength, t.objAndArrayAsJson)
+	if err != nil {
+		return fmt.Errorf("rendering load query template: %w", err)
+	}
 	query := t.client.newQuery(queryStr)
 	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
 
@@ -516,8 +568,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		} else if err = t.storeFiles.WriteRow(ctx, it.Binding, append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
-		} else {
-			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
+		} else if err := b.storeMergeBounds.NextKey(b.boundsKey(converted[:len(b.target.Keys)])); err != nil {
+			return nil, fmt.Errorf("tracking Store key bounds for resource %s: %w", b.target.Path, err)
 		}
 	}
 	if it.Err() != nil {
@@ -534,13 +586,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
 		}
 
-		t.cp[b.target.StateKey] = &checkpointItem{
+		t.cp.add(b.target.StateKey, t.rangeKey, &checkpointItem{
 			Bounds:     boundsLiterals(b.storeMergeBounds.Build()),
 			NeedsMerge: b.mustMerge,
 			SourceURIs: uris,
 			JobPrefix:  uuid.NewString(),
 			round:      it.Round,
-		}
+		})
 
 		b.mustMerge = false
 		b.storeMergeBounds.Reset()
@@ -548,19 +600,25 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	for binding, boundary := range t.truncations {
 		var b = t.bindings[binding]
-		if t.cp[b.target.StateKey] == nil {
-			t.cp[b.target.StateKey] = &checkpointItem{JobPrefix: uuid.NewString(), round: it.Round}
+		if t.cp[b.target.StateKey][t.rangeKey] == nil {
+			t.cp.add(b.target.StateKey, t.rangeKey, &checkpointItem{JobPrefix: uuid.NewString(), round: it.Round})
 		}
-		t.cp[b.target.StateKey].TruncateBefore = &boundary
+		t.cp[b.target.StateKey][t.rangeKey].TruncateBefore = &boundary
 	}
 	t.truncations = nil
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		// Nest under this shard's range key: range keys are disjoint across
-		// shards, so concurrent patches never clobber when the runtime
-		// consolidates connector state. A single-shard task uses the same
-		// format, with one bucket covering the full key range.
-		var checkpointJSON, err = json.Marshal(rangeCheckpoints{t.rangeKey: t.cp})
+		// Record this shard's entries, which sit under its range key: range
+		// keys are disjoint across shards, so concurrent patches never
+		// clobber when the runtime consolidates connector state. A
+		// single-shard task uses the same format, with the full key range.
+		var patch = make(checkpoints, len(t.cp))
+		for stateKey, bucket := range t.cp {
+			if item := bucket[t.rangeKey]; item != nil {
+				patch.add(stateKey, t.rangeKey, item)
+			}
+		}
+		var checkpointJSON, err = json.Marshal(patch)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
@@ -582,34 +640,17 @@ func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 			return fmt.Errorf("unexpected state reset patch in aggregated shard state")
 		}
 
-		var raw map[string]json.RawMessage
-		if err := json.Unmarshal(patch, &raw); err != nil {
+		peers, err := parseCheckpoints(patch)
+		if err != nil {
 			return fmt.Errorf("parsing aggregated state patch: %w", err)
 		}
 
-		for key, val := range raw {
-			if key == t.rangeKey {
-				continue // our own contribution, echoed back by the runtime
-			}
-
-			if !rangeKeyRe.MatchString(key) {
-				var item checkpointItem
-				if err := json.Unmarshal(val, &item); err != nil {
-					return fmt.Errorf("parsing aggregated state patch entry %q: %w", key, err)
+		for stateKey, bucket := range peers {
+			for rangeKey, item := range bucket {
+				if rangeKey == t.rangeKey {
+					continue // our own contribution, echoed back by the runtime
 				}
-				t.legacyBucket()[key] = &item
-				continue
-			}
-
-			var bucket checkpoint
-			if err := json.Unmarshal(val, &bucket); err != nil {
-				return fmt.Errorf("parsing aggregated state patch bucket %q: %w", key, err)
-			}
-			if t.peerShardsCheckpoints[key] == nil {
-				t.peerShardsCheckpoints[key] = make(checkpoint)
-			}
-			for stateKey, item := range bucket {
-				t.peerShardsCheckpoints[key][stateKey] = item
+				t.cp.add(stateKey, rangeKey, item)
 			}
 		}
 	}
@@ -655,7 +696,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	if !t.primaryShard {
 		for _, b := range t.bindings {
 			if shouldProcess(b.target.StateKey) {
-				delete(t.cp, b.target.StateKey)
+				delete(t.cp[b.target.StateKey], t.rangeKey)
 			}
 		}
 		return nil, nil
@@ -680,7 +721,6 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 	// unlimited just to maintain some sense of decorum.
 	group.SetLimit(100)
 
-	var peerRangeKeys = slices.Sorted(maps.Keys(t.peerShardsCheckpoints))
 	var drained []pendingItem
 
 	for _, b := range t.bindings {
@@ -694,11 +734,11 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 		// This binding's pending entries: its own, then those of legacy
 		// sessions and peer shards.
 		var items []pendingItem
-		if item := t.cp[sk]; item != nil {
+		if item := t.cp[sk][t.rangeKey]; item != nil {
 			items = append(items, pendingItem{t.rangeKey, sk, item})
 		}
-		for _, rk := range peerRangeKeys {
-			if item := t.peerShardsCheckpoints[rk][sk]; item != nil {
+		for _, rk := range slices.Sorted(maps.Keys(t.cp[sk])) {
+			if item := t.cp[sk][rk]; item != nil && rk != t.rangeKey {
 				items = append(items, pendingItem{rk, sk, item})
 			}
 		}
@@ -818,24 +858,24 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 	}
 
 	// Null each executed entry at the JSON path it occupies: nested under
-	// its range key, or top-level for legacyRangeKey.
+	// its state key then range key, the reverse for rangeFirst entries, or
+	// top-level for legacyRangeKey.
 	var clear = make(map[string]interface{})
+	var clearAt = func(outer, inner string) {
+		if clear[outer] == nil {
+			clear[outer] = make(map[string]interface{})
+		}
+		clear[outer].(map[string]interface{})[inner] = nil
+	}
 	for _, d := range drained {
 		if d.rangeKey == legacyRangeKey {
 			clear[d.stateKey] = nil
-			delete(t.legacyBucket(), d.stateKey)
-			continue
-		}
-		if clear[d.rangeKey] == nil {
-			clear[d.rangeKey] = make(map[string]interface{})
-		}
-		clear[d.rangeKey].(map[string]interface{})[d.stateKey] = nil
-
-		if d.rangeKey == t.rangeKey {
-			delete(t.cp, d.stateKey)
+		} else if d.item.rangeFirst {
+			clearAt(d.rangeKey, d.stateKey)
 		} else {
-			delete(t.peerShardsCheckpoints[d.rangeKey], d.stateKey)
+			clearAt(d.stateKey, d.rangeKey)
 		}
+		delete(t.cp[d.stateKey], d.rangeKey)
 	}
 
 	checkpointJSON, err := json.Marshal(clear)
@@ -856,18 +896,68 @@ func (t *transactor) Destroy() {
 	_ = t.client.bigqueryClient.Close()
 }
 
+// maxLoadQueryLength is the longest load query, in bytes, which keeps the
+// split ranges of its merge bounds. BigQuery rejects a query whose text is
+// longer than 1,024,000 characters.
+const maxLoadQueryLength = 1_000_000
+
+// loadSubquery is one binding's part of a load query.
+type loadSubquery struct {
+	table  sql.Table
+	tpl    *template.Template
+	bounds []sql.MergeBound
+}
+
+// renderLoadQuery renders the UNION ALL of subqueries. A query longer than
+// limit is rendered with each merge bound as its one enclosing range, which
+// takes less text than its split ranges.
+func renderLoadQuery(subqueries []loadSubquery, limit int, objAndArrayAsJson bool) (string, error) {
+	var render = func(split bool) (string, error) {
+		var parts = make([]string, 0, len(subqueries))
+		for _, sq := range subqueries {
+			var bounds = sq.bounds
+			if !split {
+				bounds = slices.Clone(bounds)
+				for i := range bounds {
+					bounds[i].Ranges = nil
+				}
+			}
+			var part, err = renderQueryTemplate(sq.table, sq.tpl, bounds, objAndArrayAsJson)
+			if err != nil {
+				return "", err
+			}
+			parts = append(parts, part)
+		}
+		return strings.Join(parts, "\nUNION ALL\n") + ";", nil
+	}
+
+	if query, err := render(true); err != nil || len(query) <= limit {
+		return query, err
+	}
+	return render(false)
+}
+
 // combineBounds unions the per-key-column merge bounds of coalesced checkpoint
 // entries. A column keeps a bound only when every entry carries one, and
 // differing literals combine with LEAST/GREATEST cast to the column's type:
 // those functions compare in their operands' type, and comparing e.g.
-// timestamp literals as strings can pick the wrong extremum.
+// timestamp literals as strings can pick the wrong extremum. When any entry's
+// bound splits into ranges, the combined bound is the union of every entry's
+// ranges, taking an unsplit bound as a single range.
 func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound {
 	var out = make([]sql.MergeBound, len(keys))
 	for i, key := range keys {
 		out[i] = sql.MergeBound{Column: key}
 
-		var valid = true
+		var valid, split = true, false
 		var lowers, uppers []string
+		var ranges []sql.MergeRange
+		var addRange = func(lower, upper string) {
+			var r = sql.MergeRange{LiteralLower: lower, LiteralUpper: upper}
+			if !slices.Contains(ranges, r) {
+				ranges = append(ranges, r)
+			}
+		}
 		for _, item := range items {
 			if len(item.Bounds) != len(keys) || item.Bounds[i].Lower == "" || item.Bounds[i].Upper == "" {
 				valid = false
@@ -879,6 +969,13 @@ func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound 
 			if !slices.Contains(uppers, item.Bounds[i].Upper) {
 				uppers = append(uppers, item.Bounds[i].Upper)
 			}
+			if len(item.Bounds[i].Ranges) == 0 {
+				addRange(item.Bounds[i].Lower, item.Bounds[i].Upper)
+			}
+			for _, r := range item.Bounds[i].Ranges {
+				split = true
+				addRange(r.Lower, r.Upper)
+			}
 		}
 		if !valid {
 			continue
@@ -886,6 +983,9 @@ func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound 
 
 		out[i].LiteralLower = extremumExpr("LEAST", lowers, key)
 		out[i].LiteralUpper = extremumExpr("GREATEST", uppers, key)
+		if split {
+			out[i].Ranges = ranges
+		}
 	}
 	return out
 }

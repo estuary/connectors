@@ -46,6 +46,12 @@ class Response(BaseModel, Generic[EndpointConfig, ResourceConfig, ConnectorState
     captured: response.Captured | None = None
     sourcedSchema: response.SourcedSchema | None = None
     checkpoint: response.Checkpoint[ConnectorState] | None = None
+    backfillBegin: response.BackfillBegin | None = None
+    backfillComplete: response.BackfillComplete | None = None
+
+
+def serialize_response(message: Response[Any, Any, Any]) -> bytes:
+    return message.model_dump_json(by_alias=True, exclude_unset=True).encode()
 
 
 # Bounds applied to SourcedSchema locations that don't declare their own. They
@@ -53,6 +59,8 @@ class Response(BaseModel, Generic[EndpointConfig, ResourceConfig, ConnectorState
 # (maxLength and maximum grow, minLength and minimum shrink).
 DEFAULT_STRING_BOUNDS = {"minLength": 1, "maxLength": 1}
 DEFAULT_NUMERIC_BOUNDS = {"minimum": 1, "maximum": 1}
+DEFAULT_ARRAY_BOUNDS = {"minItems": 1, "maxItems": 1}
+DEFAULT_NUMERIC_STRING_BOUNDS = {"x-str-minimum": "1", "x-str-maximum": "1"}
 
 
 def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
@@ -68,9 +76,19 @@ def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
     - `type: object` and `additionalProperties: False` on the root and wherever
       properties are declared. The runtime rejects a SourcedSchema that isn't
       closed, and a captured document is always an object.
+    - `additionalProperties: False` on every other object location. Inference
+      adds no properties beneath an open object.
     - `required`, covering every declared property. Inference relaxes this for real
       when a document turns up without the field.
     - length and range bounds, which materializations size columns from.
+    - `items: False` on arrays that declare no items. The union keeps an
+      array's inferred items when the SourcedSchema says `items: false`, but
+      drops them when it says nothing.
+    - item count bounds on arrays. The union keeps an inferred `maxItems` only
+      if the SourcedSchema states one too.
+    - `x-str-minimum` and `x-str-maximum` on strings with `format: integer` or
+      `number`, for the same reason. Inference never adds them to a location
+      that already exists.
 
     Whatever the connector already declared wins, so one that knows better - a truer
     bound, its own `_meta` - keeps it. The input is left unmodified.
@@ -118,12 +136,19 @@ def with_sourced_schema_defaults(schema: dict[str, Any]) -> dict[str, Any]:
         declared = out.get("type", [])
         types = {declared} if isinstance(declared, str) else set(declared)
 
+        if "object" in types:
+            out = {"additionalProperties": False, **out}
+
         # Length bounds constrain only string values and range bounds only numeric
         # ones, so a union of both types carries both sets.
         if "string" in types:
             out = {**DEFAULT_STRING_BOUNDS, **out}
+            if out.get("format") in ("integer", "number"):
+                out = {**DEFAULT_NUMERIC_STRING_BOUNDS, **out}
         if types & {"integer", "number"}:
             out = {**DEFAULT_NUMERIC_BOUNDS, **out}
+        if "array" in types:
+            out = {**DEFAULT_ARRAY_BOUNDS, "items": False, **out}
 
         return out
 
@@ -257,6 +282,10 @@ class _BaseTask:
         self.requires_ack = requires_ack
         self.catalog_task_name = catalog_task_name
 
+    def _write_response(self, message: Response[Any, Any, Any]):
+        self._buffer.write(serialize_response(message))
+        self._buffer.write(b"\n")
+
     def _captured(self, binding: int, document: Any):
         if isinstance(document, dict):
             b = orjson.dumps(
@@ -269,10 +298,8 @@ class _BaseTask:
                 default=orjson_default,
             )
         else:
-            b = (
+            b = serialize_response(
                 Response(captured=response.Captured(binding=binding, doc=document))
-                .model_dump_json(by_alias=True, exclude_unset=True)
-                .encode()
             )
 
         self._buffer.write(b)
@@ -283,18 +310,13 @@ class _BaseTask:
         return self._hasher.digest().hex()
 
     def _sourced_schema(self, binding_index: int, schema: dict[str, Any]):
-        b = (
+        self._write_response(
             Response(
                 sourcedSchema=response.SourcedSchema(
                     binding=binding_index, schema_json=with_sourced_schema_defaults(schema)
                 )
             )
-            .model_dump_json(by_alias=True, exclude_unset=True)
-            .encode()
         )
-
-        self._buffer.write(b)
-        self._buffer.write(b"\n")
 
     def _reset(self):
         self._buffer.truncate(0)
@@ -315,10 +337,7 @@ class _BaseTask:
                 state=ConnectorStateUpdate(updated=state, mergePatch=merge_patch)
             )
         )
-        self._buffer.write(
-            checkpoint.model_dump_json(by_alias=True, exclude_unset=True).encode()
-        )
-        self._buffer.write(b"\n")
+        self._write_response(checkpoint)
 
         completion = await self.transactor.commit(
             self._buffer, wait_for_ack=self.requires_ack
@@ -390,6 +409,40 @@ class Task(_BaseTask):
                 {"task": self._name},
             )
             raise
+
+    async def _backfill_begin(
+        self,
+        binding: int,
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
+    ):
+        """Emit a BackfillBegin for the binding, then a checkpoint of `state`."""
+        # The runtime fails the session unless a backfill signal stands alone in
+        # its checkpoint, so nothing may be buffered ahead of it.
+        if self._buffer.tell() != 0:
+            raise RuntimeError(
+                "Implementation error: a BackfillBegin must stand alone in its checkpoint, but this task has buffered output"
+            )
+        self._write_response(
+            Response(backfillBegin=response.BackfillBegin(binding=binding))
+        )
+        await self.checkpoint(state)
+
+    async def _backfill_complete(
+        self,
+        binding: int,
+        state: ConnectorState,  # pyright: ignore[reportInvalidTypeVarUse]
+    ):
+        """Emit a BackfillComplete for the binding, then a checkpoint of `state`."""
+        # The runtime fails the session unless a backfill signal stands alone in
+        # its checkpoint, so nothing may be buffered ahead of it.
+        if self._buffer.tell() != 0:
+            raise RuntimeError(
+                "Implementation error: a BackfillComplete must stand alone in its checkpoint, but this task has buffered output"
+            )
+        self._write_response(
+            Response(backfillComplete=response.BackfillComplete(binding=binding))
+        )
+        await self.checkpoint(state)
 
     def spawn_child(
         self, name_suffix: str, child: Callable[["Task"], Awaitable[None]]

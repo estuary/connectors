@@ -1,0 +1,68 @@
+info:
+  name: fields 401 limit probe
+  type: http
+  seq: 6
+
+http:
+  method: POST
+  url: "{{base_url}}/people/search"
+  body:
+    type: json
+    data: |-
+      { "fields": ["root.id"], "showInactive": true }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Shapes this ONE request's body: 401 field ids (metadata ids, padded by cycling
+        // the list if the tenant has fewer than 401), one pinned employee.
+        const all = JSON.parse(bru.getVar('all_field_ids') || 'null');
+        const ids = JSON.parse(bru.getVar('pin_employee_ids') || 'null');
+        if (!all || !ids) throw new Error('run Metadata/fields and People/ids only show inactive first');
+        const fields = [];
+        for (let i = 0; fields.length < 401; i++) fields.push(all[i % all.length]);
+        req.setBody({
+          fields,
+          filters: [{ fieldPath: 'root.id', operator: 'equals', values: ids.slice(0, 1) }],
+          showInactive: true,
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "400 - 401 fields rejected"
+    request:
+      url: "https://api.hibob.com/v1/people/search"
+      method: POST
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "key": "exception.public.read.employees.invalid.fields.count",
+            "error": "\"fields\" can only contain up to 400 values",
+            "args": []
+          }
+
+docs: |-
+  **REFERENCE:** [Search for employees](https://apidocs.hibob.com/reference/post_people-search.md)
+
+  Read-only search. Requires `Metadata / fields` and `People / ids only show inactive`.
+
+  **WHY:** +1 probe on the documented `fields` cap of 400.
+
+  **LIMITATION (VERIFIED 2026-11-02):** **rejected** — 400
+  `{"key": "exception.public.read.employees.invalid.fields.count", "error": "\"fields\"
+  can only contain up to 400 values"}`. The connector must chunk `fields[]` into slices
+  of at most 400 and merge the slices per employee.

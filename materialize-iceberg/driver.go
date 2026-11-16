@@ -23,6 +23,7 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-iceberg/catalog"
 	"github.com/estuary/connectors/materialize-iceberg/python"
+	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
@@ -124,6 +125,9 @@ type materialization struct {
 	// fields are materialized as Iceberg format v3 variant columns rather
 	// than JSON strings.
 	variantColumns bool
+	// truncateAfterBackfill permits deleting rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
 }
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mapped] = &materialization{}
@@ -184,14 +188,15 @@ func NewMaterializer(ctx context.Context, materializationName string, cfg config
 	}
 
 	return &materialization{
-		cfg:                 cfg,
-		materializationName: materializationName,
-		catalog:             catalog,
-		bucket:              bucket,
-		compute:             compute,
-		templates:           parseTemplates(),
-		locationStyle:       locationStyle,
-		variantColumns:      featureFlags["variant_columns"],
+		cfg:                   cfg,
+		materializationName:   materializationName,
+		catalog:               catalog,
+		bucket:                bucket,
+		compute:               compute,
+		templates:             parseTemplates(),
+		locationStyle:         locationStyle,
+		variantColumns:        featureFlags["variant_columns"],
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}, nil
 }
 
@@ -670,16 +675,17 @@ func (d *materialization) NewTransactor(
 	}
 
 	t := &transactor{
-		materializationName: d.materializationName,
-		be:                  be,
-		cfg:                 d.cfg,
-		bucket:              d.bucket,
-		compute:             d.compute,
-		templates:           d.templates,
-		bindings:            make([]binding, 0, len(mappedBindings)),
-		loadFiles:           boilerplate.NewStagedFiles(stagedFileClient{}, d.bucket, fileSizeLimit, d.cfg.Compute.BucketPath, false, false),
-		storeFiles:          boilerplate.NewStagedFiles(stagedFileClient{}, d.bucket, fileSizeLimit, d.cfg.Compute.BucketPath, true, true),
-		pyFiles:             *pyFiles,
+		materializationName:   d.materializationName,
+		be:                    be,
+		cfg:                   d.cfg,
+		bucket:                d.bucket,
+		compute:               d.compute,
+		templates:             d.templates,
+		bindings:              make([]binding, 0, len(mappedBindings)),
+		loadFiles:             boilerplate.NewStagedFiles(stagedFileClient{}, d.bucket, fileSizeLimit, d.cfg.Compute.BucketPath, false, false),
+		storeFiles:            boilerplate.NewStagedFiles(stagedFileClient{}, d.bucket, fileSizeLimit, d.cfg.Compute.BucketPath, true, true),
+		pyFiles:               *pyFiles,
+		truncateAfterBackfill: d.truncateAfterBackfill,
 	}
 
 	for idx, mapped := range mappedBindings {
@@ -689,6 +695,9 @@ func (d *materialization) NewTransactor(
 		b := binding{
 			Idx:    idx,
 			Mapped: &mapped,
+		}
+		if col, err := publishedAtColumn(&mapped); err == nil {
+			b.publishedAtColumn = col
 		}
 
 		for _, p := range mapped.SelectedProjections() {

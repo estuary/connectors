@@ -6498,6 +6498,61 @@
     }
   ],
   [
+    "acmeCo/order_shipping_lines",
+    {
+      "_meta": {
+        "store": "estuary-alex-testing",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-04-10T17:53:40Z",
+      "id": "gid://shopify/Order/5714629820461",
+      "legacyResourceId": "5714629820461",
+      "shippingLines": [
+        {
+          "carrierIdentifier": null,
+          "code": "International Shipping",
+          "currentDiscountedPriceSet": {
+            "presentmentMoney": {
+              "amount": "30.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "30.0",
+              "currencyCode": "USD"
+            }
+          },
+          "custom": false,
+          "deliveryCategory": null,
+          "discountedPriceSet": {
+            "presentmentMoney": {
+              "amount": "30.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "30.0",
+              "currencyCode": "USD"
+            }
+          },
+          "id": "gid://shopify/ShippingLine/4692902215725",
+          "isRemoved": false,
+          "originalPriceSet": {
+            "presentmentMoney": {
+              "amount": "30.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "30.0",
+              "currencyCode": "USD"
+            }
+          },
+          "source": "shopify",
+          "title": "International Shipping"
+        }
+      ],
+      "updatedAt": "redacted"
+    }
+  ],
+  [
     "acmeCo/inventory_items",
     {
       "_meta": {

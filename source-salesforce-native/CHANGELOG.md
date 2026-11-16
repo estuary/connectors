@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-06
+
+### Changed
+- The `Username, Password, & Security Token` authentication option is no longer offered when creating a capture.
+
 ## 2026-09-17
 
 ### Changed

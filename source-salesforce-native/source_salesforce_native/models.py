@@ -20,6 +20,7 @@ from pydantic import (
     create_model,
     model_validator,
 )
+from pydantic.json_schema import DEFAULT_REF_TEMPLATE, GenerateJsonSchema, JsonSchemaMode
 
 from .auth import OAuth2Credentials, SalesforceClientCredentials, UserPass
 from .shared import dt_to_str, str_to_dt
@@ -180,6 +181,32 @@ class EndpointConfig(BaseModel):
         description="Advanced settings for the connector.",
         json_schema_extra={"advanced": True},
     )
+
+    # Salesforce is retiring the SOAP login() call that UserPass relies on, so the UI shouldn't
+    # offer it to new captures. Dropping UserPass from the spec's oneOf hides it in the UI, while
+    # the credentials union still accepts it so existing captures keep working.
+    @classmethod
+    def model_json_schema(
+        cls,
+        by_alias: bool = True,
+        ref_template: str = DEFAULT_REF_TEMPLATE,
+        schema_generator: type[GenerateJsonSchema] = GenerateJsonSchema,
+        mode: JsonSchemaMode = "validation",
+        *,
+        union_format: Literal["any_of", "primitive_type_array"] = "any_of",
+    ) -> dict[str, Any]:
+        schema = super().model_json_schema(
+            by_alias, ref_template, schema_generator, mode, union_format=union_format
+        )
+
+        credentials = schema["properties"]["credentials"]
+        credentials["oneOf"] = [
+            option
+            for option in credentials["oneOf"]
+            if option["$ref"] != f"#/$defs/{UserPass.__name__}"
+        ]
+
+        return schema
 
 
 ConnectorState = GenericConnectorState[ResourceState]

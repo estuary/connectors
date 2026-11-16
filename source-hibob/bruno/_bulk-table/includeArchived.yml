@@ -1,0 +1,520 @@
+info:
+  name: includeArchived
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/bulk/people/{{table}}?limit=200&includeArchived=true"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // `table` selects the bulk table (employment | lifecycle | work). Override per
+        // run with `--env-var table=<name>`; otherwise default to employment.
+        if (!bru.getEnvVar('table') && !bru.getVar('table')) bru.setVar('table', 'employment');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://apidocs.hibob.com/reference/get_bulk-people-employment
+
+    **WHY:** Silent-data-loss audit of a defaulted parameter. `includeArchived`
+    defaults to `false`, and the docs say it governs archived *columns*: "By
+    default (false), archived columns are excluded from the response. When set to
+    true, archived columns are included." (DOCUMENTED 2026-11-02)
+
+    **VERIFIED (2026-11-02):** on employment, `includeArchived=true` returned the
+    same 45 employees, entries and per-entry key set as `Employment History / bare`.
+    The tenant has no archived columns, so the column-adding effect is
+    **UNOBSERVABLE** here (archiving a custom column is an admin action we won't
+    ask for). Row set is unaffected. The connector sends `includeArchived=true`
+    so columns archived after the fact stay in history; schema inference
+    absorbs the extra columns.
+  type: text/markdown
+
+examples:
+  - name: "200 - employment: identical rows and keys to bare, no archived columns in account (projection: ids only)"
+    request:
+      url: "{{base_url}}/bulk/people/employment?limit=200&includeArchived=true"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-ratelimit-limit
+          value: "100"
+        - name: x-ratelimit-remaining
+          value: "93"
+        - name: x-ratelimit-reset
+          value: "1793639160"
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "employeeId": "4021630335610520270",
+                "values": [
+                  {
+                    "id": 1000020261102,
+                    "effectiveDate": "2026-11-02",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630422130623184",
+                "values": [
+                  {
+                    "id": 1000020131101,
+                    "effectiveDate": "2013-11-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630425922274001",
+                "values": [
+                  {
+                    "id": 1000020141120,
+                    "effectiveDate": "2014-11-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630442204562130",
+                "values": [
+                  {
+                    "id": 1000020140202,
+                    "effectiveDate": "2014-02-02",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630446323368659",
+                "values": [
+                  {
+                    "id": 1000020140312,
+                    "effectiveDate": "2014-03-12",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630449754309332",
+                "values": [
+                  {
+                    "id": 1000020150128,
+                    "effectiveDate": "2015-01-28",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630453151695573",
+                "values": [
+                  {
+                    "id": 1000020150210,
+                    "effectiveDate": "2015-02-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630456683299542",
+                "values": [
+                  {
+                    "id": 1000020150210,
+                    "effectiveDate": "2015-02-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630460424618711",
+                "values": [
+                  {
+                    "id": 1000020150205,
+                    "effectiveDate": "2015-02-05",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630463780061912",
+                "values": [
+                  {
+                    "id": 1000020150310,
+                    "effectiveDate": "2015-03-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630467101950681",
+                "values": [
+                  {
+                    "id": 1000020141210,
+                    "effectiveDate": "2014-12-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630470776160986",
+                "values": [
+                  {
+                    "id": 1000020141111,
+                    "effectiveDate": "2014-11-11",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630474366485211",
+                "values": [
+                  {
+                    "id": 1000020150216,
+                    "effectiveDate": "2015-02-16",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630477688373980",
+                "values": [
+                  {
+                    "id": 1000020141120,
+                    "effectiveDate": "2014-11-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630481756848861",
+                "values": [
+                  {
+                    "id": 1000020150501,
+                    "effectiveDate": "2015-05-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630485095514846",
+                "values": [
+                  {
+                    "id": 1000020150220,
+                    "effectiveDate": "2015-02-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630488702616287",
+                "values": [
+                  {
+                    "id": 1000020150220,
+                    "effectiveDate": "2015-02-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630492041282272",
+                "values": [
+                  {
+                    "id": 1000020141216,
+                    "effectiveDate": "2014-12-16",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630495430279905",
+                "values": [
+                  {
+                    "id": 1000020150302,
+                    "effectiveDate": "2015-03-02",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630498710225634",
+                "values": [
+                  {
+                    "id": 1000020150314,
+                    "effectiveDate": "2015-03-14",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630502443156195",
+                "values": [
+                  {
+                    "id": 1000020141201,
+                    "effectiveDate": "2014-12-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630506134143716",
+                "values": [
+                  {
+                    "id": 1000020230801,
+                    "effectiveDate": "2023-08-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630509615416037",
+                "values": [
+                  {
+                    "id": 1000020150303,
+                    "effectiveDate": "2015-03-03",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630512811475686",
+                "values": [
+                  {
+                    "id": 1000020230801,
+                    "effectiveDate": "2023-08-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630516066255591",
+                "values": [
+                  {
+                    "id": 1000020140212,
+                    "effectiveDate": "2014-02-12",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630535863370472",
+                "values": [
+                  {
+                    "id": 1000020150320,
+                    "effectiveDate": "2015-03-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630539629855465",
+                "values": [
+                  {
+                    "id": 1000020230801,
+                    "effectiveDate": "2023-08-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630543111127786",
+                "values": [
+                  {
+                    "id": 1000020150101,
+                    "effectiveDate": "2015-01-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630546617565931",
+                "values": [
+                  {
+                    "id": 1000020150101,
+                    "effectiveDate": "2015-01-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630549872345836",
+                "values": [
+                  {
+                    "id": 1000020141115,
+                    "effectiveDate": "2014-11-15",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630553135514350",
+                "values": [
+                  {
+                    "id": 1000020140212,
+                    "effectiveDate": "2014-02-12",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630556751004399",
+                "values": [
+                  {
+                    "id": 1000020160101,
+                    "effectiveDate": "2016-01-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630559930286832",
+                "values": [
+                  {
+                    "id": 1000020141210,
+                    "effectiveDate": "2014-12-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630563654828785",
+                "values": [
+                  {
+                    "id": 1000020150214,
+                    "effectiveDate": "2015-02-14",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630566842499826",
+                "values": [
+                  {
+                    "id": 1000020140511,
+                    "effectiveDate": "2014-05-11",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630570399269619",
+                "values": [
+                  {
+                    "id": 1000020140301,
+                    "effectiveDate": "2014-03-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630573872153332",
+                "values": [
+                  {
+                    "id": 1000020141113,
+                    "effectiveDate": "2014-11-13",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630578989204213",
+                "values": [
+                  {
+                    "id": 1000020150410,
+                    "effectiveDate": "2015-04-10",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630583141565174",
+                "values": [
+                  {
+                    "id": 1000020160801,
+                    "effectiveDate": "2016-08-01",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630599860060919",
+                "values": [
+                  {
+                    "id": 1000020160408,
+                    "effectiveDate": "2016-04-08",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630603584602872",
+                "values": [
+                  {
+                    "id": 1000020141120,
+                    "effectiveDate": "2014-11-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630607242035961",
+                "values": [
+                  {
+                    "id": 1000020150220,
+                    "effectiveDate": "2015-02-20",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630611084018426",
+                "values": [
+                  {
+                    "id": 1000020150202,
+                    "effectiveDate": "2015-02-02",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630614447850235",
+                "values": [
+                  {
+                    "id": 1000020150103,
+                    "effectiveDate": "2015-01-03",
+                    "isCurrent": true
+                  }
+                ]
+              },
+              {
+                "employeeId": "4021630617878790908",
+                "values": [
+                  {
+                    "id": 1000020150306,
+                    "effectiveDate": "2015-03-06",
+                    "isCurrent": true
+                  }
+                ]
+              }
+            ],
+            "response_metadata": {
+              "next_cursor": null
+            },
+            "errors": {}
+          }

@@ -28,6 +28,9 @@ type MergeBinding struct {
 	Columns          []NestedField `json:"columns"`
 	Files            []string      `json:"files"`
 	IdempotencyToken string        `json:"idempotency_token"`
+	// TruncateQuery deletes rows published before a completed backfill's
+	// boundary. Empty if the binding has no backfill truncation pending.
+	TruncateQuery string `json:"truncate_query,omitempty"`
 }
 
 type MergeInput struct {

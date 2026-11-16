@@ -1,0 +1,55 @@
+# The key shape of uuidv7-recency-3tx, with only ten updates per transaction
+# to arbitrary old rows instead of 0.2%. A transaction's keys are then one
+# dense band of recent ids plus a few far-off outliers, which stretch a single
+# min/max key bound across most of the table but leave wide gaps between the
+# keys, so a bound split at those gaps excludes most of the table.
+#
+# Doc math (4KB docs, 2,621,440 docs per 10GB):
+#   tx1: 25% of 2.6M = 655K updates drawn from the last 40% of tx0's keys,
+#        plus 10 updates drawn from all of tx0; 1.97M fresh.
+#   tx2: the same against tx1's fresh keys.
+#   tx3: a 10-document trailer so tx2's commit lands inside the logged window.
+collections:
+  - name: bench/wide_uuidv7_outliers
+    schema:
+      type: object
+      if:
+        properties:
+          _meta:
+            properties: { op: { const: d } }
+      then:
+        reduce: { delete: true, strategy: lastWriteWins }
+      properties:
+        id:      { type: string }
+        val:     { type: integer }
+        payload: { type: string }
+        _meta:
+          type: object
+          properties: { op: { type: string } }
+          required: [op]
+      required: [id, _meta]
+    key: [/id]
+    key_type: uuid_ordered
+    resource:
+      table: wide_uuidv7_outliers
+
+transactions:
+  - total_size: 10GB
+    doc_size:   4KB
+    op: c
+
+  - total_size: 10GB
+    doc_size:   4KB
+    overlaps:
+      - { with: 0, fraction: 0.25, op: u, range: [0.6, 1.0] }
+      - { with: 0, fraction: 0.0000039, op: u }
+
+  - total_size: 10GB
+    doc_size:   4KB
+    overlaps:
+      - { with: 1, fraction: 0.25, op: u, range: [0.6, 1.0] }
+      - { with: 1, fraction: 0.0000039, op: u }
+
+  - doc_count: 10
+    doc_size: 4KB
+    op: c

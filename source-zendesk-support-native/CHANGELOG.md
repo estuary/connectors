@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-06
+
+### Changed
+- `calls` and `call_legs` are discovered only while Zendesk allows access to their incremental exports.
+
 ## 2026-10-23
 
 ### Fixed

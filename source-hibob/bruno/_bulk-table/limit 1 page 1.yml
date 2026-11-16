@@ -1,0 +1,142 @@
+info:
+  name: limit 1 page 1
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/bulk/people/{{table}}?limit=1"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // `table` selects the bulk table (employment | lifecycle | work). Override per
+        // run with `--env-var table=<name>`; otherwise default to employment.
+        if (!bru.getEnvVar('table') && !bru.getVar('table')) bru.setVar('table', 'employment');
+    - type: after-response
+      code: |-
+        const next = res.getBody()?.response_metadata?.next_cursor;
+        bru.setVar('bulk_next_cursor', next ?? '');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://apidocs.hibob.com/reference/pagination-1
+
+    **WHY:** Proves the cursor pagination contract the connector loops on, and
+    stores `next_cursor` (a non-secret runtime var) for
+    `_bulk-table / limit 1 page 2`.
+
+    **VERIFIED (2026-11-02):** `limit=1` returned 1 result (1 employee, 1 entry)
+    and a string `response_metadata.next_cursor` (opaque base64, decodes to an
+    `algo2::...` token). The full-size calls (`limit=200`, 45 employees) return
+    `next_cursor: null`, which is the completion signal.
+    **UNOBSERVABLE:** whether `limit` counts employees (results) or entries, and
+    whether one employee's entries can span two pages. Every employee had one
+    entry when this ran, and producing >200 entries needs bulk seeding (out of
+    scope). It doesn't matter to the connector: each result carries its own
+    `employeeId` and the connector flattens per result, so a split employee
+    just yields its entries across two pages.
+
+    The cursor is never checkpointed (each snapshot walks start to finish in one
+    invocation), so the opaque-token durability rule doesn't apply.
+  type: text/markdown
+
+examples:
+  - name: "200 - employment: 1 result, next_cursor string (full body)"
+    request:
+      url: "{{base_url}}/bulk/people/employment?limit=1"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-ratelimit-limit
+          value: "100"
+        - name: x-ratelimit-remaining
+          value: "96"
+        - name: x-ratelimit-reset
+          value: "1793639160"
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "employeeId": "4021630335610520270",
+                "values": [
+                  {
+                    "id": 1000020261102,
+                    "effectiveDate": "2026-11-02",
+                    "endEffectiveDate": null,
+                    "isCurrent": true,
+                    "canBeDeleted": true,
+                    "canEditOotbColumns": true,
+                    "change": {
+                      "reason": null,
+                      "changedBy": null,
+                      "changedById": "system"
+                    },
+                    "creationDate": null,
+                    "modificationDate": "2026-11-02",
+                    "contract": "Full time",
+                    "type": null,
+                    "workingPattern": null,
+                    "standardWorkingPattern": null,
+                    "standardWorkingPatternId": null,
+                    "personalWorkingPatternType": null,
+                    "siteWorkingPattern": {
+                      "workingPatternType": "hourly",
+                      "days": {
+                        "sunday": 0,
+                        "tuesday": 8,
+                        "wednesday": 8,
+                        "monday": 8,
+                        "friday": 8,
+                        "thursday": 8,
+                        "saturday": 0
+                      },
+                      "hoursPerDay": 8,
+                      "workingPatternId": 66985751
+                    },
+                    "calendarName": null,
+                    "calendarId": null,
+                    "flsaCode": null,
+                    "salaryPayType": null,
+                    "fte": 100,
+                    "weeklyHours": 40,
+                    "activeEffectiveDate": "2026-11-02",
+                    "actualWorkingPattern": {
+                      "workingPatternType": "hourly",
+                      "days": {
+                        "sunday": 0,
+                        "tuesday": 8,
+                        "wednesday": 8,
+                        "monday": 8,
+                        "friday": 8,
+                        "thursday": 8,
+                        "saturday": 0
+                      },
+                      "hoursPerDay": 8,
+                      "workingPatternId": 66985751
+                    },
+                    "hoursInDayNotWorked": 8,
+                    "customColumns": {}
+                  }
+                ]
+              }
+            ],
+            "response_metadata": {
+              "next_cursor": "YWxnbzI6OiYmdlNHZ3F1YU9ibFpnUGgxaFBoUUFaQ1ZiK3IxVEY1YndySFNCYzFYT2prYUt2d0EvQkszWkdTOUo5UUErZ3dDVEE4MTBBMlptYmdFaXlDR0ViZHZZR2hvNXB2S2N3UTJyZDhxYThhWjZRc0dO"
+            },
+            "errors": {}
+          }

@@ -10,13 +10,15 @@ This connector captures data from Calendly into Estuary collections.
 
 The connector captures the following Calendly resources:
 
-- [Event Invitees](https://developer.calendly.com/api-docs/eb8ee72701f99-list-event-invitees)
-- [Event Types](https://developer.calendly.com/api-docs/25a4ece03c1bc-list-user-s-event-types)
-- [Groups](https://developer.calendly.com/api-docs/6rb6dtdln74sy-list-groups) (Teams accounts only)
-- [Organization Memberships](https://developer.calendly.com/api-docs/b3A6NTkxNDI0-list-organization-memberships)
-- [Routing Form Submissions](https://developer.calendly.com/api-docs/17db5cb915a57-list-routing-form-submissions) (Teams accounts only)
-- [Routing Forms](https://developer.calendly.com/api-docs/9fe7334bec6ad-list-routing-forms) (Teams accounts only)
-- [Scheduled Events](https://developer.calendly.com/api-docs/b3A6NTkxNDEy-list-events)
+| Resource | Replication Mode | Additional Requirements |
+| --- | --- | --- |
+| [Event Invitees](https://developer.calendly.com/api-docs/eb8ee72701f99-list-event-invitees) | Incremental |  |
+| [Event Types](https://developer.calendly.com/api-docs/25a4ece03c1bc-list-user-s-event-types) | Incremental |  |
+| [Groups](https://developer.calendly.com/api-docs/6rb6dtdln74sy-list-groups) | Snapshot | Teams accounts only |
+| [Organization Memberships](https://developer.calendly.com/api-docs/b3A6NTkxNDI0-list-organization-memberships) | Snapshot |  |
+| [Routing Form Submissions](https://developer.calendly.com/api-docs/17db5cb915a57-list-routing-form-submissions) | Snapshot | Teams accounts only |
+| [Routing Forms](https://developer.calendly.com/api-docs/9fe7334bec6ad-list-routing-forms) | Snapshot | Teams accounts only |
+| [Scheduled Events](https://developer.calendly.com/api-docs/b3A6NTkxNDEy-list-events) | Incremental |  |
 
 :::info
 Resources that require a Calendly Teams account are automatically omitted during discovery when the authenticated account is not on a Teams plan.

@@ -3,6 +3,7 @@ package sql
 import (
 	"fmt"
 	"math"
+	"mime"
 	"slices"
 	"strings"
 
@@ -379,6 +380,10 @@ type StringMappings struct {
 	// application/octet-stream; if both base64 encoding and a non-octet-stream
 	// media type are present, the field is still a string and flows through
 	// this map.
+	//
+	// A key without parameters also matches an annotation that adds some, such
+	// as "application/vnd.estuary.mysql.varchar; size=20". Its mapping function
+	// can read them with mime.ParseMediaType.
 	WithContentType map[string]MapProjectionFn
 }
 
@@ -390,9 +395,15 @@ func MapString(m StringMappings) MapProjectionFn {
 		delegate := m.Fallback
 
 		if p.Inference.String_ != nil {
+			contentType := p.Inference.String_.ContentType
+			// The lowercased type without its parameters.
+			baseType, _, _ := mime.ParseMediaType(contentType)
+
 			if h, ok := m.WithFormat[p.Inference.String_.Format]; ok {
 				delegate = h
-			} else if h, ok := m.WithContentType[p.Inference.String_.ContentType]; ok {
+			} else if h, ok := m.WithContentType[contentType]; ok {
+				delegate = h
+			} else if h, ok := m.WithContentType[baseType]; ok {
 				delegate = h
 			}
 		}

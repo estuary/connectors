@@ -47,15 +47,11 @@ If your Salesforce organization's login policy prevents signing in through `logi
 
 ### Authentication
 
-There are three ways to authenticate with Salesforce when capturing data into Estuary.
+There are two ways to authenticate with Salesforce when creating a capture in Estuary. Some existing captures use a third method, which is deprecated.
 
 #### OAuth
 
 Sign in to Salesforce from the Estuary web app and grant access. Estuary handles the token exchange and refresh for you. This is the recommended method in the web app.
-
-#### Username, Password, & Security Token
-
-Sign in using a Salesforce user's username, password, and [security token](https://help.salesforce.com/s/articleView?id=sf.user_security_token.htm&type=5). This is a good fit if you cannot use OAuth, but **will not work in organizations that enforce single sign-on (SSO)** for interactive logins.
 
 #### Client Credentials
 
@@ -64,6 +60,10 @@ Authenticate via Salesforce's [OAuth 2.0 Client Credentials flow](https://help.s
 Use this option when your organization enforces SSO or other login restrictions that prevent the other authentication methods from working. The [`my_domain`](#endpoint) field is required since the Client Credentials flow must hit your org's My Domain token endpoint.
 
 See [Create an External Client App](#create-an-external-client-app) for setup steps.
+
+#### Username, Password, & Security Token (deprecated)
+
+This method signs in with a Salesforce user's username, password, and [security token](https://help.salesforce.com/s/articleView?id=sf.user_security_token.htm&type=5) through Salesforce's SOAP API `login()` call. Salesforce is [retiring `login()`](https://help.salesforce.com/s/articleView?id=release-notes.rn_api.htm&release=258&type=5) in Summer '27, so this method isn't offered for new captures. Existing captures that use it keep working until then, but we recommend switching them to OAuth or Client Credentials.
 
 ### Setup
 
@@ -77,7 +77,7 @@ This is useful if you have a large amount of data in your Salesforce organizatio
 2. [Edit the new profile's permissions](https://help.salesforce.com/s/articleView?id=sf.perm_sets_object_perms_edit.htm&type=5). Grant it read access to all the standard and custom objects you'd like to capture with Estuary.
 
 3. [Create a new user](https://help.salesforce.com/s/articleView?id=sf.adding_new_users.htm&type=5), applying the profile you just created.
-You'll use this user's email address and password to authenticate Salesforce in Estuary. If you're authenticating with username, password, and security token, you'll also need the user's security token. If you're authenticating with Client Credentials, you'll designate this user as the External Client App's "Run As" user.
+You'll use this user's email address and password to authenticate Salesforce in Estuary. If you're authenticating with Client Credentials, you'll designate this user as the External Client App's "Run As" user.
 
 #### Create an External Client App
 
@@ -175,7 +175,7 @@ See [connectors](../../../../concepts/connectors.md#using-connectors) to learn m
 | **`/credentials/refresh_token`** | OAuth Refresh Token | The refresh token received from the OAuth app. | string | Required |
 | **`/credentials/instance_url`** | Instance URL | The URL for the instance of your Salesforce organization. | string | Required |
 
-**Username, Password, & Security Token:**
+**Username, Password, & Security Token (deprecated):**
 
 | Property | Title | Description | Type | Required/Default |
 |---|---|---|---|---|

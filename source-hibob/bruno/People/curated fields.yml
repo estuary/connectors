@@ -1,0 +1,284 @@
+info:
+  name: curated fields
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{base_url}}/people/search"
+  body:
+    type: json
+    data: |-
+      {
+        "fields": [
+          "root.id",
+          "root.email",
+          "root.firstName",
+          "root.surname",
+          "root.displayName",
+          "work.employeeIdInCompany",
+          "work.title",
+          "work.department",
+          "work.site",
+          "work.siteId",
+          "work.reportsTo",
+          "work.manager",
+          "work.startDate",
+          "work.originalStartDate",
+          "payroll.employment.activeEffectiveDate",
+          "payroll.employment.fte",
+          "payroll.employment.weeklyHours",
+          "payroll.employment.type",
+          "payroll.employment.contract",
+          "internal.status",
+          "internal.lifecycleStatus",
+          "internal.terminationDate",
+          "internal.terminationReason",
+          "internal.terminationType",
+          "employee.firstDayOfWork",
+          "employee.lastDayOfWork",
+          "employee.recentLeaveStartDate",
+          "employee.recentLeaveEndDate",
+          "internal.currentActiveStatusStartDate"
+        ],
+        "filters": [{ "fieldPath": "root.id", "operator": "equals", "values": {{pin_employee_ids}} }],
+        "showInactive": true
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - projection: 1 of 45 employees, full item (slash keys omit nulls; nested objects keep them)"
+    request:
+      url: "https://api.hibob.com/v1/people/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-ratelimit-limit
+          value: "100"
+      body:
+        type: json
+        data: |-
+          {
+            "employees": [
+              {
+                "/root/id": {
+                  "value": "4021630481756848861"
+                },
+                "internal": {
+                  "terminationDate": null,
+                  "currentActiveStatusStartDate": "2015-05-01",
+                  "lifecycleStatus": "employed",
+                  "terminationType": null,
+                  "terminationReason": null,
+                  "status": "Active"
+                },
+                "displayName": "Alan Tullin",
+                "/work/startDate": {
+                  "value": "2015-05-01"
+                },
+                "employee": {
+                  "firstDayOfWork": null,
+                  "recentLeaveStartDate": null,
+                  "lastDayOfWork": null,
+                  "recentLeaveEndDate": null
+                },
+                "/root/surname": {
+                  "value": "Tullin"
+                },
+                "/payroll/employment/activeEffectiveDate": {
+                  "value": "2015-05-01"
+                },
+                "/work/department": {
+                  "value": "Client Services"
+                },
+                "/payroll/employment/weeklyHours": {
+                  "value": 40
+                },
+                "surname": "Tullin",
+                "/root/email": {
+                  "value": "alan.tullin_644219_14@samplebob.com"
+                },
+                "id": "4021630481756848861",
+                "/internal/status": {
+                  "value": "Active"
+                },
+                "/work/reportsTo": {
+                  "value": {
+                    "firstName": "Frederick",
+                    "surname": "Bateson",
+                    "displayName": "Frederick Bateson",
+                    "id": "4021630477688373980",
+                    "email": "frederick.bateson_644219_13@samplebob.com"
+                  }
+                },
+                "/work/title": {
+                  "value": "Account Manager"
+                },
+                "email": "alan.tullin_644219_14@samplebob.com",
+                "/work/site": {
+                  "value": "New York (Demo)"
+                },
+                "/internal/lifecycleStatus": {
+                  "value": "employed"
+                },
+                "/work/manager": {
+                  "value": "4021630477688373980"
+                },
+                "/work/originalStartDate": {
+                  "value": "2015-05-01"
+                },
+                "/payroll/employment/contract": {
+                  "value": "Full time"
+                },
+                "/work/employeeIdInCompany": {
+                  "value": 40
+                },
+                "work": {
+                  "originalStartDate": "2015-05-01",
+                  "site": "New York (Demo)",
+                  "employeeIdInCompany": 40,
+                  "manager": "4021630477688373980",
+                  "siteId": 2614101,
+                  "reportsTo": {
+                    "firstName": "Frederick",
+                    "surname": "Bateson",
+                    "displayName": "Frederick Bateson",
+                    "id": "4021630477688373980",
+                    "email": "frederick.bateson_644219_13@samplebob.com"
+                  },
+                  "title": "Account Manager",
+                  "department": "Client Services",
+                  "startDate": "2015-05-01"
+                },
+                "/work/siteId": {
+                  "value": 2614101
+                },
+                "firstName": "Alan",
+                "/payroll/employment/fte": {
+                  "value": 100
+                },
+                "/root/displayName": {
+                  "value": "Alan Tullin"
+                },
+                "/root/firstName": {
+                  "value": "Alan"
+                },
+                "/internal/currentActiveStatusStartDate": {
+                  "value": "2015-05-01"
+                },
+                "payroll": {
+                  "employment": {
+                    "weeklyHours": 40,
+                    "fte": 100,
+                    "contract": "Full time",
+                    "activeEffectiveDate": "2015-05-01",
+                    "type": null
+                  }
+                }
+              }
+            ]
+          }
+
+  - name: "200 - projection: terminated employee after H3 (nested keys only)"
+    request:
+      url: "https://api.hibob.com/v1/people/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "employees": [
+              {
+                "internal": {
+                  "terminationDate": "2026-10-31",
+                  "currentActiveStatusStartDate": null,
+                  "lifecycleStatus": "terminated",
+                  "terminationType": null,
+                  "terminationReason": null,
+                  "status": "Inactive"
+                },
+                "displayName": "Owen Reed",
+                "employee": {
+                  "firstDayOfWork": null,
+                  "recentLeaveStartDate": null,
+                  "lastDayOfWork": "2026-10-31",
+                  "recentLeaveEndDate": null
+                },
+                "surname": "Reed",
+                "id": "4021630453151695573",
+                "email": "owen.reed_644219_6@samplebob.com",
+                "work": {
+                  "originalStartDate": "2015-02-10",
+                  "site": "New York (Demo)",
+                  "employeeIdInCompany": 15,
+                  "manager": "4021630446323368659",
+                  "siteId": 2614101,
+                  "reportsTo": {
+                    "firstName": "Sofia",
+                    "surname": "Hopkins",
+                    "displayName": "Sofia Hopkins",
+                    "id": "4021630446323368659",
+                    "email": "sofia.hopkins_644219_4@samplebob.com"
+                  },
+                  "title": "Developer",
+                  "department": "Development",
+                  "startDate": "2015-02-10"
+                },
+                "firstName": "Owen",
+                "payroll": {
+                  "employment": {
+                    "weeklyHours": 40,
+                    "fte": 100,
+                    "contract": "Full time",
+                    "activeEffectiveDate": "2015-02-10",
+                    "type": null
+                  }
+                }
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Search for employees](https://apidocs.hibob.com/reference/post_people-search.md)
+
+  Read-only search. Run `People / ids only show inactive` first in a fresh session
+  (provides `{{pin_employee_ids}}`).
+
+  **WHY:** step 2 of the two-phase read — batch read by `root.id` filter, machine format
+  (`humanReadable` omitted), with the fields the user's requirements depend on.
+
+  **VERIFIED (2026-11-02):** a `root.id` filter with 45 ids returns all 45.
+
+  **LIMITATION (VERIFIED 2026-11-02):** each employee carries **two copies** of the
+  data: slash keys (`"/work/department": {"value": ...}`) and nested objects (`"work":
+  {"department": ...}`, root fields flattened to top level: `id`, `email`, ...). Slash
+  keys are **omitted when the value is null** (no `/internal/terminationDate` on active
+  employees); the nested form keeps explicit `null`s. The connector keeps the nested
+  form and drops slash keys (see `People / all fields` for the superset proof).
+
+  **VERIFIED (2026-11-02):** terminated employee (after `Seeding / H3 - Terminate Employee`):
+  `internal.lifecycleStatus: "terminated"`, `internal.status: "Inactive"`,
+  `internal.terminationDate` and `employee.lastDayOfWork` both `"2026-10-31"`,
+  `internal.currentActiveStatusStartDate: null`.
+
+  **VERIFIED (2026-11-02):** raw value encodings — `work.department`: list item id
+  (string, == name here); `work.siteId`: int site item id; `work.site`: site name
+  text; `work.manager`: manager employee id; `work.reportsTo`: object
+  `{id, firstName, surname, displayName, email}`; dates `YYYY-MM-DD`;
+  `payroll.employment.fte`: number (100); `weeklyHours`: number (40).

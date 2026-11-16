@@ -1,0 +1,25 @@
+collections:
+  acmeCo/employee_fields:
+    schema: employee_fields.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/employees:
+    schema: employees.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/employment_history:
+    schema: employment_history.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/lifecycle_history:
+    schema: lifecycle_history.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/named_lists:
+    schema: named_lists.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/work_history:
+    schema: work_history.schema.yaml
+    key:
+    - /_meta/row_id

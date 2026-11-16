@@ -24,16 +24,6 @@ const (
 
 	// This is the maximum allowed by DynamoDB for a BatchWriteItem request.
 	storeBatchSize = 25
-
-	// Initial backoff to use if a batch request returns successfully with unprocessed items/keys.
-	// Will increase exponentially as additional requests continue to return unprocessed items/keys.
-	initialBackoff = 10 * time.Millisecond
-
-	// Maximum amount of time to wait between retry attempts of unprocessed items/keys.
-	maxBackoff = 1 * time.Second
-
-	// Maximum number of retry attempts before failing with an error.
-	maxAttempts = 30
 )
 
 type transactor struct {
@@ -256,7 +246,7 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(i int, doc json
 				return nil
 			}
 
-			for attempt := 1; ; attempt++ {
+			if err := unprocessedRetry.Do(ctx, "BatchGetItem", func(ctx context.Context) error {
 				res, err := t.client.db.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
 					RequestItems: batch,
 				})
@@ -293,18 +283,17 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(i int, doc json
 				}
 
 				if len(res.UnprocessedKeys) == 0 {
-					break
+					return nil
 				}
-
-				// BatchGetItem returns without error if at least one of the requests was successful.
-				// The items that the get request was not successful for are returned as UnprocessedKeys,
-				// and must be retried. Items are unprocessed if getting them would exceed rate limits
-				// for the table.
 				batch = res.UnprocessedKeys
 
-				if err := delay(ctx, attempt, "load"); err != nil {
-					return err
+				var count int
+				for _, ka := range batch {
+					count += len(ka.Keys)
 				}
+				return &unprocessedError{operation: "BatchGetItem", count: count}
+			}); err != nil {
+				return err
 			}
 		}
 	}
@@ -321,7 +310,7 @@ func (t *transactor) storeWorker(ctx context.Context, batches <-chan map[string]
 				return nil
 			}
 
-			for attempt := 1; ; attempt++ {
+			if err := unprocessedRetry.Do(ctx, "BatchWriteItem", func(ctx context.Context) error {
 				res, err := t.client.db.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
 					RequestItems: batch,
 				})
@@ -336,49 +325,18 @@ func (t *transactor) storeWorker(ctx context.Context, batches <-chan map[string]
 				}
 
 				if len(res.UnprocessedItems) == 0 {
-					break
+					return nil
 				}
-
-				// BatchWriteItem returns without error if at least one of the request items was stored
-				// successfully. The remaining items are returned as UnprocessedItems, and must be retried.
-				// Items are unprocessed if storing them would exceed rate limits for the table.
 				batch = res.UnprocessedItems
 
-				if err := delay(ctx, attempt, "store"); err != nil {
-					return err
+				var count int
+				for _, reqs := range batch {
+					count += len(reqs)
 				}
+				return &unprocessedError{operation: "BatchWriteItem", count: count}
+			}); err != nil {
+				return err
 			}
 		}
-	}
-}
-
-func delay(ctx context.Context, attempt int, key string) error {
-	if attempt > maxAttempts {
-		return fmt.Errorf("%s worker failed after %d retry attempts", key, maxAttempts)
-	}
-
-	d := time.Duration(1<<attempt) * initialBackoff
-	if d > maxBackoff {
-		d = maxBackoff
-	}
-
-	entry := log.WithFields(log.Fields{
-		"attempt":  attempt,
-		"waitTime": d.String(),
-	})
-	msg := fmt.Sprintf("%s worker waiting to retry unprocessed items", key)
-
-	if attempt < 15 {
-		entry.Debug(msg)
-	} else {
-		entry.Info(msg)
-	}
-
-	// Retry with exponential backoff if there were unprocessed items in the batch.
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-time.After(d):
-		return nil
 	}
 }

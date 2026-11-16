@@ -25,7 +25,6 @@ from source_tiktok_ads_native.api.entities import EVENTUAL_CONSISTENCY_DELAY
 from source_tiktok_ads_native.models import EndpointConfig, ResourceState
 from estuary_cdk.capture import common
 from source_tiktok_ads_native.resources import (
-    DEFAULT_REPORT_HISTORY,
     _add_new_advertisers,
     _per_advertiser_state,
     all_resources,
@@ -201,16 +200,17 @@ async def test_each_subtask_reads_its_own_advertiser_in_its_own_zone(monkeypatch
     assert {"Campaigns", "AdGroups", "Ads", "ad_report_daily"} <= set(opened)
 
 
-@pytest.mark.parametrize("start_date", [None, "2026-11-01T00:00:00Z"], ids=["blank", "set"])
+@pytest.mark.parametrize("start_date", [{}, {"start_date": "2026-11-01T00:00:00Z"}], ids=["blank", "set"])
 @pytest.mark.asyncio
-async def test_only_a_start_date_the_user_set_holds_back_the_report_incremental(monkeypatch, start_date: str | None):
+async def test_reports_are_bound_to_the_start_date(monkeypatch, start_date: dict[str, str]):
     opened: dict[str, Any] = {}
     monkeypatch.setattr(common, "open_binding", lambda binding, *args, **fetch_fns: opened.update(fetch_fns))
+    before = datetime.now(tz=UTC)
     endpoint = EndpointConfig.model_validate(
         {
             "credentials": {"credentials_title": "Private App Credentials", "access_token": "t"},
             "advertiser_ids": ["1001"],
-            "start_date": start_date,
+            **start_date,
         }
     )
     resources = await all_resources(LOG, InfoStub({"1001": "UTC"}), endpoint)  # type: ignore[arg-type]
@@ -221,14 +221,11 @@ async def test_only_a_start_date_the_user_set_holds_back_the_report_incremental(
     # Both are bound as (client, advertiser_id, zone, report, model, start, ...).
     incremental_start = opened["fetch_changes"]["1001"].args[5]
     backfill_start = opened["fetch_page"]["1001"].args[5]
-    if start_date is None:
-        assert isinstance(state.backfill, dict)
-        backfill = state.backfill["1001"]
-        assert backfill is not None and isinstance(backfill.cutoff, datetime)
-        assert incremental_start is None
-        assert backfill_start == backfill.cutoff - DEFAULT_REPORT_HISTORY
-    else:
-        assert incremental_start == backfill_start == endpoint.start_date
+    assert incremental_start == backfill_start == endpoint.start_date
+    if not start_date:
+        # A blank start date is 30 days before the config was read.
+        thirty_days = timedelta(days=30)
+        assert before - thirty_days <= endpoint.start_date <= datetime.now(tz=UTC) - thirty_days
 
 
 @pytest.mark.asyncio

@@ -24,6 +24,8 @@ const (
 	// QueryProfileMaxWait is how long a query waits for its history to be
 	// final before it's logged without it.
 	QueryProfileMaxWait = 10 * time.Minute
+	// tableContextTimeout bounds reading a table's context.
+	tableContextTimeout = time.Minute
 )
 
 // ErrQueryHistoryDenied is wrapped by a QueryHistory error when the
@@ -41,6 +43,12 @@ type QueryHistory interface {
 // the returned context to setID. The returned func, if not nil, is called
 // once the query finishes, before its ID is read.
 type QueryIDReporter func(ctx context.Context, setID func(string)) (context.Context, func())
+
+// TableContext reads what explains a binding's slow queries beyond their
+// history, such as its table's layout and maintenance. It's called once per
+// binding, in the background, and its fields are added to the binding's first
+// logged profile. Fields it returns with an error are still logged.
+type TableContext func(ctx context.Context, binding int) (log.Fields, error)
 
 // ProfileBounds are the key bounds a binding's queries are restricted to.
 type ProfileBounds interface {
@@ -61,20 +69,23 @@ type QueryProfiler struct {
 	emit          func(log.Fields)
 	warned        bool
 	cancel        context.CancelFunc
-	done          chan struct{}
+	done          sync.WaitGroup
+	tableContext  TableContext
+	contextRead   []bool
 }
 
 // profiledQuery is a finished query awaiting its history.
 type profiledQuery struct {
 	id       string
+	binding  int
 	fields   log.Fields
 	finished time.Time
 }
 
 // NewQueryProfiler starts a profiler of the queries of bindings with the given
 // resource paths, which fetches the history of finished queries every
-// interval. A nil history logs queries without it.
-func NewQueryProfiler(history QueryHistory, interval time.Duration, reportIDs QueryIDReporter, resourcePaths [][]string) *QueryProfiler {
+// interval.
+func NewQueryProfiler(history QueryHistory, interval time.Duration, reportIDs QueryIDReporter, resourcePaths [][]string, tableContext TableContext) *QueryProfiler {
 	var ctx, cancel = context.WithCancel(context.Background())
 	var p = &QueryProfiler{
 		history:       history,
@@ -85,16 +96,17 @@ func NewQueryProfiler(history QueryHistory, interval time.Duration, reportIDs Qu
 		queue:         make(chan *profiledQuery, queryProfileQueueSize),
 		emit:          func(fields log.Fields) { log.WithFields(fields).Info("query profile") },
 		cancel:        cancel,
-		done:          make(chan struct{}),
+		tableContext:  tableContext,
+		contextRead:   make([]bool, len(resourcePaths)),
 	}
-	go p.run(ctx)
+	p.done.Go(func() { p.run(ctx) })
 	return p
 }
 
 // Stop ends the profiler, dropping the queries still awaiting their history.
 func (p *QueryProfiler) Stop() {
 	p.cancel()
-	<-p.done
+	p.done.Wait()
 }
 
 // QueryProfile collects what the connector learns of each binding over a phase
@@ -240,7 +252,7 @@ func (t *QueryTrace) Finish(err error) {
 		return
 	}
 
-	var q = &profiledQuery{id: *id, fields: t.profile.fields(t.binding), finished: time.Now()}
+	var q = &profiledQuery{id: *id, binding: t.binding, fields: t.profile.fields(t.binding), finished: time.Now()}
 	maps.Copy(q.fields, log.Fields{"query": t.kind, "queryId": *id, "took": took.String()})
 	if t.executeTook > 0 {
 		maps.Copy(q.fields, log.Fields{"executeTook": t.executeTook.String(), "docs": t.docs, "docBytes": t.docBytes})
@@ -256,7 +268,6 @@ func (t *QueryTrace) Finish(err error) {
 }
 
 func (p *QueryProfiler) run(ctx context.Context) {
-	defer close(p.done)
 	var ticker = time.NewTicker(p.interval)
 	defer ticker.Stop()
 
@@ -307,14 +318,32 @@ func (p *QueryProfiler) fetch(ctx context.Context, awaiting []*profiledQuery, no
 		if fields, ok := history[q.id]; ok {
 			var out = maps.Clone(q.fields)
 			maps.Copy(out, fields)
-			p.emit(out)
+			p.emit(p.addTableContext(ctx, q.binding, out))
 		} else if p.history == nil || now.Sub(q.finished) >= QueryProfileMaxWait {
-			p.emit(q.fields)
+			p.emit(p.addTableContext(ctx, q.binding, q.fields))
 		} else {
 			rest = append(rest, q)
 		}
 	}
 	return rest
+}
+
+// addTableContext adds the binding's table context to its first logged
+// profile.
+func (p *QueryProfiler) addTableContext(ctx context.Context, binding int, fields log.Fields) log.Fields {
+	if p.tableContext == nil || binding < 0 || binding >= len(p.contextRead) || p.contextRead[binding] {
+		return fields
+	}
+	p.contextRead[binding] = true
+
+	ctx, cancel := context.WithTimeout(ctx, tableContextTimeout)
+	defer cancel()
+	extra, err := p.tableContext(ctx, binding)
+	if err != nil {
+		log.WithError(err).WithField("resourcePath", p.resourcePaths[binding]).Debug("reading table context for query profiles failed")
+	}
+	maps.Copy(fields, extra)
+	return fields
 }
 
 // StatementKind names a query by its leading keyword, such as "merge" or

@@ -98,6 +98,11 @@ captures:
         schedule: ''
       target: acmeCo/order_risks
     - resource:
+        name: order_shipping_lines
+        interval: PT5M
+        schedule: ''
+      target: acmeCo/order_shipping_lines
+    - resource:
         name: inventory_items
         interval: PT5M
         schedule: ''

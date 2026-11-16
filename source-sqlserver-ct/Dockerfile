@@ -31,7 +31,6 @@ COPY --from=busybox:latest /bin/sh /bin/sh
 
 # Bring in the compiled connector artifacts from the builder.
 COPY --from=builder /builder/connector ./source-sqlserver-ct
-COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 
 # Avoid running the connector as root.

@@ -9,7 +9,7 @@ graphql:
     query: |-
       query Prefixes {
         prefixes(by: { minCapability: read }) {
-          edges { node { prefix userCapability capabilities } }
+          edges { node { prefix userCapability capabilities capabilityBits } }
         }
       }
     variables: |-
@@ -27,12 +27,14 @@ docs: |-
 
   **WHY:** The scope planner for every cluster-C stream. Each stream needs a
   different capability (CatalogRead / ViewBilling / QueryServiceAccounts / admin).
-  If `capabilities` lists the fine-grained bits per prefix, the connector can
+  If `capabilityBits` lists the fine-grained bits per prefix, the connector can
   compute each stream's scopes up front and never send a query it isn't
   authorized for (which would cost a 307 provisional-authz round trip and then
   fail). Also shows whether nested prefixes come back unpruned.
 
   **VERIFIED (2026-10-07):** 15 prefixes. Nested grants come back **unpruned** (`Artificial-Industries/`, `.../databricks/`, `.../postgres-shipments/` all listed). Each node carries `capabilities` (fine-grained bits): legacy `admin` prefixes hold `ViewBilling` and `QueryServiceAccounts`; `read` prefixes hold only `CatalogRead`, `JournalRead`, `ViewDataPlanePrivateNetworking`. The connector plans each stream's scopes from these bits.
+
+  **PENDING:** estuary/flow#3738 changed `capabilities` to list capability bundles (`Viewer`, `Admin`, ...) and moved the bits to `capabilityBits`. The example below predates that change, and this request hasn't been re-run since.
 
 examples:
   - name: 200 - 15 prefixes, nested unpruned, capability bits

@@ -1,0 +1,140 @@
+opencollection: 1.0.0
+
+info:
+  name: Shopify
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Shopify auth via the connector's sops-encrypted config.yaml, mirroring the
+        // ShopifyClientCredentials TokenSource in source_shopify_native/resources.py:
+        // stores[0]'s client_id + client_secret are exchanged for a short-lived Admin
+        // API token on every request. Neither the secret nor the token is persisted to
+        // a var or env file. Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env Shopify --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        //
+        // At pre-request time req.getUrl() returns the raw template, so a request
+        // against the store still reads "{{base_url}}". Anything else (the signed
+        // storage URL in `Bulk / result`) must not carry the store's token.
+        const STORE_HOST = 'STORE.myshopify.com';
+        const url = req.getUrl();
+        if (url.includes('{{base_url}}') || url.includes(STORE_HOST)) {
+          const { execFileSync } = require('child_process');
+          const path = require('path');
+          const configured = bru.getEnvVar('config_path');
+          if (!configured) throw new Error('config_path env var is not set');
+          // Resolve relative to the collection root, not the process cwd.
+          const configPath = path.isAbsolute(configured)
+            ? configured
+            : path.resolve(bru.cwd(), configured);
+          const decrypted = execFileSync(
+            'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+          );
+          // Raw `sops -d` keeps the `_sops` encrypted-suffix on key names (the
+          // platform strips it at runtime, sops itself does not) — accept both.
+          const storeConfig = JSON.parse(decrypted)?.stores?.[0];
+          const store = storeConfig?.store ?? storeConfig?.store_sops;
+          const creds = storeConfig?.credentials;
+          const clientId = creds?.client_id ?? creds?.client_id_sops;
+          const clientSecret = creds?.client_secret ?? creds?.client_secret_sops;
+          if (!store || !clientId || !clientSecret) {
+            throw new Error(
+              'stores[0].store / stores[0].credentials.{client_id,client_secret} missing from decrypted config',
+            );
+          }
+
+          const host = `${store}.myshopify.com`;
+          const resp = await bru.sendRequest({
+            method: 'POST',
+            url: `https://${host}/admin/oauth/access_token`,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            data:
+              'grant_type=client_credentials' +
+              `&client_id=${encodeURIComponent(clientId)}` +
+              `&client_secret=${encodeURIComponent(clientSecret)}`,
+          });
+          const token = resp?.data?.access_token;
+          if (!token) throw new Error(`client_credentials token exchange failed (HTTP ${resp?.status})`);
+
+          req.setUrl(
+            url.replace('{{base_url}}', bru.getEnvVar('base_url')).replace(STORE_HOST, host),
+          );
+          req.setHeader('X-Shopify-Access-Token', token);
+        }
+    - type: after-response
+      code: |-
+        // Redact signed result URLs so saved examples are safe to commit. A bulk
+        // operation's `url` / `partialDataUrl` is a bearer link to the store's data
+        // for 7 days. tests/test_snapshots.py's sanitize_tokens() scrubs the same
+        // kind of value (`?token=`) in captured documents; keep the two in step.
+        // `updatedAt` is redacted by the snapshot test but deliberately NOT here:
+        // `Orders / change history` compares it with each order's change times.
+        // Request-level after-response scripts run first, so `Bulk / status` can
+        // still capture the URL into a runtime var for `Bulk / result`.
+        const REDACTED_FIELDS = ['url', 'partialDataUrl'];
+        function redact(v) {
+          if (Array.isArray(v)) return v.map(redact);
+          if (v && typeof v === 'object') {
+            const o = {};
+            for (const k of Object.keys(v)) {
+              o[k] = REDACTED_FIELDS.includes(k) && v[k] !== null ? 'REDACTED' : redact(v[k]);
+            }
+            return o;
+          }
+          return v;
+        }
+        const body = res.getBody();
+        // Only JSON object/array bodies; `Bulk / result` returns JSONL text.
+        if (body && typeof body === 'object') res.setBody(redact(body));
+
+docs:
+  content: |-
+    Requests that check what Shopify's Admin GraphQL API returns before connector
+    code relies on it. Everything POSTs to `{{base_url}}/graphql.json`; the API
+    version in `environments/Shopify.yml` matches `VERSION` in
+    `source_shopify_native/graphql/common.py`.
+
+    Run from this directory:
+    `bru run "<Folder>/<request>.yml" --env Shopify --sandbox developer`.
+    Everything under `Seeding/` is a mutation and is run by a person, never by
+    an assistant.
+
+    ## API constraints (account-wide)
+
+    - **Cost-based rate limit, per app per store (DOCUMENTED 2026-10-29):** each
+      query has a calculated cost, drawn from a leaky bucket that refills at
+      100 points/s (Standard), 200 (Advanced), 1,000 (Plus) or 2,000
+      (Enterprise). Before a query runs the bucket must hold its *requested*
+      cost; afterwards the difference to the *actual* cost is refunded —
+      https://shopify.dev/docs/apps/build/apis/graphql-admin/rate-limits
+    - **Single-query ceiling (DOCUMENTED 2026-10-29):** "A single query may not
+      exceed a cost of 1,000 points, regardless of plan limits." Checked against
+      the requested cost, before execution.
+    - **Cost rules (DOCUMENTED 2026-10-29):** scalar and enum 0, object 1,
+      connection "sized by `first` and `last`", mutation 10. The page does not
+      give the formula for a connection nested in another; the
+      `Shopify-GraphQL-Cost-Debug: 1` header adds a per-field breakdown under
+      `extensions.cost.fields` (used by `Orders / shipping lines`).
+    - **Page size (DOCUMENTED 2026-10-29):** "You can retrieve up to a maximum of
+      250 resources" per page; paging over arrays of objects stops at 25,000 —
+      https://shopify.dev/docs/api/usage/pagination-graphql
+    - **Bulk query operations (DOCUMENTED 2026-10-29):** up to five running at
+      once per app per shop on API 2026-01 and later; at most five connections
+      and two levels of nesting per query; "Connections must implement the
+      `Node` interface"; must finish within 10 days; results are JSONL with a
+      `__parentId` on each child line —
+      https://shopify.dev/docs/api/usage/bulk-operations/queries
+    - **Bulk results URL (DOCUMENTED 2026-10-29):** `url` "expires 7 days after
+      the operation completes" —
+      https://shopify.dev/docs/api/admin-graphql/2026-01/objects/BulkOperation
+
+    ## Docs conventions
+
+    Request docs follow the `bruno-probe-endpoint` skill's conventions. Find open
+    items with `grep -rl '\*\*PENDING' . | grep -v opencollection.yml`.
+
+    ### Per-endpoint limitations
+
+    None recorded yet.

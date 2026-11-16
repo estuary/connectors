@@ -261,7 +261,7 @@ func TestStreamV2LeavingTheWritePathSweepsItsChannels(t *testing.T) {
 
 		require.NoError(t, d.addBinding(ctx, target(stateKey, true), *d.cp[stateKey]))
 		require.False(t, lastBinding(d).streaming)
-		require.NotNil(t, lastBinding(d).store.stage)
+		require.NotNil(t, lastBinding(d).store.copyStage)
 		require.NotContains(t, fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE")), channel)
 	})
 

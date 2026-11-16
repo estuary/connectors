@@ -132,3 +132,12 @@ class FeatureFlagsConfig(BaseModel):
                 f"Implementation error: feature flag '{name}' was read before feature flags were resolved"
             )
         return self._resolved_flags[name]
+
+
+def feature_flags_config(config: object) -> FeatureFlagsConfig | None:
+    """
+    The endpoint config's `advanced` section if it's a FeatureFlagsConfig, and None
+    otherwise.
+    """
+    advanced = getattr(config, "advanced", None)
+    return advanced if isinstance(advanced, FeatureFlagsConfig) else None

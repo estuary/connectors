@@ -3,6 +3,7 @@ package connector
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/apache/iceberg-go"
 	"github.com/bradleyjkemp/cupaloy"
@@ -135,6 +136,18 @@ func TestTemplates(t *testing.T) {
 	snap.WriteString("--- Begin merge query ---\n")
 	require.NoError(t, templates.mergeQuery.Execute(&snap, input))
 	snap.WriteString("--- End merge query ---")
+
+	snap.WriteString("\n\n")
+
+	truncateInp := truncateInput{
+		binding:           input.binding,
+		PublishedAtColumn: "flow_published_at",
+		Boundary:          quoteLiteral(timestamptzLiteral(time.Date(2026, 9, 29, 12, 0, 0, 0, time.UTC))),
+	}
+
+	snap.WriteString("--- Begin truncate query ---\n")
+	require.NoError(t, templates.truncateQuery.Execute(&snap, truncateInp))
+	snap.WriteString("--- End truncate query ---")
 
 	snap.WriteString("\n\n")
 

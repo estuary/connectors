@@ -1,56 +1,43 @@
 package connector
 
 import (
-	"context"
 	"errors"
 	"time"
 
+	"github.com/estuary/connectors/go/retry"
 	"github.com/jackc/pgx/v5/pgconn"
-	log "github.com/sirupsen/logrus"
 )
 
-const maxAttempts = 5
-
-var retryDelay = 5 * time.Second
+// commitRetry retries the commit transaction after Redshift rolled it back
+// on a conflict with a concurrent transaction. Jitter keeps the conflicting
+// writers from retrying in lockstep.
+var commitRetry = retry.Policy{
+	Classify:       classify,
+	MaxAttempts:    5,
+	InitialBackoff: 5 * time.Second,
+	MaxBackoff:     20 * time.Second,
+	Jitter:         0.5,
+}
 
 type pgErrorMatch struct {
 	code, message string
 }
 
-var retriableErrors = []pgErrorMatch{
+// retryableErrors roll back the transaction, so nothing was applied.
+var retryableErrors = []pgErrorMatch{
 	{code: "XX000", message: "1023"}, // serializable isolation violation
 	{code: "40P01"},                  // deadlock detected
 }
 
-func isRetriable(err error) bool {
+func classify(err error) retry.Outcome {
 	var pgErr, ok = errors.AsType[*pgconn.PgError](err)
 	if !ok {
-		return false
+		return retry.Fatal
 	}
-	for _, m := range retriableErrors {
+	for _, m := range retryableErrors {
 		if pgErr.Code == m.code && (m.message == "" || pgErr.Message == m.message) {
-			return true
+			return retry.Retryable
 		}
 	}
-	return false
-}
-
-func retry(ctx context.Context, fn func() error) error {
-	for attempt := 1; ; attempt++ {
-		err := fn()
-		if err == nil || !isRetriable(err) || attempt == maxAttempts {
-			return err
-		}
-		var delay = time.Duration(attempt) * retryDelay
-		log.WithFields(log.Fields{
-			"attempt": attempt,
-			"retryIn": delay.String(),
-			"error":   err,
-		}).Warn("transaction rolled back by a retriable error and will be retried")
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(delay):
-		}
-	}
+	return retry.Fatal
 }

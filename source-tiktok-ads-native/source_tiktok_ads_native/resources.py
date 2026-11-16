@@ -57,8 +57,6 @@ SNAPSHOT_INTERVAL = timedelta(hours=12)
 # The first report poll of each day re-reads the whole lookback window for every
 # advertiser.
 REPORT_INTERVAL = timedelta(hours=12)
-# A blank start date backfills reports from this far before the capture starts.
-DEFAULT_REPORT_HISTORY = timedelta(days=30)
 
 type TikTokResource = common.Resource[Any, ResourceConfig, ResourceState]
 
@@ -304,7 +302,7 @@ def _report_resource(
     client: TikTokClient,
     accounts: AdvertiserAccounts,
     advertiser_ids: list[str],
-    start_date: datetime | None,
+    start_date: datetime,
     lookback_days: int,
 ) -> TikTokResource:
     model = report_document_model(report)
@@ -313,7 +311,6 @@ def _report_resource(
     # date, and the incremental re-reads from that date onward. Lifetime rows have
     # no dates, so there is no history to walk.
     cutoff = datetime.now(tz=UTC).replace(microsecond=0)
-    history_start = start_date or cutoff - DEFAULT_REPORT_HISTORY
     initial_state = _per_advertiser_state(
         advertiser_ids, cutoff, None if is_lifetime else cutoff
     )
@@ -355,7 +352,7 @@ def _report_resource(
                     zone_of[advertiser_id],
                     report,
                     model,
-                    history_start,
+                    start_date,
                 )
                 for advertiser_id in advertiser_ids
             },

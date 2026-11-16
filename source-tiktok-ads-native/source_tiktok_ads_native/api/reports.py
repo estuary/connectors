@@ -301,7 +301,7 @@ async def fetch_report[DocT: ReportDocument](
     zone: ZoneInfo,
     report: ReportConfig,
     model: type[DocT],
-    start_date: datetime | None,
+    start_date: datetime,
     lookback_days: int,
     log: Logger,
     log_cursor: LogCursor,
@@ -324,10 +324,9 @@ async def fetch_report[DocT: ReportDocument](
 
     Both bounds are inclusive dates in the advertiser's time zone, `zone`. The
     lookback applies on the first sweep of each local day; later sweeps that
-    day start at the cursor's date. Nothing before `start_date` is read, when
-    the user set one. A re-read row replaces the earlier one by key.
-    Lifetime reports have no dates and are read whole. The cursor is the instant
-    the sweep started.
+    day start at the cursor's date. Nothing before `start_date` is read. A
+    re-read row replaces the earlier one by key. Lifetime reports have no dates
+    and are read whole. The cursor is the instant the sweep started.
     """
     assert isinstance(log_cursor, datetime)
     swept_at = _now()
@@ -344,8 +343,7 @@ async def fetch_report[DocT: ReportDocument](
         # first sweep of each local day only.
         lookback = lookback_days if cursor_day < today else 0
         first = cursor_day - timedelta(days=lookback)
-        if start_date is not None:
-            first = max(first, start_date.astimezone(zone).date())
+        first = max(first, start_date.astimezone(zone).date())
         for start, end in _windows(first, today, WINDOW_DAYS[report.granularity]):
             async for doc in _documents_split_by_date(
                 log, client, report, model, advertiser_id, start, end
