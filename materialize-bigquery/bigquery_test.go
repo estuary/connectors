@@ -166,10 +166,11 @@ func TestIntegration(t *testing.T) {
 
 			seedPending := func(t *testing.T, appliedSpec *pf.MaterializationSpec) json.RawMessage {
 				// A staged transaction is a query persisted in the connector
-				// state, keyed by the binding's state key, along with the GCS
-				// files it consumes as an external table and the job prefix
-				// making its execution idempotent. The staged file must exist
-				// since Acknowledge deletes it after the query succeeds.
+				// state under the binding's state key and the staging shard's
+				// key range, along with the GCS files it consumes as an
+				// external table and the job prefix making its execution
+				// idempotent. The staged file must exist since Acknowledge
+				// deletes it after the query succeeds.
 				credOption, err := cfg.CredentialsClientOption()
 				require.NoError(t, err)
 				bucket, err := blob.NewGCSBucket(ctx, cfg.Bucket, credOption)
@@ -181,10 +182,12 @@ func TestIntegration(t *testing.T) {
 				query := sql.DrainSeedInsertQuery(t, NewDriver().sqlDriver, cfg, appliedSpec, "JSON '{}'")
 				state, err := json.Marshal(map[string]any{
 					appliedSpec.Bindings[0].StateKey: map[string]any{
-						"Query":         query,
-						"SourceURIs":    []string{bucket.URI(fileKey)},
-						"JobPrefix":     uuid.NewString(),
-						"TempTableName": "flow_temp_table_0",
+						"00000000-ffffffff": map[string]any{
+							"Query":         query,
+							"SourceURIs":    []string{bucket.URI(fileKey)},
+							"JobPrefix":     uuid.NewString(),
+							"TempTableName": "flow_temp_table_0",
+						},
 					},
 				})
 				require.NoError(t, err)

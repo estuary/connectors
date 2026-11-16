@@ -1,13 +1,10 @@
 package connector
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"math"
-	"regexp"
 	"slices"
 	"strings"
 	"text/template"
@@ -48,11 +45,6 @@ type checkpointItem struct {
 	// attributing its commit's row stats. Recovered and peer entries are
 	// reported outside of round pairing, so theirs is left zero.
 	round int
-	// rangeFirst marks an entry recovered from {rangeKey: {stateKey: entry}},
-	// the layout earlier versions wrote, which is where it is cleared.
-	// TODO(#5681): remove three months after the release that stopped
-	// writing that layout has rolled out.
-	rangeFirst bool
 }
 
 // mergeBoundLiterals is the serialized form of a key column's sql.MergeBound:
@@ -82,23 +74,6 @@ func boundsLiterals(bounds []sql.MergeBound) []mergeBoundLiterals {
 	return out
 }
 
-// checkpoints holds entries by binding StateKey, then by the range key
-// ("%08x-%08x") of the shard that staged them, which is how they persist.
-type checkpoints map[string]map[string]*checkpointItem
-
-func (c checkpoints) add(stateKey, rangeKey string, item *checkpointItem) {
-	if c[stateKey] == nil {
-		c[stateKey] = make(map[string]*checkpointItem)
-	}
-	c[stateKey][rangeKey] = item
-}
-
-// legacyRangeKey holds entries written before range-scoping (bare StateKey).
-// TODO(#5681): remove after 2026-12-02.
-const legacyRangeKey = ""
-
-var rangeKeyRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{8}$`)
-
 // loadResultsTablePrefix marks a table as holding the results of one
 // transaction's load query.
 const loadResultsTablePrefix = "flow_load_results_"
@@ -126,10 +101,6 @@ func deleteLoadResultsTable(ctx context.Context, table *bigquery.Table) {
 	}
 }
 
-func isJSONNull(data json.RawMessage) bool {
-	return bytes.Equal(bytes.TrimSpace(data), []byte("null"))
-}
-
 var _ m.Transactor = (*transactor)(nil)
 
 type transactor struct {
@@ -145,12 +116,7 @@ type transactor struct {
 
 	bindings []*binding
 	be       *m.BindingEvents
-	// cp holds this shard's entries under its own range key. The primary
-	// shard also holds, and alone executes, the pending entries of other
-	// shards and of sessions predating range-scoping (legacyRangeKey).
-	cp           checkpoints
-	primaryShard bool
-	rangeKey     string
+	state    *boilerplate.ShardedState[*checkpointItem]
 	// truncateAfterBackfill permits deleting the rows published before a
 	// completed backfill.
 	truncateAfterBackfill bool
@@ -199,9 +165,9 @@ func prepareNewTransactor(
 			keyBegin, keyEnd = open.Range.KeyBegin, open.Range.KeyEnd
 		}
 
-		primaryShard := true
-		if boilerplate.IsMaterializationSpecRuntimeV2(open.Materialization) {
-			primaryShard = keyBegin == 0
+		var stateKeys []string
+		for _, b := range bindings {
+			stateKeys = append(stateKeys, b.StateKey)
 		}
 
 		t := &transactor{
@@ -214,9 +180,7 @@ func prepareNewTransactor(
 			skipCleanup:           featureFlags["skip_cleanup"],
 			client:                client,
 			be:                    be,
-			cp:                    make(checkpoints),
-			primaryShard:          primaryShard,
-			rangeKey:              fmt.Sprintf("%08x-%08x", keyBegin, keyEnd),
+			state:                 boilerplate.NewShardedState[*checkpointItem](keyBegin, keyEnd, stateKeys),
 			truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 			loadFiles:             boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),
 			storeFiles:            boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), true, false),
@@ -361,70 +325,7 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error {
-	// Non-primary shards do not recover state.  This avoids them incorporating
-	// state from other shards into their own checkpoint data.
-	if !t.primaryShard {
-		return nil
-	}
-
-	cp, err := parseCheckpoints(state)
-	if err != nil {
-		return err
-	}
-	t.cp = cp
-
-	return nil
-}
-
-// parseCheckpoints decodes a checkpoint, persisted as {stateKey: {rangeKey:
-// entry}}. Entries that earlier versions wrote as {rangeKey: {stateKey:
-// entry}} are marked rangeFirst, and entries from before range-scoping are
-// held under legacyRangeKey.
-func parseCheckpoints(state json.RawMessage) (checkpoints, error) {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(state, &raw); err != nil {
-		return nil, fmt.Errorf("unmarshaling checkpoint state: %w", err)
-	}
-
-	var out = make(checkpoints)
-	for key, val := range raw {
-		var nested map[string]*checkpointItem
-		var err = json.Unmarshal(val, &nested)
-
-		if rangeKeyRe.MatchString(key) {
-			if err != nil {
-				return nil, fmt.Errorf("unmarshaling checkpoint range %q: %w", key, err)
-			}
-			for stateKey, item := range nested {
-				if item != nil {
-					item.rangeFirst = true
-				}
-				out.add(stateKey, key, item)
-			}
-		} else if err == nil && allRangeKeys(nested) {
-			for rangeKey, item := range nested {
-				out.add(key, rangeKey, item)
-			}
-		} else {
-			// A bare StateKey: an entry from before range-scoping was added.
-			var item checkpointItem
-			if err := json.Unmarshal(val, &item); err != nil {
-				return nil, fmt.Errorf("unmarshaling checkpoint entry %q: %w", key, err)
-			}
-			out.add(key, legacyRangeKey, &item)
-		}
-	}
-
-	return out, nil
-}
-
-func allRangeKeys(nested map[string]*checkpointItem) bool {
-	for key := range nested {
-		if !rangeKeyRe.MatchString(key) {
-			return false
-		}
-	}
-	return true
+	return t.state.Recover(state)
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
@@ -487,7 +388,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// A query with no destination table caps its response at 10 GB, so the
 	// results are written to a table created for this transaction.
-	dst := t.client.bigqueryClient.DatasetInProject(t.cfg.ProjectID, t.cfg.Dataset).Table(loadResultsTableName(t.materializationName, t.rangeKey))
+	dst := t.client.bigqueryClient.DatasetInProject(t.cfg.ProjectID, t.cfg.Dataset).Table(loadResultsTableName(t.materializationName, t.state.RangeKey()))
 	ll := log.WithFields(log.Fields{"query": queryStr, "external_data": externalData, "results_table": dst.TableID})
 	if err := dst.Create(ctx, &bigquery.TableMetadata{ExpirationTime: time.Now().Add(loadResultsTableTTL)}); err != nil {
 		return fmt.Errorf("creating load results table: %w", err)
@@ -576,6 +477,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, it.Err()
 	}
 
+	var staged = make(map[string]*checkpointItem)
 	for idx, b := range t.bindings {
 		if !t.storeFiles.Started(idx) {
 			continue
@@ -586,13 +488,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
 		}
 
-		t.cp.add(b.target.StateKey, t.rangeKey, &checkpointItem{
+		staged[b.target.StateKey] = &checkpointItem{
 			Bounds:     boundsLiterals(b.storeMergeBounds.Build()),
 			NeedsMerge: b.mustMerge,
 			SourceURIs: uris,
 			JobPrefix:  uuid.NewString(),
 			round:      it.Round,
-		})
+		}
 
 		b.mustMerge = false
 		b.storeMergeBounds.Reset()
@@ -600,69 +502,27 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	for binding, boundary := range t.truncations {
 		var b = t.bindings[binding]
-		if t.cp[b.target.StateKey][t.rangeKey] == nil {
-			t.cp.add(b.target.StateKey, t.rangeKey, &checkpointItem{JobPrefix: uuid.NewString(), round: it.Round})
+		if staged[b.target.StateKey] == nil {
+			staged[b.target.StateKey] = &checkpointItem{JobPrefix: uuid.NewString(), round: it.Round}
 		}
-		t.cp[b.target.StateKey][t.rangeKey].TruncateBefore = &boundary
+		staged[b.target.StateKey].TruncateBefore = &boundary
 	}
 	t.truncations = nil
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		// Record this shard's entries, which sit under its range key: range
-		// keys are disjoint across shards, so concurrent patches never
-		// clobber when the runtime consolidates connector state. A
-		// single-shard task uses the same format, with the full key range.
-		var patch = make(checkpoints, len(t.cp))
-		for stateKey, bucket := range t.cp {
-			if item := bucket[t.rangeKey]; item != nil {
-				patch.add(stateKey, t.rangeKey, item)
-			}
-		}
-		var checkpointJSON, err = json.Marshal(patch)
+		state, err := t.state.StartCommit(staged)
 		if err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
+			return nil, m.FinishedOperation(err)
 		}
-
-		return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
+		return state, nil
 	}, nil
-}
-
-// mergePeerStatePatches folds the aggregated StartedCommit state patches of
-// all task shards into the primary's bookkeeping, so Acknowledge executes
-// the queries staged by every shard of the just-committed transaction.
-func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
-	if !t.primaryShard {
-		return nil
-	}
-
-	for _, patch := range patches {
-		if isJSONNull(patch) {
-			return fmt.Errorf("unexpected state reset patch in aggregated shard state")
-		}
-
-		peers, err := parseCheckpoints(patch)
-		if err != nil {
-			return fmt.Errorf("parsing aggregated state patch: %w", err)
-		}
-
-		for stateKey, bucket := range peers {
-			for rangeKey, item := range bucket {
-				if rangeKey == t.rangeKey {
-					continue // our own contribution, echoed back by the runtime
-				}
-				t.cp.add(stateKey, rangeKey, item)
-			}
-		}
-	}
-
-	return nil
 }
 
 // Flush records completed backfills on the primary only, since every shard
 // receives the same completions and only the primary applies staged work.
 func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
 	t.truncations = make(map[int]time.Time, len(completes))
-	if !t.primaryShard {
+	if !t.state.Primary() {
 		return nil
 	}
 	for binding, boundary := range completes {
@@ -687,65 +547,24 @@ func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error
 }
 
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
-	if err := t.mergePeerStatePatches(statePatches); err != nil {
-		return nil, err
-	}
-
-	shouldProcess := m.StateKeyFilter(stateKeys)
-
-	if !t.primaryShard {
-		for _, b := range t.bindings {
-			if shouldProcess(b.target.StateKey) {
-				delete(t.cp[b.target.StateKey], t.rangeKey)
-			}
-		}
-		return nil, nil
-	}
-
-	return t.acknowledgeApply(ctx, shouldProcess)
+	return t.state.Acknowledge(statePatches, stateKeys, func(pending boilerplate.ShardedEntries[*checkpointItem]) error {
+		return t.acknowledgeApply(ctx, pending)
+	})
 }
 
-// pendingItem pairs a checkpoint entry with the range and state key it was
-// staged under, so the clearing pass afterward knows which JSON path it
-// occupies.
-type pendingItem struct {
-	rangeKey string
-	stateKey string
-	item     *checkpointItem
-}
-
-func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(string) bool) (*pf.ConnectorState, error) {
+func (t *transactor) acknowledgeApply(ctx context.Context, pending boilerplate.ShardedEntries[*checkpointItem]) error {
 	group, groupCtx := errgroup.WithContext(ctx)
 	// You can run up to 1,000 concurrent multi-statement queries, so we use a
 	// generous concurrency limit here, while not leaving it completely
 	// unlimited just to maintain some sense of decorum.
 	group.SetLimit(100)
 
-	var drained []pendingItem
-
 	for _, b := range t.bindings {
-		sk := b.target.StateKey
-		if !shouldProcess(sk) {
-			// This state key's pending work was not requested to be
-			// processed, so it remains staged in the persisted state.
-			continue
-		}
-
-		// This binding's pending entries: its own, then those of legacy
-		// sessions and peer shards.
-		var items []pendingItem
-		if item := t.cp[sk][t.rangeKey]; item != nil {
-			items = append(items, pendingItem{t.rangeKey, sk, item})
-		}
-		for _, rk := range slices.Sorted(maps.Keys(t.cp[sk])) {
-			if item := t.cp[sk][rk]; item != nil && rk != t.rangeKey {
-				items = append(items, pendingItem{rk, sk, item})
-			}
-		}
+		// This binding's pending entries: its own, then those of peer shards.
+		var items = pending.Sorted(b.target.StateKey)
 		if len(items) == 0 {
 			continue
 		}
-		drained = append(drained, items...)
 
 		group.Go(func() error {
 			t.be.StartedResourceCommit(b.target.Path)
@@ -755,7 +574,7 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 			// coalesce into a single query over their combined bounds and
 			// source files.
 			// items[0] is this shard's own entry when it has one.
-			round := items[0].item.round
+			round := items[0].round
 			needsMerge := false
 			var coalesce []*checkpointItem
 			var coalescedURIs []string
@@ -763,26 +582,26 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 			var truncateBefore *time.Time
 			var truncateJobPrefix string
 			for _, e := range items {
-				sourceURIs = append(sourceURIs, e.item.SourceURIs...)
-				if e.item.TruncateBefore != nil && (truncateBefore == nil || e.item.TruncateBefore.After(*truncateBefore)) {
-					truncateBefore, truncateJobPrefix = e.item.TruncateBefore, e.item.JobPrefix
+				sourceURIs = append(sourceURIs, e.SourceURIs...)
+				if e.TruncateBefore != nil && (truncateBefore == nil || e.TruncateBefore.After(*truncateBefore)) {
+					truncateBefore, truncateJobPrefix = e.TruncateBefore, e.JobPrefix
 				}
-				if e.item.Query == "" {
-					coalesce = append(coalesce, e.item)
-					coalescedURIs = append(coalescedURIs, e.item.SourceURIs...)
-					if e.item.NeedsMerge {
+				if e.Query == "" {
+					coalesce = append(coalesce, e)
+					coalescedURIs = append(coalescedURIs, e.SourceURIs...)
+					if e.NeedsMerge {
 						needsMerge = true
 					}
 					continue
 				}
-				stat, err := t.client.queryIdempotent(groupCtx, b.storeSchema, e.item.Query, e.item.JobPrefix, e.item.SourceURIs, e.item.TempTableName)
+				stat, err := t.client.queryIdempotent(groupCtx, b.storeSchema, e.Query, e.JobPrefix, e.SourceURIs, e.TempTableName)
 				if err != nil {
 					return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
 				}
 				t.be.ReportRowStats(round, b.target.Path, dmlRowStats(stat))
 				log.WithFields(log.Fields{
-					"query":         e.item.Query,
-					"external_data": map[string][]string{e.item.TempTableName: e.item.SourceURIs},
+					"query":         e.Query,
+					"external_data": map[string][]string{e.TempTableName: e.SourceURIs},
 				}).Debug("acknowledge legacy query executed")
 			}
 
@@ -849,41 +668,7 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 		})
 	}
 
-	if err := group.Wait(); err != nil {
-		return nil, err
-	}
-
-	if len(drained) == 0 {
-		return nil, nil
-	}
-
-	// Null each executed entry at the JSON path it occupies: nested under
-	// its state key then range key, the reverse for rangeFirst entries, or
-	// top-level for legacyRangeKey.
-	var clear = make(map[string]interface{})
-	var clearAt = func(outer, inner string) {
-		if clear[outer] == nil {
-			clear[outer] = make(map[string]interface{})
-		}
-		clear[outer].(map[string]interface{})[inner] = nil
-	}
-	for _, d := range drained {
-		if d.rangeKey == legacyRangeKey {
-			clear[d.stateKey] = nil
-		} else if d.item.rangeFirst {
-			clearAt(d.rangeKey, d.stateKey)
-		} else {
-			clearAt(d.stateKey, d.rangeKey)
-		}
-		delete(t.cp[d.stateKey], d.rangeKey)
-	}
-
-	checkpointJSON, err := json.Marshal(clear)
-	if err != nil {
-		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
-	}
-
-	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
+	return group.Wait()
 }
 
 // timestampLiteral renders a TIMESTAMP literal floored to microseconds, the
