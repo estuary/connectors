@@ -6,22 +6,29 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"sort"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	m "github.com/estuary/connectors/go/materialize"
 	mbp "github.com/estuary/connectors/materialize-boilerplate"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"gopkg.in/yaml.v3"
 )
 
 // requiredPolicyActions are the permissions the connector documentation tells
-// users to grant.
+// users to grant.  Notably this doesn't include dynamodb:Scan, which was added
+// as an optional permission later on in the life of the connector.
 var requiredPolicyActions = []string{
 	"dynamodb:BatchGetItem",
 	"dynamodb:BatchWriteItem",
@@ -116,6 +123,29 @@ func createRestrictedUser(ctx context.Context, adminCfg config) (accessKeys, err
 	}, nil
 }
 
+// withKeys bundles the flow.yaml at sourcePath and returns the bundle with
+// keys filled into the config of each materialization.
+func withKeys(t *testing.T, sourcePath string, keys accessKeys) []byte {
+	t.Helper()
+
+	bundled := boilerplate.RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
+
+	for taskName := range gjson.GetBytes(bundled, "materializations").Map() {
+		cfgPath := fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)
+		rawCfg := []byte(gjson.GetBytes(bundled, cfgPath).Raw)
+
+		var err error
+		for path, value := range keys.configOverrides() {
+			rawCfg, err = sjson.SetBytes(rawCfg, path, value)
+			require.NoError(t, err)
+		}
+		bundled, err = sjson.SetRawBytes(bundled, cfgPath, rawCfg)
+		require.NoError(t, err)
+	}
+
+	return bundled
+}
+
 // adminSnapshotter reads tables back with admin keys, since the restricted
 // user lacks dynamodb:Scan. Every other method runs with the keys of the
 // task's config.
@@ -172,6 +202,66 @@ func TestIntegration(t *testing.T) {
 			boilerplate.RuntimeConfig{Shards: 1, Fidelity: m.FidelityTotal, ConfigOverrides: keys.configOverrides()})
 	})
 
+	t.Run("truncate", func(t *testing.T) {
+		boilerplate.SkipRuntimeV1(t)
+
+		client, err := adminCfg.client(ctx)
+		require.NoError(t, err)
+		adminKeys := accessKeys{accessKeyID: adminCfg.AWSAccessKeyID, secretAccessKey: adminCfg.AWSSecretAccessKey}
+
+		// The fixture stores ids 1-3, then re-stores only id 1 during a
+		// backfill. Truncation needs dynamodb:Scan, which
+		// requiredPolicyActions lacks, so with those permissions the
+		// connector skips it. Otherwise only truncate_standard has
+		// flow_published_at selected, so only it loses the ids the backfill
+		// didn't re-send.
+		for _, tc := range []struct {
+			name string
+			keys accessKeys
+			want map[string][]int64
+		}{
+			{
+				name: "documented permissions",
+				keys: keys,
+				want: map[string][]int64{
+					"truncate_standard":        {1, 2, 3},
+					"truncate_no_published_at": {1, 2, 3},
+				},
+			},
+			{
+				name: "all permissions",
+				keys: adminKeys,
+				want: map[string][]int64{
+					"truncate_standard":        {1},
+					"truncate_no_published_at": {1, 2, 3},
+				},
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				cfg := adminCfg
+				cfg.AWSAccessKeyID = tc.keys.accessKeyID
+				cfg.AWSSecretAccessKey = tc.keys.secretAccessKey
+				task := boilerplate.PrepareTestTask(t, newMaterializer, withKeys(t, "testdata/truncate.flow.yaml", tc.keys),
+					"acmeCo/tests/materialize-dynamodb-truncate", cfg, makeResourceFn)
+
+				boilerplate.RunFlowctl(t, "raw", "preview-next",
+					"--name", task.Name,
+					"--source", task.SourcePath,
+					"--fixture", "testdata/truncate.fixture.json",
+					"--shards", "1",
+					"--timeout", "5m",
+					"--network", "flow-test",
+				)
+
+				for table, want := range tc.want {
+					ids, err := scanIDs(ctx, client, task.Resource(t, table))
+					require.NoError(t, err)
+					require.Equal(t, want, ids, table)
+				}
+			})
+		}
+	})
+
 	t.Run("apply", func(t *testing.T) {
 		boilerplate.RunApplyTest(t, &driver{}, newMaterializer, "testdata/apply.flow.yaml", makeResourceFn,
 			boilerplate.RuntimeConfig{ConfigOverrides: keys.configOverrides()})
@@ -181,4 +271,31 @@ func TestIntegration(t *testing.T) {
 		boilerplate.RunMigrationTest(t, newMaterializer, "testdata/migrate.flow.yaml", makeResourceFn, nil,
 			boilerplate.RuntimeConfig{ConfigOverrides: keys.configOverrides()})
 	})
+}
+
+// scanIDs returns the sorted ids stored in table.
+func scanIDs(ctx context.Context, client *client, table string) ([]int64, error) {
+	out, err := client.db.Scan(ctx, &dynamodb.ScanInput{
+		TableName:      aws.String(table),
+		ConsistentRead: aws.Bool(true),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scanning table %q: %w", table, err)
+	}
+
+	var ids []int64
+	for _, item := range out.Items {
+		n, ok := item["id"].(*types.AttributeValueMemberN)
+		if !ok {
+			return nil, fmt.Errorf("item missing numeric id: %v", item)
+		}
+		v, err := strconv.ParseInt(n.Value, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("parsing id %q: %w", n.Value, err)
+		}
+		ids = append(ids, v)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+
+	return ids, nil
 }
