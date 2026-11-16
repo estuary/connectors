@@ -329,6 +329,10 @@ func TestIntegration(t *testing.T) {
 		runOmitTableLocationTest(t, cfg)
 	})
 
+	t.Run("omit-table-location-bucket-mismatch", func(t *testing.T) {
+		runOmitTableLocationBucketMismatchTest(t, cfg)
+	})
+
 	// Migration test is skipped because Iceberg does not support the type
 	// migrations exercised by the test (e.g. long→string).
 	//t.Run("migrate", func(t *testing.T) {
@@ -1258,6 +1262,50 @@ func runOmitTableLocationTest(t *testing.T, cfg config) {
 	require.False(t, strings.HasPrefix(loc, connectorPrefix),
 		"location %q should be catalog-assigned, not under the connector's prefix %q", loc, connectorPrefix)
 	require.Equal(t, cfg.Bucket, bucketFromS3Path(loc))
+}
+
+// runOmitTableLocationBucketMismatchTest verifies that with omit_table_location
+// enabled, a catalog-assigned location outside the configured bucket fails the
+// create and drops the new table.
+func runOmitTableLocationBucketMismatchTest(t *testing.T, cfg config) {
+	t.Helper()
+	ctx := context.Background()
+
+	ensureNamespace(t, cfg)
+	cfg.Bucket = "omit-location-other-bucket"
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle, true)
+	require.NoError(t, err)
+
+	table := fmt.Sprintf("omitlocmm_flow_test_%d", time.Now().Unix())
+	ident := icebergtable.Identifier{cfg.Namespace, table}
+
+	binding := &pf.MaterializationSpec_Binding{
+		ResourcePath: ident,
+		Collection: pf.CollectionSpec{
+			Name: "acmeCo/tests/omit-location-mismatch",
+			Projections: []pf.Projection{{
+				Field: "id",
+				Inference: pf.Inference{
+					Types:   []string{"string"},
+					String_: &pf.Inference_String{},
+				},
+			}},
+		},
+		FieldSelection: pf.FieldSelection{Values: []string{"id"}},
+	}
+
+	_, apply, err := cat.CreateResource(ctx, binding, resource{})
+	require.NoError(t, err)
+	err = apply(ctx)
+	t.Cleanup(func() { _ = cat.cat.DropTable(ctx, ident) })
+
+	require.ErrorContains(t, err, `configured bucket "omit-location-other-bucket"`)
+	require.NotContains(t, err.Error(), "dropping table")
+
+	exists, err := cat.cat.CheckTableExists(ctx, ident)
+	require.NoError(t, err)
+	require.False(t, exists, "table should have been dropped after the bucket mismatch")
 }
 
 // TestMapTypeIgnoreStringFormatOnNonStringField guards against a regression

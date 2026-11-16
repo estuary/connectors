@@ -467,10 +467,14 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 			return fmt.Errorf("creating table %q: %w", fqn, err)
 		}
 
-		// Fail at publish time on a bucket mismatch; the table is left in place.
+		// Fail at publish time on a bucket mismatch, dropping the new (empty)
+		// table so a later publish or flag change can't proceed with it.
 		if c.omitLocation {
 			if err := checkTableLocationBucket(fqn, tbl.Location(), c.cfg.Bucket); err != nil {
-				return fmt.Errorf("%w (table %q was created in the catalog and was not removed: drop it or keep it once Bucket is corrected)", err, fqn)
+				if dropErr := c.cat.DropTable(ctx, b.ResourcePath); dropErr != nil {
+					return fmt.Errorf("%w (dropping table %q also failed, so it must be dropped by hand: %v)", err, fqn, dropErr)
+				}
+				return err
 			}
 		}
 

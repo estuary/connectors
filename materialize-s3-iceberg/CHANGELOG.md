@@ -11,7 +11,8 @@
   access check still tests writes under the Prefix, so make sure the
   credentials can also write to the catalog's storage location. That location
   must be in the configured bucket; if it is not, publishing a new table fails
-  and the task fails at startup, with an error naming both buckets.
+  (and the new table is dropped) and the task fails at startup, with an error
+  naming both buckets.
 
 ## 2026-11-03
 
