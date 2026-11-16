@@ -199,6 +199,39 @@ type RuntimeConfig struct {
 	Fidelity m.Fidelity
 }
 
+// applyConfigOverrides returns bundled with runtime's ExtraFeatureFlags and
+// ConfigOverrides applied to the endpoint config of taskName. Extra feature
+// flags are appended to whatever the source config already sets (later
+// entries win in ParseFeatureFlags). flowctl passes a plaintext (non-sops)
+// config to the connector unchanged, so writing the decrypted config back
+// inline is sufficient.
+func applyConfigOverrides(t *testing.T, bundled []byte, taskName string, runtime RuntimeConfig) []byte {
+	t.Helper()
+
+	if len(runtime.ExtraFeatureFlags) == 0 && len(runtime.ConfigOverrides) == 0 {
+		return bundled
+	}
+
+	rawCfg := decryptConfigRaw(t, bundled, taskName)
+	var err error
+	if len(runtime.ExtraFeatureFlags) > 0 {
+		flags := strings.Join(runtime.ExtraFeatureFlags, ",")
+		if baseFlags := gjson.GetBytes(rawCfg, "advanced.feature_flags").String(); baseFlags != "" {
+			flags = baseFlags + "," + flags
+		}
+		rawCfg, err = sjson.SetBytes(rawCfg, "advanced.feature_flags", flags)
+		require.NoError(t, err)
+	}
+	for path, value := range runtime.ConfigOverrides {
+		rawCfg, err = sjson.SetBytes(rawCfg, path, value)
+		require.NoError(t, err)
+	}
+	bundled, err = sjson.SetRawBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName), rawCfg)
+	require.NoError(t, err)
+
+	return bundled
+}
+
 func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
@@ -228,28 +261,7 @@ func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerpla
 		}
 	}
 
-	// Extra feature flags are appended to whatever the source config already
-	// sets (later entries win in ParseFeatureFlags). flowctl passes a
-	// plaintext (non-sops) config to the connector unchanged, so writing the
-	// decrypted config back inline is sufficient.
-	if len(runtime.ExtraFeatureFlags) > 0 || len(runtime.ConfigOverrides) > 0 {
-		rawCfg := decryptConfigRaw(t, bundled, taskName)
-		var err error
-		if len(runtime.ExtraFeatureFlags) > 0 {
-			flags := strings.Join(runtime.ExtraFeatureFlags, ",")
-			if baseFlags := gjson.GetBytes(rawCfg, "advanced.feature_flags").String(); baseFlags != "" {
-				flags = baseFlags + "," + flags
-			}
-			rawCfg, err = sjson.SetBytes(rawCfg, "advanced.feature_flags", flags)
-			require.NoError(t, err)
-		}
-		for path, value := range runtime.ConfigOverrides {
-			rawCfg, err = sjson.SetBytes(rawCfg, path, value)
-			require.NoError(t, err)
-		}
-		bundled, err = sjson.SetRawBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName), rawCfg)
-		require.NoError(t, err)
-	}
+	bundled = applyConfigOverrides(t, bundled, taskName, runtime)
 
 	cfg := decryptConfig[EC](t, bundled, taskName)
 	rt := rewriteTaskForTest[EC, RC](t, bundled, taskName, tsSuffix, cfg, makeResourceFn)

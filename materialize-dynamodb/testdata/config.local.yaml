@@ -1,6 +1,6 @@
-awsAccessKeyId: anything
-awsSecretAccessKey: anything
-region: anything
+awsAccessKeyId: test
+awsSecretAccessKey: test_secret
+region: us-east-1
 advanced:
-  endpoint: http://localhost:8000
+  endpoint: http://localhost:4566
   feature_flags: allow_existing_tables_for_new_bindings

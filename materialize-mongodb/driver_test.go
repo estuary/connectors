@@ -58,11 +58,11 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, "testdata/apply.flow.yaml", makeResourceFn)
+		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, "testdata/apply.flow.yaml", makeResourceFn, boilerplate.RuntimeConfig{})
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		boilerplate.RunMigrationTest(t, NewMaterializer, "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		boilerplate.RunMigrationTest(t, NewMaterializer, "testdata/migrate.flow.yaml", makeResourceFn, nil, boilerplate.RuntimeConfig{})
 	})
 
 	t.Run("truncate", func(t *testing.T) {
