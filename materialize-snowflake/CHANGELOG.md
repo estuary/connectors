@@ -1,5 +1,12 @@
 # materialize-snowflake
 
+## 2026-11-16
+
+### Fixed
+- High-performance Snowpipe Streaming transactions no longer wait 5–25 seconds
+  for Snowflake to commit. The connector now checks for the commit after
+  100 ms and backs off to every 2 seconds, instead of checking every 5 seconds.
+
 ## 2026-11-13
 
 ### Fixed

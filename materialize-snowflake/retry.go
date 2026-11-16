@@ -65,6 +65,26 @@ func classifyTokenPersisted(err error) retry.Outcome {
 	return retry.Fatal
 }
 
+// streamV2CommitRetry polls Snowpipe Streaming channels until they commit the
+// offset tokens a transaction awaits. Snowflake usually commits within a second
+// of an append, so the first polls come quickly.
+var streamV2CommitRetry = retry.Policy{
+	Classify:       classifyStreamV2Commit,
+	MaxElapsed:     10 * time.Minute,
+	InitialBackoff: 100 * time.Millisecond,
+	MaxBackoff:     2 * time.Second,
+	QuietRetries:   10,
+}
+
+var errStreamV2NotCommitted = errors.New("offset tokens not committed yet")
+
+func classifyStreamV2Commit(err error) retry.Outcome {
+	if errors.Is(err, errStreamV2NotCommitted) {
+		return retry.Retryable
+	}
+	return retry.Fatal
+}
+
 // streamV2Retry retries Snowpipe Streaming requests, ambiguous failures
 // included. An append of rows or of a staged file presents the channel's
 // continuation token, and Snowflake buffers a repeat of the same token and rows

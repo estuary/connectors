@@ -23,15 +23,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-const streamV2CommitPollInterval = 5 * time.Second
-
 // streamV2MaxAppendBytes is Snowflake's limit on the compressed body of one append
 // request. Snowflake refuses a larger body outright, whatever its encoding.
 const streamV2MaxAppendBytes = 4 * 1024 * 1024
-
-// streamV2WaitCommitTimeout bounds one wait for a commit. It is a var so that
-// tests can shorten it.
-var streamV2WaitCommitTimeout = 10 * time.Minute
 
 // streamV2TokenExchangeTimeout bounds one token exchange, retries included,
 // because every request that needs a token waits on the exchange. It is a var so
@@ -576,27 +570,19 @@ func (c *streamV2Client) WaitCommit(ctx context.Context, tokens map[string]strin
 		}
 		offsets[channelName] = offset
 	}
-	ctx, cancel := context.WithTimeout(ctx, streamV2WaitCommitTimeout)
-	defer cancel()
-
 	var committed = make(map[string]*streamV2ChannelStatusResult, len(tokens))
-	for {
+	var err = streamV2CommitRetry.Do(ctx, "waiting for snowpipe streaming channels to commit", func(ctx context.Context) error {
 		var pending []string
 		for channelName := range tokens {
 			if _, ok := committed[channelName]; !ok {
 				pending = append(pending, channelName)
 			}
 		}
-		if len(pending) == 0 {
-			return committed, nil
-		}
 		slices.Sort(pending)
 
 		var statuses, err = c.channelStatuses(ctx, pending)
-		if err != nil && ctx.Err() != nil {
-			return nil, waitCommitError(ctx, pending)
-		} else if err != nil {
-			return nil, err
+		if err != nil {
+			return err
 		}
 		for _, channelName := range pending {
 			var status, token = statuses[channelName], tokens[channelName]
@@ -605,30 +591,20 @@ func (c *streamV2Client) WaitCommit(ctx context.Context, tokens map[string]strin
 			} else if *status.CommittedToken == token {
 				committed[channelName] = status
 			} else if offset, _, ok := streamV2ParseOffsetToken(*status.CommittedToken); !ok {
-				return nil, fmt.Errorf("channel %q reports committed offset token %q, which is not one this write path formats: something other than this task is appending to the channel", channelName, *status.CommittedToken)
+				return fmt.Errorf("channel %q reports committed offset token %q, which is not one this write path formats: something other than this task is appending to the channel", channelName, *status.CommittedToken)
 			} else if offset >= offsets[channelName] {
-				return nil, fmt.Errorf("channel %q reports committed offset token %s in place of the awaited %s: something other than this task is appending to the channel", channelName, *status.CommittedToken, token)
+				return fmt.Errorf("channel %q reports committed offset token %s in place of the awaited %s: something other than this task is appending to the channel", channelName, *status.CommittedToken, token)
 			}
 		}
-		if len(committed) == len(tokens) {
-			return committed, nil
+		if len(committed) < len(tokens) {
+			return fmt.Errorf("offset tokens of channels %q are not committed: %w", pending, errStreamV2NotCommitted)
 		}
-
-		select {
-		case <-time.After(streamV2CommitPollInterval):
-		case <-ctx.Done():
-			return nil, waitCommitError(ctx, pending)
-		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-}
-
-// waitCommitError is the error of a commit wait on the pending channels that
-// ended with ctx.
-func waitCommitError(ctx context.Context, pending []string) error {
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return fmt.Errorf("offset tokens of channels %q were not committed within %s: %w", pending, streamV2WaitCommitTimeout, ctx.Err())
-	}
-	return fmt.Errorf("waiting for offset tokens of channels %q to commit: %w", pending, ctx.Err())
+	return committed, nil
 }
 
 // DropChannel drops a channel in Snowflake, which discards its committed offset
