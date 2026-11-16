@@ -1,0 +1,13 @@
+{"key":"counters:1","ttl":"none","value":{"_meta":{"uuid":"UUID"},"id":1,"label":"retained","total":5}}
+{"key":"counters:2","ttl":"none","value":{"_meta":{"uuid":"UUID"},"id":2,"label":"larger","total":5}}
+{"key":"counters_delta:1","ttl":"none","value":{"_meta":{"uuid":"UUID"},"id":1,"total":2}}
+{"key":"counters_delta:2","ttl":"none","value":{"_meta":{"uuid":"UUID"},"id":2,"label":"larger","total":5}}
+{"key":"events:us:7","ttl":"expires","value":{"_meta":{"uuid":"UUID"},"canary":"e7","region":"us","seq":7}}
+{"key":"orders:1","ttl":"none","value":{"_meta":{"uuid":"UUID"},"canary":"o1","id":1,"status":"new"}}
+{"key":"orders:2","ttl":"none","value":{"_meta":{"uuid":"UUID"},"canary":"o2-v2","id":2,"status":"shipped"}}
+{"key":"orders:3","ttl":"none","value":{"_meta":{"op":"d","uuid":"UUID"},"id":3}}
+{"key":"orders:4","ttl":"none","value":{"_meta":{"uuid":"UUID"},"canary":"o4","id":4,"status":"new"}}
+{"key":"orders_delta:1","ttl":"none","value":{"_meta":{"uuid":"UUID"},"canary":"o1","id":1,"status":"new"}}
+{"key":"orders_delta:2","ttl":"none","value":{"_meta":{"uuid":"UUID"},"canary":"o2-v2","id":2,"status":"shipped"}}
+{"key":"orders_delta:3","ttl":"none","value":{"_meta":{"op":"d","uuid":"UUID"},"id":3}}
+{"key":"orders_delta:4","ttl":"none","value":{"_meta":{"uuid":"UUID"},"canary":"o4","id":4,"status":"new"}}

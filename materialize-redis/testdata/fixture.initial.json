@@ -1,0 +1,8 @@
+["tests/orders", {"id": 1, "status": "new", "canary": "o1"}]
+["tests/orders", {"id": 2, "status": "new", "canary": "o2"}]
+["tests/events", {"region": "us", "seq": 7, "canary": "e7"}]
+["tests/counters", {"id": 2, "label": "larger", "total": 5}]
+{"commit": true}
+["tests/orders", {"id": 3, "status": "new", "canary": "o3"}]
+["tests/counters", {"id": 1, "label": "retained", "total": 3}]
+{"commit": true}
