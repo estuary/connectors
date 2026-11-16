@@ -69,8 +69,8 @@ func TestStreamV2CommitPrecedesCheckpoint(t *testing.T) {
 	// Appends succeed and the committed token never advances, as a channel whose
 	// rows Snowflake accepted but never committed would report.
 	t.Setenv("FAKE_SNOWPIPE_MODE", "commit_never_lands")
-	defer func(d time.Duration) { streamV2WaitCommitTimeout = d }(streamV2WaitCommitTimeout)
-	streamV2WaitCommitTimeout = 3 * time.Second
+	defer func(d time.Duration) { streamV2CommitRetry.MaxElapsed = d }(streamV2CommitRetry.MaxElapsed)
+	streamV2CommitRetry.MaxElapsed = 3 * time.Second
 
 	var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/commitFirst",
 		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
@@ -507,8 +507,8 @@ func TestStreamV2WaitCommitRejectsAnOvertakenOffset(t *testing.T) {
 // this write path did not format, which only another writer can produce: the wait
 // fails at once instead of running to its timeout.
 func TestStreamV2WaitCommitRejectsAForeignToken(t *testing.T) {
-	defer func(d time.Duration) { streamV2WaitCommitTimeout = d }(streamV2WaitCommitTimeout)
-	streamV2WaitCommitTimeout = 10 * time.Second
+	defer func(d time.Duration) { streamV2CommitRetry.MaxElapsed = d }(streamV2CommitRetry.MaxElapsed)
+	streamV2CommitRetry.MaxElapsed = 10 * time.Second
 
 	var ctx = context.Background()
 	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
