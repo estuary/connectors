@@ -4,8 +4,13 @@
 
 ### Added
 
+- New General Ledger bindings `GLBATCH` (journal entries) and `GLENTRY`
+  (journal entry lines). They include the records made inside an entity of a
+  multi-entity company.
 - Backfills: each binding has a new optional `schedule` setting, to backfill
-  it on a cron schedule.
+  it on a cron schedule. Backfills of the General Ledger bindings read all
+  entries. They also remove the rows that no longer exist in Sage from the
+  destination, for captures created on or after 2026-12-01.
 
 ### Fixed
 
