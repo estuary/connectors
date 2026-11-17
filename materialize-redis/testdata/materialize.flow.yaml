@@ -1,0 +1,58 @@
+collections:
+  tests/orders:
+    schema:
+      type: object
+      required: [id]
+      properties:
+        id: {type: integer}
+        status: {type: string}
+        canary: {type: string}
+    key: [/id]
+
+  tests/events:
+    schema:
+      type: object
+      required: [region, seq]
+      properties:
+        region: {type: string}
+        seq: {type: integer}
+        canary: {type: string}
+    key: [/region, /seq]
+
+  tests/counters:
+    schema:
+      type: object
+      required: [id]
+      reduce: {strategy: merge}
+      properties:
+        id: {type: integer}
+        label: {type: string}
+        total: {type: integer, reduce: {strategy: sum}}
+    key: [/id]
+
+materializations:
+  acmeCo/tests/materialize-redis:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+      - resource:
+          keyPrefix: orders
+        source: tests/orders
+      - resource:
+          keyPrefix: orders_delta
+          delta_updates: true
+        source: tests/orders
+      - resource:
+          keyPrefix: events
+          ttlSeconds: 86400
+        source: tests/events
+      - resource:
+          keyPrefix: counters
+        source: tests/counters
+      - resource:
+          keyPrefix: counters_delta
+          delta_updates: true
+        source: tests/counters

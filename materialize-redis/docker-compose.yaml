@@ -1,0 +1,17 @@
+services:
+  db:
+    image: redis:7.4
+    ports:
+      - "6380:6379"
+    networks:
+      - flow-test
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true

@@ -1,0 +1,13 @@
+["tests/orders", {"id": 1, "status": "new", "canary": "o1"}]
+["tests/orders", {"id": 2, "status": "new", "canary": "o2"}]
+["tests/events", {"region": "us", "seq": 7, "canary": "e7"}]
+["tests/counters", {"id": 2, "label": "larger", "total": 5}]
+{"commit": true}
+["tests/orders", {"id": 3, "status": "new", "canary": "o3"}]
+["tests/counters", {"id": 1, "label": "retained", "total": 3}]
+{"commit": true}
+["tests/orders", {"id": 2, "status": "shipped", "canary": "o2-v2"}]
+["tests/orders", {"id": 3, "_meta": {"op": "d"}}]
+["tests/orders", {"id": 4, "status": "new", "canary": "o4"}]
+["tests/counters", {"id": 1, "total": 2}]
+{"commit": true}

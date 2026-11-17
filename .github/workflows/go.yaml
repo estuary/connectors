@@ -480,6 +480,9 @@ jobs:
       - name: Materialization connector ${{ matrix.connector.name }} integration tests (runtime v1)
         if: startsWith(matrix.connector.name, 'materialize-')
         env:
+          # Redis opts into its Docker fixture through the repository runner's
+          # CONNECTOR variable. Carry it into this direct go test invocation too.
+          CONNECTOR: ${{ matrix.connector.name }}
           FLOW_TEST_RUNTIME: v1
           FLOW_TEST_FLOWCTL: flowctl-v1
         run: |

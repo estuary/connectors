@@ -1,0 +1,218 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-redis/config",
+    "properties": {
+      "address": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Address",
+        "description": "Address of your Redis server or initial Sentinel endpoint in host:port format.",
+        "order": 0
+      },
+      "username": {
+        "type": "string",
+        "title": "Username",
+        "description": "Username for authenticating to your Redis server.",
+        "order": 1
+      },
+      "password": {
+        "type": "string",
+        "title": "Password",
+        "description": "Password for authenticating to your Redis server.",
+        "order": 2,
+        "secret": true
+      },
+      "database": {
+        "type": "integer",
+        "minimum": 0,
+        "title": "Database",
+        "description": "Redis database number to materialize into.",
+        "default": 0,
+        "order": 3
+      },
+      "tls": {
+        "type": "boolean",
+        "title": "TLS",
+        "description": "Connect to your Redis server using TLS.",
+        "default": false,
+        "order": 4
+      },
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "Delete Redis keys when source documents are deleted. Otherwise store deletion documents.",
+        "default": false,
+        "order": 5
+      },
+      "advanced": {
+        "properties": {
+          "ssl_server_ca": {
+            "type": "string",
+            "title": "SSL Server CA",
+            "description": "PEM-encoded CA certificates to trust instead of the system certificate authorities.",
+            "multiline": true,
+            "secret": true
+          },
+          "ssl_client_cert": {
+            "type": "string",
+            "title": "SSL Client Certificate",
+            "description": "PEM-encoded client certificate for mutual TLS.",
+            "multiline": true,
+            "secret": true
+          },
+          "ssl_client_key": {
+            "type": "string",
+            "title": "SSL Client Key",
+            "description": "PEM-encoded private key for the client certificate.",
+            "multiline": true,
+            "secret": true
+          },
+          "ssl_server_name": {
+            "type": "string",
+            "title": "SSL Server Name",
+            "description": "Override the hostname used to verify the server certificate. Defaults to the hostname being connected to including through SSH."
+          },
+          "ssl_skip_verify": {
+            "type": "boolean",
+            "title": "Skip Certificate Verification",
+            "description": "Disable server certificate and hostname verification. This makes TLS vulnerable to impersonation.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Custom TLS settings. Requires TLS to be enabled.",
+        "advanced": true
+      },
+      "sentinel": {
+        "properties": {
+          "masterName": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Primary Name",
+            "description": "Name of the primary monitored by Sentinel."
+          },
+          "addresses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Additional Sentinel Addresses",
+            "description": "Additional Sentinel endpoints in host:port format. The endpoint address is always included."
+          },
+          "username": {
+            "type": "string",
+            "title": "Sentinel Username",
+            "description": "Username for authenticating to Sentinel separately from Redis."
+          },
+          "password": {
+            "type": "string",
+            "title": "Sentinel Password",
+            "description": "Password for authenticating to Sentinel separately from Redis.",
+            "secret": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "masterName"
+        ],
+        "title": "Sentinel",
+        "description": "Discover the current primary using Redis Sentinel. Address is used as the initial Sentinel endpoint."
+      },
+      "networkTunnel": {
+        "properties": {
+          "sshForwarding": {
+            "properties": {
+              "sshEndpoint": {
+                "type": "string",
+                "title": "SSH Endpoint",
+                "description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+                "pattern": "^ssh://.+@.+$"
+              },
+              "privateKey": {
+                "type": "string",
+                "title": "SSH Private Key",
+                "description": "Private key to connect to the remote SSH server.",
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "sshEndpoint",
+              "privateKey"
+            ],
+            "title": "SSH Forwarding"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Network Tunnel",
+        "description": "Connect to your system through an SSH server that acts as a bastion host for your network."
+      }
+    },
+    "type": "object",
+    "required": [
+      "address"
+    ],
+    "title": "Materialize Redis Spec"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-redis/resource",
+    "properties": {
+      "keyPrefix": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Key Prefix",
+        "description": "Prefix for Redis keys. Collection keys are appended using the selected key encoding.",
+        "x-collection-name": true
+      },
+      "ttlSeconds": {
+        "type": "integer",
+        "maximum": 9223372036,
+        "minimum": 0,
+        "title": "TTL Seconds",
+        "description": "Lifetime of each Redis key in seconds after it is written. Zero disables expiry.",
+        "default": 0
+      },
+      "delta_updates": {
+        "type": "boolean",
+        "title": "Delta Updates",
+        "description": "Write documents without first loading their existing values.",
+        "default": false,
+        "x-delta-updates": true
+      },
+      "format": {
+        "type": "string",
+        "enum": [
+          "string",
+          "json"
+        ],
+        "title": "Document Format",
+        "description": "Store documents as Redis strings or RedisJSON values. JSON requires RedisJSON support.",
+        "default": "string"
+      },
+      "keyEncoding": {
+        "type": "string",
+        "enum": [
+          "legacy",
+          "json"
+        ],
+        "title": "Key Encoding",
+        "description": "Legacy joins key values with colons. JSON encodes the complete key tuple as a JSON array to prevent collisions.",
+        "default": "legacy"
+      }
+    },
+    "type": "object",
+    "required": [
+      "keyPrefix"
+    ],
+    "title": "Redis Keys"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-redis"
+}
