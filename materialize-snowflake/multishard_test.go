@@ -31,11 +31,11 @@ func TestRequireMultiShardCapable(t *testing.T) {
 		wantErr  []string
 	}{
 		{name: "one shard takes any binding", r: full, bindings: []*binding{staged, streamV2, streamV1, pipe}},
-		{name: "shards take streaming v2 bindings", r: keySplit, bindings: []*binding{streamV2}},
-		{name: "a key split refuses every other binding", r: keySplit,
-			bindings: []*binding{streamV2, staged, streamV1, pipe}, wantErr: []string{"staged_table", "v1_table", "pipe_table"}},
-		{name: "an r-clock split refuses a staged binding", r: rClockSplit,
-			bindings: []*binding{staged}, wantErr: []string{"staged_table"}},
+		{name: "shards take staged and streaming v2 bindings", r: keySplit, bindings: []*binding{staged, streamV2}},
+		{name: "a key split refuses snowpipe_streaming and Snowpipe bindings", r: keySplit,
+			bindings: []*binding{streamV2, staged, streamV1, pipe}, wantErr: []string{"v1_table", "pipe_table"}},
+		{name: "an r-clock split refuses a Snowpipe binding", r: rClockSplit,
+			bindings: []*binding{pipe}, wantErr: []string{"pipe_table"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err = requireMultiShardCapable(tc.r, tc.bindings)
@@ -48,6 +48,7 @@ func TestRequireMultiShardCapable(t *testing.T) {
 				require.ErrorContains(t, err, s)
 			}
 			require.NotContains(t, err.Error(), "v2_table")
+			require.NotContains(t, err.Error(), "staged_table")
 		})
 	}
 }
