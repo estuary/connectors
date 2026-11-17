@@ -43,6 +43,11 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	// When this flag is enabled:
 	//   <base_location>/<namespace>/<table>.<hash>
 	"nested_dot_hash_location_style": common.FlagDisabled,
+
+	// Leave the storage location out of create-table requests and let the
+	// catalog assign it. Needed for catalogs that reject explicit locations,
+	// such as Snowflake Horizon with Snowflake-managed Iceberg tables.
+	"omit_table_location": common.FlagDisabled,
 }
 
 type catalogType string
@@ -379,7 +384,8 @@ func NewMaterializer(ctx context.Context, materializationName string, cfg config
 		locationStyle = NestedDotHashLocationStyle
 	}
 
-	catalog, err := newCatalog(ctx, cfg, locationStyle)
+	omitLocation := featureFlags["omit_table_location"]
+	catalog, err := newCatalog(ctx, cfg, locationStyle, omitLocation)
 	if err != nil {
 		return nil, fmt.Errorf("creating iceberg catalog: %w", err)
 	}
@@ -596,6 +602,15 @@ func (d *materialization) NewTransactor(
 	for idx := range bindings {
 		b := &bindings[idx]
 		b.catalogTablePath = tableInfos[idx].location
+
+		// Data files are uploaded to the configured bucket, so a table
+		// location in another bucket would commit references to files
+		// that were never written there.
+		if d.catalog.omitLocation {
+			if err := checkTableLocationBucket(pathToFQN(b.path), b.catalogTablePath, d.cfg.Bucket); err != nil {
+				return nil, err
+			}
+		}
 
 		// Embed the table's field IDs in written parquet files so they are
 		// self-describing: readers then never consult the table's name mapping
