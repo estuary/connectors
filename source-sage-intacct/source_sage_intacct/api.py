@@ -107,7 +107,9 @@ async def _fetch_records_generic(
                 rec = cls.model_validate(rec.model_dump())
                 last_record_identifier = getattr(rec, id_field)
                 this_count += 1
-                if cache.should_yield(object, getattr(rec, id_field), rec.cursor_value()):
+                if cache.should_yield(
+                    object, getattr(rec, id_field), rec.cursor_value()
+                ):
                     yield rec
 
             if this_count < page_size:

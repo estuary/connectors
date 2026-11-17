@@ -88,7 +88,11 @@ class ApiResponse(BaseModel):
                     return True
                 # AUDITHISTORY denials arrive without an `errorno`, so fall
                 # back to matching the literal description Sage emits.
-                if self.description2 and "do not have permission to view audit history" in self.description2.lower():
+                if (
+                    self.description2
+                    and "do not have permission to view audit history"
+                    in self.description2.lower()
+                ):
                     return True
                 return False
 
