@@ -638,12 +638,22 @@ def get_records_at_request(
 ) -> str:
     def filter() -> str:
         if after is None:
-            return ""
+            return f"""
+              <equalto>
+                  <field>WHENMODIFIED</field>
+                  <value>{at}</value>
+              </equalto>"""
         return f"""
+            <and>
+              <equalto>
+                <field>WHENMODIFIED</field>
+                <value>{at}</value>
+              </equalto>
               <greaterthan>
-                  <field>RECORDNO</field>
-                  <value>{after}</value>
-              </greaterthan>"""
+                <field>RECORDNO</field>
+                <value>{after}</value>
+              </greaterthan>
+            </and>"""
 
     exec = f"""
         <query>
@@ -651,11 +661,7 @@ def get_records_at_request(
           <select>
 {"\n".join(f"            <field>{field}</field>" for field in fields)}
           </select>
-          <filter>
-              <equalto>
-                  <field>WHENMODIFIED</field>
-                  <value>{at}</value>
-              </equalto>{filter()}
+          <filter>{filter()}
           </filter>
           <orderby>
             <order>

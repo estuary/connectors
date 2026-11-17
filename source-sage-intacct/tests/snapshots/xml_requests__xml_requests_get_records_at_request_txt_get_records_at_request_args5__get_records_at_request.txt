@@ -22,14 +22,16 @@
             <field>THIRD_FIELD</field>
           </select>
           <filter>
+            <and>
               <equalto>
-                  <field>WHENMODIFIED</field>
-                  <value>2023-01-02 03:04:56</value>
+                <field>WHENMODIFIED</field>
+                <value>2023-01-02 03:04:56</value>
               </equalto>
               <greaterthan>
-                  <field>RECORDNO</field>
-                  <value>1234</value>
+                <field>RECORDNO</field>
+                <value>1234</value>
               </greaterthan>
+            </and>
           </filter>
           <orderby>
             <order>
