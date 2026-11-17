@@ -256,7 +256,7 @@ class Sage:
         self,
         obj: str,
         at: AwareDatetime,
-        after: int | None,
+        after: int | str | None,
     ) -> AsyncGenerator[SageRecord, None]:
         model = await self.get_model(obj)
         formatted_at = at.astimezone(model.tz_dt.tzinfo).strftime("%m/%d/%Y %H:%M:%S")
@@ -267,7 +267,7 @@ class Sage:
             yield rec
 
     async def fetch_all(
-        self, obj: str, after: int | None
+        self, obj: str, after: int | str | None
     ) -> AsyncGenerator[SageRecord, None]:
         model = await self.get_model(obj)
         data = get_all_records_request(
@@ -293,7 +293,7 @@ class Sage:
         self,
         obj: str,
         at: AwareDatetime,
-        after: int | None,
+        after: int | str | None,
     ) -> AsyncGenerator[SageRecord, None]:
         model = await self.get_model(obj)
         formatted_at = at.astimezone(model.tz_dt.tzinfo).strftime("%m/%d/%Y %H:%M:%S")
@@ -485,6 +485,22 @@ class Sage:
         return m
 
 
+# Objects whose queries set `showprivate`. Without it, a query from the top
+# level of a multi-entity company skips the records made inside an entity.
+SHOW_PRIVATE_OBJECTS: frozenset[str] = frozenset()
+
+
+def query_options(object: str) -> str:
+    show_private = (
+        "\n            <showprivate>true</showprivate>"
+        if object in SHOW_PRIVATE_OBJECTS
+        else ""
+    )
+    return f"""<options>{show_private}
+            <returnformat>json</returnformat>
+          </options>"""
+
+
 def xml_query(cfg: EndpointConfig, operation: str) -> str:
     return f"""
 <?xml version="1.0" encoding="UTF-8"?>
@@ -618,9 +634,7 @@ def get_records_since_request(
                 <ascending/>
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options(object)}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()
@@ -634,7 +648,7 @@ def get_records_at_request(
     object: str,
     fields: list[str],
     at: str,  # ex: 12/08/202 10:46:26
-    after: int | None,
+    after: int | str | None,
 ) -> str:
     def filter() -> str:
         if after is None:
@@ -669,9 +683,7 @@ def get_records_at_request(
                 <ascending/>
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options(object)}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()
@@ -684,7 +696,7 @@ def get_all_records_request(
     session_id: str,
     object: str,
     fields: list[str],
-    after: int | None,
+    after: int | str | None,
 ) -> str:
     def filter() -> str:
         if after is None:
@@ -709,9 +721,7 @@ def get_all_records_request(
                 <ascending/>
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options(object)}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()
@@ -749,9 +759,7 @@ def get_creations_since_request(
                 <ascending/>
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options(object)}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()
@@ -765,7 +773,7 @@ def get_creations_at_request(
     object: str,
     fields: list[str],
     at: str,  # ex: 12/08/2024 10:46:26
-    after: int | None,
+    after: int | str | None,
 ) -> str:
     def filter() -> str:
         if after is None:
@@ -799,9 +807,7 @@ def get_creations_at_request(
                 <ascending/>
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options(object)}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()
@@ -845,9 +851,7 @@ def get_deletions_since_request(
               <ascending />
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options("AUDITHISTORY")}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()
@@ -901,9 +905,7 @@ def get_deletions_at_request(
               <ascending />
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options("AUDITHISTORY")}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()
