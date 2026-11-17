@@ -6,7 +6,8 @@ FROM --platform=linux/amd64 debian:trixie-slim AS debian
 # version.
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
- && apt-get install -y openssh-client ca-certificates curl tzdata tzdata-legacy
+ && apt-get install -y openssh-client ca-certificates curl tzdata tzdata-legacy \
+ && rm -rf /var/lib/apt/lists/*
 
 # Create a non-privileged "nonroot" user.
 RUN useradd nonroot --create-home --shell /usr/sbin/nologin
