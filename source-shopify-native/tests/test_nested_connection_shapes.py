@@ -10,6 +10,7 @@ Supported shapes exercised here (declared via `NestedConnection.parent_path`):
   - `[]`                     connection directly on the document node
   - `["wrapper", "things"]`  connection on each element of a list nested under an object
   - `["agreements"]`         connection nested inside another connection (resolved in order)
+  - `["conditions", "regionsCondition"]`  connection under nullable objects (Markets, real)
 """
 
 import json
@@ -22,6 +23,7 @@ import pytest
 
 from source_shopify_native.api import _paginate_through_resources
 from source_shopify_native.graphql.client import ShopifyGraphQLClient
+from source_shopify_native.graphql.markets import Markets
 from source_shopify_native.graphql.orders.refunds import OrderRefunds
 from source_shopify_native.models import (
     NestedConnection,
@@ -325,3 +327,61 @@ async def test_connection_in_connection_resolves_both(log):
     assert dumped["agreements"][0]["id"] == "gid://shopify/SalesAgreement/1"
     assert dumped["agreements"][0]["sales"] == [{"id": "s1"}, {"id": "s2"}]
     assert len(http.queries) == 1  # everything inline, no overflow
+
+
+# --- ["conditions", "regionsCondition"]: a nullable path to a parent that isn't a Node (real) ------
+
+
+def _market(n: int, conditions: dict | None) -> dict:
+    return {"id": f"gid://shopify/Market/{n}", "conditions": conditions, "catalogs": _conn([])}
+
+
+@pytest.mark.asyncio
+async def test_nullable_path_resolves_regions_and_keeps_nulls(log):
+    """A market's regions are flattened in place. A market with no regionsCondition, or no
+    conditions at all, comes through as Shopify returned it."""
+    regions = [{"id": "gid://shopify/MarketRegionCountry/1", "name": "Mexico", "code": "MX"}]
+    http = MockHTTP(
+        outer_pages=[
+            _outer_page(
+                "markets",
+                [
+                    _market(1, {"conditionTypes": ["REGION"], "regionsCondition": {"regions": _conn(regions)}}),
+                    _market(2, {"conditionTypes": ["COMPANY_LOCATION"], "regionsCondition": None}),
+                    _market(3, None),
+                ],
+            )
+        ]
+    )
+
+    docs = await _capture(Markets, http, log)
+
+    dumped = [doc.model_dump(by_alias=True) for doc in docs]
+    assert dumped[0]["conditions"]["regionsCondition"]["regions"] == regions
+    assert dumped[1]["conditions"]["regionsCondition"] is None
+    assert dumped[2]["conditions"] is None
+    assert len(http.queries) == 1
+
+
+@pytest.mark.asyncio
+async def test_regions_overflow_raises(log):
+    """RegionsCondition has no id to page from, so a market reporting more regions than its inline
+    page fails loudly instead of capturing part of the list."""
+    conditions = {
+        "conditionTypes": ["REGION"],
+        "regionsCondition": {"regions": _conn([{"id": "r1"}], has_next=True, end_cursor="C1")},
+    }
+    http = MockHTTP(outer_pages=[_outer_page("markets", [_market(1, conditions)])])
+
+    with pytest.raises(ValueError, match="no id"):
+        await _capture(Markets, http, log)
+
+
+@pytest.mark.asyncio
+async def test_market_without_conditions_raises(log):
+    """A market missing the `conditions` field the query selects is a query bug, not a null."""
+    market = {"id": "gid://shopify/Market/1", "catalogs": _conn([])}
+    http = MockHTTP(outer_pages=[_outer_page("markets", [market])])
+
+    with pytest.raises(TypeError, match="missing"):
+        await _capture(Markets, http, log)
