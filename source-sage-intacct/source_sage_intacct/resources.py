@@ -92,7 +92,7 @@ async def incremental_resource(
             and isinstance(existing.cursor, datetime)
         ):
             current_cursor = existing.cursor
-            creation_state: dict[str, ResourceState.Incremental] = {
+            creation_state: dict[str, ResourceState.Incremental | None] = {
                 REALTIME_CREATIONS: ResourceState.Incremental(cursor=current_cursor),
                 LOOKBACK_CREATIONS: ResourceState.Incremental(
                     cursor=current_cursor - LOOKBACK_LAG

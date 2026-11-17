@@ -96,22 +96,18 @@ class SageRecord(BaseModel):
             match datatype:
                 case "TIMESTAMP":
                     assert isinstance(val, str)
-                    parsed = False
                     for fmt in ("%m/%d/%Y %H:%M:%S", "%m/%d/%Y"):
                         try:
-                            dt_naive = datetime.strptime(val, fmt)
-                            parsed = True
+                            val = datetime.strptime(val, fmt).replace(
+                                tzinfo=cls.tz_dt.tzinfo
+                            )
                             break
                         except ValueError:
                             continue
-
-                    if not parsed:
+                    else:
                         raise ValueError(
                             f"Invalid TIMESTAMP format for {field_name}: {val}"
                         )
-
-                    dt_aware = dt_naive.replace(tzinfo=cls.tz_dt.tzinfo)
-                    val = dt_aware
                 case "BOOLEAN":
                     assert isinstance(val, str)
                     if val == "":
@@ -372,7 +368,9 @@ class Sage:
         the Sage error message attached on a PL04000005 denial."""
         await self._maybe_refresh_session()
 
-        data = permission_probe_request(self.config, self.session_id, obj)
+        # The request body is XML. The CDK sends `form` as the body as it is,
+        # and its type hint only names the form-encoded use.
+        data: Any = permission_probe_request(self.config, self.session_id, obj)
         bs = await self.http.request(
             self.log,
             endpoint_url,

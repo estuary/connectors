@@ -3,7 +3,19 @@ import re
 import pytest
 
 from source_sage_intacct.models import EndpointConfig
-from source_sage_intacct.sage import *
+from source_sage_intacct.sage import (
+    api_session_request,
+    get_all_records_request,
+    get_creations_at_request,
+    get_creations_since_request,
+    get_deletions_at_request,
+    get_deletions_since_request,
+    get_records_at_request,
+    get_records_since_request,
+    get_user_by_id_request,
+    object_definition_request,
+    user_datetime_prefs_request,
+)
 
 cfg = EndpointConfig(
     sender_id="sender_id",
