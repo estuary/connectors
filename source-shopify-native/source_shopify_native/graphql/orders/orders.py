@@ -277,6 +277,38 @@ class Orders(ShopifyGraphQLResource):
                     allocatedAmountSet {
                         ..._MoneyBagFields
                     }
+                    # The full application, not just its index: the order-level
+                    # discountApplications excludes order edits, so an index
+                    # alone may have nothing to join to.
+                    discountApplication {
+                        __typename
+                        allocationMethod
+                        index
+                        targetSelection
+                        targetType
+                        value {
+                            __typename
+                            ... on MoneyV2 {
+                                amount
+                                currencyCode
+                            }
+                            ... on PricingPercentageValue {
+                                percentage
+                            }
+                        }
+                        ... on AutomaticDiscountApplication {
+                            title
+                        }
+                        ... on DiscountCodeApplication {
+                            code
+                        }
+                        ... on ManualDiscountApplication {
+                            title
+                        }
+                        ... on ScriptDiscountApplication {
+                            title
+                        }
+                    }
                 }
                 taxLines {
                     title

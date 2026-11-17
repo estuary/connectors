@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-18
+
+### Added
+- `orders` line item discount allocations now include `discountApplication`,
+  the discount that produced each allocation, with its `index`, type, value,
+  and `code` or `title`. The `index` matches the order's `discountApplications`
+  entry, except for discounts added by an order edit, which that list omits.
+
 ## 2026-11-16
 
 ### Added
