@@ -57,8 +57,9 @@ To meet these requirements, follow the steps for your hosting type.
 
 Grant `SELECT` on all tables or restrict it to the tables to be captured. `SELECT`
 permissions must be at the table level, not the column level. Automatic discovery also
-requires `information_schema` access. To keep specific columns, such as sensitive fields,
-out of the capture, use [redaction](/features/redaction) rather than column-level grants.
+requires `information_schema` access. See [Restricting which data the connector reads](#restricting-which-data-the-connector-reads)
+for how these grants apply to backfill and replication, and for how to keep a sensitive
+column out of a capture.
 
 ```sql
 CREATE USER IF NOT EXISTS flow_capture
@@ -154,8 +155,9 @@ CALL mysql.rds_set_configuration('binlog retention hours', 168);
 
 Grant `SELECT` on all tables or restrict it to the tables to be captured. `SELECT`
 permissions must be at the table level, not the column level. Automatic discovery also
-requires `information_schema` access. To keep specific columns, such as sensitive fields,
-out of the capture, use [redaction](/features/redaction) rather than column-level grants.
+requires `information_schema` access. See [Restricting which data the connector reads](#restricting-which-data-the-connector-reads)
+for how these grants apply to backfill and replication, and for how to keep a sensitive
+column out of a capture.
 
 :::tip
 Your username must be specified in the format `username@servername`.
@@ -289,6 +291,46 @@ This is desirable in most cases, as it ensures that a complete view of your tabl
 However, you may find it appropriate to skip the backfill, especially for extremely large tables.
 
 In this case, you may turn off backfilling on a per-table basis. See [properties](#properties) for details.
+
+## Restricting which data the connector reads
+
+The connector reads data by two different mechanisms, and database-side access controls do not apply to both of them equally:
+
+- **Backfill**, the initial scan of an existing table, runs an ordinary `SELECT *` query as the capture user.
+- **Replication**, the ongoing stream of changes, reads the binary log using the `REPLICATION SLAVE` privilege.
+
+Any control you apply at the database must account for both.
+
+### Replication is not restricted per table or column
+
+`REPLICATION SLAVE` is a global privilege: MySQL only accepts it as `ON *.*`, and it is required to read the binary log at all. The binary log is a server-wide stream, so the row events the connector receives are **not filtered by the `SELECT` grants that constrain the backfill.**
+
+:::warning
+Narrowing a capture user's `SELECT` grants does not keep data out of the replication stream. Row events for a table reach the connector based on which tables the capture binds, not on what the capture user may read.
+:::
+
+Bind only the tables you intend to capture, and treat `REPLICATION SLAVE` as access to all changes on the server.
+
+### Column-level privileges are not supported
+
+The backfill query is `SELECT *`, so the capture user needs table-level `SELECT` on every captured table. Granting `SELECT` on a subset of columns instead does not narrow the capture; it fails outright:
+
+```
+ERROR 1142 (42000): SELECT command denied to user 'flow_capture'@'localhost' for table 'customers'
+```
+
+Grant `SELECT` at the table level, as shown in the [setup instructions](#setup). Automatic discovery also requires `information_schema` access.
+
+### Keeping a column out of a capture
+
+To remove a sensitive field from a capture, use one of the following:
+
+- [Redaction](/features/redaction/) with the `block` strategy, which removes the value in the Estuary runtime before any document is written to disk. This is the supported option in most cases.
+- A database-side table containing only the permitted columns, captured in place of the base table. Use this when the value must never leave the source database. Changes to a view are not written to the binary log as events of their own, so a view cannot be captured by replication.
+
+:::info
+Redaction applies only to documents captured after the rule is in place, and a redacted field does not automatically redact its copy under `_meta/before`. See [Redacting CDC before-images](/features/redaction/#redacting-cdc-before-images).
+:::
 
 ## Configuration
 

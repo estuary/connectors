@@ -208,6 +208,56 @@ Granting that permission to the capture user is a hard requirement for using thi
 
 Note also that you still need to have enough free storage space to hold the full 3 days of CDC event retention in the worst case. Otherwise, in the event of downtime exceeding what you can store, you have only changed the failure mode to running out of disk space. This option is best used in situations where it is _possible_ to use that much storage but it is still undesirable for other reasons to use that much in normal operation, such as when using flexible storage volumes on a cloud host.
 
+## Restricting which data the connector reads
+
+The connector reads data by two different mechanisms, and database-side access controls do not apply to both of them equally:
+
+- **Backfill**, the initial scan of an existing table, runs an ordinary `SELECT *` query against the source table as the capture user.
+- **Replication**, the ongoing stream of changes, reads the CDC change tables through `cdc.fn_cdc_get_all_changes_*`. The source table is never read on this path.
+
+Any control you apply at the database must account for both.
+
+### Row-level security does not restrict replication
+
+[Row-level security](https://learn.microsoft.com/sql/relational-databases/security/row-level-security) (RLS) predicates are applied while reading from the base table, so they constrain the backfill. **They do not constrain the change events the connector receives through CDC.** A policy that hides rows from the capture user during backfill will not stop those same rows from being streamed once replication begins.
+
+:::warning
+Do not rely on RLS alone to keep rows out of a capture. The capture will appear to succeed, and the restricted rows will still arrive through replication.
+:::
+
+This is documented SQL Server behavior rather than a connector limitation. Microsoft notes that change data capture "can leak entire rows that should be filtered" to members of the gating role specified when CDC is enabled on a table. See [Cross-feature compatibility](https://learn.microsoft.com/sql/relational-databases/security/row-level-security#cross-feature-compatibility).
+
+Access to the change tables is granted through that gating role, set by the `@role_name` argument to `sys.sp_cdc_enable_table` during [setup](#setup) and configured on the connector as `Advanced > CDC Instance Access Role`. Any member of that role reads change events unfiltered by RLS.
+
+To restrict rows at the database, separate them before they reach the capture, for example by enabling CDC only on a table that contains the permitted rows.
+
+### Column-level privileges are not supported
+
+The backfill query is `SELECT *`, so the capture user needs `SELECT` on every captured table at the table or schema level, as shown in the [setup instructions](#setup):
+
+```sql
+GRANT SELECT ON SCHEMA :: dbo TO flow_capture;
+```
+
+Denying `SELECT` on individual columns does not narrow the capture. The backfill requires every column the table defines.
+
+### Keeping a column out of a capture
+
+`sys.sp_cdc_enable_table` accepts a [`@captured_column_list`](https://learn.microsoft.com/sql/relational-databases/system-stored-procedures/sys-sp-cdc-enable-table-transact-sql) argument that limits which columns the change table records. This restricts replication only. The backfill still reads every column directly from the source table, so a column list alone does not keep a value out of a capture.
+
+:::warning
+If you narrow a capture instance this way, do not enable `Advanced > Automatic Capture Instance Management`. When that option is set, the connector creates replacement capture instances itself and does not carry over `@captured_column_list`, so the excluded columns would begin flowing again.
+:::
+
+To remove a sensitive field from a capture, use one of the following:
+
+- [Redaction](/features/redaction/) with the `block` strategy, which removes the value in the Estuary runtime before any document is written to disk. This is the supported option in most cases.
+- A database-side table containing only the permitted columns, with CDC enabled on that table and captured in place of the base table. Use this when the value must never leave the source database. CDC cannot be enabled on a view, so a view is not an option here.
+
+:::info
+Redaction applies only to documents captured after the rule is in place, and a redacted field does not automatically redact its copy under `_meta/before`. See [Redacting CDC before-images](/features/redaction/#redacting-cdc-before-images).
+:::
+
 ## Configuration
 
 You configure connectors either in the Estuary web app, or by directly editing the catalog specification file.
