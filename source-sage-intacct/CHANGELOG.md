@@ -2,6 +2,11 @@
 
 ## 2026-11-19
 
+### Added
+
+- Backfills: each binding has a new optional `schedule` setting, to backfill
+  it on a cron schedule.
+
 ### Fixed
 
 - Bindings with more than 2,000 records modified in the same second now send

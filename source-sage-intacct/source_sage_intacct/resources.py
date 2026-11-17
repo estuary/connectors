@@ -18,7 +18,7 @@ from .models import (
     ConnectorState,
     Document,
     EndpointConfig,
-    ResourceConfig,
+    ResourceConfigWithSchedule,
     ResourceState,
     SagePermissionError,
     SnapshotResource,
@@ -77,7 +77,7 @@ async def incremental_resource(
     model = await sage.get_model(obj)
 
     async def open(
-        binding: CaptureBinding[ResourceConfig],
+        binding: CaptureBinding[ResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
         task: Task,
@@ -194,7 +194,7 @@ async def incremental_resource(
             },
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=obj, interval=DEFAULT_INTERVAL),
+        initial_config=ResourceConfigWithSchedule(name=obj, interval=DEFAULT_INTERVAL),
         schema_inference=True,
     )
 
@@ -204,7 +204,7 @@ async def snapshot_resource(sage: Sage, obj: str) -> common.Resource:
 
     async def open(
         obj: str,
-        binding: CaptureBinding[ResourceConfig],
+        binding: CaptureBinding[ResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
         task: Task,
@@ -228,7 +228,7 @@ async def snapshot_resource(sage: Sage, obj: str) -> common.Resource:
         model=SnapshotResource,
         open=functools.partial(open, obj),
         initial_state=ResourceState(),
-        initial_config=ResourceConfig(name=obj, interval=DEFAULT_INTERVAL),
+        initial_config=ResourceConfigWithSchedule(name=obj, interval=DEFAULT_INTERVAL),
         schema_inference=True,
     )
 

@@ -75,6 +75,7 @@ configuration details specific to the Sage Intacct source connector.
 |-------------|----------|-----------------------------|--------|------------------|
 | **`/name`** | Name     | Name of this resource       | string | Required         |
 | `/interval` | Interval | Interval between data syncs | string | PT6H             |
+| `/schedule` | Backfill schedule | The schedule for automatically backfilling this binding. Accepts a cron expression. If left empty, the binding will not automatically backfill. | string |                  |
 
 ### Sample
 
