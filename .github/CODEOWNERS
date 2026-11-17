@@ -4,3 +4,18 @@
 # .github/workflows/cloud-cas.yaml, which the workflow's own token cannot
 # request from a team.
 /go/cloudcas/ @estuary/capture
+
+# Changes to these files can let a connector image with a HIGH or CRITICAL
+# vulnerability ship, either by adding an exception or by weakening or
+# disabling the image scan, so they need operations' approval. The first
+# pattern covers the root exceptions, which apply to every image, and each
+# connector's own. This file is listed too, so the ownership itself cannot be
+# removed without that approval.
+**/.trivyignore.yaml                      @estuary/operations
+/trivy.yaml                               @estuary/operations
+/.github/workflows/image-scan.yaml        @estuary/operations
+/.github/actions/scan-images/             @estuary/operations
+/.github/scripts/trivy-scan.sh            @estuary/operations
+/.github/scripts/test_trivy_scan.py       @estuary/operations
+/.github/scripts/published-images.sh      @estuary/operations
+/.github/CODEOWNERS                       @estuary/operations
