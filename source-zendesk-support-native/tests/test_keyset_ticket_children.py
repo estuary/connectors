@@ -9,7 +9,9 @@ from source_zendesk_support_native.api.shared import INCREMENTAL_LAG, dt_to_s
 from source_zendesk_support_native.api.ticket_children import (
     backfill_incremental_keyset_paginated_ticket_children,
     fetch_incremental_keyset_paginated_ticket_children,
+    fetch_incremental_keyset_paginated_ticket_metrics,
 )
+from source_zendesk_support_native.models import TicketMetricSet
 
 log = logging.getLogger(__name__)
 
@@ -116,3 +118,36 @@ async def test_empty_sweep_yields_nothing() -> None:
 
     assert results == []
     assert children.batches == []
+
+
+@pytest.mark.asyncio
+async def test_metric_sets_follow_their_tickets(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("source_zendesk_support_native.api.incremental_keyset_paginated.CHECKPOINT_INTERVAL", 1)
+
+    now = datetime.now(tz=UTC).replace(microsecond=0)
+    log_cursor = now - timedelta(hours=1)
+    second = timedelta(seconds=1)
+
+    # Ticket 3 has no metric set, and ticket 4 is past the horizon.
+    http = MockHTTP(
+        {
+            **_page([_ticket(1, log_cursor + second), _ticket(2, log_cursor + 2 * second)], after_cursor="c1"),
+            "metric_sets": [{"id": 102, "ticket_id": 2}, {"id": 101, "ticket_id": 1}],
+        },
+        {
+            **_page([_ticket(3, log_cursor + 2 * second), _ticket(4, now)], after_cursor=None),
+            "metric_sets": [{"id": 104, "ticket_id": 4}],
+        },
+    )
+
+    results = [
+        r async for r in fetch_incremental_keyset_paginated_ticket_metrics(
+            http,  # type: ignore[arg-type]
+            "example", log, log_cursor,
+        )
+    ]
+
+    assert [r.id if isinstance(r, TicketMetricSet) else r for r in results] == [
+        101, log_cursor + second, 102, log_cursor + 2 * second,
+    ]
+    assert all(params["support_type_scope"] == "all" and params["include"] == "metric_sets" for params in http.params)
