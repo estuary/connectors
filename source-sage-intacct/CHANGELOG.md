@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-19
+
+### Fixed
+
+- Bindings with more than 2,000 records modified in the same second now send
+  a valid request for the records after the first 2,000. Its two filter
+  conditions are combined with `<and>`, as Sage requires.
+
 ## 2026-09-10
 
 ### Fixed
