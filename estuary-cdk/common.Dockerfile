@@ -39,11 +39,18 @@ ARG ENCRYPTION_URL="https://config-encryption.estuary.dev/v1/encrypt-config"
 # `.github/python-connectors.yaml`.
 ARG USAGE_RATE
 
+# Upgrade the packages that ship in python:3.14-slim as well, so security fixes
+# published after that image was cut are picked up, as base-image does for the
+# Go connectors. `apt install` alone leaves already-installed packages at the
+# image's version. python.yaml builds this stage without its layer cache, so
+# the upgrade runs on every CI build rather than once per python:3.14-slim.
 RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && \
     apt install -y --no-install-recommends \
     openssh-client \
     tzdata \
-    tzdata-legacy
+    tzdata-legacy && \
+    rm -rf /var/lib/apt/lists/*
 
 LABEL FLOW_RUNTIME_PROTOCOL=${CONNECTOR_TYPE}
 LABEL FLOW_RUNTIME_CODEC=json
