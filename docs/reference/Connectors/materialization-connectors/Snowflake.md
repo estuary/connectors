@@ -416,6 +416,11 @@ until you backfill the binding rather than letting a retry continue with the row
 `NOT NULL` only for a field your collection schema requires, and the runtime always supplies those, so this should not
 arise for a table the connector created and still manages.
 
+When a field stops being required, the connector drops the column's `NOT NULL` constraint, and then adds a column named
+`FLOW_PIPE_REFRESH_` followed by eight random characters and drops it again at once. Without this step, Snowflake's
+streaming pipe can keep rejecting nulls for the column after its constraint is dropped. If the connector is
+interrupted between the two steps, a column of that name stays on the table, and you can safely drop it.
+
 :::caution
 Streaming requires a destination that Snowflake can stream into — a table, not a view. Snowflake reports an
 incompatible destination asynchronously, so the connector surfaces it as a failure to commit the transaction

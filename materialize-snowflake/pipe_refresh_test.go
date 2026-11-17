@@ -5,8 +5,10 @@ import (
 	stdsql "database/sql"
 	"fmt"
 	"math"
+	"regexp"
 	"testing"
 
+	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -14,6 +16,54 @@ import (
 )
 
 const pipeRefreshIssue = "https://github.com/estuary/connectors/issues/5809"
+
+var streamV2Flags = map[string]bool{flagSnowpipeStreaming: true, flagSnowpipeStreamingV2: true}
+
+// TestAlterTablePipeRefresh covers which alterations carry the statements of
+// pipeRefreshStatements.
+func TestAlterTablePipeRefresh(t *testing.T) {
+	var dropNotNull = []boilerplate.ExistingField{{Name: "VAL"}}
+	var addColumn = []sql.Column{{Identifier: "NEW", MappedType: sql.MappedType{NullableDDL: "TEXT"}}}
+
+	var refresh = regexp.MustCompile(`DROP NOT NULL;\n+` +
+		`ALTER TABLE T ADD COLUMN (` + pipeRefreshColumnPrefix + `[0-9A-F]{8}) BOOLEAN;\n` +
+		`ALTER TABLE T DROP COLUMN (` + pipeRefreshColumnPrefix + `[0-9A-F]{8});$`)
+
+	for _, tc := range []struct {
+		name         string
+		flags        map[string]bool
+		addColumns   []sql.Column
+		dropNotNulls []boilerplate.ExistingField
+		want         bool
+	}{
+		{"drop not null", streamV2Flags, nil, dropNotNull, true},
+		{"drop not null with an added column", streamV2Flags, addColumn, dropNotNull, true},
+		{"added column only", streamV2Flags, addColumn, nil, false},
+		{"not streaming v2", map[string]bool{flagSnowpipeStreaming: true}, nil, dropNotNull, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var c = &client{
+				cfg:          config{Credentials: &snowflake_auth.CredentialConfig{AuthType: snowflake_auth.JWT}},
+				ep:           &sql.Endpoint[config]{Dialect: testDialect},
+				featureFlags: tc.flags,
+			}
+			var stmts, _, err = c.AlterTable(context.Background(), sql.TableAlter{
+				Table:        sql.Table{TableShape: sql.TableShape{DeltaUpdates: true}, Identifier: "T"},
+				AddColumns:   tc.addColumns,
+				DropNotNulls: tc.dropNotNulls,
+			})
+			require.NoError(t, err)
+
+			if !tc.want {
+				require.NotContains(t, stmts, pipeRefreshColumnPrefix)
+				return
+			}
+			var match = refresh.FindStringSubmatch(stmts)
+			require.NotNil(t, match, stmts)
+			require.Equal(t, match[1], match[2])
+		})
+	}
+}
 
 // TestStreamV2StalePipeAfterDropNotNullLive asserts that a Snowflake bug still
 // exists: a streaming pipe that has ingested rows rejects a null in a column
@@ -107,9 +157,10 @@ func writeNullAfterDropNotNull(t *testing.T, name string, refresh bool) error {
 	require.NoError(t, write("pipe-refresh-"+name+"-before", 200, "2026-01-02T03:04:05Z"))
 
 	if refresh {
-		var c = &client{db: db, cfg: cfg, ep: &sql.Endpoint[config]{Dialect: testDialect}}
-		var _, apply, err = c.AlterTable(ctx, sql.TableAlter{Table: tbl, DropNotNulls: []boilerplate.ExistingField{{Name: "VAL"}}})
+		var c = &client{db: db, cfg: cfg, ep: &sql.Endpoint[config]{Dialect: testDialect}, featureFlags: streamV2Flags}
+		var stmts, apply, err = c.AlterTable(ctx, sql.TableAlter{Table: tbl, DropNotNulls: []boilerplate.ExistingField{{Name: "VAL"}}})
 		require.NoError(t, err)
+		require.Contains(t, stmts, pipeRefreshColumnPrefix)
 		require.NoError(t, apply(ctx))
 	} else {
 		exec(fmt.Sprintf("ALTER TABLE %s ALTER COLUMN VAL DROP NOT NULL;", tbl.Identifier))
