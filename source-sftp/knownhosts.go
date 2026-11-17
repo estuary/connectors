@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -23,8 +22,8 @@ import (
 // The content is handed to golang.org/x/crypto/ssh/knownhosts verbatim, which
 // is what gives us host patterns, hashed hosts, multiple keys per host,
 // @cert-authority and @revoked; `verify` is the callback it built. knownhosts
-// is also the authority on what is a valid line, so that anything it would
-// reject is rejected when the config is validated rather than when connecting.
+// is also the authority on what is a valid line: any line it can't parse is
+// rejected when the config is validated, rather than silently skipped.
 // The entries are kept parsed for diagnostics and for deriving the host key
 // algorithm preference.
 type knownHosts struct {
@@ -44,10 +43,40 @@ func lineError(line int, cause error) error {
 	return fmt.Errorf("knownHosts line %d: not a known_hosts entry ('[host]:port key-type base64-key', as printed by ssh-keyscan): %v", line, cause)
 }
 
-// newKnownHostsCallback feeds the field's content to knownhosts.New, which
-// only reads files. The content goes in verbatim so that the line numbers
-// knownhosts reports are the user's.
+// newKnownHostsCallback builds the host key callback for the field's content.
+// knownhosts skips lines it can't parse as long as another line is valid, so
+// each line is first handed to it on its own, where a bad line is an error
+// that can be reported with its line number in the field.
 func newKnownHostsCallback(content string) (ssh.HostKeyCallback, error) {
+	for i, line := range strings.Split(content, "\n") {
+		if strings.TrimSuffix(line, "\r") == "" {
+			continue
+		}
+		if _, err := knownhostsNew(line); err != nil {
+			if _, ok := errors.AsType[*knownhostsError](err); ok {
+				return nil, lineError(i+1, err)
+			}
+			return nil, err
+		}
+	}
+
+	cb, err := knownhostsNew(content)
+	if err != nil {
+		return nil, fmt.Errorf("parsing knownHosts: %w", err)
+	}
+	return cb, nil
+}
+
+// knownhostsError is knownhosts rejecting the content, as opposed to the temp
+// file for it failing to be written.
+type knownhostsError struct{ cause string }
+
+func (e *knownhostsError) Error() string { return e.cause }
+
+// knownhostsNew runs knownhosts.New over content, which it only reads from
+// files. The file is temporary and means nothing to the user, so its path is
+// kept out of the error.
+func knownhostsNew(content string) (ssh.HostKeyCallback, error) {
 	f, err := os.CreateTemp("", "known_hosts")
 	if err != nil {
 		return nil, fmt.Errorf("creating known_hosts file: %w", err)
@@ -64,16 +93,16 @@ func newKnownHostsCallback(content string) (ssh.HostKeyCallback, error) {
 
 	cb, err := knownhosts.New(f.Name())
 	if err != nil {
-		// knownhosts reports "knownhosts: <file>:<line>: <cause>". The file name
-		// means nothing to the user, so restate it as a line of the field.
-		if rest, ok := strings.CutPrefix(err.Error(), "knownhosts: "+f.Name()+":"); ok {
-			if lineStr, cause, ok := strings.Cut(rest, ": "); ok {
-				if line, convErr := strconv.Atoi(lineStr); convErr == nil {
-					return nil, lineError(line, errors.New(cause))
-				}
+		// knownhosts reports "knownhosts: <file>: no valid entries, line <n>:
+		// <cause>". Keep only the cause, and should the format change, still
+		// drop the path.
+		msg := err.Error()
+		if rest, ok := strings.CutPrefix(msg, "knownhosts: "+f.Name()+": no valid entries, line "); ok {
+			if _, cause, ok := strings.Cut(rest, ": "); ok {
+				return nil, &knownhostsError{cause: cause}
 			}
 		}
-		return nil, fmt.Errorf("parsing knownHosts: %w", err)
+		return nil, &knownhostsError{cause: strings.ReplaceAll(msg, f.Name(), "known_hosts")}
 	}
 	return cb, nil
 }
