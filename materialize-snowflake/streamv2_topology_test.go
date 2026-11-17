@@ -2,6 +2,8 @@ package connector
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -588,22 +590,203 @@ func fullLayoutCheckpoint(task string, layout []streamV2Range) streamV2Checkpoin
 	return cp
 }
 
-// TestStreamV2LostChannelRejected pins the reading of a channel that reports no
-// committed offset token while the checkpoint records documents appended to it:
-// the account of what Snowflake holds is gone, so the binding is rejected.
-func TestStreamV2LostChannelRejected(t *testing.T) {
-	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
-	const task = "test/topologyLost"
-
+// TestStreamV2LostTokenResumes covers channels that report no committed offset
+// token while the checkpoint records documents routed to them, as Snowflake leaves
+// a channel it expired after 30 days without ingestion. The shard resumes each
+// such channel from its routed offset, its next commit writes a token beyond that
+// offset, and a later session validates that token as usual. Expiring every
+// channel stands for a task disabled past the expiry.
+func TestStreamV2LostTokenResumes(t *testing.T) {
+	var ctx = context.Background()
 	quarters, err := streamV2TargetLayout(0, math.MaxUint32, streamV2ChannelsPerShard)
 	require.NoError(t, err)
 
-	var prior = fullLayoutCheckpoint(task, quarters)
-	prior[quarters[1]].Routed = 5
-	var m = newTopologyManager(t, task, 0, math.MaxUint32, prior)
+	// storeRound stores one row to each channel and returns the flushed checkpoint.
+	var storeRound = func(m *streamV2Manager, salt string) streamV2Checkpoint {
+		var keys []string
+		for _, q := range quarters {
+			keys = append(keys, keysHashingTo(q, 1, salt)...)
+		}
+		storeKeys(t, m, keys)
+		entries, err := m.flush(ctx)
+		require.NoError(t, err)
+		return mergeCheckpoints(entries)
+	}
 
-	err = testWriteRow(context.Background(), m, 0, []any{"any", "v"})
-	require.ErrorContains(t, err, "reports no committed offset token while this task's checkpoint records")
+	for _, tt := range []struct {
+		name    string
+		expired []int
+	}{
+		{name: "one channel", expired: []int{1}},
+		{name: "every channel", expired: []int{0, 1, 2, 3}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
+			const task = "test/topologyLostToken"
+
+			var first = newTopologyManager(t, task, 0, math.MaxUint32, nil)
+			var prior = storeRound(first, "first")
+			for _, i := range tt.expired {
+				require.NoError(t, first.client.DropChannel(ctx, "DB", "SCH", "TBL", prior[quarters[i]].ChannelName))
+			}
+
+			var second = newTopologyManager(t, task, 0, math.MaxUint32, prior)
+			prior = storeRound(second, "second")
+			var tokens = fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE"))
+			for _, q := range quarters {
+				require.Equal(t, int64(2), prior[q].Routed)
+				require.Equal(t, streamV2FormatOffsetToken(2, q), tokens[prior[q].ChannelName])
+			}
+
+			var third = newTopologyManager(t, task, 0, math.MaxUint32, prior)
+			prior = storeRound(third, "third")
+			for _, q := range quarters {
+				require.Equal(t, int64(3), prior[q].Routed)
+			}
+		})
+	}
+}
+
+// TestStreamV2LostTokenReplaysAnInterruptedTransaction pins the cost of resuming
+// a channel without a token. A transaction that Snowflake committed but the
+// runtime never checkpointed is replayed from the checkpoint's routed offset once
+// the channel's token is gone, so the table holds its rows twice.
+func TestStreamV2LostTokenReplaysAnInterruptedTransaction(t *testing.T) {
+	var ctx = context.Background()
+	var statePath = filepath.Join(t.TempDir(), "channels.json")
+	t.Setenv("FAKE_SNOWPIPE_STATE", statePath)
+	const task = "test/topologyReplayed"
+
+	var first = singleChannelLayout(newTopologyManager(t, task, 0, math.MaxUint32, nil))
+	storeKeys(t, first, []string{"a", "b"})
+	entries, err := first.flush(ctx)
+	require.NoError(t, err)
+	var prior = mergeCheckpoints(entries)
+
+	// The interrupted transaction commits in Snowflake, and its checkpoint is lost.
+	var interrupted = singleChannelLayout(newTopologyManager(t, task, 0, math.MaxUint32, prior))
+	storeKeys(t, interrupted, []string{"c", "d"})
+	_, err = interrupted.flush(ctx)
+	require.NoError(t, err)
+
+	var name = prior[fullKeyRange].ChannelName
+	require.NoError(t, interrupted.client.DropChannel(ctx, "DB", "SCH", "TBL", name))
+
+	var replay = singleChannelLayout(newTopologyManager(t, task, 0, math.MaxUint32, prior))
+	storeKeys(t, replay, []string{"c", "d"})
+	require.Equal(t, int64(2), replay.bindings[0].activeChannels[0].progress.committed)
+	entries, err = replay.flush(ctx)
+	require.NoError(t, err)
+
+	require.Equal(t, int64(4), mergeCheckpoints(entries)[fullKeyRange].Routed)
+	require.Equal(t, streamV2FormatOffsetToken(4, fullKeyRange), fakeCommittedTokens(t, statePath)[name])
+	raw, err := os.ReadFile(statePath)
+	require.NoError(t, err)
+	var state fakeSnowpipeState
+	require.NoError(t, json.Unmarshal(raw, &state))
+	require.Equal(t, []string{"a", "b", "c", "d", "c", "d"}, state.Rows)
+}
+
+// TestStreamV2DeletedChannelMidSession covers a channel that Snowflake deletes
+// while a session holds it open, as it does once the channel goes 30 days without
+// ingestion.
+func TestStreamV2DeletedChannelMidSession(t *testing.T) {
+	var ctx = context.Background()
+	const task = "test/topologyDeleted"
+
+	// session stores a and b through one channel and checkpoints them.
+	var session = func(t *testing.T) (*streamV2Manager, streamV2Checkpoint, string) {
+		t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))
+		var m = singleChannelLayout(newTopologyManager(t, task, 0, math.MaxUint32, nil))
+		storeKeys(t, m, []string{"a", "b"})
+		entries, err := m.flush(ctx)
+		require.NoError(t, err)
+		var prior = mergeCheckpoints(entries)
+		return m, prior, prior[fullKeyRange].ChannelName
+	}
+	var tableRows = func(t *testing.T) []string {
+		raw, err := os.ReadFile(os.Getenv("FAKE_SNOWPIPE_STATE"))
+		require.NoError(t, err)
+		var state fakeSnowpipeState
+		require.NoError(t, json.Unmarshal(raw, &state))
+		return state.Rows
+	}
+
+	t.Run("a rejected append to a fully committed channel reopens it", func(t *testing.T) {
+		var m, _, name = session(t)
+		fakeDeleteChannel(t, name)
+
+		storeKeys(t, m, []string{"c"})
+		entries, err := m.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(3), mergeCheckpoints(entries)[fullKeyRange].Routed)
+		require.Equal(t, streamV2FormatOffsetToken(3, fullKeyRange), fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE"))[name])
+		require.Equal(t, []string{"a", "b", "c"}, tableRows(t))
+	})
+
+	t.Run("a rejected append behind an uncommitted one fails", func(t *testing.T) {
+		var m, _, name = session(t)
+		require.NoError(t, testWriteRowBatched(ctx, m, 0, []any{"c", "v"}, 1))
+		require.NoError(t, m.bindings[0].activeChannels[0].wait())
+		fakeDeleteChannel(t, name)
+
+		require.NoError(t, testWriteRowBatched(ctx, m, 0, []any{"d", "v"}, 1))
+		_, err := m.flush(ctx)
+		require.ErrorContains(t, err, streamV2ErrChannelDoesNotExist)
+		require.NotContains(t, err.Error(), "reopening")
+	})
+
+	t.Run("a rejected append through the stage fails, and a restart resumes", func(t *testing.T) {
+		var m, prior, name = session(t)
+		fakeDeleteChannel(t, name)
+
+		// Random bytes don't compress, so this row's batch exceeds the direct
+		// append limit and goes through the stage.
+		var raw = make([]byte, streamV2MaxAppendBytes)
+		_, err := rand.Read(raw)
+		require.NoError(t, err)
+		var big = base64.StdEncoding.EncodeToString(raw)
+
+		require.NoError(t, testWriteRow(ctx, m, 0, []any{"c", big}))
+		_, err = m.flush(ctx)
+		require.ErrorContains(t, err, streamV2ErrChannelDoesNotExist)
+		require.NotContains(t, err.Error(), "reopening")
+
+		var restarted = singleChannelLayout(newTopologyManager(t, task, 0, math.MaxUint32, prior))
+		require.NoError(t, testWriteRow(ctx, restarted, 0, []any{"c", big}))
+		entries, err := restarted.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(3), mergeCheckpoints(entries)[fullKeyRange].Routed)
+		require.Equal(t, []string{"a", "b", "c"}, tableRows(t))
+	})
+
+	t.Run("another append error fails", func(t *testing.T) {
+		var _, prior, _ = session(t)
+		t.Setenv("FAKE_SNOWPIPE_MODE", "append_must_reopen")
+		var m = singleChannelLayout(newTopologyManager(t, task, 0, math.MaxUint32, prior))
+		storeKeys(t, m, []string{"c"})
+		_, err := m.flush(ctx)
+		require.ErrorContains(t, err, "ERR_CHANNEL_MUST_BE_REOPENED")
+	})
+
+	t.Run("an accepted append to a deleted channel fails its commit, and a restart resumes", func(t *testing.T) {
+		var _, prior, name = session(t)
+		t.Setenv("FAKE_SNOWPIPE_MODE", "deleted_append_accepted")
+		var m = singleChannelLayout(newTopologyManager(t, task, 0, math.MaxUint32, prior))
+		storeKeys(t, m, []string{"c"})
+		fakeDeleteChannel(t, name)
+		_, err := m.flush(ctx)
+		require.ErrorContains(t, err, "is unknown to Snowflake, which deletes a channel after 30 days without ingestion or when it is dropped")
+		require.Equal(t, []string{"a", "b"}, tableRows(t))
+
+		var restarted = singleChannelLayout(newTopologyManager(t, task, 0, math.MaxUint32, prior))
+		storeKeys(t, restarted, []string{"c"})
+		entries, err := restarted.flush(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(3), mergeCheckpoints(entries)[fullKeyRange].Routed)
+		require.Equal(t, streamV2FormatOffsetToken(3, fullKeyRange), fakeCommittedTokens(t, os.Getenv("FAKE_SNOWPIPE_STATE"))[name])
+		require.Equal(t, []string{"a", "b", "c"}, tableRows(t))
+	})
 }
 
 // TestStreamV2ForeignTokenRejected pins the unconditional key range guard at the

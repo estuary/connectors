@@ -43,6 +43,10 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	// unless opted in; toggling the flag on an existing table migrates the
 	// affected columns in place, preserving rows.
 	"variant_columns": common.FlagEnabledForTasksCreatedAfter("2026-09-23"),
+	// truncate_after_backfill permits deleting rows published before a
+	// completed backfill.
+	"truncate_after_backfill":          common.FlagEnabled,
+	"retain_existing_data_on_backfill": common.FlagDisabled,
 }
 
 var (

@@ -1,0 +1,160 @@
+info:
+  name: overflow page
+  type: graphql
+  seq: 4
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query ShippingLinesOverflow($id: ID!, $after: String) {
+        node(id: $id) {
+          ... on Order {
+            shippingLines(first: 250, after: $after, includeRemovals: true) {
+              edges {
+                node {
+                  id
+                  title
+                  code
+                  source
+                  carrierIdentifier
+                  deliveryCategory
+                  custom
+                  isRemoved
+                  originalPriceSet { ..._MoneyBagFields }
+                  discountedPriceSet { ..._MoneyBagFields }
+                  currentDiscountedPriceSet { ..._MoneyBagFields }
+                }
+              }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
+        }
+      }
+
+      fragment _MoneyBagFields on MoneyBag {
+        shopMoney { amount currencyCode }
+        presentmentMoney { amount currencyCode }
+      }
+    variables: |-
+      {
+        "id": "{{overflow_order_id}}",
+        "after": "{{overflow_after}}"
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Fallback when `Orders / shipping lines` hasn't run first in this session:
+        // the values it passed on 2026-11-07.
+        if (!bru.getVar('overflow_order_id')) bru.setVar('overflow_order_id', 'gid://shopify/Order/5714631393325');
+        if (!bru.getVar('overflow_after')) {
+          bru.setVar('overflow_after', 'eyJsYXN0X2lkIjo0NjkyOTAzNTI2NDQ1LCJsYXN0X3ZhbHVlIjoiMjAyNS0wNC0xMCAxNzo1NToyNS4wMDAwMDAifQ==');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [node](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/node) and [Order.shippingLines](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/Order)
+
+  **WHY:** the query `order_shipping_lines` sends for an order with more than 5
+  shipping lines, as `_build_node_query` in
+  `source_shopify_native/graphql/nested_resolver.py` builds it (the id and
+  cursor are variables here and inlined there). No test-store order has more
+  than 5 lines, so the capture never sends it. Answers: does Shopify accept
+  `includeRemovals: true` on a connection read through `node(id:)`, does it
+  accept the inline page's cursor, and what does a 250-line page request
+  against the 1,000-point ceiling (`MAX_COST_EXCEEDED` fails the capture).
+  Shopify validates and prices a query before running it, from `first` rather
+  than from how many lines exist, so an order with one line answers all three.
+
+  Takes `overflow_order_id` and `overflow_after` from `Orders / shipping
+  lines`: the newest order with a shipping line, and its inline page's end
+  cursor. Run both in the same `bru run`; otherwise the values pinned in this
+  request's script are used.
+
+  **VERIFIED (2026-11-07):** Shopify accepts the query. Order
+  `gid://shopify/Order/5714631393325` (one shipping line), with `after` set to
+  its inline page's end cursor, returned HTTP 200 with no errors, no further
+  lines and `hasNextPage: false`. A 250-line page requests 14 points (actual
+  3): the breakdown prices the connection at 13 and every scalar and money set
+  at 0, far under the 1,000-point ceiling.
+
+  **UNOBSERVABLE:** a non-empty overflow page, since no test-store order has a
+  second line and none will be seeded (the capture snapshot reads this store).
+  It uses the same selection as the inline page, whose lines `Orders /
+  shipping lines` shows, and the resolver's unit tests cover draining one.
+
+examples:
+  - name: "200 - accepted, requested 14 (projection: response and cost totals)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "node": {
+                "shippingLines": {
+                  "edges": [],
+                  "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": null
+                  }
+                }
+              }
+            },
+            "extensions": {
+              "cost": {
+                "requestedQueryCost": 14,
+                "actualQueryCost": 3,
+                "throttleStatus": {
+                  "maximumAvailable": 2000,
+                  "currentlyAvailable": 1997,
+                  "restoreRate": 100
+                },
+                "fields": [
+                  {
+                    "path": ["node", "shippingLines", "edges", "node"],
+                    "definedCost": 1,
+                    "requestedTotalCost": 1,
+                    "requestedChildrenCost": 0
+                  },
+                  {
+                    "path": ["node", "shippingLines", "edges"],
+                    "definedCost": 0,
+                    "requestedTotalCost": 1,
+                    "requestedChildrenCost": 1
+                  },
+                  {
+                    "path": ["node", "shippingLines"],
+                    "definedCost": null,
+                    "requestedTotalCost": 13,
+                    "requestedChildrenCost": 1
+                  },
+                  {
+                    "path": ["node"],
+                    "definedCost": 1,
+                    "requestedTotalCost": 14,
+                    "requestedChildrenCost": 13
+                  }
+                ]
+              }
+            }
+          }

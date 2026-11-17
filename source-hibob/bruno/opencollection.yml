@@ -1,0 +1,104 @@
+opencollection: 1.0.0
+
+info:
+  name: HiBob
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // HiBob auth via the connector's sops-encrypted config.yaml: HTTP Basic with a
+        // service user (username = service user ID, password = token). Credentials are
+        // re-derived from sops on every request and live only on `req` — never
+        // persisted to a var or env file. Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env HiBob --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        // Resolve relative to the collection root, not the process cwd.
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` suffix on key names — accept both spellings.
+        const creds = JSON.parse(decrypted)?.credentials;
+        const username = creds?.username ?? creds?.username_sops;
+        const password = creds?.password ?? creds?.password_sops;
+        if (!username || !password) {
+          throw new Error('credentials.username(_sops)/password(_sops) missing from decrypted config');
+        }
+        const basic = Buffer.from(`${username}:${password}`).toString('base64');
+        req.setHeader('Authorization', `Basic ${basic}`);
+        req.setHeader('Accept', 'application/json');
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    - **Base URL:** `https://api.hibob.com/v1` (sandbox `https://api.sandbox.hibob.com/v1`,
+      selected by the connector's `advanced.sandbox`; this collection targets production —
+      edit `environments/HiBob.yml` `base_url` for a sandbox service user).
+    - **Auth:** HTTP Basic, service user ID : token.
+    - **Rate limits (per minute, per endpoint)** — https://apidocs.hibob.com/reference/people.md,
+      https://apidocs.hibob.com/reference/metadata.md, https://apidocs.hibob.com/reference/rate-limiting.md
+      (DOCUMENTED 2026-11-02):
+      - `POST /people/search`: 50/min
+      - `POST /people/{identifier}`: 100/min
+      - `GET /company/people/fields`: 50/min
+      - `GET /company/named-lists`, `GET /company/named-lists/{name}`: 50/min
+      - `GET /bulk/people/{employment,lifecycle,work,salaries,variable,...}`: 100/min each per
+        https://apidocs.hibob.com/reference/employee-tables (DOCUMENTED 2026-11-02).
+        **Observed as one shared bucket (VERIFIED 2026-11-02):** back-to-back calls to three
+        different bulk tables returned X-RateLimit-Remaining 99 → 98 → 97. Budget all
+        bulk-table streams together.
+      - All well above 20 req/hr → `API-BUDGET-20RPH` does not restrict test runs.
+    - **Headers:** `X-RateLimit-Limit` / `X-RateLimit-Remaining` / `X-RateLimit-Reset` (epoch).
+      429 on excess.
+    - **WAF:** >50 401s (per IP or per Authorization header) or >50 403s (per header) within
+      10 s → 5-minute IP block. Never retry 401/403.
+    - **Silent field drops:** fields the service user cannot view (or invalid ids) are omitted
+      from `/people/search` responses with HTTP 200 and no warning.
+
+    ## Docs conventions
+
+    Request docs follow the `bruno-probe-endpoint` skill's conventions (WHY / VERIFIED /
+    PENDING / UNOBSERVABLE / DOCUMENTED, `**LIMITATION**` marker).
+
+    ### Per-endpoint limitations
+
+    - `Metadata / fields` — passes even when the service user can see 0 employees.
+    - `Metadata / named lists` — object keyed by list name (not the documented array);
+      `values` duplicates `items`; item `id` mixed int/str; 2-level nesting.
+    - `People / ids only` — empty 200 when unpermissioned; default hides terminated
+      employees (always send `showInactive: true`).
+    - `People / curated fields` — slash keys omit nulls; nested form is canonical.
+    - `People / all fields` — restricted fields silently dropped; signed media URLs and
+      tenure/age fields are volatile.
+    - `People / fields 401 limit probe` — >400 fields rejected with 400 (chunk fields[]).
+    - `Employment History / bare` — no date filter (snapshot only); the documented envelope
+      nesting is wrong (`results[].values[]` are entries; `restricted_columns` is top-level)
+      and `errors` is a dict keyed by employeeId, not an array.
+    - `_bulk-table / employeeIds terminated` — terminated employees are omitted unless the
+      permission group's "Access data for" drops "Lifecycle status equals Employed".
+    - `_bulk-table / limit 201 probe` — `limit` > 200 → 400.
+    - Measured rate-limit headers: search 100/min, named lists 60/min, fields 50/min
+      (docs: 50 for all — design to 50).
+
+    ## Format
+
+    OpenCollection YAML (bru CLI >= 3.0.0). Run from this directory:
+    `bru run "<Folder>/<request>.yml" --env HiBob --sandbox developer`
+
+    Note: `People / *` requests are `POST /people/search` — a read-only search despite the
+    verb. They mutate nothing.
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

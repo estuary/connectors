@@ -8,7 +8,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/apache/iceberg-go"
 	icebergcatalog "github.com/apache/iceberg-go/catalog"
@@ -19,6 +18,7 @@ import (
 	icebergtable "github.com/apache/iceberg-go/table"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/estuary/connectors/filesink"
+	"github.com/estuary/connectors/go/retry"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -33,9 +33,10 @@ type catalog struct {
 	cfg           *config
 	locationStyle LocationStyle
 	cat           icebergcatalog.Catalog
+	omitLocation  bool
 }
 
-func newCatalog(ctx context.Context, cfg config, locationStyle LocationStyle) (*catalog, error) {
+func newCatalog(ctx context.Context, cfg config, locationStyle LocationStyle, omitLocation bool) (*catalog, error) {
 	cfg.normalizeCredentials()
 
 	var cat icebergcatalog.Catalog
@@ -56,6 +57,7 @@ func newCatalog(ctx context.Context, cfg config, locationStyle LocationStyle) (*
 		cfg:           &cfg,
 		locationStyle: locationStyle,
 		cat:           cat,
+		omitLocation:  omitLocation,
 	}, nil
 }
 
@@ -396,8 +398,6 @@ func (c *catalog) createNamespace(ctx context.Context, namespace string) error {
 }
 
 func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_Binding, res resource) (string, boilerplate.ActionApplyFn, error) {
-	location := tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)
-
 	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, *c.cfg)
 	if err != nil {
 		return "", nil, err
@@ -452,15 +452,45 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 			props[k] = v
 		}
 
-		if _, err := c.cat.CreateTable(ctx, b.ResourcePath, schema,
-			icebergcatalog.WithLocation(location),
-			icebergcatalog.WithProperties(props),
-		); err != nil {
+		opts := []icebergcatalog.CreateTableOpt{icebergcatalog.WithProperties(props)}
+		if !c.omitLocation {
+			location := tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)
+			opts = append(opts, icebergcatalog.WithLocation(location))
+		}
+
+		tbl, err := c.cat.CreateTable(ctx, b.ResourcePath, schema, opts...)
+		if err != nil {
+			// Some catalogs (e.g. Glue) can't assign a location themselves.
+			if c.omitLocation {
+				return fmt.Errorf("creating table %q without a location (omit_table_location is enabled; the catalog must be able to assign a default table location, otherwise disable the flag): %w", fqn, err)
+			}
 			return fmt.Errorf("creating table %q: %w", fqn, err)
+		}
+
+		// Fail at publish time on a bucket mismatch, dropping the new (empty)
+		// table so a later publish or flag change can't proceed with it.
+		if c.omitLocation {
+			if err := checkTableLocationBucket(fqn, tbl.Location(), c.cfg.Bucket); err != nil {
+				if dropErr := c.cat.DropTable(ctx, b.ResourcePath); dropErr != nil {
+					return fmt.Errorf("%w (dropping table %q also failed, so it must be dropped by hand: %v)", err, fqn, dropErr)
+				}
+				return err
+			}
 		}
 
 		return nil
 	}, nil
+}
+
+// checkTableLocationBucket errors if a table's location is outside the
+// configured bucket, where data files are written.
+func checkTableLocationBucket(fqn, location, bucket string) error {
+	if got := bucketFromS3Path(location); got != bucket {
+		return fmt.Errorf(
+			"table %q has storage location %q in bucket %q, but data files are written to the configured bucket %q: set Bucket to the bucket of the catalog's storage location",
+			fqn, location, got, bucket)
+	}
+	return nil
 }
 
 func (c *catalog) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
@@ -720,25 +750,18 @@ func (c *catalog) appendFiles(
 	})
 	logger.Info("append_files: starting")
 
-	const maxAttempts = 3
-	for attempt := 1; ; attempt++ {
+	var attempt int
+	return appendRetry.Do(ctx, "append files to "+fqn, func(ctx context.Context) error {
+		attempt++
 		tbl, err := c.cat.LoadTable(ctx, tablePath)
 		if err != nil {
-			err = fmt.Errorf("loading table %q: %w", fqn, err)
-			if attempt >= maxAttempts {
-				return err
-			}
-			logger.WithError(err).WithField("attempt", attempt).Warn("append_files: retrying")
-			if err := sleepCtx(ctx, time.Duration(attempt*2)*time.Second); err != nil {
-				return err
-			}
-			continue
+			return fmt.Errorf("loading table %q: %w", fqn, err)
 		}
 
 		checkpoints := map[string]string{}
 		if raw, ok := tbl.Properties()[flowCheckpointsKey]; ok && raw != "" {
 			if err := json.Unmarshal([]byte(raw), &checkpoints); err != nil {
-				return fmt.Errorf("parsing %s on %q: %w", flowCheckpointsKey, fqn, err)
+				return retry.Permanent(fmt.Errorf("parsing %s on %q: %w", flowCheckpointsKey, fqn, err))
 			}
 		}
 
@@ -750,7 +773,7 @@ func (c *catalog) appendFiles(
 		checkpoints[materialization] = nextCheckpoint
 		newProps, err := json.Marshal(checkpoints)
 		if err != nil {
-			return fmt.Errorf("marshaling checkpoints: %w", err)
+			return retry.Permanent(fmt.Errorf("marshaling checkpoints: %w", err))
 		}
 
 		tx := tbl.NewTransaction()
@@ -760,41 +783,16 @@ func (c *catalog) appendFiles(
 		// above is the guard against replaying an already-recorded append,
 		// matching the pyiceberg 0.7.0 behavior this connector shipped with.
 		if err := tx.AddFiles(ctx, filePaths, nil, true); err != nil {
-			err = fmt.Errorf("staging files for %q: %w", fqn, err)
-			if attempt >= maxAttempts {
-				return err
-			}
-			logger.WithError(err).WithField("attempt", attempt).Warn("append_files: retrying")
-			if err := sleepCtx(ctx, time.Duration(attempt*2)*time.Second); err != nil {
-				return err
-			}
-			continue
+			return fmt.Errorf("staging files for %q: %w", fqn, err)
 		}
 		if err := tx.SetProperties(iceberg.Properties{flowCheckpointsKey: string(newProps)}); err != nil {
-			return fmt.Errorf("setting %s on %q: %w", flowCheckpointsKey, fqn, err)
+			return retry.Permanent(fmt.Errorf("setting %s on %q: %w", flowCheckpointsKey, fqn, err))
 		}
 		if _, err := tx.Commit(ctx); err != nil {
-			err = fmt.Errorf("committing append on %q: %w", fqn, err)
-			if attempt >= maxAttempts {
-				return err
-			}
-			logger.WithError(err).WithField("attempt", attempt).Warn("append_files: retrying")
-			if err := sleepCtx(ctx, time.Duration(attempt*2)*time.Second); err != nil {
-				return err
-			}
-			continue
+			return fmt.Errorf("committing append on %q: %w", fqn, err)
 		}
 
 		logger.WithField("attempt", attempt).Info("append_files: committed")
 		return nil
-	}
-}
-
-func sleepCtx(ctx context.Context, d time.Duration) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-time.After(d):
-		return nil
-	}
+	})
 }

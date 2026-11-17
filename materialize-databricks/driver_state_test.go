@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/databricks/databricks-sdk-go/service/files"
@@ -35,7 +36,7 @@ func testTransactor(rangeKey string, stateKeys ...string) *transactor {
 		primary:               rangeKey == fullRangeKey || rangeKey == lowerRangeKey,
 		rangeKey:              rangeKey,
 		be:                    &m.BindingEvents{},
-		profiler:              boilerplate.NewQueryProfiler(nil, profileInterval, nil, nil),
+		profiler:              boilerplate.NewQueryProfiler(nil, profileInterval, nil, nil, nil),
 	}
 	for _, sk := range stateKeys {
 		d.bindings = append(d.bindings, &binding{target: sql.Table{
@@ -313,47 +314,49 @@ func TestMergePeerStatePatches(t *testing.T) {
 }
 
 func TestExecQueriesRetriesRetriableErrors(t *testing.T) {
-	var origDelay = queryRetryDelay
-	queryRetryDelay = func(int) time.Duration { return 0 }
-	t.Cleanup(func() { queryRetryDelay = origDelay })
-
 	var conflict = fmt.Errorf("databricks: execution error: [%s] Duplicated files were committed in a concurrent COPY INTO operation. Please try again later.", retriableErrorClasses[0])
 	var d = testTransactor(fullRangeKey)
 
 	t.Run("succeeds once the concurrent copy has finished", func(t *testing.T) {
-		var db = recordingDB(t, conflict)
-		recording.failFirst = 2
+		synctest.Test(t, func(t *testing.T) {
+			var db = recordingDB(t, conflict)
+			recording.failFirst = 2
 
-		require.NoError(t, d.execQueries(context.Background(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport))
-		require.Equal(t, 3, recording.attempts)
-		require.Equal(t, []string{"COPY"}, recording.executed)
+			require.NoError(t, d.execQueries(t.Context(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport))
+			require.Equal(t, 3, recording.attempts)
+			require.Equal(t, []string{"COPY"}, recording.executed)
+		})
 	})
 
-	t.Run("gives up after the retry budget", func(t *testing.T) {
-		var db = recordingDB(t, conflict)
+	t.Run("waits minutes for the concurrent copy before giving up", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			var db = recordingDB(t, conflict)
 
-		var err = d.execQueries(context.Background(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport)
-		require.ErrorIs(t, err, conflict)
-		require.Equal(t, maxQueryRetries+1, recording.attempts)
+			var start = time.Now()
+			var err = d.execQueries(t.Context(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport)
+			require.ErrorIs(t, err, conflict)
+			require.Equal(t, commitQueryRetry.MaxAttempts, recording.attempts)
+			require.Greater(t, time.Since(start), 3*time.Minute)
+		})
 	})
 
 	t.Run("other errors are not retried", func(t *testing.T) {
 		var db = recordingDB(t, fmt.Errorf("[DELTA_CONCURRENT_APPEND] something else"))
 
-		require.Error(t, d.execQueries(context.Background(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport))
+		require.Error(t, d.execQueries(t.Context(), db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport))
 		require.Equal(t, 1, recording.attempts)
 	})
 
 	t.Run("cancellation ends the wait", func(t *testing.T) {
-		queryRetryDelay = func(int) time.Duration { return time.Hour }
-		t.Cleanup(func() { queryRetryDelay = func(int) time.Duration { return 0 } })
-		var db = recordingDB(t, conflict)
-		var ctx, cancel = context.WithTimeout(context.Background(), 50*time.Millisecond)
-		defer cancel()
+		synctest.Test(t, func(t *testing.T) {
+			var db = recordingDB(t, conflict)
+			var ctx, cancel = context.WithCancel(t.Context())
+			time.AfterFunc(time.Second, cancel)
 
-		var err = d.execQueries(ctx, db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport)
-		require.ErrorIs(t, err, context.DeadlineExceeded)
-		require.Equal(t, 1, recording.attempts)
+			var err = d.execQueries(ctx, db, d.profiler.NewProfile(), 0, []string{"COPY"}, false, noReport)
+			require.ErrorIs(t, err, context.Canceled)
+			require.Equal(t, 1, recording.attempts)
+		})
 	})
 }
 
@@ -1001,20 +1004,31 @@ func TestAcknowledgeMergesStagingTables(t *testing.T) {
 }
 
 func TestCopyIntoStagingTable(t *testing.T) {
-	for _, needsMerge := range []bool{false, true} {
+	for _, tc := range []struct {
+		needsMerge bool
+		bytes      int // written before the test's one row
+		last       bool
+		copies     bool
+	}{
+		{needsMerge: false, bytes: minStagingTableBytes, copies: false},
+		{needsMerge: true, bytes: 0, copies: false},
+		{needsMerge: true, bytes: minStagingTableBytes, copies: true},
+		{needsMerge: true, bytes: minStagingTableBytes, last: true, copies: false},
+	} {
 		var db = recordingDB(t, nil)
 		var d = renderingTransactor(lowerRangeKey)
 		var b = d.bindings[0]
 		b.storeFile = newStagedFile(config{}, b.rootStagingPath, "abc", []string{"id", "ts", "_flow_delete"}, d.files)
 		b.storeFile.dir = filepath.Join(t.TempDir(), "local")
-		b.needsMerge = needsMerge
+		b.needsMerge = tc.needsMerge
 
 		var ctx = context.Background()
 		require.NoError(t, b.storeFile.start(ctx, db))
+		b.storeFile.uncompressed = tc.bytes
 		require.NoError(t, b.storeFile.writeRow([]any{1, "2024-01-01T00:00:00Z", false}))
-		require.NoError(t, d.copyIntoStagingTable(ctx, db, 0, b))
+		require.NoError(t, d.copyIntoStagingTable(ctx, db, 0, b, tc.last))
 
-		if !needsMerge {
+		if !tc.copies {
 			require.Len(t, recording.executed, 1)
 			require.Empty(t, b.stagingTable)
 			continue

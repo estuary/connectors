@@ -110,6 +110,16 @@ func TestParseKnownHosts(t *testing.T) {
 			wantErr: "line 3",
 		},
 		{
+			name:    "unknown marker after a valid entry is rejected",
+			content: "[myserver.com]:2222 " + keyLine(edKey) + "\n@revokd [myserver.com]:2222 " + keyLine(edKey),
+			wantErr: "line 2",
+		},
+		{
+			name:    "bracketed host without a port after a valid entry is rejected",
+			content: "[myserver.com]:2222 " + keyLine(edKey) + "\r\n# comment\r\n[myserver.com " + keyLine(edKey) + "\r\n",
+			wantErr: "line 3",
+		},
+		{
 			name:    "empty content means no pins",
 			content: "",
 			wantNil: true,

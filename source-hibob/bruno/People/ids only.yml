@@ -1,0 +1,115 @@
+info:
+  name: ids only
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/people/search"
+  body:
+    type: json
+    data: |-
+      {
+        "fields": ["root.id"]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - before permission grant: empty"
+    request:
+      url: "https://api.hibob.com/v1/people/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "employees": []
+          }
+  - name: "200 - projection: 2 of 45 employees (after permission grant)"
+    request:
+      url: "https://api.hibob.com/v1/people/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-ratelimit-limit
+          value: "100"
+        - name: x-ratelimit-remaining
+          value: "99"
+      body:
+        type: json
+        data: |-
+          {
+            "employees": [
+              {
+                "/root/id": {
+                  "value": "4021630481756848861"
+                },
+                "id": "4021630481756848861"
+              },
+              {
+                "/root/id": {
+                  "value": "4021630535863370472"
+                },
+                "id": "4021630535863370472"
+              }
+            ]
+          }
+
+  - name: "200 - after H3 termination: 44 employees, terminated 4021630453151695573 absent (projection: count + membership)"
+    request:
+      url: "https://api.hibob.com/v1/people/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+      body:
+        type: json
+        data: |-
+          {
+            "employee_count": 44,
+            "terminated_employee_present": false
+          }
+
+docs: |-
+  **REFERENCE:** [Search for employees](https://apidocs.hibob.com/reference/post_people-search.md)
+
+  Read-only search (POST verb, no side effects).
+
+  **WHY:** silent-data-loss audit for the provider default `showInactive=false`;
+  compare with `People / ids only show inactive`.
+
+  **DOCUMENTED (2026-11-02):** "`showInactive` (boolean, default `false`)" — active
+  employees only by default.
+
+  **VERIFIED (2026-11-02):** envelope `{"employees": [...]}`; with `fields: ["root.id"]`
+  each item is `{"/root/id": {"value": "<id>"}, "id": "<id>"}` (id is a numeric
+  **string**). 45 employees after the permission grant.
+
+  **LIMITATION (VERIFIED 2026-11-02):** before the service user was granted People's
+  data access the search returned **200 with `employees: []`** — no 403, no warning.
+  A mis-permissioned service user produces an empty employees stream silently.
+
+  **LIMITATION (VERIFIED 2026-11-02):** after `Seeding / H3 - Terminate Employee`, the
+  default (`showInactive` omitted) returns 44 and **hides** terminated employee
+  4021630453151695573 — the connector must always send `showInactive: true`.
+
+  Rate-limit header: `x-ratelimit-limit: 100` (docs say 50 — design to 50).

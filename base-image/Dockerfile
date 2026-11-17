@@ -1,6 +1,13 @@
 FROM --platform=linux/amd64 debian:trixie-slim AS debian
 
-RUN apt-get update && apt-get install -y openssh-client ca-certificates curl tzdata tzdata-legacy
+# Upgrade the packages that ship in debian:trixie-slim as well, so security
+# fixes published after that image was cut are picked up on every rebuild.
+# `apt-get install` alone leaves already-installed packages at the image's
+# version.
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+ && apt-get install -y openssh-client ca-certificates curl tzdata tzdata-legacy \
+ && rm -rf /var/lib/apt/lists/*
 
 # Create a non-privileged "nonroot" user.
 RUN useradd nonroot --create-home --shell /usr/sbin/nologin

@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/blob"
@@ -112,35 +111,14 @@ func pushTableMetadata(ctx context.Context, is *boilerplate.InfoSchema, mu *sync
 	return nil
 }
 
-// tableMetadataWithRetry fetches BigQuery table metadata, retrying on 404 NotFound.
-// BigQuery's metadata layer is eventually consistent: a getMetadata call shortly after
-// the DDL that created or altered the table can return 404 even when the table exists.
-// Retrying briefly absorbs this propagation lag without masking real "table doesn't exist"
-// errors — those will still fail after the retry budget is exhausted.
+// tableMetadataWithRetry fetches a table's metadata. A 404 that persists
+// through metadataRetry means the table really doesn't exist.
 func tableMetadataWithRetry(ctx context.Context, table *bigquery.Table) (*bigquery.TableMetadata, error) {
-	const maxAttempts = 5
-	const backoff = 2 * time.Second
-
 	var md *bigquery.TableMetadata
-	var err error
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
+	err := metadataRetry.Do(ctx, "getting table metadata", func(ctx context.Context) (err error) {
 		md, err = table.Metadata(ctx, bigquery.WithMetadataView(bigquery.BasicMetadataView))
-		if err == nil {
-			return md, nil
-		}
-		if gErr, ok := errors.AsType[*googleapi.Error](err); !ok || gErr.Code != 404 || attempt == maxAttempts {
-			return nil, err
-		}
-		log.WithFields(log.Fields{
-			"table":   fmt.Sprintf("%s.%s", table.DatasetID, table.TableID),
-			"attempt": attempt,
-		}).Debug("BigQuery returned 404 for recent table; retrying after backoff")
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(backoff):
-		}
-	}
+		return err
+	})
 	return md, err
 }
 

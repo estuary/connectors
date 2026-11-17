@@ -1,0 +1,68 @@
+info:
+  name: result
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{bulk_result_url}}"
+  auth: none
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('bulk_result_url')) {
+          throw new Error('bulk_result_url is not set: run `Bulk / status` first in the same run');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [The JSONL data format](https://shopify.dev/docs/api/usage/bulk-operations/queries)
+
+  **WHY:** the JSONL a bulk shipping-lines stream would parse. Shows how a
+  `ShippingLine` line arrives: whether it carries an `id` and `__typename`,
+  that its `__parentId` is the order, and that with `groupObjects: true` it
+  follows its order. A stream's `process_result` raises on any line it can't
+  place, so this decides how it recognises shipping lines (`orders.py`
+  matches discount applications, also not `Node`s, by `__typename`). Bulk
+  was rejected for the stream; see `Bulk / status`.
+
+  **VERIFIED (2026-10-29):** with `groupObjects: true`, each order line is
+  followed by its shipping lines. A shipping line arrives as its own line with
+  `"__typename": "ShippingLine"`, its `id` (`gid://shopify/ShippingLine/<n>`)
+  and `__parentId` set to its order's id. An order with no shipping has no
+  child lines. Orders came in ascending id order, not by `updatedAt`. A
+  `process_result` can therefore start a document at each `gid://shopify/Order/`
+  line and append lines whose `__typename` is `ShippingLine` and whose
+  `__parentId` matches, raising on anything else.
+
+examples:
+  - name: 200 - JSONL for A1 (7 orders, 3 shipping lines)
+    request:
+      url: "{{bulk_result_url}}"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/jsonl
+      body:
+        type: text
+        data: |-
+          {"id":"gid:\/\/shopify\/Order\/5714619858989","updatedAt":"2025-04-10T17:54:23Z"}
+          {"id":"gid:\/\/shopify\/Order\/5714629820461","updatedAt":"2025-04-17T11:57:10Z"}
+          {"__typename":"ShippingLine","id":"gid:\/\/shopify\/ShippingLine\/4692902215725","title":"International Shipping","code":"International Shipping","source":"shopify","isRemoved":false,"originalPriceSet":{"shopMoney":{"amount":"30.0","currencyCode":"USD"}},"currentDiscountedPriceSet":{"shopMoney":{"amount":"30.0","currencyCode":"USD"}},"__parentId":"gid:\/\/shopify\/Order\/5714629820461"}
+          {"id":"gid:\/\/shopify\/Order\/5714631393325","updatedAt":"2026-06-15T13:33:37Z"}
+          {"__typename":"ShippingLine","id":"gid:\/\/shopify\/ShippingLine\/4692903526445","title":"International Shipping","code":"International Shipping","source":"shopify","isRemoved":false,"originalPriceSet":{"shopMoney":{"amount":"30.0","currencyCode":"USD"}},"currentDiscountedPriceSet":{"shopMoney":{"amount":"30.0","currencyCode":"USD"}},"__parentId":"gid:\/\/shopify\/Order\/5714631393325"}
+          {"id":"gid:\/\/shopify\/Order\/5714631688237","updatedAt":"2026-06-15T13:24:53Z"}
+          {"id":"gid:\/\/shopify\/Order\/5714631819309","updatedAt":"2025-04-17T12:07:45Z"}
+          {"__typename":"ShippingLine","id":"gid:\/\/shopify\/ShippingLine\/4692903755821","title":"International Shipping","code":"International Shipping","source":"shopify","isRemoved":false,"originalPriceSet":{"shopMoney":{"amount":"30.0","currencyCode":"USD"}},"currentDiscountedPriceSet":{"shopMoney":{"amount":"30.0","currencyCode":"USD"}},"__parentId":"gid:\/\/shopify\/Order\/5714631819309"}
+          {"id":"gid:\/\/shopify\/Order\/5729677082669","updatedAt":"2026-06-11T17:26:19Z"}
+          {"id":"gid:\/\/shopify\/Order\/18697849798701","updatedAt":"2026-08-18T17:51:40Z"}

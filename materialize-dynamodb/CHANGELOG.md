@@ -1,5 +1,12 @@
 # materialize-dynamodb
 
+## 2026-11-16
+
+### Added
+- A completed backfill now deletes a table's rows published before the
+  backfill began, instead of leaving them in place until the next store
+  overwrites or removes them.
+
 ## 2026-11-03
 
 ### Changed

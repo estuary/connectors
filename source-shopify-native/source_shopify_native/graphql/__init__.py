@@ -25,6 +25,7 @@ from .orders.orders import Orders
 from .orders.refunds import OrderRefunds
 from .orders.returns import OrderReturns
 from .orders.risks import OrderRisks
+from .orders.shipping_lines import OrderShippingLines
 from .orders.transactions import OrderTransactions
 from .subscriptions.subscription_contracts import SubscriptionContracts
 from .staff_members import StaffMembers
@@ -59,6 +60,7 @@ __all__ = [
     "OrderRefunds",
     "OrderReturns",
     "OrderRisks",
+    "OrderShippingLines",
     "OrderTransactions",
     "Disputes",
     "SubscriptionContracts",

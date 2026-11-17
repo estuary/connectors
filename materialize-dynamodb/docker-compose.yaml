@@ -1,11 +1,10 @@
-version: '3.7'
-
 services:
   db:
-    image: "amazon/dynamodb-local:latest"
-    command: "-jar DynamoDBLocal.jar -sharedDb"
+    image: "floci/floci:2.4.0"
+    environment:
+      FLOCI_SERVICES_IAM_ENFORCEMENT_ENABLED: "true"
     ports:
-      - "8000:8000"
+      - "4566:4566"
     networks:
       - flow-test
 

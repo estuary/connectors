@@ -23,6 +23,11 @@ type binding struct {
 	nullFieldsToStrip []string
 	hasBinaryColumns  bool
 
+	// publishedAtColumn is the column that holds each document's publication
+	// time, used to delete rows published before a completed backfill. Nil
+	// if the binding excludes flow_published_at.
+	publishedAtColumn *sql.Column
+
 	load struct {
 		mergeBounds *sql.MergeBoundsBuilder
 	}
@@ -46,6 +51,13 @@ type transactor struct {
 	loadFiles  *boilerplate.StagedFiles
 	bindings   []*binding
 	be         *m.BindingEvents
+
+	// truncateAfterBackfill permits deleting rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion in this transaction's commit.
+	truncations map[int]time.Time
 }
 
 func newTransactor(
@@ -77,12 +89,13 @@ func newTransactor(
 	templates := renderTemplates(ep.Dialect)
 
 	t := &transactor{
-		cfg:        cfg,
-		templates:  templates,
-		fence:      fence,
-		be:         be,
-		loadFiles:  boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, false, false),
-		storeFiles: boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, true, false),
+		cfg:                   cfg,
+		templates:             templates,
+		fence:                 fence,
+		be:                    be,
+		loadFiles:             boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, false, false),
+		storeFiles:            boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, true, false),
+		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 
 	for idx, target := range bindings {
@@ -100,6 +113,9 @@ func newTransactor(
 			target:           target,
 			hasBinaryColumns: hasBinaryColumns,
 		}
+		if col, err := target.PublishedAtColumn(); err == nil {
+			b.publishedAtColumn = col
+		}
 		if ep.Config.Advanced.NoFlowDocument {
 			b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 		}
@@ -112,7 +128,27 @@ func newTransactor(
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
-func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = t.bindings[binding]
+		if b.target.DeltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not deleted because feature flags disable it")
+			continue
+		}
+		if b.publishedAtColumn == nil {
+			var _, reason = b.target.PublishedAtColumn()
+			t.be.Warn(b.target.Identifier, fmt.Sprintf("Rows published before the backfill of table %s were not deleted because %s.", b.target.Identifier, reason))
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
 	return nil
 }
 
@@ -136,8 +172,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("converting Load key: %w", err)
 		} else if err = t.loadFiles.WriteRow(ctx, it.Binding, converted); err != nil {
 			return fmt.Errorf("writing Load key: %w", err)
-		} else {
-			b.load.mergeBounds.NextKey(converted)
+		} else if err := b.load.mergeBounds.NextKey(converted); err != nil {
+			return fmt.Errorf("tracking Load key bounds for resource %s: %w", b.target.Path, err)
 		}
 	}
 	if it.Err() != nil {
@@ -280,8 +316,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		} else if err := t.storeFiles.WriteRow(ctx, it.Binding, append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing row for store: %w", err)
-		} else {
-			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
+		} else if err := b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)]); err != nil {
+			return nil, fmt.Errorf("tracking Store key bounds for resource %s: %w", b.target.Path, err)
 		}
 	}
 	if it.Err() != nil {
@@ -309,94 +345,160 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 		defer db.Close()
 
-		txn, err := db.BeginTx(ctx, nil)
-		if err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("store BeginTx: %w", err))
-		}
-		defer txn.Rollback()
-
+		// A deadlock or snapshot-isolation conflict rolls the whole
+		// transaction back, and the retry below reruns it from the start.
+		// Only the transaction is retried: the staged files and merge bounds
+		// it loads from are prepared once, here.
+		parameters := make([]*queryParams, len(t.bindings))
 		for idx, b := range t.bindings {
 			if !t.storeFiles.Started(idx) {
 				continue
 			}
-
 			uris, err := t.storeFiles.Flush(idx)
 			if err != nil {
 				return nil, m.FinishedOperation(fmt.Errorf("flushing store file for binding[%d]: %w", idx, err))
 			}
-
-			params := &queryParams{
+			parameters[idx] = &queryParams{
 				Table:             b.target,
 				URIs:              uris,
 				StorageAccountKey: t.cfg.StorageAccountKey,
 				Bounds:            b.store.mergeBounds.Build(),
 			}
+		}
 
-			// Statements run one per Exec: go-mssqldb sums the row counts of
-			// every statement in a batch, which would fold the staging load
-			// into the count of target rows affected.
-			exec := func(tpl *template.Template, name string) (int64, error) {
+		// affected and truncated accumulate each binding's row counts for
+		// the attempt that ultimately commits; row stats are only reported
+		// once, after that attempt, since a rolled-back attempt is redone
+		// from scratch.
+		affected := make([]int64, len(t.bindings))
+		truncated := make(map[int]int64, len(t.truncations))
+
+		if err := commitRetry.Do(ctx, "committing store transaction", func(ctx context.Context) error {
+			txn, err := db.BeginTx(ctx, nil)
+			if err != nil {
+				return fmt.Errorf("store BeginTx: %w", err)
+			}
+			defer txn.Rollback()
+
+			for idx, b := range t.bindings {
+				params := parameters[idx]
+				if params == nil {
+					continue
+				}
+
+				// Statements run one per Exec: go-mssqldb sums the row counts of
+				// every statement in a batch, which would fold the staging load
+				// into the count of target rows affected.
+				exec := func(tpl *template.Template, name string) (int64, error) {
+					var query strings.Builder
+					if err := tpl.Execute(&query, params); err != nil {
+						return 0, err
+					}
+					res, err := txn.ExecContext(ctx, query.String())
+					if err != nil {
+						log.WithField(
+							"query", redactedQuery(query, t.cfg.StorageAccountKey),
+						).Error(name + " query failed")
+						return 0, fmt.Errorf("executing store %s query for binding[%d]: %w", name, idx, err)
+					}
+					rows, _ := res.RowsAffected()
+					return rows, nil
+				}
+
+				t.be.StartedResourceCommit(b.target.Path)
+				var bindingAffected int64
+				if !b.store.mustMerge && !b.hasBinaryColumns {
+					// All values are new and need no conversion, so the data can
+					// be loaded directly into the target table.
+					if n, err := exec(t.templates.storeCopyIntoDirectQuery, "copy into"); err != nil {
+						return err
+					} else {
+						bindingAffected += n
+					}
+				} else {
+					if _, err := exec(t.templates.createStoreTable, "create store table"); err != nil {
+						return err
+					}
+					if b.store.mustMerge {
+						if n, err := exec(t.templates.storeDeleteQuery, "delete"); err != nil {
+							return err
+						} else {
+							bindingAffected += n
+						}
+					}
+					if n, err := exec(t.templates.storeInsertQuery, "insert"); err != nil {
+						return err
+					} else if _, err := exec(t.templates.dropStoreTable, "drop store table"); err != nil {
+						return err
+					} else {
+						bindingAffected += n
+					}
+				}
+				t.be.FinishedResourceCommit(b.target.Path)
+				affected[idx] = bindingAffected
+			}
+
+			// Truncations run after the stores, because a store of an existing
+			// row is a DELETE-then-INSERT that would match nothing if its old
+			// row were already deleted.
+			for binding, boundary := range t.truncations {
+				b := t.bindings[binding]
+
 				var query strings.Builder
-				if err := tpl.Execute(&query, params); err != nil {
-					return 0, err
+				if err := t.templates.truncateQuery.Execute(&query, truncateParams{
+					Table:             b.target,
+					PublishedAtColumn: b.publishedAtColumn.Identifier,
+					Boundary:          boundary.UTC().Format("2006-01-02T15:04:05.999999"),
+				}); err != nil {
+					return fmt.Errorf("evaluating truncate query for %s: %w", b.target.Identifier, err)
 				}
 				res, err := txn.ExecContext(ctx, query.String())
 				if err != nil {
-					log.WithField(
-						"query", redactedQuery(query, t.cfg.StorageAccountKey),
-					).Error(name + " query failed")
-					return 0, fmt.Errorf("executing store %s query for binding[%d]: %w", name, idx, err)
+					log.WithField("query", redactedQuery(query, t.cfg.StorageAccountKey)).Error("truncate query failed")
+					return fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
 				}
-				rows, _ := res.RowsAffected()
-				return rows, nil
+				deleted, _ := res.RowsAffected()
+				truncated[binding] = deleted
 			}
 
-			t.be.StartedResourceCommit(b.target.Path)
-			var affected int64
-			if !b.store.mustMerge && !b.hasBinaryColumns {
-				// All values are new and need no conversion, so the data can
-				// be loaded directly into the target table.
-				if n, err := exec(t.templates.storeCopyIntoDirectQuery, "copy into"); err != nil {
-					return nil, m.FinishedOperation(err)
-				} else {
-					affected += n
-				}
-			} else {
-				if _, err := exec(t.templates.createStoreTable, "create store table"); err != nil {
-					return nil, m.FinishedOperation(err)
-				}
-				if b.store.mustMerge {
-					if n, err := exec(t.templates.storeDeleteQuery, "delete"); err != nil {
-						return nil, m.FinishedOperation(err)
-					} else {
-						affected += n
-					}
-				}
-				if n, err := exec(t.templates.storeInsertQuery, "insert"); err != nil {
-					return nil, m.FinishedOperation(err)
-				} else if _, err := exec(t.templates.dropStoreTable, "drop store table"); err != nil {
-					return nil, m.FinishedOperation(err)
-				} else {
-					affected += n
-				}
+			if res, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
+				return fmt.Errorf("updating checkpoints: %w", err)
+			} else if rows, err := res.RowsAffected(); err != nil {
+				return fmt.Errorf("getting fence update rows affected: %w", err)
+			} else if rows != 1 {
+				return fmt.Errorf("this instance was fenced off by another")
+			} else if err := txn.Commit(); err != nil {
+				return fmt.Errorf("committing store transaction: %w", err)
+			}
+
+			return nil
+		}); err != nil {
+			return nil, m.FinishedOperation(err)
+		}
+
+		for idx, b := range t.bindings {
+			if parameters[idx] == nil {
+				continue
 			}
 			// An update is a DELETE of the old row plus an INSERT of the new
 			// one, so it counts twice; subtract it once so the total counts
 			// documents.
-			t.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(affected-b.store.updates))
-			t.be.FinishedResourceCommit(b.target.Path)
+			t.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(affected[idx]-b.store.updates))
 			b.store.mustMerge, b.store.updates = false, 0
 		}
 
-		if res, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("updating checkpoints: %w", err))
-		} else if rows, err := res.RowsAffected(); err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("getting fence update rows affected: %w", err))
-		} else if rows != 1 {
-			return nil, m.FinishedOperation(fmt.Errorf("this instance was fenced off by another"))
-		} else if err := txn.Commit(); err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("committing store transaction: %w", err))
-		} else if err := t.storeFiles.CleanupCurrentTransaction(ctx); err != nil {
+		for binding, boundary := range t.truncations {
+			b := t.bindings[binding]
+			deleted := truncated[binding]
+			log.WithFields(log.Fields{
+				"table":    b.target.Identifier,
+				"boundary": boundary,
+				"deleted":  deleted,
+			}).Info("truncated rows published before the backfill")
+			t.be.ReportRowStats(round, b.target.Path, m.TotalRowStats(0).WithTruncated(deleted))
+		}
+
+		if err := t.storeFiles.CleanupCurrentTransaction(ctx); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("cleaning up temporary object files: %w", err))
 		}
 

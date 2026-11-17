@@ -119,6 +119,9 @@ type stagedFile struct {
 	buf    *fileBuffer
 	writer *writer.JsonWriter
 
+	// Bytes of rows written this transaction, before compression, by the files already closed.
+	uncompressed int
+
 	// Per-transaction coordination.
 	putFiles chan string
 	group    *errgroup.Group
@@ -162,6 +165,7 @@ func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 
 	// Reset values used per-transaction.
 	f.txnDir = f.prefix + "_" + uuid.Must(uuid.NewV7()).String()
+	f.uncompressed = 0
 	if err := f.files.CreateDirectory(ctx, files.CreateDirectoryRequest{DirectoryPath: f.remoteDir()}); err != nil {
 		return fmt.Errorf("creating staging directory %q: %w", f.remoteDir(), err)
 	}
@@ -244,20 +248,12 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 		var fName = filepath.Base(file)
 		log.WithField("filepath", filepath.Join(f.remoteDir(), fName)).Debug("staged file: uploading")
 
-		ctx = driverctx.NewContextWithStagingInfo(ctx, []string{f.dir})
-
-		// This query fails sometimes even in low load, we retry this query to avoid a full restart
-		var maxAttempts = 3
-		var attempt = 0
-		for {
-			if _, err := db.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s' OVERWRITE`, file, filepath.Join(f.remoteDir(), fName))); err != nil {
-				if attempt < maxAttempts {
-					attempt++
-					continue
-				}
-				return fmt.Errorf("put file: %w", err)
-			}
-			break
+		if err := putRetry.Do(ctx, "staging file", func(ctx context.Context) error {
+			ctx = driverctx.NewContextWithStagingInfo(ctx, []string{f.dir})
+			_, err := db.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s' OVERWRITE`, file, filepath.Join(f.remoteDir(), fName)))
+			return err
+		}); err != nil {
+			return fmt.Errorf("put file: %w", err)
 		}
 
 		log.WithField("filepath", filepath.Join(f.remoteDir(), fName)).Debug("staged file: upload done")
@@ -296,6 +292,7 @@ func (f *stagedFile) putFile() error {
 	if err := f.writer.Close(); err != nil {
 		return fmt.Errorf("closing writer: %w", err)
 	}
+	f.uncompressed += f.writer.WrittenUncompressed()
 	f.writer = nil
 
 	select {

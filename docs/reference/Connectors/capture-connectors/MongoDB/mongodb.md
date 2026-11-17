@@ -182,3 +182,25 @@ collection must have `changeStreamPreAndPostImages` enabled. See the [official
 MongoDB
 documentation](https://www.mongodb.com/docs/manual/changeStreams/#change-streams-with-document-pre--and-post-images)
 for more information on how to enable this setting.
+
+## Duplicate Events with Delta Updates
+
+Materializing data from a MongoDB capture using [Delta Updates](/concepts/materialization/#delta-updates)
+may result in duplicate records during backfills since documents are not fully
+[reduced](/concepts/schemas/#reductions). This occurs when change streams are
+active during the backfill: a document inserted or updated before the backfill
+scan reaches it may be emitted from both the change stream and the backfill.
+
+Most CDC captures can get around this limitation by using [Precise mode](/reference/backfilling-data/#precise-mode)
+for the backfill. The MongoDB connector, however, does not currently support
+precise backfills.
+
+[Reach out](/getting-started/support) if you need precise backfills for your
+MongoDB use case to help us prioritize this feature based on interest.
+
+In the meantime, depending on your use case, you may:
+
+* Implement your own deduplication logic in your destination
+* Skip backfills on change stream collections with the connector's
+`/advanced/skipBackfills` [property](#endpoint)
+* Use batch capture rather than change streams

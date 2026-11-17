@@ -1,0 +1,128 @@
+info:
+  name: limit 1 page 2
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/bulk/people/{{table}}?limit=1&cursor={{bulk_next_cursor}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // `table` selects the bulk table (employment | lifecycle | work). Override per
+        // run with `--env-var table=<name>`; otherwise default to employment.
+        if (!bru.getEnvVar('table') && !bru.getVar('table')) bru.setVar('table', 'employment');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://apidocs.hibob.com/reference/pagination-1
+
+    **WHY:** Second page of the cursor walk. Needs `_bulk-table / limit 1 page 1`
+    to run first in the same session (it sets `bulk_next_cursor`).
+
+    **VERIFIED (2026-11-02):** the URL-encoded cursor is accepted. Page 2 returned
+    the employee in position 2 of `Employment History / bare` (page 1 had
+    position 1), with no overlap and stable ordering, and another string
+    `next_cursor`.
+  type: text/markdown
+
+examples:
+  - name: "200 - employment: next result in bare order, next_cursor string (full body)"
+    request:
+      url: "{{base_url}}/bulk/people/employment?limit=1&cursor=YWxnbzI6OiYmdlNHZ3F1YU9ibFpnUGgxaFBoUUFaQ1ZiK3IxVEY1YndySFNCYzFYT2prYUt2d0EvQkszWkdTOUo5UUErZ3dDVEE4MTBBMlptYmdFaXlDR0ViZHZZR2hvNXB2S2N3UTJyZDhxYThhWjZRc0dO"
+      method: GET
+    response:
+      status: 200
+      statusText: "OK"
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-ratelimit-limit
+          value: "100"
+        - name: x-ratelimit-remaining
+          value: "95"
+        - name: x-ratelimit-reset
+          value: "1793639160"
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "employeeId": "4021630422130623184",
+                "values": [
+                  {
+                    "id": 1000020131101,
+                    "effectiveDate": "2013-11-01",
+                    "endEffectiveDate": null,
+                    "isCurrent": true,
+                    "canBeDeleted": true,
+                    "canEditOotbColumns": true,
+                    "change": {
+                      "reason": null,
+                      "changedBy": null,
+                      "changedById": "4021630335610520270"
+                    },
+                    "creationDate": null,
+                    "modificationDate": "2026-11-02",
+                    "contract": "Full time",
+                    "type": null,
+                    "workingPattern": null,
+                    "standardWorkingPattern": null,
+                    "standardWorkingPatternId": null,
+                    "personalWorkingPatternType": null,
+                    "siteWorkingPattern": {
+                      "workingPatternType": "hourly",
+                      "days": {
+                        "sunday": 0,
+                        "tuesday": 8,
+                        "wednesday": 8,
+                        "monday": 8,
+                        "friday": 8,
+                        "thursday": 8,
+                        "saturday": 0
+                      },
+                      "hoursPerDay": 8,
+                      "workingPatternId": 66985751
+                    },
+                    "calendarName": null,
+                    "calendarId": null,
+                    "flsaCode": null,
+                    "salaryPayType": null,
+                    "fte": 100,
+                    "weeklyHours": 40,
+                    "activeEffectiveDate": "2013-11-01",
+                    "actualWorkingPattern": {
+                      "workingPatternType": "hourly",
+                      "days": {
+                        "sunday": 0,
+                        "tuesday": 8,
+                        "wednesday": 8,
+                        "monday": 8,
+                        "friday": 8,
+                        "thursday": 8,
+                        "saturday": 0
+                      },
+                      "hoursPerDay": 8,
+                      "workingPatternId": 66985751
+                    },
+                    "hoursInDayNotWorked": 8,
+                    "customColumns": {}
+                  }
+                ]
+              }
+            ],
+            "response_metadata": {
+              "next_cursor": "YWxnbzI6OiYmcDlUNmdBSEdjeG1NaEw1OVpzZ0dsNVA2NituM0djZmoyOHV5dERCdXhmTzhCbFpGejhhTkt1RDEwd3BSRE5wU3FXNE1oazJsSk1pTk4yZEFId2tjRm9rWnpkVFNEWU5vY0ljcDkyS2Yxd3ZE"
+            },
+            "errors": {}
+          }

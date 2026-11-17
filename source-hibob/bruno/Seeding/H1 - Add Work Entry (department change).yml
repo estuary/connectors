@@ -1,0 +1,49 @@
+info:
+  name: H1 - Add Work Entry (department change)
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/people/4021630442204562130/work"
+  body:
+    type: json
+    data: |-
+      {
+        "effectiveDate": "2026-10-15",
+        "siteId": 2614100,
+        "department": "Product",
+        "title": "Developer"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://apidocs.hibob.com/reference/post_people-id-work
+    
+    SEEDING REQUEST — only the user runs this; never the assistant.
+    
+    **WHY:** every employee in the test account has exactly one work entry, so
+    `Work History / bare` can't show real history. This adds a second, current
+    entry (Development -> Product, effective 2026-10-15) for employee
+    4021630442204562130 (current entry effective 2014-02-02). Re-running
+    `Work History / bare` should then show: two entries for this employee, the old
+    one with `isCurrent=false` and `endEffectiveDate` set; distinct `id`s
+    (`10000` + yyyymmdd of effectiveDate); and how
+    `no_view_history_permission` columns render on the non-current row (dropped
+    or null).
+    Docs say department/title take list *ids*; the bare response returns the
+    display names ("Product" here), so this sends the name.
+    **Outcome:** run by the user 2026-11-02. It showed up in the bulk listing
+    only on a later re-check (not visible on the first re-read after the run,
+    which fits HiBob's documented read-after-write lag). Then VERIFIED in
+    `Work History / bare`: 2 entries for ...2130, the old one with
+    `isCurrent=false`, `endEffectiveDate=2026-10-14`. The name "Product" was
+    accepted as the department value (in this tenant the list ids equal the names).
+  type: text/markdown

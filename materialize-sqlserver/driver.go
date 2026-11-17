@@ -374,13 +374,13 @@ type transactor struct {
 	templates templates
 	// Variables exclusively used by Load.
 	load struct {
-		conn     *stdsql.Conn
+		session  *session
 		unionSQL string
 	}
 	// Variables exclusively used by Store.
 	store struct {
-		conn  *stdsql.Conn
-		fence sql.Fence
+		session *session
+		fence   sql.Fence
 	}
 	bindings []*binding
 	be       *m.BindingEvents
@@ -430,12 +430,14 @@ func prepareNewTransactor(
 
 		// Establish connections.
 		db := stdsql.OpenDB(connector)
-		if d.load.conn, err = db.Conn(ctx); err != nil {
-			return nil, fmt.Errorf("load db.Conn: %w", err)
+		d.load.session = &session{db: db}
+		if err = d.load.session.connect(ctx, nil); err != nil {
+			return nil, fmt.Errorf("connecting the load session: %w", err)
 		}
 
-		if d.store.conn, err = db.Conn(ctx); err != nil {
-			return nil, fmt.Errorf("store db.Conn: %w", err)
+		d.store.session = &session{db: db}
+		if err = d.store.session.connect(ctx, nil); err != nil {
+			return nil, fmt.Errorf("connecting the store session: %w", err)
 		}
 
 		for _, binding := range bindings {
@@ -529,17 +531,27 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	t.bindings = append(t.bindings, b)
 
 	// Create a binding-scoped temporary table for staged keys to load.
-	if _, err := t.load.conn.ExecContext(ctx, b.createLoadTableSQL); err != nil {
+	if _, err := t.load.session.conn.ExecContext(ctx, b.createLoadTableSQL); err != nil {
 		return fmt.Errorf("Exec(%s): %w", b.createLoadTableSQL, err)
 	}
 
 	// Create a binding-scoped temporary table for store documents to be merged
 	// into target table
-	if _, err := t.store.conn.ExecContext(ctx, b.createStoreTableSQL); err != nil {
+	if _, err := t.store.session.conn.ExecContext(ctx, b.createStoreTableSQL); err != nil {
 		return fmt.Errorf("Exec(%s): %w", b.createStoreTableSQL, err)
 	}
 
 	return nil
+}
+
+// tempTables returns the statement that stmt selects from each binding, which
+// creates that binding's temporary table.
+func (t *transactor) tempTables(stmt func(*binding) string) []string {
+	var out = make([]string, 0, len(t.bindings))
+	for _, b := range t.bindings {
+		out = append(out, stmt(b))
+	}
+	return out
 }
 
 // addTruncation prepares b to delete the rows whose col is earlier than a
@@ -597,7 +609,12 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
-	var txn, err = d.load.conn.BeginTx(ctx, &stdsql.TxOptions{})
+	// The transaction begins at the first key, because the wait for that key
+	// is unbounded and a connection is only replaceable between transactions.
+	if !it.Next() {
+		return it.Err()
+	}
+	var txn, err = d.load.session.begin(ctx, d.tempTables(func(b *binding) string { return b.createLoadTableSQL }))
 	if err != nil {
 		return fmt.Errorf("DB.BeginTx: %w", err)
 	}
@@ -609,7 +626,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// consecutive keys of the same binding as a bulk insert to minimise roundtrips
 	var lastBinding = -1
 	var batch *stdsql.Stmt
-	for it.Next() {
+	for more := true; more; more = it.Next() {
 		var b = d.bindings[it.Binding]
 
 		if it.Binding != lastBinding {
@@ -700,7 +717,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
-	txn, err := d.store.conn.BeginTx(ctx, &stdsql.TxOptions{})
+	txn, err := d.store.session.begin(ctx, d.tempTables(func(b *binding) string { return b.createStoreTableSQL }))
 	if err != nil {
 		return nil, fmt.Errorf("DB.BeginTx: %w", err)
 	}
@@ -883,6 +900,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 }
 
 func (d *transactor) Destroy() {
-	d.load.conn.Close()
-	d.store.conn.Close()
+	d.load.session.close()
+	d.store.session.close()
 }

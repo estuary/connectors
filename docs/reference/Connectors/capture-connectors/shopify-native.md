@@ -29,6 +29,7 @@ The following data resources are supported through the Shopify API:
    * Order Refunds
    * Order Returns
    * Order Risks
+   * Order Shipping Lines
    * Order Transactions
 * [Product Variants](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/productvariants)
 * [Products](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/products)

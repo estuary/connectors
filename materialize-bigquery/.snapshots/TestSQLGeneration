@@ -204,4 +204,65 @@ JOIN flow_temp_table_0 AS r
 	 AND l.key_binary = r.c2 AND l.key_binary >= 'aGVsbG8K' AND l.key_binary <= 'Z29vZGJ5ZQo='
 --- End projectID.dataset.key_value loadQueryNoFlowDocument ---
 
+--- Begin projectID.dataset.key_value storeUpdate ranges ---
+MERGE INTO projectID.dataset.key_value AS l
+USING flow_temp_table_0 AS r
+ON 
+	l.key1 = r.c0 AND ((l.key1 >= 10 AND l.key1 <= 10) OR (l.key1 >= 90 AND l.key1 <= 100))
+	AND l.key2 = r.c1
+	AND l.key_binary = r.c2 AND l.key_binary >= 'aGVsbG8K' AND l.key_binary <= 'Z29vZGJ5ZQo='
+WHEN MATCHED AND r._flow_delete THEN
+	DELETE
+WHEN MATCHED THEN
+	UPDATE SET l.`array` = r.c3, l.binary = r.c4, l.boolean = r.c5, l.field_with_projection = r.c6, l.flow_published_at = r.c7, l.integer = r.c8, l.integerGt128Bit = r.c9, l.integerGt256Bit = r.c10, l.integerGt64Bit = r.c11, l.integerWithUserDDL = r.c12, l.multiple = r.c13, l.nonAscii_____ = r.c14, l.number = r.c15, l.numberCastToString = r.c16, l.object = r.c17, l.string = r.c18, l.stringInteger = r.c19, l.stringInteger18Chars = r.c20, l.stringInteger38Chars = r.c21, l.stringInteger39Chars = r.c22, l.stringInteger66Chars = r.c23, l.stringInteger77Chars = r.c24, l.stringNumber = r.c25, l.flow_document = r.c26
+WHEN NOT MATCHED AND NOT r._flow_delete THEN
+	INSERT (key1, key2, key_binary, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, nonAscii_____, number, numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document)
+	VALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10, r.c11, r.c12, r.c13, r.c14, r.c15, r.c16, r.c17, r.c18, r.c19, r.c20, r.c21, r.c22, r.c23, r.c24, r.c25, r.c26);
+--- End projectID.dataset.key_value ---
+
+--- Begin projectID.dataset.key_value loadQuery ranges ---
+SELECT 0, l.flow_document
+	FROM projectID.dataset.key_value AS l
+	JOIN flow_temp_table_0 AS r
+		 ON l.key1 = r.c0 AND ((l.key1 >= 10 AND l.key1 <= 10) OR (l.key1 >= 90 AND l.key1 <= 100))
+		 AND l.key2 = r.c1
+		 AND l.key_binary = r.c2 AND l.key_binary >= 'aGVsbG8K' AND l.key_binary <= 'Z29vZGJ5ZQo='
+--- End projectID.dataset.key_value ---
+
+--- Begin projectID.dataset.key_value loadQueryNoFlowDocument ranges ---
+SELECT 0,
+TO_JSON(STRUCT(
+	l.key1 AS `key1`, 
+	l.key2 AS `key2`, 
+	TO_BASE64(l.key_binary) AS `key!binary`, 
+	l.`array` AS `array`, 
+	TO_BASE64(l.binary) AS `binary`, 
+	l.boolean AS `boolean`, 
+	l.field_with_projection AS `fieldWithProjection`, 
+	l.integer AS `integer`, 
+	l.integerGt128Bit AS `integerGt128Bit`, 
+	l.integerGt256Bit AS `integerGt256Bit`, 
+	l.integerGt64Bit AS `integerGt64Bit`, 
+	l.integerWithUserDDL AS `integerWithUserDDL`, 
+	l.multiple AS `multiple`, 
+	l.nonAscii_____ AS `nonAsciiκόσμε`, 
+	l.number AS `number`, 
+	CAST(l.numberCastToString AS STRING) AS `numberCastToString`, 
+	l.object AS `object`, 
+	l.string AS `string`, 
+	CAST(l.stringInteger AS STRING) AS `stringInteger`, 
+	CAST(l.stringInteger18Chars AS STRING) AS `stringInteger18Chars`, 
+	CAST(l.stringInteger38Chars AS STRING) AS `stringInteger38Chars`, 
+	CAST(l.stringInteger39Chars AS STRING) AS `stringInteger39Chars`, 
+	CAST(l.stringInteger66Chars AS STRING) AS `stringInteger66Chars`, 
+	CAST(l.stringInteger77Chars AS STRING) AS `stringInteger77Chars`, 
+	CAST(l.stringNumber AS STRING) AS `stringNumber`
+)) as flow_document
+FROM projectID.dataset.key_value AS l
+JOIN flow_temp_table_0 AS r
+	 ON l.key1 = r.c0 AND ((l.key1 >= 10 AND l.key1 <= 10) OR (l.key1 >= 90 AND l.key1 <= 100))
+	 AND l.key2 = r.c1
+	 AND l.key_binary = r.c2 AND l.key_binary >= 'aGVsbG8K' AND l.key_binary <= 'Z29vZGJ5ZQo='
+--- End projectID.dataset.key_value ---
+
 

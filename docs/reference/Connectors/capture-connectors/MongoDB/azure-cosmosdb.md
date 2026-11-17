@@ -124,3 +124,25 @@ captures:
           database: test
         target: ${PREFIX}/users
 ```
+
+## Duplicate Events with Delta Updates
+
+Materializing data from a Cosmos DB capture using [Delta Updates](/concepts/materialization/#delta-updates)
+may result in duplicate records during backfills since documents are not fully
+[reduced](/concepts/schemas/#reductions). This occurs when change feeds are
+active during the backfill: a document inserted or updated before the backfill
+scan reaches it may be emitted from both the change feed and the backfill.
+
+Most CDC captures can get around this limitation by using [Precise mode](/reference/backfilling-data/#precise-mode)
+for the backfill. The Cosmos DB connector, however, does not currently support
+precise backfills.
+
+[Reach out](/getting-started/support) if you need precise backfills for your
+Cosmos DB use case to help us prioritize this feature based on interest.
+
+In the meantime, depending on your use case, you may:
+
+* Implement your own deduplication logic in your destination
+* Skip backfills on change feed collections with the connector's
+`/advanced/skipBackfills` [property](#endpoint)
+* Use batch capture rather than change feeds

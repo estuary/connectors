@@ -1,0 +1,115 @@
+info:
+  name: status
+  type: graphql
+  seq: 1
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query BulkStatus($id: ID!) {
+        bulkOperation(id: $id) {
+          id
+          status
+          errorCode
+          objectCount
+          rootObjectCount
+          fileSize
+          url
+          partialDataUrl
+          createdAt
+          completedAt
+          query
+        }
+      }
+    variables: |-
+      {
+        "id": "{{bulk_operation_id}}"
+      }
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Hand the signed results URL to `Bulk / result` before the collection
+        // script redacts it. Runtime vars live in memory only.
+        const op = res.getBody()?.data?.bulkOperation;
+        if (op?.url) bru.setVar('bulk_result_url', op.url);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [bulkOperation](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/bulkOperation) and [BulkOperation](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/BulkOperation)
+
+  **WHY:** read-only status of the job `Seeding / A1 - Run shipping lines bulk
+  query` started. Answers whether Shopify accepts `Order.shippingLines` in a
+  bulk query at all, given its rule that "Connections must implement the
+  `Node` interface" and `ShippingLine` doesn't.
+
+  Bulk was EVALUATED AND REJECTED for `order_shipping_lines` in review
+  (#5653); this request is the record of that. Bulk works, but the stream
+  pages like `order_refunds`: a store's five bulk slots are already shared by
+  about 20 bulk streams, a page of 250 orders with their lines requests only
+  68 points (`Orders / cost at full page`), and paging doesn't rely on
+  Shopify accepting a connection of non-`Node` types.
+
+  Looks the job up by id: A1 sets `bulk_operation_id` in the GUI; for a CLI
+  run, pin it in `environments/Shopify.yml`. Listing with
+  `bulkOperations(first: 1, reverse: true)` did not return the newest job
+  (2026-10-29: it returned a job from 2026-10-23 while newer ones existed),
+  so don't rely on it to find a job.
+
+  Run with `Bulk / result` in the same `bru run` so the URL carries over.
+
+  **VERIFIED (2026-10-29):** Shopify accepts `Order.shippingLines` in a bulk
+  query today, `Node` rule notwithstanding. A1's job completed in 2 seconds
+  with no `errorCode`: 10 objects, 7 of them root orders, so 3 shipping lines
+  (matching `Orders / shipping lines`).
+
+examples:
+  - name: 200 - A1 completed, 7 orders + 3 lines
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "bulkOperation": {
+                "id": "gid://shopify/BulkOperation/8721679613997",
+                "status": "COMPLETED",
+                "errorCode": null,
+                "objectCount": "10",
+                "rootObjectCount": "7",
+                "fileSize": "1745",
+                "url": "REDACTED",
+                "partialDataUrl": null,
+                "createdAt": "2026-10-30T03:56:06Z",
+                "completedAt": "2026-10-30T03:56:08Z",
+                "query": "# shipping-lines bulk probe\n{\n  orders {\n    edges {\n      node {\n        id\n        updatedAt\n        shippingLines(includeRemovals: true) {\n          edges {\n            node {\n              __typename\n              id\n              title\n              code\n              source\n              isRemoved\n              originalPriceSet { shopMoney { amount currencyCode } }\n              currentDiscountedPriceSet { shopMoney { amount currencyCode } }\n            }\n          }\n        }\n      }\n    }\n  }\n}"
+              }
+            },
+            "extensions": {
+              "cost": {
+                "requestedQueryCost": 1,
+                "actualQueryCost": 1,
+                "throttleStatus": {
+                  "maximumAvailable": 2000,
+                  "currentlyAvailable": 1999,
+                  "restoreRate": 100
+                }
+              }
+            }
+          }

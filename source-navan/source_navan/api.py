@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import AsyncGenerator
 
@@ -11,6 +11,7 @@ from .utils import dt_to_str
 
 API_BASE_URL = "https://api.navan.com/v1"
 DEFAULT_PAGE_SIZE = 100
+NAVAN_FOUNDING_YEAR = 2015
 
 BookingsResponse = ApiResponse[Booking]
 
@@ -20,21 +21,29 @@ async def _fetch_bookings_request(
     log: Logger,
     page: int,
     page_size: int,
-    updated_from: str | None = None,
-    updated_to: str | None = None,
+    created_from: datetime | None = None,
+    created_to: datetime | None = None,
+    updated_from: datetime | None = None,
+    updated_to: datetime | None = None,
 ) -> BookingsResponse:
     url = f"{API_BASE_URL}/bookings"
 
-    params: dict[str, int | str] = {
+    params: dict[str, int] = {
         "page": page,
-        "pageSize": page_size,
+        "size": page_size,
     }
 
-    if updated_from:
-        params["updatedFrom"] = updated_from
+    if created_from is not None:
+        params["createdFrom"] = int(created_from.timestamp())
 
-    if updated_to:
-        params["updatedTo"] = updated_to
+    if created_to is not None:
+        params["createdTo"] = int(created_to.timestamp())
+
+    if updated_from is not None:
+        params["updatedFrom"] = int(updated_from.timestamp())
+
+    if updated_to is not None:
+        params["updatedTo"] = int(updated_to.timestamp())
 
     return BookingsResponse.model_validate_json(
         await http.request(log, url, params=params)
@@ -52,25 +61,29 @@ async def fetch_bookings_page(
     )
     assert isinstance(cutoff, datetime), f"Expected datetime cutoff, got {type(cutoff)}"
 
-    page = page_cursor if page_cursor else 1
-    updated_to = dt_to_str(cutoff)
+    page = page_cursor or 0
 
     log.debug(
-        f"Fetching bookings page {page} with cutoff: {updated_to})",
+        f"Fetching bookings page {page} with cutoff: {dt_to_str(cutoff)})",
     )
 
+    # A booking's `created` never changes, so bounding by it means an update
+    # can't remove a booking from the results and shift later pages. Navan
+    # rejects `updatedTo` without `updatedFrom`, so we set both ends of the
+    # `created` range.
     response = await _fetch_bookings_request(
         http,
         log,
         page=page,
         page_size=DEFAULT_PAGE_SIZE,
-        updated_to=updated_to,
+        created_from=datetime(NAVAN_FOUNDING_YEAR, 1, 1, tzinfo=UTC),
+        created_to=cutoff,
     )
 
     for booking in response.data:
         yield booking
 
-    if response.page and page < response.page.totalPages:
+    if response.page and page + 1 < response.page.totalPages:
         next_page = page + 1
         log.debug(
             f"Page {page} of {response.page.totalPages} complete, continuing to next page",
@@ -95,25 +108,33 @@ async def fetch_bookings_changes(
     last_seen_modified = log_cursor
     cursor_timestamp = log_cursor
 
-    updated_from = dt_to_str(log_cursor)
-    updated_to = datetime.now(tz=log_cursor.tzinfo)
+    # Navan may stamp `lastModified` in whole seconds. A booking modified later
+    # in the current second would then share the cursor's `lastModified`, and
+    # the `>` filter below would drop it. So polls stop at the last complete
+    # second.
+    updated_to = datetime.now(tz=UTC).replace(microsecond=0) - timedelta(seconds=1)
+    if updated_to <= log_cursor:
+        return
 
     log.debug(
-        f"Fetching bookings changes in range {updated_from} to {dt_to_str(updated_to)}",
+        f"Fetching bookings changes in range {dt_to_str(log_cursor)} to {dt_to_str(updated_to)}",
     )
 
-    current_page = 1
+    current_page = 0
     total_pages = 1
 
-    while current_page <= total_pages:
+    while current_page < total_pages:
         response = await _fetch_bookings_request(
             http,
             log,
             page=current_page,
             page_size=DEFAULT_PAGE_SIZE,
-            updated_from=updated_from,
-            updated_to=dt_to_str(updated_to),
+            updated_from=log_cursor,
+            updated_to=updated_to,
         )
+
+        if response.page:
+            total_pages = response.page.totalPages
 
         for booking in response.data:
             modified_ts = booking.lastModified

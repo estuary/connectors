@@ -10,50 +10,52 @@ This connector captures data from [Greenhouse](https://www.greenhouse.com/) into
 
 The following data resources are supported through the Greenhouse Harvest API:
 
-* [applications](https://harvestdocs.greenhouse.io/reference/get_v3-applications)
-* [application_stages](https://harvestdocs.greenhouse.io/reference/get_v3-application-stages)
-* [applied_candidate_tags](https://harvestdocs.greenhouse.io/reference/get_v3-applied-candidate-tags)
-* [approval_flows](https://harvestdocs.greenhouse.io/reference/get_v3-approval-flows)
-* [approver_groups](https://harvestdocs.greenhouse.io/reference/get_v3-approver-groups)
-* [approvers](https://harvestdocs.greenhouse.io/reference/get_v3-approvers)
-* [attachments](https://harvestdocs.greenhouse.io/reference/get_v3-attachments)
-* [candidates](https://harvestdocs.greenhouse.io/reference/get_v3-candidates)
-* [candidate_attribute_types](https://harvestdocs.greenhouse.io/reference/get_v3-candidate-attribute-types)
-* [candidate_educations](https://harvestdocs.greenhouse.io/reference/get_v3-candidate-educations)
-* [candidate_employments](https://harvestdocs.greenhouse.io/reference/get_v3-candidate-employments)
-* [candidate_tags](https://harvestdocs.greenhouse.io/reference/get_v3-candidate-tags)
-* [close_reasons](https://harvestdocs.greenhouse.io/reference/get_v3-close-reasons)
-* [custom_fields](https://harvestdocs.greenhouse.io/reference/get_v3-custom-fields)
-* [custom_field_options](https://harvestdocs.greenhouse.io/reference/get_v3-custom-field-options)
-* [demographic_answers](https://harvestdocs.greenhouse.io/reference/get_v3-demographic-answers)
-* [demographic_questions](https://harvestdocs.greenhouse.io/reference/get_v3-demographic-questions)
-* [demographic_question_sets](https://harvestdocs.greenhouse.io/reference/get_v3-demographic-question-sets)
-* [departments](https://harvestdocs.greenhouse.io/reference/get_v3-departments)
-* [eeoc](https://harvestdocs.greenhouse.io/reference/get_v3-eeoc)
-* [email_templates](https://harvestdocs.greenhouse.io/reference/get_v3-email-templates)
-* [interviews](https://harvestdocs.greenhouse.io/reference/get_v3-interviews)
-* [interviewers](https://harvestdocs.greenhouse.io/reference/get_v3-interviewers)
-* [interviewer_tags](https://harvestdocs.greenhouse.io/reference/get_v3-interviewer-tags)
-* [job_hiring_managers](https://harvestdocs.greenhouse.io/reference/get_v3-job-hiring-managers)
-* [job_interview_stages](https://harvestdocs.greenhouse.io/reference/get_v3-job-interview-stages)
-* [job_notes](https://harvestdocs.greenhouse.io/reference/get_v3-job-notes)
-* [job_posts](https://harvestdocs.greenhouse.io/reference/get_v3-job-posts)
-* [jobs](https://harvestdocs.greenhouse.io/reference/get_v3-jobs)
-* [offers](https://harvestdocs.greenhouse.io/reference/get_v3-offers)
-* [offices](https://harvestdocs.greenhouse.io/reference/get_v3-offices)
-* [openings](https://harvestdocs.greenhouse.io/reference/get_v3-openings)
-* [prospect_pools](https://harvestdocs.greenhouse.io/reference/get_v3-prospect-pools)
-* [prospect_pool_stages](https://harvestdocs.greenhouse.io/reference/get_v3-prospect-pool-stages)
-* [referrers](https://harvestdocs.greenhouse.io/reference/get_v3-referrers)
-* [rejection_details](https://harvestdocs.greenhouse.io/reference/get_v3-rejection-details)
-* [rejection_reasons](https://harvestdocs.greenhouse.io/reference/get_v3-rejection-reasons)
-* [scorecard_questions](https://harvestdocs.greenhouse.io/reference/get_v3-scorecard-questions)
-* [scorecards](https://harvestdocs.greenhouse.io/reference/get_v3-scorecards)
-* [sources](https://harvestdocs.greenhouse.io/reference/get_v3-sources)
-* [user_emails](https://harvestdocs.greenhouse.io/reference/get_v3-user-emails)
-* [user_job_permissions](https://harvestdocs.greenhouse.io/reference/get_v3-user-job-permissions)
-* [user_roles](https://harvestdocs.greenhouse.io/reference/get_v3-user-roles)
-* [users](https://harvestdocs.greenhouse.io/reference/get_v3-users)
+| Resource | Replication Mode |
+| --- | --- |
+| [applications](https://harvestdocs.greenhouse.io/reference/get_v3-applications) | Incremental |
+| [application_stages](https://harvestdocs.greenhouse.io/reference/get_v3-application-stages) | Incremental |
+| [applied_candidate_tags](https://harvestdocs.greenhouse.io/reference/get_v3-applied-candidate-tags) | Incremental |
+| [approval_flows](https://harvestdocs.greenhouse.io/reference/get_v3-approval-flows) | Incremental |
+| [approver_groups](https://harvestdocs.greenhouse.io/reference/get_v3-approver-groups) | Incremental |
+| [approvers](https://harvestdocs.greenhouse.io/reference/get_v3-approvers) | Incremental |
+| [attachments](https://harvestdocs.greenhouse.io/reference/get_v3-attachments) | Incremental |
+| [candidates](https://harvestdocs.greenhouse.io/reference/get_v3-candidates) | Incremental |
+| [candidate_attribute_types](https://harvestdocs.greenhouse.io/reference/get_v3-candidate-attribute-types) | Incremental |
+| [candidate_educations](https://harvestdocs.greenhouse.io/reference/get_v3-candidate-educations) | Incremental |
+| [candidate_employments](https://harvestdocs.greenhouse.io/reference/get_v3-candidate-employments) | Incremental |
+| [candidate_tags](https://harvestdocs.greenhouse.io/reference/get_v3-candidate-tags) | Incremental |
+| [close_reasons](https://harvestdocs.greenhouse.io/reference/get_v3-close-reasons) | Incremental |
+| [custom_fields](https://harvestdocs.greenhouse.io/reference/get_v3-custom-fields) | Incremental |
+| [custom_field_options](https://harvestdocs.greenhouse.io/reference/get_v3-custom-field-options) | Incremental |
+| [demographic_answers](https://harvestdocs.greenhouse.io/reference/get_v3-demographic-answers) | Incremental |
+| [demographic_questions](https://harvestdocs.greenhouse.io/reference/get_v3-demographic-questions) | Snapshot |
+| [demographic_question_sets](https://harvestdocs.greenhouse.io/reference/get_v3-demographic-question-sets) | Incremental |
+| [departments](https://harvestdocs.greenhouse.io/reference/get_v3-departments) | Incremental |
+| [eeoc](https://harvestdocs.greenhouse.io/reference/get_v3-eeoc) | Incremental |
+| [email_templates](https://harvestdocs.greenhouse.io/reference/get_v3-email-templates) | Incremental |
+| [interviews](https://harvestdocs.greenhouse.io/reference/get_v3-interviews) | Incremental |
+| [interviewers](https://harvestdocs.greenhouse.io/reference/get_v3-interviewers) | Incremental |
+| [interviewer_tags](https://harvestdocs.greenhouse.io/reference/get_v3-interviewer-tags) | Incremental |
+| [job_hiring_managers](https://harvestdocs.greenhouse.io/reference/get_v3-job-hiring-managers) | Incremental |
+| [job_interview_stages](https://harvestdocs.greenhouse.io/reference/get_v3-job-interview-stages) | Incremental |
+| [job_notes](https://harvestdocs.greenhouse.io/reference/get_v3-job-notes) | Incremental |
+| [job_posts](https://harvestdocs.greenhouse.io/reference/get_v3-job-posts) | Incremental |
+| [jobs](https://harvestdocs.greenhouse.io/reference/get_v3-jobs) | Incremental |
+| [offers](https://harvestdocs.greenhouse.io/reference/get_v3-offers) | Incremental |
+| [offices](https://harvestdocs.greenhouse.io/reference/get_v3-offices) | Incremental |
+| [openings](https://harvestdocs.greenhouse.io/reference/get_v3-openings) | Incremental |
+| [prospect_pools](https://harvestdocs.greenhouse.io/reference/get_v3-prospect-pools) | Incremental |
+| [prospect_pool_stages](https://harvestdocs.greenhouse.io/reference/get_v3-prospect-pool-stages) | Incremental |
+| [referrers](https://harvestdocs.greenhouse.io/reference/get_v3-referrers) | Incremental |
+| [rejection_details](https://harvestdocs.greenhouse.io/reference/get_v3-rejection-details) | Incremental |
+| [rejection_reasons](https://harvestdocs.greenhouse.io/reference/get_v3-rejection-reasons) | Incremental |
+| [scorecard_questions](https://harvestdocs.greenhouse.io/reference/get_v3-scorecard-questions) | Incremental |
+| [scorecards](https://harvestdocs.greenhouse.io/reference/get_v3-scorecards) | Incremental |
+| [sources](https://harvestdocs.greenhouse.io/reference/get_v3-sources) | Incremental |
+| [user_emails](https://harvestdocs.greenhouse.io/reference/get_v3-user-emails) | Incremental |
+| [user_job_permissions](https://harvestdocs.greenhouse.io/reference/get_v3-user-job-permissions) | Incremental |
+| [user_roles](https://harvestdocs.greenhouse.io/reference/get_v3-user-roles) | Incremental |
+| [users](https://harvestdocs.greenhouse.io/reference/get_v3-users) | Incremental |
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
 

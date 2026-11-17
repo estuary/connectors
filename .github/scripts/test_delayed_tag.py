@@ -19,14 +19,16 @@ from delayed_tag import (
     build_claude_content,
     build_claude_prompt,
     call_claude,
+    current_delayed_commit,
     filter_backward_moves,
     find_boundary,
+    inspect_image,
     load_connector_images,
     load_verdict_cache,
     parse_claude_verdict,
     pr_touches_dir,
     resolve_family,
-    select_commit_tag,
+    revision_label,
     verdict_cache_key,
     write_verdict_cache,
 )
@@ -430,29 +432,6 @@ class TestResolveFamily(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# select_commit_tag
-# ---------------------------------------------------------------------------
-
-class TestSelectCommitTag(unittest.TestCase):
-
-    def test_picks_seven_hex_chars(self):
-        self.assertEqual(select_commit_tag(['dev', 'v4', 'e35f112', 'delayed']), 'e35f112')
-
-    def test_ignores_version_and_named_tags(self):
-        self.assertIsNone(select_commit_tag(['dev', 'delayed', 'v10', 'local']))
-
-    def test_rejects_wrong_length(self):
-        # 6 and 8 hex chars are not commit tags (CI uses exactly 7).
-        self.assertIsNone(select_commit_tag(['abc123', 'abcdef12']))
-
-    def test_rejects_non_hex(self):
-        self.assertIsNone(select_commit_tag(['ghijklm', 'v1']))
-
-    def test_empty(self):
-        self.assertIsNone(select_commit_tag([]))
-
-
-# ---------------------------------------------------------------------------
 # filter_backward_moves
 # ---------------------------------------------------------------------------
 
@@ -462,6 +441,8 @@ class TestFilterBackwardMoves(unittest.TestCase):
     ORDER = ['old1234', 'mid1234', 'new1234', 'tip1234']
 
     def is_ancestor(self, a, b):
+        if a not in self.ORDER or b not in self.ORDER:
+            return False
         return self.ORDER.index(a) <= self.ORDER.index(b)
 
     def run_filter(self, plan, current):
@@ -491,24 +472,93 @@ class TestFilterBackwardMoves(unittest.TestCase):
         self.assertEqual([e.image_name for e in kept], ['a'])
         self.assertEqual(skipped, [])
 
-    def test_keeps_when_current_unknown(self):
-        # No resolvable :delayed commit -> fail open, tag the boundary.
+    def test_keeps_when_no_current_commit(self):
         plan = [make_plan('a', sha7='mid1234')]
         kept, skipped = self.run_filter(plan, {})
         self.assertEqual([e.image_name for e in kept], ['a'])
         self.assertEqual(skipped, [])
 
+    def test_holds_when_history_unrelated(self):
+        # Neither commit is an ancestor of the other (or one is unknown to git).
+        plan = [make_plan('a', sha7='tip1234')]
+        kept, skipped = self.run_filter(plan, {'a': 'side123'})
+        self.assertEqual(kept, [])
+        self.assertEqual([(e.image_name, cur) for e, cur in skipped], [('a', 'side123')])
+
     def test_mixed_plan(self):
         plan = [
-            make_plan('fwd', sha7='mid1234'),   # backward -> skip
-            make_plan('norm', sha7='tip1234'),  # forward  -> keep
-            make_plan('fresh', sha7='old1234'), # unknown  -> keep
+            make_plan('fwd', sha7='mid1234'),   # backward   -> skip
+            make_plan('norm', sha7='tip1234'),  # forward    -> keep
+            make_plan('fresh', sha7='old1234'), # no tag yet -> keep
         ]
-        kept, skipped = self.run_filter(
-            plan, {'fwd': 'tip1234', 'norm': 'mid1234'},
-        )
+        kept, skipped = self.run_filter(plan, {'fwd': 'tip1234', 'norm': 'mid1234'})
         self.assertEqual([e.image_name for e in kept], ['norm', 'fresh'])
         self.assertEqual([e.image_name for e, _ in skipped], ['fwd'])
+
+
+# ---------------------------------------------------------------------------
+# current_delayed_commit
+# ---------------------------------------------------------------------------
+
+REV = '0123456789abcdef0123456789abcdef01234567'
+
+
+def labeled(rev: str) -> dict:
+    return {'config': {'Labels': {'org.opencontainers.image.revision': rev}}}
+
+
+class TestRevisionLabel(unittest.TestCase):
+
+    def test_single_platform_config(self):
+        self.assertEqual(revision_label(labeled(REV)), '0123456')
+
+    def test_platform_map(self):
+        self.assertEqual(revision_label({'linux/amd64': labeled(REV)}), '0123456')
+
+    def test_missing_or_malformed(self):
+        self.assertIsNone(revision_label({'config': {'Labels': None}}))
+        self.assertIsNone(revision_label(labeled('not-a-sha')))
+        self.assertIsNone(revision_label({}))
+
+
+class TestInspectImage(unittest.TestCase):
+
+    def run_with(self, returncode, stdout='', stderr=''):
+        result = mock.Mock(returncode=returncode, stdout=stdout, stderr=stderr)
+        with mock.patch('delayed_tag.subprocess.run', return_value=result):
+            return inspect_image('ghcr.io/estuary/a:delayed')
+
+    def test_parses_output(self):
+        self.assertEqual(self.run_with(0, '{"config": {}}'), {'config': {}})
+
+    def test_not_found_is_none(self):
+        self.assertIsNone(self.run_with(
+            1, stderr='ERROR: ghcr.io/estuary/a:delayed: not found'))
+
+    def test_other_failure_raises(self):
+        with self.assertRaises(RuntimeError):
+            self.run_with(1, stderr='ERROR: unexpected status: 503')
+
+
+class TestCurrentDelayedCommit(unittest.TestCase):
+
+    def resolve(self, inspected):
+        with mock.patch('delayed_tag.inspect_image', return_value=inspected) as m:
+            sha = current_delayed_commit('a')
+        m.assert_called_once_with('ghcr.io/estuary/a:delayed')
+        return sha
+
+    def test_reads_revision_label(self):
+        self.assertEqual(self.resolve(labeled(REV)), '0123456')
+
+    def test_no_delayed_tag_or_label_is_none(self):
+        self.assertIsNone(self.resolve(None))
+        self.assertIsNone(self.resolve({'config': {}}))
+
+    def test_registry_failure_raises(self):
+        with mock.patch('delayed_tag.inspect_image', side_effect=RuntimeError('503')):
+            with self.assertRaises(RuntimeError):
+                current_delayed_commit('a')
 
 
 # ---------------------------------------------------------------------------

@@ -69,8 +69,8 @@ func TestStreamV2CommitPrecedesCheckpoint(t *testing.T) {
 	// Appends succeed and the committed token never advances, as a channel whose
 	// rows Snowflake accepted but never committed would report.
 	t.Setenv("FAKE_SNOWPIPE_MODE", "commit_never_lands")
-	defer func(d time.Duration) { streamV2WaitCommitTimeout = d }(streamV2WaitCommitTimeout)
-	streamV2WaitCommitTimeout = 3 * time.Second
+	defer func(d time.Duration) { streamV2CommitRetry.MaxElapsed = d }(streamV2CommitRetry.MaxElapsed)
+	streamV2CommitRetry.MaxElapsed = 3 * time.Second
 
 	var m = singleChannelLayout(newFakeStreamV2Manager(t, ctx, &config{Credentials: &snowflake_auth.CredentialConfig{}}, "test/commitFirst",
 		&pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}))
@@ -371,18 +371,21 @@ func TestReconcileStreamV2Channel(t *testing.T) {
 			committed: nil,
 		},
 		{
-			// The channel Snowflake held those documents on is gone, and with it
-			// the token which says which of them it holds. A backfill of the
-			// binding is what does that — it re-creates the table, taking every
-			// channel bound to it — so this is what a shard of the last
-			// specification finds when it restarts into a backfill. The one drop this
-			// connector makes itself follows a checkpoint that deleted the channel's
-			// item, so it never reaches here.
-			name:                     "nothing committed with a checkpointed routed offset is rejected",
+			// Snowflake deletes a channel and its token after 30 days without
+			// ingestion. The checkpoint item was written only once Snowflake
+			// committed the channel through its routed offset, so the channel
+			// resumes from there.
+			name:                     "nothing committed with a checkpointed routed offset resumes from it",
 			committed:                nil,
 			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(42),
 			priorItems:               1,
-			wantErr:                  "reports no committed offset token while this task's checkpoint records",
+			wantCommitted:            42,
+		},
+		{
+			name:                     "nothing committed with nothing routed",
+			committed:                nil,
+			sv2ChannelCheckpointItem: sv2ChannelCheckpointItem(0),
+			priorItems:               1,
 		},
 		{
 			name:                     "clean boundary",
@@ -504,8 +507,8 @@ func TestStreamV2WaitCommitRejectsAnOvertakenOffset(t *testing.T) {
 // this write path did not format, which only another writer can produce: the wait
 // fails at once instead of running to its timeout.
 func TestStreamV2WaitCommitRejectsAForeignToken(t *testing.T) {
-	defer func(d time.Duration) { streamV2WaitCommitTimeout = d }(streamV2WaitCommitTimeout)
-	streamV2WaitCommitTimeout = 10 * time.Second
+	defer func(d time.Duration) { streamV2CommitRetry.MaxElapsed = d }(streamV2CommitRetry.MaxElapsed)
+	streamV2CommitRetry.MaxElapsed = 10 * time.Second
 
 	var ctx = context.Background()
 	t.Setenv("FAKE_SNOWPIPE_STATE", filepath.Join(t.TempDir(), "channels.json"))

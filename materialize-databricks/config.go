@@ -185,6 +185,13 @@ func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
+// warehouseID is the ID of the SQL warehouse at the end of HTTPPath, as in
+// /sql/1.0/warehouses/<id>.
+func (c config) warehouseID() string {
+	var parts = strings.Split(c.HTTPPath, "/")
+	return parts[len(parts)-1]
+}
+
 // ToURI puts together address and http_path to form the full workspace URL
 func (c config) ToURI(materializationName string) string {
 	var address = c.Address

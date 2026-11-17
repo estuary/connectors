@@ -1,5 +1,67 @@
 # materialize-snowflake
 
+## 2026-11-17
+
+### Changed
+- Tasks with many bindings finish each transaction a little sooner, because
+  the connector now deletes the staged files of all bindings at the same time
+  instead of one binding after another.
+
+### Fixed
+- High-performance Snowpipe Streaming no longer rejects a null value in a
+  column right after the column stops being required. The connector now makes
+  Snowflake re-read the table's schema by adding a column named
+  `FLOW_PIPE_REFRESH_<random>` and dropping it again at once.
+
+## 2026-11-16
+
+### Fixed
+- High-performance Snowpipe Streaming transactions no longer wait 5–25 seconds
+  for Snowflake to commit. The connector now checks for the commit after
+  100 ms and backs off to every 2 seconds, instead of checking every 5 seconds.
+- Large transactions no longer run out of memory while loading existing rows.
+
+## 2026-11-13
+
+### Fixed
+- High-performance Snowpipe Streaming bindings that receive no new data for
+  30 days no longer fail when their next document arrives.
+
+## 2026-11-12
+
+### Changed
+- Staged files are uploaded once they reach 64 MB compressed instead of
+  250 MB, so uploads overlap with writing and commits of large transactions
+  start sooner.
+
+## 2026-11-10
+
+### Changed
+- Load and merge queries restrict a string key to up to eight ranges split at
+  the widest gaps between a transaction's keys, instead of one range from its
+  smallest key to its largest. Transactions whose keys cluster with a few
+  outliers, such as time-ordered IDs, can read less of the table.
+
+## 2026-11-09
+
+### Changed
+- Waiting for a newly created Snowpipe pipe to become visible now gives up
+  after 10 minutes instead of waiting indefinitely.
+
+## 2026-11-06
+
+### Changed
+- A transaction's new rows are appended with COPY INTO, and only rows that
+  already exist in the table go through MERGE INTO. Commits that mix updates
+  with new rows are faster. The new rows are written in key order, so later
+  queries can often skip more of the table.
+
+## 2026-11-05
+
+### Changed
+- Updates that follow transactions of only new rows, such as the end of a
+  backfill, may scan less of the destination table.
+
 ## 2026-11-03
 
 ### Added

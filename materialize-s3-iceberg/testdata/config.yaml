@@ -7,7 +7,7 @@ s3_endpoint: http://localhost:9702
 credentials:
     auth_type: AWSAccessKey
     awsAccessKeyId: flow
-    awsSecretAccessKey: flow
+    awsSecretAccessKey: flow_secret
 catalog:
     catalog_type: Iceberg REST Server
     uri: http://localhost:9700/api/catalog

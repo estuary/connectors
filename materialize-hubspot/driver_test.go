@@ -196,7 +196,7 @@ func (c *LocalDevClient) CreateTestAccount(ctx context.Context, portal *Portal, 
 		return nil, fmt.Errorf("unable to marshal config: %w", err)
 	}
 	var testAccount TestAccount
-	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err = requestRetry.Do(ctx, "create test account", func(ctx context.Context) error {
 		req, err := http.NewRequestWithContext(ctx, "POST", uri.String(), bytes.NewBuffer(data))
 		if err != nil {
 			return err
@@ -262,7 +262,7 @@ func (c *LocalDevClient) RefreshToken(ctx context.Context, personalAccessKey Sec
 	}
 
 	var response AccessToken
-	err = Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err = idempotentRetry.Do(ctx, "refresh test token", func(ctx context.Context) error {
 		req, err := http.NewRequestWithContext(ctx, "POST", uri.String(), bytes.NewBuffer(data))
 		if err != nil {
 			return err
@@ -302,7 +302,7 @@ func (c *LocalDevClient) AccountStatus(ctx context.Context, portal *Portal, test
 	var response struct {
 		Status string `json:"status"`
 	}
-	err := Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	err := idempotentRetry.Do(ctx, "get test account status", func(ctx context.Context) error {
 		req, err := http.NewRequestWithContext(ctx, "GET", uri.String(), nil)
 		if err != nil {
 			return err
@@ -345,7 +345,7 @@ func (c *LocalDevClient) DeleteTestAccount(ctx context.Context, portal *Portal, 
 	params.Set("portalId", portal.ID)
 	uri.RawQuery = params.Encode()
 
-	return Retry[*TemporaryError](ctx, DefaultBackoff, func(attempt int) error {
+	return idempotentRetry.Do(ctx, "delete test account", func(ctx context.Context) error {
 		req, err := http.NewRequestWithContext(ctx, "DELETE", uri.String(), nil)
 		if err != nil {
 			return err

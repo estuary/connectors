@@ -199,6 +199,13 @@ ALTER PUBLICATION flow_publication ADD TABLE public.flow_watermarks, <other_tabl
 
 Certain managed PostgreSQL implementations may require you to explicitly set the [SSL Mode](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-PROTECTION) to connect with Estuary. One example is [Neon](https://neon.tech/docs/connect/connect-securely), which requires the setting `verify-full`. Check your managed PostgreSQL's documentation for details if you encounter errors related to the SSL mode configuration.
 
+To verify the server's certificate, set the `sslmode` advanced option to one of:
+
+- `verify-full` checks that the server's certificate is signed by a trusted CA and is valid for the configured server address. Through an SSH tunnel, the certificate is still checked against the configured server address, not against the tunnel.
+- `verify-ca` checks only that the server's certificate is signed by a trusted CA, without checking the hostname. Use this when connecting by IP address, or when the certificate doesn't name the address you connect to.
+
+In both modes the connector trusts public certificate authorities, the CAs of Amazon RDS and Aurora, and Google Cloud SQL's shared CA. It doesn't trust other private CAs, such as Cloud SQL's default per-instance CA, so these modes can't verify servers that use them.
+
 ## Backfills and performance considerations
 
 When the PostgreSQL capture is initiated, by default, the connector first _backfills_, or captures the targeted tables in their current state. It then transitions to capturing change events on an ongoing basis.
@@ -470,7 +477,7 @@ these filters exclude will be deactivated the next time discovery runs.
 | `/advanced/skip_backfills` | Skip Backfills | A comma-separated list of fully-qualified table names which should not be backfilled. | string |  |
 | `/advanced/slotName` | Slot Name | The name of the PostgreSQL replication slot to replicate from. | string | `"flow_slot"` |
 | `/advanced/watermarksTable` | Watermarks Table | The name of the table used for watermark writes during backfills. Must be fully-qualified in `<schema>.<table>` form. | string  | `"public.flow_watermarks"` |
-| `/advanced/sslmode` | SSL Mode | Overrides SSL connection behavior by setting the 'sslmode' parameter. | string |  |
+| `/advanced/sslmode` | SSL Mode | Overrides SSL connection behavior by setting the 'sslmode' parameter. 'verify-ca' and 'verify-full' trust public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA). | string |  |
 | `/advanced/discover_schemas` | Discovery Schema Selection | If this is specified, only tables in the selected schema(s) will be automatically discovered. | string array |  |
 | `/advanced/min_backfill_xid` | Minimum Backfill XID | Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases. | string |  |
 | `/advanced/read_only_capture` | Read-Only Capture | When set, the capture will operate in [read-only mode](#read-only-captures) and avoid operations such as watermark writes. | boolean | `false` |

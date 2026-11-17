@@ -12,12 +12,14 @@ This connector captures data from Gong into Estuary collections.
 
 The following data resources are supported through the [Gong API](https://gong.app.gong.io/settings/api/documentation):
 
-* [calls](https://gong.app.gong.io/settings/api/documentation#get-/v2/calls)
-* [extensive_calls](https://gong.app.gong.io/settings/api/documentation#post-/v2/calls/extensive)
-* [call_transcripts](https://gong.app.gong.io/settings/api/documentation#post-/v2/calls/transcript)
-* [users](https://gong.app.gong.io/settings/api/documentation#post-/v2/users/extensive)
-* [scorecards](https://gong.app.gong.io/settings/api/documentation#post-/v2/stats/activity/scorecards)
-* [scorecard_definitions](https://gong.app.gong.io/settings/api/documentation#get-/v2/settings/scorecards)
+| Resource | Replication Mode |
+| --- | --- |
+| [calls](https://gong.app.gong.io/settings/api/documentation#get-/v2/calls) | Incremental |
+| [call_transcripts](https://gong.app.gong.io/settings/api/documentation#post-/v2/calls/transcript) | Incremental |
+| [extensive_calls](https://gong.app.gong.io/settings/api/documentation#post-/v2/calls/extensive) | Incremental |
+| [scorecards](https://gong.app.gong.io/settings/api/documentation#post-/v2/stats/activity/scorecards) | Incremental |
+| [scorecard_definitions](https://gong.app.gong.io/settings/api/documentation#get-/v2/settings/scorecards) | Snapshot |
+| [users](https://gong.app.gong.io/settings/api/documentation#post-/v2/users/extensive) | Incremental |
 
 By default, each resource is mapped to an Estuary collection through a separate binding.
 

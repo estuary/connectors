@@ -40,12 +40,13 @@ class _NodeResponse(BaseModel, extra="allow"):
 
 def _build_node_query(parent_id: str, connection: NestedConnection, after: str | None) -> str:
     after_arg = f', after: "{after}"' if after else ""
+    extra_args = f", {connection.extra_args}" if connection.extra_args else ""
     first = connection.overflow_page_size or connection.page_size
     query = f"""
     {{
         node(id: "{parent_id}") {{
             ... on {connection.parent_typename} {{
-                {connection.field_name}(first: {first}{after_arg}) {{
+                {connection.field_name}(first: {first}{after_arg}{extra_args}) {{
                     edges {{
                         node {{
                             {connection.node_selection}

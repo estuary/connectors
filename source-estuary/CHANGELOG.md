@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-14
+
+### Fixed
+- `live_specs`, `task_status`, `publication_history`, `storage_mappings`, `alert_subscriptions`, `service_accounts` and the catalog stats streams capture data again after an Estuary API change caused them to come back empty.
+
 ## 2026-10-21
 
 ### Fixed

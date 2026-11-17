@@ -29,7 +29,7 @@ func newQueryProfiler(db *stdsql.DB, bindings []*binding) *boilerplate.QueryProf
 	for i, b := range bindings {
 		paths[i] = b.target.Path
 	}
-	return boilerplate.NewQueryProfiler(&queryHistory{db: db}, profileInterval, reportQueryID, paths)
+	return boilerplate.NewQueryProfiler(&queryHistory{db: db}, profileInterval, reportQueryID, paths, nil)
 }
 
 // reportQueryID has the driver send the ID of a query run with the returned

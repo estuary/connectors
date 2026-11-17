@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
@@ -15,10 +16,60 @@ import (
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 	"resty.dev/v3"
 )
+
+func TestCheckpointSplitsExistingAndNewRows(t *testing.T) {
+	var staged = func(uuid string) *stagedFile {
+		return &stagedFile{uuid: uuid, started: true, finished: true, group: new(errgroup.Group)}
+	}
+	var newTransactor = func(merge, copy *stagedFile) *transactor {
+		var b = &binding{target: sql.Table{StateKey: "a_table", Identifier: "a_table"}}
+		b.store.mergeStage, b.store.copyStage = merge, copy
+		b.store.mergeBounds = sql.NewMergeBoundsBuilder(nil, nil)
+		return &transactor{bindings: []*binding{b}, cp: make(checkpoint), templates: testTemplates}
+	}
+
+	t.Run("existing and new rows", func(t *testing.T) {
+		var d = newTransactor(staged("merged"), staged("copied"))
+		_, err := d.buildDriverCheckpoint(t.Context(), nil, 3)
+		require.NoError(t, err)
+
+		var item = d.cp["a_table"]
+		require.True(t, strings.HasPrefix(item.Query, "\nMERGE INTO"))
+		require.Contains(t, item.Query, "@flow_v1/merged")
+		require.Equal(t, "@flow_v1/merged", item.StagedDir)
+		require.True(t, strings.HasPrefix(item.CopyQuery, "\nCOPY INTO"))
+		require.Contains(t, item.CopyQuery, "@flow_v1/copied")
+		require.Equal(t, "@flow_v1/copied", item.CopyStagedDir)
+	})
+
+	t.Run("only new rows", func(t *testing.T) {
+		var d = newTransactor(newStagedFile("", nil), staged("copied"))
+		cpJSON, err := d.buildDriverCheckpoint(t.Context(), nil, 3)
+		require.NoError(t, err)
+
+		var item = d.cp["a_table"]
+		require.True(t, strings.HasPrefix(item.Query, "\nCOPY INTO"))
+		require.Equal(t, "@flow_v1/copied", item.StagedDir)
+		require.NotContains(t, string(cpJSON), "CopyQuery")
+		require.NotContains(t, string(cpJSON), "CopyStagedDir")
+	})
+
+	t.Run("only existing rows", func(t *testing.T) {
+		var d = newTransactor(staged("merged"), newStagedFile("", nil))
+		_, err := d.buildDriverCheckpoint(t.Context(), nil, 3)
+		require.NoError(t, err)
+
+		var item = d.cp["a_table"]
+		require.True(t, strings.HasPrefix(item.Query, "\nMERGE INTO"))
+		require.Empty(t, item.CopyQuery)
+	})
+}
 
 func TestAcknowledgeSubsetLeavesOtherKeysPending(t *testing.T) {
 	d := &transactor{
@@ -203,9 +254,58 @@ func TestStreamingChannelQuotesSchema(t *testing.T) {
 				},
 			}
 			var target = sql.Table{TableShape: sql.TableShape{Path: []string{tc.schema, "my-table"}, DeltaUpdates: true}}
-			require.NoError(t, d.addBinding(context.Background(), target, checkpointItem{}))
+			require.NoError(t, d.addBinding(context.Background(), target, checkpointItem{}, nil))
 			require.Equal(t, tc.want, gotSchema)
 			require.Equal(t, `"my-table"`, gotTable)
 		})
 	}
+}
+
+func TestExistingFieldCollation(t *testing.T) {
+	for _, tc := range []struct {
+		dataType string
+		want     string
+	}{
+		{dataType: `{"type":"TEXT","length":16777216,"byteLength":67108864,"nullable":true,"fixed":false,"collation":"en-ci"}`, want: "en-ci"},
+		{dataType: `{"type":"TEXT","length":16777216,"byteLength":67108864,"nullable":true,"fixed":false}`},
+	} {
+		field, err := showColumnsResult{ColumnName: "ID", DataType: tc.dataType}.existingField()
+		require.NoError(t, err)
+		require.Equal(t, existingColumn{Collation: tc.want}, field.Meta)
+	}
+}
+
+func TestMergeBoundRangesNeedUncollatedKeys(t *testing.T) {
+	var identity = func(s string) string { return s }
+	var target = sql.Table{
+		TableShape: sql.TableShape{Path: []string{"S", "T"}},
+		Keys: []sql.Column{{Identifier: "ID", Projection: sql.Projection{Projection: pf.Projection{
+			Field:     "ID",
+			Inference: pf.Inference{Types: []string{"string"}},
+		}}}},
+	}
+	// A band of keys and an outlier far below it, which a split bound gives a
+	// range of its own.
+	var keys = []string{"0123ffff"}
+	for i := range 500 {
+		keys = append(keys, fmt.Sprintf("019a2b3c-%04x", i))
+	}
+
+	var ranges = func(is *boilerplate.InfoSchema) []sql.MergeRange {
+		var b = sql.NewMergeBoundsBuilder(target.Keys, testDialect.Literal, mergeBoundsOptions(target, is)...)
+		for _, k := range keys {
+			b.NextKey([]any{k})
+		}
+		return b.Build()[0].Ranges
+	}
+	var existing = func(collation string) *boilerplate.InfoSchema {
+		var is = boilerplate.NewInfoSchema(func(p []string) []string { return p }, identity, identity, false, false)
+		is.PushResource("S", "T").PushField(boilerplate.ExistingField{Name: "ID", Type: "TEXT", Meta: existingColumn{Collation: collation}})
+		return is
+	}
+
+	require.Len(t, ranges(existing("")), 2)
+	require.Nil(t, ranges(existing("en-ci")), "a collated column doesn't order keys byte by byte")
+	require.Nil(t, ranges(boilerplate.NewInfoSchema(func(p []string) []string { return p }, identity, identity, false, false)), "the table's columns are unknown")
+	require.Nil(t, ranges(nil))
 }

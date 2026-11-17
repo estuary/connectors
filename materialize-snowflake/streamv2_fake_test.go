@@ -42,8 +42,14 @@ import (
 //
 // Fault injection via FAKE_SNOWPIPE_MODE:
 //
-//	commit_never_lands  accepts appends but never advances the committed token
-//	hex_binary_input    reports pipes that read binary values as HEX
+//	commit_never_lands       accepts appends but never advances the committed token
+//	hex_binary_input         reports pipes that read binary values as HEX
+//	deleted_append_accepted  accepts an append to a deleted channel and discards it
+//	append_must_reopen       fails every append with ERR_CHANNEL_MUST_BE_REOPENED
+//
+// A deleted channel stands for one Snowflake expired or dropped: an append to it
+// fails with ERR_CHANNEL_DOES_NOT_EXIST_OR_IS_NOT_AUTHORIZED, a status request
+// omits it, and opening it again creates it afresh.
 //
 // A row carrying the REJECT column stands in for a row Snowflake's ingestion
 // discards: the append and the commit both succeed and the committed token still
@@ -91,6 +97,11 @@ var fakeSnowpipeFileAppends atomic.Int64
 type fakeSnowpipeState struct {
 	Committed map[string]string `json:"committed"`
 	Errors    map[string]int64  `json:"errors"`
+	// Rows is the KEY of every committed row, in commit order, standing for the
+	// table's contents.
+	Rows []string `json:"rows,omitempty"`
+	// Deleted names the channels Snowflake no longer holds.
+	Deleted map[string]bool `json:"deleted,omitempty"`
 }
 
 // fakeSnowpipeGunzip decompresses a gzip append body or staged file.
@@ -220,6 +231,7 @@ func (f *fakeSnowpipe) open(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f.locked(func() {
+		delete(f.state.Deleted, channel)
 		f.continuation[channel]++
 		f.reply(w, 200, map[string]any{
 			"next_continuation_token": fmt.Sprint(f.continuation[channel]),
@@ -233,6 +245,7 @@ func (f *fakeSnowpipe) drop(w http.ResponseWriter, r *http.Request) {
 	f.locked(func() {
 		delete(f.state.Committed, channel)
 		f.state.Errors[channel] = 0
+		f.markDeleted(channel)
 		f.reply(w, 200, map[string]any{})
 	})
 }
@@ -252,7 +265,9 @@ func (f *fakeSnowpipe) status(w http.ResponseWriter, r *http.Request) {
 	f.locked(func() {
 		var statuses = make(map[string]any)
 		for _, name := range req.Names {
-			statuses[name] = f.channelStatus(name)
+			if !f.state.Deleted[name] {
+				statuses[name] = f.channelStatus(name)
+			}
 		}
 		f.reply(w, 200, map[string]any{"channel_statuses": statuses})
 	})
@@ -354,6 +369,7 @@ func (f *fakeSnowpipe) appendFile(w http.ResponseWriter, r *http.Request) {
 // commits the append's end offset token.
 func (f *fakeSnowpipe) ingest(w http.ResponseWriter, channel, continuation, startToken, endToken string, body []byte) {
 	var rejected, rows int64
+	var keys []string
 	var scanner = bufio.NewScanner(bytes.NewReader(body))
 	scanner.Buffer(nil, 64*1024*1024)
 	for scanner.Scan() {
@@ -366,6 +382,7 @@ func (f *fakeSnowpipe) ingest(w http.ResponseWriter, channel, continuation, star
 		if _, ok := row["REJECT"]; ok {
 			rejected++
 		}
+		keys = append(keys, fmt.Sprint(row["KEY"]))
 	}
 	if len(body) > 0 && body[len(body)-1] != '\n' {
 		f.fail(w, 400, "invalid_rows", "last row lacks a newline")
@@ -377,6 +394,16 @@ func (f *fakeSnowpipe) ingest(w http.ResponseWriter, channel, continuation, star
 	require.Equal(f.t, rows, end-start+1, "offset tokens %q to %q span a different number of rows than the append carries", startToken, endToken)
 
 	f.locked(func() {
+		if f.state.Deleted[channel] && f.mode == "deleted_append_accepted" {
+			f.reply(w, 200, map[string]any{"next_continuation_token": continuation})
+			return
+		} else if f.state.Deleted[channel] {
+			f.fail(w, 400, streamV2ErrChannelDoesNotExist, "")
+			return
+		} else if f.mode == "append_must_reopen" {
+			f.fail(w, 400, "ERR_CHANNEL_MUST_BE_REOPENED", "channel must be reopened")
+			return
+		}
 		if continuation != fmt.Sprint(f.continuation[channel]) {
 			f.fail(w, 400, "STALE_CONTINUATION_TOKEN_SEQUENCER", "stale continuation token")
 			return
@@ -384,6 +411,7 @@ func (f *fakeSnowpipe) ingest(w http.ResponseWriter, channel, continuation, star
 		f.continuation[channel]++
 		if f.mode != "commit_never_lands" {
 			f.state.Committed[channel] = endToken
+			f.state.Rows = append(f.state.Rows, keys...)
 		}
 		var errs, seeded = f.state.Errors[channel]
 		if !seeded {
@@ -392,4 +420,30 @@ func (f *fakeSnowpipe) ingest(w http.ResponseWriter, channel, continuation, star
 		f.state.Errors[channel] = errs + rejected
 		f.reply(w, 200, map[string]any{"next_continuation_token": fmt.Sprint(f.continuation[channel])})
 	})
+}
+
+func (f *fakeSnowpipe) markDeleted(channel string) {
+	if f.state.Deleted == nil {
+		f.state.Deleted = make(map[string]bool)
+	}
+	f.state.Deleted[channel] = true
+}
+
+// fakeDeleteChannel deletes a channel from the fake Snowpipe behind the back of
+// every session that holds it open, as Snowflake's expiry of an idle channel does.
+func fakeDeleteChannel(t *testing.T, channel string) {
+	t.Helper()
+	var path = os.Getenv("FAKE_SNOWPIPE_STATE")
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var state fakeSnowpipeState
+	require.NoError(t, json.Unmarshal(raw, &state))
+	delete(state.Committed, channel)
+	if state.Deleted == nil {
+		state.Deleted = make(map[string]bool)
+	}
+	state.Deleted[channel] = true
+	raw, err = json.Marshal(state)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, raw, 0o644))
 }

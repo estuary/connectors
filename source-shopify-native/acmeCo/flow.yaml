@@ -89,6 +89,11 @@ collections:
     key:
     - /_meta/store
     - /id
+  acmeCo/order_shipping_lines:
+    schema: order_shipping_lines.schema.yaml
+    key:
+    - /_meta/store
+    - /id
   acmeCo/order_transactions:
     schema: order_transactions.schema.yaml
     key:

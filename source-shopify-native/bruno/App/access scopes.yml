@@ -1,0 +1,68 @@
+info:
+  name: access scopes
+  type: graphql
+  seq: 1
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query AccessScopes {
+        currentAppInstallation {
+          accessScopes { handle }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [AppInstallation](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/AppInstallation)
+
+  **WHY:** the scopes the test app holds, read the way the connector reads
+  them (`_get_granted_scopes` in `resources.py`). Check here before adding a
+  request that needs more than read access.
+
+  **VERIFIED (2026-10-29):** the app holds 85 scopes, all
+  read-only: no `write_*` scope at all. It has `read_orders`, `read_all_orders`
+  and `read_order_edits`, enough for every read here and for
+  `Seeding / A1 - Run shipping lines bulk query` (bulk queries only read).
+  Creating, editing or refunding orders would be refused. That's deliberate:
+  the capture snapshot reads this store, so this collection doesn't change
+  its orders.
+
+examples:
+  - name: "200 - read-only app (projection: counts and order scopes)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "scopeCount": 85,
+            "writeScopes": [],
+            "orderScopes": [
+              "customer_read_draft_orders",
+              "customer_read_orders",
+              "read_all_orders",
+              "read_assigned_fulfillment_orders",
+              "read_draft_orders",
+              "read_merchant_managed_fulfillment_orders",
+              "read_order_edits",
+              "read_orders",
+              "read_third_party_fulfillment_orders"
+            ]
+          }

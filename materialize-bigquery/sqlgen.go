@@ -289,7 +289,7 @@ SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 	{{- range $ind, $bound := $.Bounds }}
 		{{ if $ind }} AND {{ else }} ON {{ end -}}
 		l.{{ $bound.Identifier }} = r.c{{$ind}}
-		{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+		{{- template "boundCondition" (BoundOn "l" $bound) }}
 	{{- end }}
 {{- else -}}
 (SELECT -1, CAST(NULL AS {{ $.ObjectType }}) LIMIT 0) as nodoc
@@ -328,7 +328,7 @@ JOIN {{ template "tempTableName" . }} AS r
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON {{ end -}}
 	l.{{ $bound.Identifier }} = r.c{{$ind}}
-	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- template "boundCondition" (BoundOn "l" $bound) }}
 {{- end }}
 {{ end }}
 
@@ -355,7 +355,7 @@ USING {{ template "tempTableName" . }} AS r
 ON {{ range $ind, $bound := $.Bounds }}
 	{{ if $ind -}} AND {{end -}}
 	l.{{$bound.Identifier}} = r.c{{$ind}}
-	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- template "boundCondition" (BoundOn "l" $bound) }}
 {{- end}}
 WHEN MATCHED AND r._flow_delete THEN
 	DELETE

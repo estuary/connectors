@@ -17,11 +17,15 @@ Rules for `fetch_*` (incremental) and `backfill_*` (backfill) functions in estua
 
 ### `FETCH-MODEL-OWNS-CONTRACT` · checkable-from-diff
 
-**The model owns its endpoint contract.** Path templates, items keys, and cursor-filter parameter names (`SINCE_PARAM` / `BEFORE_PARAM`-style) are ClassVars on the document model; the cursor value comes from an abstract `get_cursor()` method on the model base — never a `cursor_of` callable threaded through signatures.
+**The model owns its endpoint contract.** Path templates, items keys, and cursor-filter parameter names (`SINCE_PARAM` / `BEFORE_PARAM`-style) are ClassVars on the document model. Give the model base an abstract `get_cursor()` exactly when generic fetch code reads a cursor value off its documents; that code calls it in place of a `cursor_of` callable threaded through signatures.
 
 ### `FETCH-PARAM-DICT-NAMING` · checkable-from-diff
 
 **Name request-param dicts by distance from the request.** Plain `params` only where the dict is handed directly to the HTTP call; `request_params` / `extra_request_params` when it crosses a signature, struct, or partial. No anonymous tuples in wiring maps — use a small frozen dataclass.
+
+### `FETCH-NAMED-ERROR-CODES` · checkable-from-diff
+
+**A provider error code the connector branches on is a module-level constant named for its meaning** (`RESOURCE_NOT_FOUND = "E0000007"`), with a comment citing the provider's error-code docs.
 
 ---
 
@@ -34,6 +38,10 @@ Rules for `fetch_*` (incremental) and `backfill_*` (backfill) functions in estua
 **Fetch complete ticks only.** Cap every incremental window at the last fully-elapsed tick (at second resolution, `horizon = now() floored to the second − 1s`); early-return when `horizon <= cursor`.
 
 Updates always stamp their own "now", so an elapsed tick is final the moment it is read — no boundary re-fetch or re-emission tricks are ever needed.
+
+### `FETCH-LAG-BEYOND-INTERVAL` · checkable-from-diff
+
+**When the cursor can trail `now` by more than the stream's `interval`, return without a checkpoint while the next window is shorter than `interval`.** Bind `interval` from `open()` and early-return when `horizon − cursor < interval`. The CDK re-invokes a datetime cursor with no sleep whenever its lag exceeds `interval`, so a settle lag longer than the interval turns every poll into a sliver-sized window in a hot loop. `rate limit errors are elevated` in a preview is a bug: trace it to its cause.
 
 ### `FETCH-SERVER-SIDE-BOUNDARIES` · needs-runtime-evidence
 
@@ -51,7 +59,7 @@ The **start** of a backfill window is not load-bearing: query `since = start_dat
 
 ### `FETCH-BACKFILL-ALONGSIDE` · checkable-from-diff
 
-When implementing an incremental stream, always try to implement a backfill function (`fetch_page`) alongside `fetch_changes`. The backfill collects historical data up to the log cursor.
+Implement a backfill function (`fetch_page`) alongside `fetch_changes` for every incremental stream, unless `classify-stream-types` settled it as incremental-only. The backfill collects historical data up to the log cursor.
 
 ### `FETCH-CURSOR-MUST-BE-UPDATED` · checkable-from-diff
 
@@ -73,6 +81,8 @@ The positional `count=M&offset=N` resume is the real hazard: a row deleted mid-b
 
 Whether the ordering key is immutable or mutable is a _secondary_ choice — both terminate over a frozen `[start_date, cutoff]` window. An immutable key (`create_time`, `send_time`) processes every windowed item exactly once, so the backfill is self-contained. A mutable key (`updated_at`) lets items updated mid-sweep leave the window, so the range query drains to empty — the backfill still terminates, it just hands those churned items to the incremental task. Pick immutable when you want the backfill self-contained; mutable is fine wherever update-induced backfill misses are acceptable (usually — incremental is the backstop and the collection key collapses duplicates).
 
+When the provider filters on an updated-style timestamp but can't sort by it, backfill by id: one range on the timestamp filter, from `start_date` to the cutoff fixed at the start (`FETCH-SEAM-PRECISION`), walked in id order with `id > watermark` as the resume key.
+
 Either way, do **not** add machinery to chase an item merely _updated_ mid-sweep. A short sibling backfill completing in one in-memory run tolerates a fragile key because it rarely resumes; a multi-hour backfill resumes from persisted state constantly, so resume is the _normal_ mode.
 
 Separate concern from the incremental cursor: incremental tails event-time with a `LogCursor`; a backfill walks a bounded set with a `PageCursor` position. Don't force one to use the other's key.
@@ -85,13 +95,17 @@ Page/offset pagination is fine in itself — but a positional offset may cross a
 
 The asymmetry that decides close calls: a re-read duplicate is free — the collection key collapses it — while a document skipped inside the backfill window is permanently lost, because the incremental task never revisits pre-cutoff time.
 
-### `FETCH-DICT-CURSOR-WORKLIST` · checkable-from-diff
+### `FETCH-FANOUT-RESUME` · checkable-from-diff
 
-**When a backfill's resume state is a work list, carry it in a dict PageCursor.** `PageCursor` is `str | int | dict | None`; dict cursors (`make_cursor_dict` in `estuary_cdk.capture.common`) support JSON merge patches (RFC 7396).
+**Resume a fan-out backfill from a position over the sorted parent ids, `(parent_id, child_page_token)`.** Each invocation re-lists the parents, sorts them by id, skips to `parent_id` and resumes its children from `child_page_token`, checkpointing after every child page. The position holds when:
 
-Use this whenever deriving the work set is expensive (e.g. a full parent-collection drain to select units): persist the remaining set in the initial full cursor and resume from it directly — never re-derive the set per invocation, and never substitute wall-clock checkpoint-deadline machinery (`time.monotonic()` deadlines, `CHECKPOINT_INTERVAL`s) for checkpoints the cursor itself can carry. Deadline batching trades crash-loss windows for drain cost; a dict cursor eliminates both.
+- the child token is a proven value watermark (else `GATE-OPAQUE-CURSOR`);
+- the cutoff is fixed before the first parent listing;
+- the parents have a stable total order, sorted connector-side when the provider's order isn't stable.
 
-Dict cursors are the exception, not the default — an opaque `str` or offset `int` cursor is preferred whenever it suffices, because a bare dict's contents and meaning are hard to reconstruct later. When a dict is warranted, **document its shape with a dataclass**: a docstring stating what the keys and values are and how entries are deleted, `from_cursor_dict` to parse the persisted dict, and constructor/patch helper methods so call sites never build cursor dicts by hand. Canonical reference: `ItemsBackfillCursor` in `source-monday/source_monday/models.py`.
+Carry a work list of parents in the cursor only when the parents can't be re-listed cheaply or have no stable order; `ItemsBackfillCursor` in `source-monday/source_monday/models.py` is that case. Either way the checkpoints live in the cursor, never in wall-clock deadline machinery (`time.monotonic()` deadlines, `CHECKPOINT_INTERVAL`s).
+
+`PageCursor` is `str | int | dict | None`; dict cursors (`make_cursor_dict` in `estuary_cdk.capture.common`) support JSON merge patches (RFC 7396). A plain `str` or `int` cursor is preferred whenever it suffices, because a bare dict's contents and meaning are hard to reconstruct later. When a dict is warranted, **document its shape with a dataclass**: a docstring stating what the keys and values are and how entries are deleted, `from_cursor_dict` to parse the persisted dict, and constructor/patch helper methods so call sites never build cursor dicts by hand.
 
 Mechanics that follow from the CDK contract:
 

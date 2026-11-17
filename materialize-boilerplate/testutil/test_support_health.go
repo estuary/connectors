@@ -36,7 +36,6 @@ type HealthLine struct {
 		Deleted  int64  `json:"deleted"`
 		Total    int64  `json:"total"`
 		Staged   *int64 `json:"staged"`
-		Loaded   *int64 `json:"loaded"`
 	} `json:"actual"`
 	Pending    int               `json:"pending"`
 	Recovery   bool              `json:"recovery"`

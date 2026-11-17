@@ -1,6 +1,6 @@
 services:
   storage:
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs:1.0.5
     pull_policy: missing
     ports:
       - "4566:4566"

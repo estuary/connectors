@@ -808,9 +808,8 @@ remains valid.
 Each driver owns the correctness of its number: it must count only rows of the
 target table, exclude checkpoint and staging-table statements, and configure
 its client to report matched rather than changed rows where those differ
-(MySQL's `clientFoundRows`). Optional `.WithStaged(n)` and `.WithLoaded(n)`
-carry rows written to and loaded from a staging area, for connectors that
-already have them. `.WithTruncated(n)` carries the rows deleted because they
+(MySQL's `clientFoundRows`). Optional `.WithStaged(n)` carries rows written to
+a staging area, for connectors that already have them. `.WithTruncated(n)` carries the rows deleted because they
 were published before a completed backfill. It is never checked, and it is
 kept out of `deleted` and `total` so that a truncation cannot fail the
 comparison. A connector that truncates in a round with no stores for the
@@ -822,8 +821,7 @@ Rounds are judged per binding, once their commit is acknowledged, so that
 offsetting errors across bindings cannot cancel. At `exact` the triplet must
 match and the total must equal its sum; at `total` the total must equal
 `insert + update + delete`. Further checks: `loaded` responses never exceed
-`loadRequests`; a reported `staged` equals the documents stored; a reported
-`loaded` equals `staged`. A delta binding that merges rather than appends
+`loadRequests`; a reported `staged` equals the documents stored. A delta binding that merges rather than appends
 fails the `insert`/`update` checks since it expects only inserts.
 
 - `ok`: every check passed. A round that stored nothing has nothing to check
@@ -862,7 +860,7 @@ or `CONNECTOR_NAME` for a variant built from another connector's image) and
 Every line carries `verdict`, `fidelity`, `bindings`, `loadRequests`,
 `loaded`, `expected.{insert,update,delete,softDeleted,skipped}` (plus
 `truncate` when nonzero) and `actual.{inserted,updated,deleted,total}` (plus
-`staged`/`loaded`/`truncated` when reported).
+`staged`/`truncated` when reported).
 
 ## Testing
 

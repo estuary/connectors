@@ -1,0 +1,168 @@
+info:
+  name: curated fields human readable append
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/people/search"
+  body:
+    type: json
+    data: |-
+      {
+        "fields": [
+          "root.id",
+          "root.email",
+          "root.firstName",
+          "root.surname",
+          "root.displayName",
+          "work.employeeIdInCompany",
+          "work.title",
+          "work.department",
+          "work.site",
+          "work.siteId",
+          "work.reportsTo",
+          "work.manager",
+          "work.startDate",
+          "work.originalStartDate",
+          "payroll.employment.activeEffectiveDate",
+          "payroll.employment.fte",
+          "payroll.employment.weeklyHours",
+          "payroll.employment.type",
+          "payroll.employment.contract",
+          "internal.status",
+          "internal.lifecycleStatus",
+          "internal.terminationDate",
+          "internal.terminationReason",
+          "internal.terminationType",
+          "employee.firstDayOfWork",
+          "employee.lastDayOfWork",
+          "employee.recentLeaveStartDate",
+          "employee.recentLeaveEndDate",
+          "internal.currentActiveStatusStartDate"
+        ],
+        "filters": [{ "fieldPath": "root.id", "operator": "equals", "values": {{pin_employee_ids}} }],
+        "showInactive": true,
+        "humanReadable": "APPEND"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - projection: 1 employee, nested keys + humanReadable node (slash keys elided)"
+    request:
+      url: "https://api.hibob.com/v1/people/search"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: "application/json"
+        - name: x-ratelimit-limit
+          value: "100"
+      body:
+        type: json
+        data: |-
+          {
+            "employees": [
+              {
+                "internal": {
+                  "terminationDate": null,
+                  "currentActiveStatusStartDate": "2015-05-01",
+                  "lifecycleStatus": "employed",
+                  "terminationType": null,
+                  "terminationReason": null,
+                  "status": "Active"
+                },
+                "displayName": "Alan Tullin",
+                "employee": {
+                  "firstDayOfWork": null,
+                  "recentLeaveStartDate": null,
+                  "lastDayOfWork": null,
+                  "recentLeaveEndDate": null
+                },
+                "surname": "Tullin",
+                "id": "4021630481756848861",
+                "email": "alan.tullin_644219_14@samplebob.com",
+                "work": {
+                  "originalStartDate": "2015-05-01",
+                  "site": "New York (Demo)",
+                  "employeeIdInCompany": 40,
+                  "manager": "4021630477688373980",
+                  "siteId": 2614101,
+                  "reportsTo": {
+                    "firstName": "Frederick",
+                    "surname": "Bateson",
+                    "displayName": "Frederick Bateson",
+                    "id": "4021630477688373980",
+                    "email": "frederick.bateson_644219_13@samplebob.com"
+                  },
+                  "title": "Account Manager",
+                  "department": "Client Services",
+                  "startDate": "2015-05-01"
+                },
+                "firstName": "Alan",
+                "payroll": {
+                  "employment": {
+                    "weeklyHours": 40,
+                    "fte": 100,
+                    "contract": "Full time",
+                    "activeEffectiveDate": "2015-05-01",
+                    "type": null
+                  }
+                },
+                "humanReadable": {
+                  "firstName": "Alan",
+                  "internal": {
+                    "currentActiveStatusStartDate": "01/05/2015",
+                    "lifecycleStatus": "Employed",
+                    "status": "Active"
+                  },
+                  "surname": "Tullin",
+                  "work": {
+                    "originalStartDate": "01/05/2015",
+                    "site": "New York (Demo)",
+                    "employeeIdInCompany": "40",
+                    "manager": "Frederick Bateson",
+                    "siteId": "New York (Demo)",
+                    "reportsTo": "Frederick Bateson",
+                    "title": "Account Manager",
+                    "department": "Client Services",
+                    "startDate": "01/05/2015"
+                  },
+                  "displayName": "Alan Tullin",
+                  "payroll": {
+                    "employment": {
+                      "weeklyHours": "40.00",
+                      "fte": "100.00",
+                      "contract": "Full time",
+                      "activeEffectiveDate": "01/05/2015"
+                    }
+                  },
+                  "id": "4021630481756848861",
+                  "email": "alan.tullin_644219_14@samplebob.com"
+                }
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Search for employees](https://apidocs.hibob.com/reference/post_people-search.md)
+
+  Read-only search. Run `People / ids only show inactive` first in a fresh session.
+
+  **WHY:** decide raw ids vs display values.
+
+  **VERIFIED (2026-11-02):** `APPEND` adds a `humanReadable` object mirroring the nested
+  shape, with display strings: dates become locale strings (`"01/05/2015"`), numbers
+  become strings (`"100.00"`), `siteId` becomes the site name, `manager` the manager's
+  name, `lifecycleStatus` `"Employed"` vs raw `"employed"`. Null fields are omitted from
+  the node. Response is ~32% larger than raw (125.9 KB vs 95.7 KB for 45 employees).
+  Raw values already join to `named_lists`, so the connector does not request
+  `humanReadable`.

@@ -294,3 +294,22 @@ func TestConfigURI(t *testing.T) {
 		})
 	}
 }
+
+func TestTLSServerHost(t *testing.T) {
+	var tunnel = &tunnelConfig{SSHForwarding: &sshForwarding{SSHEndpoint: "ssh://user@bastion"}}
+	for _, tc := range []struct {
+		address string
+		tunnel  *tunnelConfig
+		want    string
+	}{
+		// Without a tunnel pgx checks each host against its own name.
+		{"db.example.com:5432", nil, ""},
+		{"pg1.example.com:5432,pg2.example.com:5432", nil, ""},
+		// With a tunnel pgx dials localhost, so the configured host is used.
+		{"db.example.com:5432", tunnel, "db.example.com"},
+		{"db.example.com", tunnel, "db.example.com"},
+	} {
+		var cfg = Config{Address: tc.address, NetworkTunnel: tc.tunnel}
+		require.Equal(t, tc.want, cfg.tlsServerHost(), tc.address)
+	}
+}

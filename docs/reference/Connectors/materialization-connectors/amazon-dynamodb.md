@@ -15,7 +15,12 @@ To use this connector, you'll need:
   - `BatchGetItem` on all resources
   - `BatchWriteItem` on all resources
   - `CreateTable` on all resources
+  - `DeleteTable` on all resources
   - `DescribeTable` on all resources
+
+  The following permission is optional:
+  - `Scan` on all resources, to delete the items published before a backfill once the backfill
+    completes.
 
   These permissions should be specified with the `dynamodb:` prefix in an IAM policy document. For
   more details and examples, see [Using identity-based policies with Amazon
