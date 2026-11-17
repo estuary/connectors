@@ -1,0 +1,48 @@
+name: Scan Images
+description: >-
+  Install the pinned Trivy and scan connector images with
+  .github/scripts/trivy-scan.sh, which applies trivy.yaml and, for each image,
+  the root .trivyignore.yaml plus its own connector's.
+
+inputs:
+  images:
+    description: >-
+      `<connector> <image>` pairs, separated by spaces or newlines, as
+      .github/scripts/published-images.sh prints them. <connector> is the
+      directory whose exceptions apply.
+    required: true
+  image_src:
+    description: >-
+      Where Trivy reads the images: `docker` for an image this job built and
+      loaded, `remote` for a registry.
+    required: true
+
+outputs:
+  failed:
+    description: The images that failed, space-separated.
+    value: ${{ steps.scan.outputs.failed }}
+  failed_connectors:
+    description: The connectors with an image that failed, space-separated.
+    value: ${{ steps.scan.outputs.failed_connectors }}
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Install Trivy
+      uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+      with:
+        version: v0.76.0
+
+    - name: Scan
+      id: scan
+      shell: bash
+      env:
+        # Passed through env, never interpolated into the script.
+        IMAGES: ${{ inputs.images }}
+        TRIVY_IMAGE_SRC: ${{ inputs.image_src }}
+      run: |
+        set -euo pipefail -o noglob
+        # The pairs are split on whitespace, so neither half may contain any.
+        # shellcheck disable=SC2086
+        "${GITHUB_WORKSPACE}/.github/scripts/trivy-scan.sh" $IMAGES
