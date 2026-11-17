@@ -120,7 +120,9 @@ def _navigate_to_parents(document: dict[str, Any], parent_path: list[str]) -> li
     out over any list it lands on. The fields/lists along the path should always be selected in the outer
     query, so an absent/scalar value where the path keeps going, or a non-object parent,
     can't arise from valid data - it's a query-building bug or an API contract breach, and we raise
-    rather than silently resolve nothing.
+    rather than silently resolve nothing. A field that is present but null ends that branch of
+    the path: the client raises on any response with errors, so a null is always a nullable
+    field Shopify returned as null.
     """
     current: list[Any] = [document]
     for step in parent_path:
@@ -131,7 +133,13 @@ def _navigate_to_parents(document: dict[str, Any], parent_path: list[str]) -> li
                     f"Cannot descend {step!r} while navigating {parent_path}: expected an object, "
                     f"got {type(obj).__name__}."
                 )
-            value = obj.get(step)
+            if step not in obj:
+                raise TypeError(
+                    f"Cannot descend {step!r} while navigating {parent_path}: the field is missing."
+                )
+            value = obj[step]
+            if value is None:
+                continue
             next.extend(value) if isinstance(value, list) else next.append(value)
         current = next
 

@@ -159,7 +159,10 @@ async def _stitch_nested_connections(
         document: dict[str, Any] = {"id": getattr(node, "id", None)}
         for connection in model.NESTED_CONNECTIONS:
             key = connection.parent_path[0] if connection.parent_path else connection.field_name
-            document[key] = getattr(node, key, None)
+            # A field the node lacks stays out of `document`, so the resolver raises on it
+            # instead of reading it as null.
+            if hasattr(node, key):
+                document[key] = getattr(node, key)
 
         await resolve_document(client, document, model.NESTED_CONNECTIONS, log, sem)
 
