@@ -33,6 +33,10 @@ REALTIME_LAG = timedelta(minutes=2)
 LOOKBACK_LAG = timedelta(hours=2)
 LOOKBACK_LAG_DELETIONS = timedelta(hours=2, minutes=30)
 
+# The polling interval of a new binding. It is long because Sage bills each
+# API call.
+DEFAULT_INTERVAL = timedelta(hours=6)
+
 REALTIME = "realtime"
 LOOKBACK = "lookback"
 REALTIME_CREATIONS = "realtime_creations"
@@ -190,7 +194,7 @@ async def incremental_resource(
             },
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=obj, interval=timedelta(hours=6)),
+        initial_config=ResourceConfig(name=obj, interval=DEFAULT_INTERVAL),
         schema_inference=True,
     )
 
@@ -224,7 +228,7 @@ async def snapshot_resource(sage: Sage, obj: str) -> common.Resource:
         model=SnapshotResource,
         open=functools.partial(open, obj),
         initial_state=ResourceState(),
-        initial_config=ResourceConfig(name=obj, interval=timedelta(hours=6)),
+        initial_config=ResourceConfig(name=obj, interval=DEFAULT_INTERVAL),
         schema_inference=True,
     )
 
