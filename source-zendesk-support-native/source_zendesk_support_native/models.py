@@ -387,6 +387,16 @@ class TicketsListResponse(IncrementalKeysetPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias=ITEMS_KEY)
 
 
+class TicketMetricSet(ZendeskResource):
+    ticket_id: int
+
+
+class TicketsWithMetricSetsListResponse(TicketsListResponse):
+    REQUEST_PARAMS: ClassVar[dict[str, str]] = {**TicketsListResponse.REQUEST_PARAMS, "include": "metric_sets"}
+
+    metric_sets: list[TicketMetricSet]
+
+
 class DeletedTicket(ZendeskResource):
     deleted_at: AwareDatetime
 
