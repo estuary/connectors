@@ -52,6 +52,12 @@ RUN apt-get update && \
     tzdata-legacy && \
     rm -rf /var/lib/apt/lists/*
 
+# The connector runs from /opt/venv, which the builder stage fills with uv, so
+# the base image's own pip is never used. It vendors packages of its own that
+# lag their fixes, so neither it nor the copy ensurepip bundles is shipped.
+RUN pip uninstall --yes --root-user-action=ignore pip && \
+    rm -f "$(python3 -c 'import ensurepip; print(ensurepip.__path__[0])')"/_bundled/pip-*.whl
+
 LABEL FLOW_RUNTIME_PROTOCOL=${CONNECTOR_TYPE}
 LABEL FLOW_RUNTIME_CODEC=json
 LABEL dev.estuary.usage-rate=${USAGE_RATE}
