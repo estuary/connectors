@@ -127,6 +127,7 @@
       "paypal_account": "",
       "status": "active",
       "sub_merchant_account": false,
+      "supports_deposit": false,
       "supports_public_descriptors": false,
       "three_d_secure": {
         "v1": {
@@ -137,6 +138,7 @@
           "card_types": [
             "AMERICAN_EXPRESS",
             "DISCOVER",
+            "JCB",
             "MASTERCARD",
             "VISA"
           ],
