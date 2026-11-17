@@ -2,6 +2,11 @@
 
 ## 2026-11-17
 
+### Changed
+- Tasks with many bindings finish each transaction a little sooner, because
+  the connector now deletes the staged files of all bindings at the same time
+  instead of one binding after another.
+
 ### Fixed
 - High-performance Snowpipe Streaming no longer rejects a null value in a
   column right after the column stops being required. The connector now makes
