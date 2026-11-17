@@ -1,5 +1,13 @@
 # materialize-snowflake
 
+## 2026-11-17
+
+### Fixed
+- High-performance Snowpipe Streaming no longer rejects a null value in a
+  column right after the column stops being required. The connector now makes
+  Snowflake re-read the table's schema by adding a column named
+  `FLOW_PIPE_REFRESH_<random>` and dropping it again at once.
+
 ## 2026-11-16
 
 ### Fixed

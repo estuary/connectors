@@ -191,11 +191,15 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 				serPolicy = boilerplate.SerPolicyDisabled
 			}
 
+			var newClientWithFlags = func(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
+				return newClient(ctx, materializationName, ep, featureFlags)
+			}
+
 			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,
 				SerPolicy:           serPolicy,
-				NewClient:           newClient,
+				NewClient:           newClientWithFlags,
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     true,

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"regexp"
 	"slices"
 	"strconv"
@@ -40,9 +41,10 @@ type client struct {
 	cfg                 config
 	ep                  *sql.Endpoint[config]
 	materializationName string
+	featureFlags        map[string]bool
 }
 
-func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
+func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config], featureFlags map[string]bool) (sql.Client, error) {
 	dsnWithSchema, err := ep.Config.toURI(true, materializationName)
 	if err != nil {
 		return nil, err
@@ -70,6 +72,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 		cfg:                 ep.Config,
 		ep:                  ep,
 		materializationName: materializationName,
+		featureFlags:        featureFlags,
 	}, nil
 }
 
@@ -240,6 +243,10 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 		alterColumnStmt := alterColumnStmtBuilder.String()
 		stmts = append(stmts, alterColumnStmt)
+
+		if len(ta.DropNotNulls) > 0 && c.cfg.isStreamsV2(ta.DeltaUpdates, c.featureFlags) {
+			stmts = append(stmts, pipeRefreshStatements(ta.Identifier)...)
+		}
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
@@ -258,6 +265,22 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 		return nil
 	}, nil
+}
+
+// pipeRefreshColumnPrefix begins the name of the column that pipeRefreshStatements adds and drops.
+const pipeRefreshColumnPrefix = "FLOW_PIPE_REFRESH_"
+
+// pipeRefreshStatements returns statements that add a randomly named column
+// to a table and drop it again. A streaming pipe that has ingested rows reads
+// the table's schema again only when the column list changes. The add must
+// fail when the table already has a column of that name, because the drop
+// would otherwise remove that column.
+func pipeRefreshStatements(tableIdentifier string) []string {
+	var column = fmt.Sprintf("%s%08X", pipeRefreshColumnPrefix, rand.Uint32())
+	return []string{
+		fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s BOOLEAN;", tableIdentifier, column),
+		fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s;", tableIdentifier, column),
+	}
 }
 
 func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
