@@ -140,6 +140,15 @@ while IFS= read -r path || [ -n "$path" ]; do
         # segment, and theirs is the file itself.
         uv.lock | pyproject.toml) lane="python" ;;
 
+        # What decides an image scan's verdict without changing any image: the
+        # scan policy, the exceptions shared by every image, and the scan
+        # itself. A change to them runs image-scan.yaml against the published
+        # images rather than rebuilding every connector, so a shared exception
+        # can merge without waiting on every connector's tests. A connector's
+        # own .trivyignore.yaml is in its directory, and builds it. CODEOWNERS
+        # changes no image either.
+        trivy.yaml | .trivyignore.yaml | .github/actions/scan-images/* | .github/CODEOWNERS) lane="none" ;;
+
         # Shared build plumbing that both workflows invoke. Both workflows also
         # build images with the repo root as the Docker context, so the root
         # .dockerignore shapes every image, and the deploy action layers

@@ -53,6 +53,8 @@ class TestRules(unittest.TestCase):
     def test_non_go_file_in_a_connector_builds_it(self):
         self.assertEqual(pick("source-b/docker-compose.yaml"), ["source-b"])
         self.assertEqual(pick("source-b/VERSION"), ["source-b"])
+        # Its image scan exceptions, which only its own scan reads.
+        self.assertEqual(pick("source-b/.trivyignore.yaml"), ["source-b"])
 
     def test_shared_package_builds_its_importers(self):
         self.assertEqual(pick("sqlcapture/backfill.go"), ["source-a", "source-b"])
@@ -99,6 +101,8 @@ class TestRules(unittest.TestCase):
             ".github/workflows/rust.yaml",
             ".github/workflows/delayed-tag.yaml",
             ".github/scripts/delayed_tag.py",
+            ".github/scripts/trivy-scan.sh",
+            ".github/workflows/image-scan.yaml",
             ".github/rust-connectors.yaml",
             "scripts/obfuscation/config_allowlist.txt",
             "scripts/obfuscation/strip_catalog.py",
