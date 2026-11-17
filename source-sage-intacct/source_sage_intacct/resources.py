@@ -86,13 +86,17 @@ async def incremental_resource(
         if (
             isinstance(state.inc, dict)
             and REALTIME_CREATIONS not in state.inc
-            and isinstance(existing := state.inc.get(REALTIME), ResourceState.Incremental)
+            and isinstance(
+                existing := state.inc.get(REALTIME), ResourceState.Incremental
+            )
             and isinstance(existing.cursor, datetime)
         ):
             current_cursor = existing.cursor
             creation_state: dict[str, ResourceState.Incremental] = {
                 REALTIME_CREATIONS: ResourceState.Incremental(cursor=current_cursor),
-                LOOKBACK_CREATIONS: ResourceState.Incremental(cursor=current_cursor - LOOKBACK_LAG),
+                LOOKBACK_CREATIONS: ResourceState.Incremental(
+                    cursor=current_cursor - LOOKBACK_LAG
+                ),
             }
             state.inc = {**state.inc, **creation_state}
 
@@ -101,7 +105,9 @@ async def incremental_resource(
                 {"state.inc": state.inc},
             )
             await task.checkpoint(
-                ConnectorState(bindingStateV1={binding.stateKey: ResourceState(inc=creation_state)}),
+                ConnectorState(
+                    bindingStateV1={binding.stateKey: ResourceState(inc=creation_state)}
+                ),
             )
         else:
             await task.checkpoint(state=ConnectorState())

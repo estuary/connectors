@@ -28,7 +28,8 @@ endpoint_url = "https://api.intacct.com/ia/xml/xmlgw.phtml"
 
 DATATYPE_MAP: dict[str, Any] = {
     "TEXT": str,
-    "INTEGER": int | float, # We have seen instances of string-encoded floats in "INTEGER" fields.
+    # We have seen instances of string-encoded floats in "INTEGER" fields.
+    "INTEGER": int | float,
     "BOOLEAN": bool,
     "DATE": str,
     "TIMESTAMP": AwareDatetime,
@@ -565,9 +566,7 @@ def get_user_by_id_request(cfg: EndpointConfig, session_id: str, user_id: str) -
     return function_with_session_id_xml(cfg, session_id, exec)
 
 
-def permission_probe_request(
-    cfg: EndpointConfig, session_id: str, object: str
-) -> str:
+def permission_probe_request(cfg: EndpointConfig, session_id: str, object: str) -> str:
     # A `pagesize=1` query is the cheapest way to surface a PL04000005
     # permission denial: Sage checks permissions before retrieval, so the
     # error fires regardless of whether the query would match any rows.
