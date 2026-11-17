@@ -192,6 +192,10 @@ jobs:
             CONNECTOR_TYPE=${{ matrix.connector.type }}
             USAGE_RATE=${{ matrix.connector.usage_rate }}
           tags: ghcr.io/estuary/${{ matrix.connector.name }}:local
+          # The runtime stage upgrades its Debian packages, which a cached layer
+          # would skip until python:3.14-slim itself is rebuilt. It's small, so
+          # it's always rebuilt; the builder stage still comes from the cache.
+          no-cache-filters: runner
           # Layers come from the connector's build-cache tag and only main writes
           # it back, so PR builds can't overwrite each other's cache. The GitHub
           # Actions cache is too small for every connector's builder stage.
