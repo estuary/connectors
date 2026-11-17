@@ -388,3 +388,54 @@ async def test_descend_into_non_object_raises(log):
 
     with pytest.raises(TypeError):
         await resolve_document(_MockClient({}), document, [connection], log, asyncio.Semaphore(5))
+
+
+# --- nullable fields: a null along the path is data, a missing field is a bug ---------------------
+
+NULLABLE_CONNECTION = NestedConnection(
+    parent_path=["conditions", "regionsCondition"],
+    parent_typename="RegionsCondition",
+    field_name="regions",
+    node_selection="id",
+    page_size=2,
+)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "conditions",
+    [None, {"regionsCondition": None}],
+    ids=["null-first-step", "null-last-step"],
+)
+async def test_nullable_path_leaves_a_null_as_is(log, conditions):
+    """A null anywhere along a nullable path means no connection: nothing resolves or is requested."""
+    document = {"id": "gid://shopify/Market/1", "conditions": conditions}
+    client = _MockClient({})
+
+    await resolve_document(client, document, [NULLABLE_CONNECTION], log, asyncio.Semaphore(5))
+
+    assert document["conditions"] == conditions
+    assert client.queries == []
+
+
+@pytest.mark.asyncio
+async def test_nullable_path_resolves_a_present_parent(log):
+    document = {
+        "id": "gid://shopify/Market/1",
+        "conditions": {"regionsCondition": {"regions": _inline([{"id": "a"}, {"id": "b"}])}},
+    }
+
+    await resolve_document(_MockClient({}), document, [NULLABLE_CONNECTION], log, asyncio.Semaphore(5))
+
+    assert document["conditions"]["regionsCondition"]["regions"] == [{"id": "a"}, {"id": "b"}]
+
+
+@pytest.mark.asyncio
+async def test_nullable_path_raises_on_an_absent_field(log):
+    """Only a null is data. A field missing from the response is still a query bug."""
+    document = {"id": "gid://shopify/Market/1", "conditions": {}}
+
+    with pytest.raises(TypeError):
+        await resolve_document(
+            _MockClient({}), document, [NULLABLE_CONNECTION], log, asyncio.Semaphore(5)
+        )

@@ -212,6 +212,16 @@ async def test_top_level_list_inline(log):
 
 
 @pytest.mark.asyncio
+async def test_top_level_list_missing_raises(log):
+    """An order without the `refunds` field the query selects is a query bug, not a null."""
+    order = {"id": "gid://shopify/Order/1"}
+    http = MockHTTP(outer_pages=[_outer_page("orders", [order])])
+
+    with pytest.raises(TypeError, match="missing"):
+        await _capture(OrderRefunds, http, log)
+
+
+@pytest.mark.asyncio
 async def test_top_level_list_overflow_drains(log):
     """A refund whose inline page reports hasNextPage drains the rest via node(id: <refund>)."""
     order = {
