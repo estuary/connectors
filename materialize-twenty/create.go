@@ -82,6 +82,9 @@ func (r resource) creates(obj *objectMeta, p *pf.Projection) (newField, string, 
 	if !slices.Contains(r.CreateFields, p.Field) || slices.Contains(r.ownFields(), p.Field) {
 		return newField{}, "", false
 	}
+	if slices.Contains(r.othersOwn, p.Field) {
+		return newField{}, othersOwnReason(obj, p.Field), true
+	}
 	if _, ok := obj.field(p.Field); ok {
 		return newField{}, "", false
 	}
@@ -211,8 +214,6 @@ func createFields(ctx context.Context, c *client, objects []objectMeta, spec *pf
 					// An integer and a number collection field: a plain NUMBER shows both.
 					f.settings = nil
 				}
-				// Another binding's ID field, written by this one's projection too.
-				f.unique = prev.field.unique
 			}
 			plan[key] = planned{obj, f, collection.Name.String()}
 		}

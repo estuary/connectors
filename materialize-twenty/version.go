@@ -110,6 +110,7 @@ func specResources(spec *pf.MaterializationSpec) ([]resource, error) {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 	}
+	markOthersOwn(out)
 	return out, nil
 }
 

@@ -119,6 +119,10 @@ type resource struct {
 	// This connector always uses delta updates. The read-only option shows that, as in other
 	// materializations.
 	DeltaUpdates bool `json:"delta_updates,omitempty" jsonschema:"title=Delta Update,default=true" jsonschema_description:"Should updates to this object be done via delta updates. This connector always uses delta updates." jsonschema_extras:"order=12"`
+
+	// othersOwn are the own fields of the other bindings that write the same object, which this
+	// binding may not write either. markOthersOwn sets them.
+	othersOwn []string
 }
 
 // JSONSchemaExtend makes the hidden-field flag a boolean, which schemagen leaves as text, marks
@@ -267,6 +271,30 @@ func (r resource) rejectedRecords() string {
 		return rejectedFail
 	}
 	return r.RejectedRecord
+}
+
+// markOthersOwn records in each resource the own fields of the other bindings on its object. A
+// projection named after another binding's ID field, or its delete fields, would let the two
+// bindings find, or delete, each other's records.
+func markOthersOwn(resources []resource) {
+	for i := range resources {
+		resources[i].othersOwn = nil
+		for k, other := range resources {
+			if k == i || other.Object != resources[i].Object {
+				continue
+			}
+			for _, f := range other.ownFields() {
+				if !slices.Contains(resources[i].ownFields(), f) && !slices.Contains(resources[i].othersOwn, f) {
+					resources[i].othersOwn = append(resources[i].othersOwn, f)
+				}
+			}
+		}
+	}
+}
+
+// othersOwnReason says why a binding may not write another binding's own field.
+func othersOwnReason(obj *objectMeta, field string) string {
+	return fmt.Sprintf("Another binding on %q finds or flags its records by the field %q, so writing it here would mix the two bindings' records", obj.NamePlural, field)
 }
 
 // ownFields are the fields the connector writes itself, so no projection may map to them.

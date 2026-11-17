@@ -479,6 +479,45 @@ func TestNewBinding(t *testing.T) {
 	require.ErrorContains(t, err, `has no field "externalId"`)
 }
 
+// Two bindings on one object, found by different ID fields, may not write each other's ID or
+// delete fields: the records of one would be found, or deleted, by the other.
+func TestOtherBindingsOwnFields(t *testing.T) {
+	_, c := newFakeTwenty(t)
+	objects, err := c.objects(t.Context())
+	require.NoError(t, err)
+	obj, err := findObject(objects, "companies")
+	require.NoError(t, err)
+	resources := []resource{
+		{Object: "companies", IDField: "externalId"},
+		{Object: "companies", IDField: "accountCode"},
+		{Object: "people", IDField: "accountCode"},
+	}
+	markOthersOwn(resources)
+	require.Equal(t, []string{"accountCode"}, resources[0].othersOwn)
+	require.Equal(t, []string{"externalId"}, resources[1].othersOwn)
+	require.Empty(t, resources[2].othersOwn)
+
+	coll := companiesCollection()
+	got, err := validateBinding(resources[0], obj, nil, &coll)
+	require.NoError(t, err)
+	require.Equal(t, pm.Response_Validated_Constraint_FIELD_FORBIDDEN, got["accountCode"][0].Type)
+	require.Contains(t, got["accountCode"][0].Reason, `Another binding on "companies" finds or flags its records by the field "accountCode"`)
+	got, err = validateBinding(resources[1], obj, nil, &coll)
+	require.NoError(t, err)
+	require.Equal(t, pm.Response_Validated_Constraint_FIELD_FORBIDDEN, got["externalId"][0].Type)
+
+	// A task started from a spec that selects the field anyway refuses it too.
+	b := &pf.MaterializationSpec_Binding{Collection: companiesCollection(),
+		FieldSelection: pf.FieldSelection{Keys: []string{"id"}, Values: []string{"accountCode", "name"}, Document: "flow_document"}}
+	_, err = newBinding(resources[0], obj, nil, &pf.MaterializationSpec{}, b)
+	require.ErrorContains(t, err, `the field "accountCode" can't be written: Another binding on "companies"`)
+
+	// A delete field of the other binding is refused as well.
+	resources[1].DeleteMode, resources[1].DeletedField, resources[1].DeletedAtField = "flag", "name", "lastOrderAt"
+	markOthersOwn(resources)
+	require.Equal(t, []string{"accountCode", "name", "lastOrderAt"}, resources[0].othersOwn)
+}
+
 func TestConnect(t *testing.T) {
 	_, c := newFakeTwenty(t)
 
@@ -3640,7 +3679,9 @@ func TestCreateOwnFields(t *testing.T) {
 }
 
 func TestCreateOwnAndCollectionField(t *testing.T) {
-	// One binding creates its ID field crmKey, and another creates a collection field of that name.
+	// One binding creates its ID field crmKey, and another lists a collection field of that name.
+	// The other binding may not write it, so Validate forbids it and Apply refuses before creating
+	// anything.
 	for _, typ := range []string{"string", "integer"} {
 		for _, ownFirst := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s,own first=%t", typ, ownFirst), func(t *testing.T) {
@@ -3667,18 +3708,20 @@ func TestCreateOwnAndCollectionField(t *testing.T) {
 						FieldSelection: pf.FieldSelection{Keys: []string{"id"}, Values: values, Document: "flow_document"},
 					})
 				}
-				_, verr := validate(t.Context(), &pm.Request_Validate{Name: "acmeCo/twenty", ConnectorType: pf.MaterializationSpec_IMAGE, ConfigJson: config, Bindings: vb})
-				_, aerr := apply(t.Context(), &pm.Request_Apply{Materialization: spec})
-				if typ == "integer" {
-					require.ErrorContains(t, verr, "would create the Twenty field companies.crmKey as")
-					require.ErrorContains(t, aerr, "would create the Twenty field companies.crmKey as")
-					require.Empty(t, f.created)
-					return
-				}
+				validated, verr := validate(t.Context(), &pm.Request_Validate{Name: "acmeCo/twenty", ConnectorType: pf.MaterializationSpec_IMAGE, ConfigJson: config, Bindings: vb})
 				require.NoError(t, verr)
-				require.NoError(t, aerr)
-				require.Equal(t, []string{"companies.crmKey:TEXT"}, f.created)
-				require.True(t, f.objects["companies"].fields["crmKey"].unique, "the ID field is unique whichever binding plans it first")
+				more := validated.Bindings[1]
+				if !ownFirst {
+					more = validated.Bindings[0]
+				}
+				i := slices.IndexFunc(more.ProjectionConstraints, func(c *pm.Response_Validated_ProjectionConstraint) bool { return c.Field == "crmKey" })
+				require.GreaterOrEqual(t, i, 0)
+				forbid := more.ProjectionConstraints[i].Constraint
+				require.Equal(t, pm.Response_Validated_Constraint_FIELD_FORBIDDEN, forbid.Type)
+				require.Contains(t, forbid.Reason, `Another binding on "companies" finds or flags its records by the field "crmKey"`)
+				_, aerr := apply(t.Context(), &pm.Request_Apply{Materialization: spec})
+				require.ErrorContains(t, aerr, `the collection "acmeCo/more": Another binding on "companies"`)
+				require.Empty(t, f.created)
 			})
 		}
 	}

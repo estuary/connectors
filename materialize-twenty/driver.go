@@ -70,6 +70,7 @@ func validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Valid
 		resources = append(resources, res)
 		collections = append(collections, b.Collection.Name.String())
 	}
+	markOthersOwn(resources)
 	// Bindings are checked against the fields Apply will create, and creates against Twenty.
 	real := objects
 	objects, creates, err := withOwnFields(objects, resources, collections)

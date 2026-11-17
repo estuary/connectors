@@ -339,6 +339,9 @@ func mapProjection(res resource, obj *objectMeta, p *pf.Projection) (mappedField
 	if slices.Contains(res.ownFields(), t.field) {
 		return mappedField{}, fmt.Sprintf("The connector writes the field %q itself", t.field)
 	}
+	if slices.Contains(res.othersOwn, t.field) {
+		return mappedField{}, othersOwnReason(obj, t.field)
+	}
 	for _, rel := range res.Relations {
 		if rel.Field == t.field {
 			return mappedField{}, fmt.Sprintf("The binding links %q from the collection field %q", t.field, rel.source())
