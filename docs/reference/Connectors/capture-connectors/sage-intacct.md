@@ -1,5 +1,5 @@
 ---
-description: Capture Sage Intacct finance data with Estuary's connector and a Web Services developer license. Supported data resources include customers, vendors, projects, tax details, and items.
+description: Capture Sage Intacct finance data with Estuary's connector and a Web Services developer license. Supported data resources include customers, vendors, projects, tax details, items, and General Ledger journal entries.
 ---
 
 # Sage Intacct
@@ -38,6 +38,26 @@ are skipped and the deleted record remains in the collection.
 
 These objects support capturing via periodic snapshotting:
 * COMPANYPREF
+
+### General Ledger objects
+
+These General Ledger objects use the same incremental strategy:
+* GLBATCH (journal entries)
+* GLENTRY (journal entry lines)
+
+General Ledger bindings include the records made inside an entity of a
+multi-entity company. Their backfills read all entries.
+
+:::info
+Sage does not record every General Ledger deletion in AUDITHISTORY. A deleted
+or replaced row can remain in the collection until the binding is backfilled.
+A backfill removes the rows that no longer exist in Sage from your
+destination. For captures created before 2026-12-01, contact
+Estuary support to enable this.
+
+Backfills can be scheduled with the `schedule` resource config setting. No
+schedule is set by default, since each backfill re-reads the whole object.
+:::
 
 ## Prerequisites
 

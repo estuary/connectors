@@ -4,6 +4,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import Any, AsyncGenerator, ClassVar, Optional, TypeVar
+from xml.sax.saxutils import escape
 
 import xmltodict
 from estuary_cdk.capture.common import LogCursor, PageCursor
@@ -24,6 +25,24 @@ from .models import (
 PAGE_SIZE = 2000
 
 endpoint_url = "https://api.intacct.com/ia/xml/xmlgw.phtml"
+
+# Objects whose queries set `showprivate`. Without it, a query from the top
+# level of a multi-entity company skips the records made inside an entity.
+SHOW_PRIVATE_OBJECTS: frozenset[str] = frozenset({"GLBATCH", "GLENTRY"})
+
+# Sage warns that General Ledger queries without a filter can time out, so
+# their backfills filter on the posting date, from GL_START_DATE on.
+# GL_START_DATE is earlier than any Sage Intacct entry, so the filter
+# excludes nothing.
+GL_START_DATE = "01/01/1900"
+
+# The posting date field of each General Ledger object. Sage requires a
+# posting date on each entry. WHENCREATED is not used because Sage leaves it
+# empty on some rows, and a date filter drops rows with an empty value.
+BACKFILL_DATE_FIELDS: dict[str, str] = {
+    "GLBATCH": "BATCH_DATE",
+    "GLENTRY": "ENTRY_DATE",
+}
 
 
 DATATYPE_MAP: dict[str, Any] = {
@@ -267,12 +286,23 @@ class Sage:
             yield rec
 
     async def fetch_all(
-        self, obj: str, after: int | str | None
+        self, obj: str, after: int | None
     ) -> AsyncGenerator[SageRecord, None]:
         model = await self.get_model(obj)
-        data = get_all_records_request(
-            self.config, self.session_id, obj, model.field_names, after
-        )
+        if date_field := BACKFILL_DATE_FIELDS.get(obj):
+            data = get_all_records_from_date_request(
+                self.config,
+                self.session_id,
+                obj,
+                model.field_names,
+                date_field,
+                GL_START_DATE,
+                after,
+            )
+        else:
+            data = get_all_records_request(
+                self.config, self.session_id, obj, model.field_names, after
+            )
         async for rec in self._req_json(model, data):
             yield rec
 
@@ -483,11 +513,6 @@ class Sage:
             m.company_id = self.config.company_id
 
         return m
-
-
-# Objects whose queries set `showprivate`. Without it, a query from the top
-# level of a multi-entity company skips the records made inside an entity.
-SHOW_PRIVATE_OBJECTS: frozenset[str] = frozenset()
 
 
 def query_options(object: str) -> str:
@@ -727,6 +752,73 @@ def get_all_records_request(
 """.strip()
 
     return function_with_session_id_xml(cfg, session_id, exec)
+
+
+def condition(operator: str, field: str, value: Any) -> str:
+    return f"""<{operator}>
+                <field>{field}</field>
+                <value>{escape(str(value))}</value>
+              </{operator}>"""
+
+
+def filtered_query_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    object: str,
+    fields: list[str],
+    conditions: list[str],
+    order_field: str,
+) -> str:
+    """`conditions` needs at least one entry."""
+    # Sage allows one element under <filter>, so two or more conditions need
+    # <and>. A request without it is not valid.
+    if len(conditions) == 1:
+        filter = f"""
+              {conditions[0]}"""
+    else:
+        filter = f"""
+            <and>
+              {"\n              ".join(conditions)}
+            </and>"""
+
+    exec = f"""
+        <query>
+          <object>{object}</object>
+          <select>
+{"\n".join(f"            <field>{field}</field>" for field in fields)}
+          </select>
+          <filter>{filter}
+          </filter>
+          <orderby>
+            <order>
+                <field>{order_field}</field>
+                <ascending/>
+            </order>
+          </orderby>
+          {query_options(object)}
+          <pagesize>{PAGE_SIZE}</pagesize>
+        </query>
+""".strip()
+
+    return function_with_session_id_xml(cfg, session_id, exec)
+
+
+def get_all_records_from_date_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    object: str,
+    fields: list[str],
+    date_field: str,
+    start_date: str,  # ex: 12/08/2024
+    after: int | None,
+) -> str:
+    conditions = [condition("greaterthanorequalto", date_field, start_date)]
+    if after is not None:
+        conditions.append(condition("greaterthan", "RECORDNO", after))
+
+    return filtered_query_request(
+        cfg, session_id, object, fields, conditions, "RECORDNO"
+    )
 
 
 def get_creations_since_request(

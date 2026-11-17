@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from logging import Logger
 
 from estuary_cdk.capture import Task, common
+from estuary_cdk.capture.backfill_signals import BackfillCoverage
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPMixin
 
@@ -62,6 +63,15 @@ INCREMENTAL_OBJECTS = {
     "TASK",
 }
 
+# GL_OBJECTS are General Ledger objects that are captured like the
+# INCREMENTAL_OBJECTS. Sage does not record all of their deletions in the audit
+# trail, so their backfills also declare a coverage: a backfill that sends
+# backfill signals removes the rows that Sage no longer has.
+GL_OBJECTS = {
+    "GLBATCH",
+    "GLENTRY",
+}
+
 SNAPSHOT_OBJECTS = {
     "COMPANYPREF",
     "PROJECT",
@@ -72,7 +82,11 @@ SNAPSHOT_OBJECTS = {
 
 
 async def incremental_resource(
-    sage: Sage, obj: str, started_at: datetime, can_read_audit_history: bool
+    sage: Sage,
+    obj: str,
+    started_at: datetime,
+    can_read_audit_history: bool,
+    backfill_coverage: BackfillCoverage | None = None,
 ) -> common.Resource:
     model = await sage.get_model(obj)
 
@@ -196,6 +210,7 @@ async def incremental_resource(
         ),
         initial_config=ResourceConfigWithSchedule(name=obj, interval=DEFAULT_INTERVAL),
         schema_inference=True,
+        backfill_coverage=backfill_coverage,
     )
 
 
@@ -252,7 +267,7 @@ async def all_resources(
         except SagePermissionError as e:
             return obj, str(e)
 
-    object_names = sorted(INCREMENTAL_OBJECTS | SNAPSHOT_OBJECTS)
+    object_names = sorted(INCREMENTAL_OBJECTS | GL_OBJECTS | SNAPSHOT_OBJECTS)
     probes = await asyncio.gather(*(_probe(obj) for obj in object_names))
     accessible_objects = {obj for obj, denial in probes if denial is None}
     for obj, denial in probes:
@@ -265,13 +280,24 @@ async def all_resources(
     except SagePermissionError as e:
         can_read_audit_history = False
         log.warning(
-            f"omitting deletion sub-tasks since AUDITHISTORY cannot be read: {e}. "
+            f"AUDITHISTORY cannot be read: {e}. No binding captures deletions "
+            "until the user's role can read the audit trail. For the General "
+            "Ledger bindings, deleted rows stay in the destination until the "
+            "next backfill of the binding."
         )
 
     started_at = datetime.now(tz=UTC)
     inc = [
         incremental_resource(sage, obj, started_at, can_read_audit_history)
         for obj in INCREMENTAL_OBJECTS
+        if obj in accessible_objects
+    ]
+    # Every General Ledger backfill reads all entries, so it covers the whole
+    # object.
+    gl_coverage = BackfillCoverage.FULL
+    gl = [
+        incremental_resource(sage, obj, started_at, can_read_audit_history, gl_coverage)
+        for obj in GL_OBJECTS
         if obj in accessible_objects
     ]
     snap = [
@@ -283,4 +309,4 @@ async def all_resources(
     # TODO(whb): Add a binding for AUDITHISTORY to capture deletes once we have
     # access to this object type.
 
-    return sorted(await asyncio.gather(*inc, *snap), key=lambda r: r.name)
+    return sorted(await asyncio.gather(*inc, *gl, *snap), key=lambda r: r.name)
