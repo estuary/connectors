@@ -1,0 +1,207 @@
+import base64
+from datetime import datetime, UTC
+import json
+from logging import Logger
+import struct
+from typing import AsyncGenerator, Protocol
+
+from estuary_cdk.capture.common import LogCursor, PageCursor
+from estuary_cdk.http import HTTPSession
+from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
+
+from ..models import (
+    IncrementalKeysetPaginatedResponse,
+    TimestampedResource,
+)
+
+from .shared import (
+    CHECKPOINT_INTERVAL,
+    CURSOR_PAGINATION_PAGE_SIZE,
+    INCREMENTAL_LAG,
+    MIN_INCREMENTAL_WINDOW_SIZE,
+    url_base,
+    dt_to_s,
+    s_to_dt,
+)
+
+
+def build_seek_cursor(lower_bound: datetime) -> str:
+    # Zendesk's list cursors are undocumented keysets, and Zendesk accepts ones we
+    # build. Each is base64 JSON whose "v" holds every sort field as a type byte and
+    # a little-endian int64, with "d" for epoch-seconds updated_at and "i" for id.
+    # An id of 0 starts at the first record updated in the second after `lower_bound`.
+    keyset = b"d" + struct.pack("<q", dt_to_s(lower_bound) + 1) + b"i" + struct.pack("<q", 0)
+    cursor = {"o": "updated_at,id", "v": base64.b64encode(keyset).decode()}
+    return base64.b64encode(json.dumps(cursor, separators=(",", ":")).encode()).decode()
+
+
+class _KeysetRecord(Protocol):
+    id: int
+    updated_at: datetime
+
+
+class KeysetWindow:
+    """
+    A keyset sweep's progress through the records updated after
+    `lower_bound` and at or before `upper_bound`.
+    """
+
+    def __init__(self, name: str, lower_bound: datetime, upper_bound: datetime) -> None:
+        self.name = name
+        self.lower_bound = lower_bound
+        self.upper_bound = upper_bound
+        self.last_seen_dt = lower_bound
+        self.count = 0
+
+    def advance(self, resource: _KeysetRecord) -> tuple[bool, datetime | None]:
+        """
+        Returns whether `resource` is past the window, which ends the sweep,
+        and the checkpoint to yield before `resource`, if any.
+        """
+        updated_at = resource.updated_at
+
+        if updated_at > self.upper_bound:
+            return True, None
+
+        if updated_at <= self.lower_bound or updated_at < self.last_seen_dt:
+            raise RuntimeError(f"Received {self.name} record {resource.id} with updated_at {updated_at} out of order after {self.last_seen_dt}.")
+
+        checkpoint: datetime | None = None
+        if (
+            updated_at > self.last_seen_dt and
+            self.last_seen_dt != self.lower_bound and
+            self.count >= CHECKPOINT_INTERVAL
+        ):
+            checkpoint = self.last_seen_dt
+            self.count = 0
+
+        self.count += 1
+        self.last_seen_dt = updated_at
+        return False, checkpoint
+
+
+async def fetch_incremental_keyset_paginated_window(
+    http: HTTPSession,
+    subdomain: str,
+    name: str,
+    path: str,
+    response_model: type[IncrementalKeysetPaginatedResponse],
+    lower_bound: datetime,
+    upper_bound: datetime,
+    log: Logger,
+) -> AsyncGenerator[TimestampedResource | datetime, None]:
+    """
+    Yields the records updated after `lower_bound` and at or before
+    `upper_bound`, in ascending `updated_at` order. A yielded datetime means
+    every record updated at or before it has been yielded.
+
+              lower_bound    lower_bound + 1s      upper_bound
+    ───────────────┼─────────────────┼──────────────────┼──────▶ time (1s ticks)
+                   │                 │                  │
+    page[after] ───┼─────────────────[══════════════════╪══════▶
+    emitted ───────┼─────────────────[══════════════════]
+                   │                 │                  └─ the first record past
+                   │                 │                     this ends the sweep
+                   │                 └─ seek (lower_bound + 1s, 0)
+                   └─ every record updated at or before
+                      this second was already emitted
+
+    Checkpoints only fall between seconds, so a resumed sweep never needs a
+    cursor partway through a second.
+    """
+    url = f"{url_base(subdomain)}/{path}"
+
+    params: dict[str, str | int] = {
+        "sort": "updated_at",
+        "page[size]": CURSOR_PAGINATION_PAGE_SIZE,
+        "page[after]": build_seek_cursor(lower_bound),
+    }
+
+    window = KeysetWindow(name, lower_bound, upper_bound)
+
+    while True:
+        _, body = await http.request_stream(log, url, params=params)
+        processor = IncrementalJsonProcessor(
+            body(),
+            f"{name}.item",
+            TimestampedResource,
+            response_model,
+        )
+
+        async for resource in processor:
+            is_past_window, checkpoint = window.advance(resource)
+            if is_past_window:
+                return
+
+            if checkpoint is not None:
+                yield checkpoint
+
+            yield resource
+
+        remainder = processor.get_remainder()
+
+        if not remainder.meta.has_more or remainder.meta.after_cursor is None:
+            return
+
+        params["page[after]"] = remainder.meta.after_cursor
+
+
+async def fetch_incremental_keyset_paginated_resources(
+    http: HTTPSession,
+    subdomain: str,
+    name: str,
+    path: str,
+    response_model: type[IncrementalKeysetPaginatedResponse],
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    horizon = (datetime.now(tz=UTC) - INCREMENTAL_LAG).replace(microsecond=0)
+
+    if horizon - log_cursor < MIN_INCREMENTAL_WINDOW_SIZE:
+        return
+
+    generator = fetch_incremental_keyset_paginated_window(
+        http, subdomain, name, path, response_model, log_cursor, horizon, log,
+    )
+
+    last_seen_dt: datetime | None = None
+
+    async for result in generator:
+        if isinstance(result, TimestampedResource):
+            last_seen_dt = result.updated_at
+        yield result
+
+    if last_seen_dt is not None:
+        yield last_seen_dt
+
+
+async def backfill_incremental_keyset_paginated_resources(
+    http: HTTPSession,
+    subdomain: str,
+    name: str,
+    path: str,
+    response_model: type[IncrementalKeysetPaginatedResponse],
+    start_date: datetime,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[TimestampedResource | PageCursor, None]:
+    assert isinstance(cutoff, datetime)
+
+    if page is None:
+        lower_bound = start_date
+    else:
+        assert isinstance(page, int)
+        lower_bound = s_to_dt(page)
+
+    generator = fetch_incremental_keyset_paginated_window(
+        http, subdomain, name, path, response_model, lower_bound, cutoff, log,
+    )
+
+    async for result in generator:
+        if isinstance(result, datetime):
+            yield dt_to_s(result)
+        else:
+            yield result

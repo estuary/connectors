@@ -33,6 +33,8 @@ from .models import (
     FULL_REFRESH_OFFSET_PAGINATED_RESOURCES,
     FULL_REFRESH_CURSOR_PAGINATED_RESOURCES,
     INCREMENTAL_TIME_EXPORT_RESOURCES,
+    INCREMENTAL_KEYSET_PAGINATED_RESOURCES,
+    IncrementalKeysetPaginatedResponse,
     INCREMENTAL_CURSOR_EXPORT_RESOURCES,
     INCREMENTAL_CURSOR_EXPORT_TYPES,
     INCREMENTAL_CURSOR_PAGINATED_RESOURCES,
@@ -45,6 +47,7 @@ from .models import (
 from .api import (
     backfill_audit_logs,
     backfill_incremental_time_export_resources,
+    backfill_incremental_keyset_paginated_resources,
     backfill_incremental_cursor_export_resources,
     backfill_incremental_cursor_paginated_resources,
     backfill_satisfaction_ratings,
@@ -56,6 +59,7 @@ from .api import (
     fetch_client_side_incremental_offset_paginated_resources,
     fetch_client_side_incremental_cursor_paginated_resources,
     fetch_incremental_time_export_resources,
+    fetch_incremental_keyset_paginated_resources,
     fetch_incremental_cursor_export_resources,
     fetch_incremental_cursor_paginated_resources,
     fetch_post_child_resources,
@@ -702,6 +706,69 @@ def incremental_time_export_resources(
             schema_inference=True,
         )
         for (name, path, response_model) in INCREMENTAL_TIME_EXPORT_RESOURCES
+    ]
+
+    return resources
+
+
+# Nothing calls this yet. A later PR adds the feature flag that switches
+# organizations from the time-based export to these resources (#5357).
+def incremental_keyset_paginated_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+        name: str,
+        path: str,
+        response_model: type[IncrementalKeysetPaginatedResponse],
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_incremental_keyset_paginated_resources,
+                http,
+                config.subdomain,
+                name,
+                path,
+                response_model,
+            ),
+            fetch_page=functools.partial(
+                backfill_incremental_keyset_paginated_resources,
+                http,
+                config.subdomain,
+                name,
+                path,
+                response_model,
+                config.start_date,
+            )
+        )
+
+    cutoff = (datetime.now(tz=UTC) - INCREMENTAL_LAG).replace(microsecond=0)
+
+    resources = [
+            common.Resource(
+            name=name,
+            key=["/id"],
+            model=TimestampedResource,
+            open=functools.partial(open, name, path, response_model),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=cutoff),
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+        for (name, path, response_model) in INCREMENTAL_KEYSET_PAGINATED_RESOURCES
     ]
 
     return resources
