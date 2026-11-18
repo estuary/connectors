@@ -39,6 +39,11 @@ type Capture struct {
 	// mutated os.Environ() would alter the behavior of every other test running at the
 	// same time.
 	Env map[string]string
+
+	// BeforeRun, if set, is called before each capture run and fails the run if it
+	// returns an error. It lets a test wait for the source to settle, such as for a
+	// change it just wrote to become visible to the connector.
+	BeforeRun func() error
 }
 
 func New(baseYAML string) (*Capture, error) {
@@ -395,6 +400,12 @@ func (c *Capture) Run(sessions int) ([]byte, error) {
 // the capture process will be killed. This is useful for tests that need to run a
 // capture indefinitely and then stop it programmatically.
 func (c *Capture) RunWithContext(ctx context.Context, sessions int) ([]byte, error) {
+	if c.BeforeRun != nil {
+		if err := c.BeforeRun(); err != nil {
+			return nil, fmt.Errorf("before run: %w", err)
+		}
+	}
+
 	path, tempdir, err := c.writeCatalog()
 	if err != nil {
 		return nil, err
