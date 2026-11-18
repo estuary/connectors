@@ -196,7 +196,7 @@ func newOracleDialect(defaultSchema string) sql.Dialect {
 		ColumnLocatorer: sql.ColumnLocatorFn(translateIdentifier),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(isSimpleIdentifier, sql.QuoteTransform(`"`, "_")))),
-		Literaler:       sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
+		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			return fmt.Sprintf(":%d", index+1)
 		}),
