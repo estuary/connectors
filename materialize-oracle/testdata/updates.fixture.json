@@ -1,0 +1,6 @@
+["tests/orders", {"id": 2, "status": "shipped", "amount": 20}]
+["tests/orders", {"id": 3, "_meta": {"op": "d"}}]
+["tests/orders", {"id": 4, "status": "new", "canary": "o4"}]
+["tests/types", {"id": 1, "small_text": "updated"}]
+["tests/keyed", {"tenant_id": "t1", "sku": "a", "event_time": "2026-11-11T10:09:08.123456789+02:30", "code": "c1", "note": ""}]
+{"commit": true}

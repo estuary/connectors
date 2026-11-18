@@ -1,0 +1,34 @@
+initial
+orders
+{"AMOUNT":10.5,"CANARY":"o1","ID":1,"STATUS":"new"}
+{"AMOUNT":20,"CANARY":"o2","ID":2,"STATUS":"new"}
+{"AMOUNT":null,"CANARY":"o3","ID":3,"STATUS":"new"}
+orders_delta
+{"AMOUNT":10.5,"CANARY":"o1","ID":1,"STATUS":"new"}
+{"AMOUNT":20,"CANARY":"o2","ID":2,"STATUS":"new"}
+{"AMOUNT":null,"CANARY":"o3","ID":3,"STATUS":"new"}
+Type Samples
+{"ACTIVE":1,"DETAILS":{"nested":{"n":1}},"EVENT_TIME":"2026-11-11T10:09:08.123456789+02:30","ID":1,"LONG_LENGTH":5000,"SMALL_TEXT":"hello","TAGS":[1,"two",true,null],"field.with.dots":"dotted","select":"reserved"}
+{"ACTIVE":0,"DETAILS":null,"EVENT_TIME":null,"ID":2,"LONG_LENGTH":null,"SMALL_TEXT":null,"TAGS":null,"field.with.dots":null,"select":null}
+keyed
+{"CODE":"c2","EVENT_TIME":"2026-11-11T07:39:08.123456789Z","NOTE":"same instant","SKU":"a","TENANT_ID":"t1"}
+{"CODE":null,"EVENT_TIME":"2026-11-11T10:09:08.123456789+02:30","NOTE":null,"SKU":"a","TENANT_ID":"t1"}
+updates
+orders
+{"AMOUNT":10.5,"CANARY":"o1","ID":1,"STATUS":"new"}
+{"AMOUNT":20,"CANARY":"o2","ID":2,"STATUS":"shipped"}
+{"AMOUNT":null,"CANARY":"o4","ID":4,"STATUS":"new"}
+orders_delta
+{"AMOUNT":10.5,"CANARY":"o1","ID":1,"STATUS":"new"}
+{"AMOUNT":20,"CANARY":"o2","ID":2,"STATUS":"new"}
+{"AMOUNT":20,"CANARY":null,"ID":2,"STATUS":"shipped"}
+{"AMOUNT":null,"CANARY":null,"ID":3,"STATUS":null}
+{"AMOUNT":null,"CANARY":"o3","ID":3,"STATUS":"new"}
+{"AMOUNT":null,"CANARY":"o4","ID":4,"STATUS":"new"}
+Type Samples
+{"ACTIVE":1,"DETAILS":{"nested":{"n":1}},"EVENT_TIME":"2026-11-11T10:09:08.123456789+02:30","ID":1,"LONG_LENGTH":5000,"SMALL_TEXT":"updated","TAGS":[1,"two",true,null],"field.with.dots":"dotted","select":"reserved"}
+{"ACTIVE":0,"DETAILS":null,"EVENT_TIME":null,"ID":2,"LONG_LENGTH":null,"SMALL_TEXT":null,"TAGS":null,"field.with.dots":null,"select":null}
+keyed
+{"CODE":"c2","EVENT_TIME":"2026-11-11T07:39:08.123456789Z","NOTE":"same instant","SKU":"a","TENANT_ID":"t1"}
+{"CODE":"c1","EVENT_TIME":"2026-11-11T10:09:08.123456789+02:30","NOTE":null,"SKU":"a","TENANT_ID":"t1"}
+

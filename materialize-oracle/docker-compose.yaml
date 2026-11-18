@@ -1,0 +1,21 @@
+services:
+  db:
+    image: gvenzl/oracle-free:23-slim
+    environment:
+      ORACLE_PASSWORD: factorysys
+      APP_USER: test
+      APP_USER_PASSWORD: factorytest
+    ports:
+      - "1522:1521"
+    networks:
+      - flow-test
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 5s
+      timeout: 10s
+      retries: 90
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
