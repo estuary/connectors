@@ -157,6 +157,7 @@ format
 compression
 contentType
 contentEncoding
+exchangeType
 defaultOffset
 encoding
 delimiter
