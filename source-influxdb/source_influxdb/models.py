@@ -7,7 +7,7 @@ from estuary_cdk.capture.common import BaseDocument, ResourceState
 from estuary_cdk.capture.common import ConnectorState as GenericConnectorState
 from estuary_cdk.capture.common import ResourceConfig as CommonResourceConfig
 from estuary_cdk.flow import BasicAuth, ValidationError
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
 ConnectorState = GenericConnectorState[ResourceState]
@@ -73,10 +73,11 @@ class EndpointConfig(BaseModel):
         description="The URL of your InfluxDB 2.x instance, including the scheme and port if needed.",
         examples=["https://us-east-1-1.aws.cloud2.influxdata.com", "http://host:8086"],
     )
-    token: Annotated[SecretStr, Field(min_length=1)] | SkipJsonSchema[None] = Field(
+    token: Annotated[str, Field(min_length=1)] | SkipJsonSchema[None] = Field(
         default_factory=lambda: None,
         title="API Token",
         description="Your InfluxDB API token with read access to the buckets you want to capture. Provide either this token or Authentication credentials.",
+        repr=False,
         json_schema_extra={"secret": True},
     )
     credentials: UsernamePassword | DatabaseToken | None = Field(
@@ -157,7 +158,7 @@ class EndpointConfig(BaseModel):
 
     @property
     def common_headers(self) -> dict[str, str]:
-        return {"Authorization": f"Token {self.token.get_secret_value()}"} if self.token else {}
+        return {"Authorization": f"Token {self.token}"} if self.token else {}
 
 
 class ResourceConfig(CommonResourceConfig):

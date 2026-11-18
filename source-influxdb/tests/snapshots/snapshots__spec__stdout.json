@@ -100,12 +100,10 @@
         },
         "token": {
           "description": "Your InfluxDB API token with read access to the buckets you want to capture. Provide either this token or Authentication credentials.",
-          "format": "password",
           "minLength": 1,
           "secret": true,
           "title": "API Token",
-          "type": "string",
-          "writeOnly": true
+          "type": "string"
         },
         "credentials": {
           "anyOf": [
