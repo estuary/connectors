@@ -1,13 +1,16 @@
 package sql
 
 import (
+	"cmp"
+	"os"
+
 	"github.com/estuary/flow/go/protocols/flow"
 )
 
-const (
-	// DefaultFlowCheckpoints is the default table for checkpoints.
-	DefaultFlowCheckpoints = "flow_checkpoints_v1"
-)
+// DefaultFlowCheckpoints is the default table for checkpoints. Tests set
+// ${TEST_FLOW_CHECKPOINTS_TABLE} to give a run its own table: they run the
+// connector as a subprocess, which an in-process override can't reach.
+var DefaultFlowCheckpoints = cmp.Or(os.Getenv("TEST_FLOW_CHECKPOINTS_TABLE"), "flow_checkpoints_v1")
 
 // FlowCheckpointsTable returns the TableShape that (optionally) holds fenced
 // materialization checkpoints, where supported by the endpoint and connector.

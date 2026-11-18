@@ -2,14 +2,17 @@ package connector
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,6 +20,7 @@ func TestIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	createRunCheckpointsTable(t)
 
 	makeResourceFn := func(table string, delta bool) tableConfig {
 		return tableConfig{
@@ -118,5 +122,42 @@ func TestIntegration(t *testing.T) {
 				return client.ExecStatements(ctx, []string{fenceUpdate.String()})
 			},
 		)
+	})
+}
+
+// createRunCheckpointsTable creates a checkpoints table for this run alone and
+// points the connector at it, both in this process and in those flowctl starts,
+// until the test ends. Fabric Warehouse detects write conflicts per table, so
+// overlapping runs sharing flow_checkpoints_v1 abort each other's commits on it.
+// Creating it up front keeps it out of every test's Apply, so snapshots are
+// unchanged.
+func createRunCheckpointsTable(t *testing.T) {
+	t.Helper()
+	var ctx = context.Background()
+	var name = fmt.Sprintf("%s_%s_flow_test_%d", sql.DefaultFlowCheckpoints, uuid.NewString()[:8], time.Now().Unix())
+	var prev = sql.DefaultFlowCheckpoints
+	sql.DefaultFlowCheckpoints = name
+	t.Cleanup(func() { sql.DefaultFlowCheckpoints = prev })
+	t.Setenv("TEST_FLOW_CHECKPOINTS_TABLE", name)
+
+	raw, err := testutil.ReadConfigFile("testdata/config.yaml")
+	require.NoError(t, err)
+	var cfg config
+	require.NoError(t, json.Unmarshal(raw, &cfg))
+	db, err := cfg.db()
+	require.NoError(t, err)
+
+	checkpoints, err := sql.ResolveTable(*sql.FlowCheckpointsTable([]string{cfg.Warehouse, cfg.Schema}), testDialect)
+	require.NoError(t, err)
+	createCheckpoints, err := sql.RenderTableTemplate(checkpoints, testTemplates.createTargetTable)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, createCheckpoints)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		defer db.Close()
+		if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS "+checkpoints.Identifier); err != nil {
+			t.Logf("dropping %s: %s", checkpoints.Identifier, err)
+		}
 	})
 }
