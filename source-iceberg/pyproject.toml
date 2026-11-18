@@ -1,0 +1,22 @@
+[project]
+name = "source-iceberg"
+version = "0.1.0"
+description = "Capture Apache Iceberg tables through a REST catalog."
+requires-python = ">=3.14"
+dependencies = [
+    "boto3>=1.40,<2",
+    "estuary-cdk",
+    "pydantic>=2,<3",
+    "pyiceberg[pyarrow,s3fs,snappy]>=0.12,<0.13",
+    "requests>=2,<3",
+    "tenacity>=9,<10",
+]
+
+# The dependency is declared in [project.dependencies] above; this is where
+# uv finds it.
+[tool.uv.sources]
+estuary-cdk = { workspace = true }
+
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"

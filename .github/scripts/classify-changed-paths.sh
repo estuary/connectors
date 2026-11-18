@@ -38,6 +38,9 @@ rust_all=false
 rust_dirs=()
 rust_connectors=$(sed -n 's/^- name: //p' "$REPO_ROOT/.github/rust-connectors.yaml")
 
+# The Python connectors, whose fixtures under tests/<name>/ only python.yaml runs.
+python_connectors=$(sed -n 's/^- name: //p' "$REPO_ROOT/.github/python-connectors.yaml")
+
 # Every connector directory, from all three lanes' lists.
 all_connectors=$(sed -n 's/^- name: //p' "$REPO_ROOT"/.github/{python,go,rust}-connectors.yaml)
 
@@ -140,6 +143,14 @@ while IFS= read -r path || [ -n "$path" ]; do
         # segment, and theirs is the file itself.
         uv.lock | pyproject.toml) lane="python" ;;
 
+        # A Python connector's integration test fixtures.
+        tests/*/*)
+            sub=${path#tests/}; sub=${sub%%/*}
+            if grep -qxF "$sub" <<< "$python_connectors"; then
+                lane="python"
+            fi
+            ;;
+
         # Shared build plumbing that both workflows invoke. Both workflows also
         # build images with the repo root as the Docker context, so the root
         # .dockerignore shapes every image, and the deploy action layers
@@ -181,12 +192,24 @@ while IFS= read -r path || [ -n "$path" ]; do
                 # and lock, feed every Python connector.
                 estuary-cdk/* | .github/workflows/python.yaml | .github/python-connectors.yaml | uv.lock | pyproject.toml)
                     python_all=true ;;
+                tests/*)
+                    sub=${path#tests/}; python_dirs+=("${sub%%/*}") ;;
                 *) python_dirs+=("${path%%/*}") ;;
             esac
             ;;
         go_rust)
             go_paths+=("$path")
             rust_select "$path"
+            # The shared source test tooling also runs Python connectors' integration tests.
+            case "$path" in
+                tests/run.sh | tests/template.flow.yaml)
+                    for name in $python_connectors; do
+                        if [ -f "$REPO_ROOT/tests/$name/setup.sh" ]; then
+                            python_dirs+=("$name")
+                        fi
+                    done
+                    ;;
+            esac
             ;;
         both)
             # Anything shared by both lanes is shared by every connector.

@@ -1,0 +1,42 @@
+name: source-iceberg
+
+services:
+  db:
+    image: apache/iceberg-rest-fixture:1.9.2
+    depends_on:
+      storage:
+        condition: service_healthy
+    environment:
+      # All pooled JDBC connections must share the catalog's tables.
+      CATALOG_URI: jdbc:sqlite:/tmp/source-iceberg-catalog.db
+      CATALOG_WAREHOUSE: s3://warehouse/
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_ENDPOINT: http://source-iceberg-storage:9000
+      CATALOG_S3_PATH__STYLE__ACCESS: "true"
+      AWS_ACCESS_KEY_ID: test_key
+      AWS_SECRET_ACCESS_KEY: test_secret
+      AWS_REGION: us-east-1
+    networks:
+      flow-test:
+        aliases: [source-iceberg-db]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8181/v1/config"]
+      interval: 2s
+      timeout: 5s
+      retries: 45
+
+  storage:
+    image: chrislusf/seaweedfs:latest
+    command: ["server", "-s3", "-s3.port=9000", "-dir=/data"]
+    networks:
+      flow-test:
+        aliases: [source-iceberg-storage]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/healthz || wget -q -O /dev/null http://127.0.0.1:9000/ 2>&1 | grep -q 403"]
+      interval: 2s
+      timeout: 5s
+      retries: 45
+
+networks:
+  flow-test:
+    external: true
