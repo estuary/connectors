@@ -394,6 +394,12 @@ func (r *deleteByQueryResult) err() error {
 
 // startDeleteByQuery starts a delete by query of index as a background task
 // tagged with opaqueID, and returns the task's ID.
+//
+// A background task stores its result as a document in the .tasks system
+// index when it completes, and nothing ever removes it. The document is left
+// in place: deleting it requires the delete privilege on .tasks with
+// allow_restricted_indices, which even the superuser role lacks, and direct
+// access to system indices is deprecated.
 func (c *client) startDeleteByQuery(ctx context.Context, index string, query map[string]any, opaqueID string) (string, error) {
 	r, err := c.es.DeleteByQuery(
 		[]string{index},
