@@ -758,7 +758,7 @@ func (d *materialization) NewTransactor(
 	}
 
 	// Serverless clusters don't support listing or cancelling tasks.
-	if !isServerless {
+	if transactor.truncateAfterBackfill && !isServerless {
 		err = transactor.cancelTruncations(ctx)
 		if err != nil {
 			log.WithError(err).Warn("unable to cancel pre-existing truncations")
