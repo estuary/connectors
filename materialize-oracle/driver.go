@@ -115,6 +115,11 @@ func (c config) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
+	// The driver's own parse error quotes the connection string, password
+	// included, so an address it can't parse is rejected here.
+	if _, err := url.Parse(c.toURI()); err != nil {
+		return fmt.Errorf("invalid 'address' %q: expected host or host:port", c.Address)
+	}
 	if err := c.Credentials.Validate(); err != nil {
 		return err
 	}

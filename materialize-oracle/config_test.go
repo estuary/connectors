@@ -11,6 +11,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	go_ora "github.com/sijms/go-ora/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,6 +41,25 @@ func TestTLSConfig(t *testing.T) {
 	var verify = config{SSLMode: sslVerifyFull, Address: "example.com:2484"}.tlsConfig().VerifyConnection
 	require.ErrorContains(t, verify(state), "certificate signed by unknown authority")
 	require.Error(t, verify(tls.ConnectionState{}))
+}
+
+// The driver fails to parse these with an error that quotes the whole
+// connection string, so they must not reach it.
+func TestValidateRejectsUnparseableAddress(t *testing.T) {
+	for _, address := range []string{"example.com:prod", "will@example.com", "example.com/db", "example .com:1521"} {
+		var cfg = config{
+			Address:     address,
+			User:        "will",
+			Credentials: credentialsConfig{AuthType: UserPassword, userPasswordConfig: userPasswordConfig{Password: "secret1234"}},
+			Database:    "ORCLPDB1",
+		}
+		_, driverErr := go_ora.ParseConfig(cfg.toURI())
+		require.ErrorContains(t, driverErr, "secret1234", address)
+
+		var err = cfg.Validate()
+		require.ErrorContains(t, err, "invalid 'address'", address)
+		require.NotContains(t, err.Error(), "secret1234", address)
+	}
 }
 
 func TestConfigURI(t *testing.T) {
