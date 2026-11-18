@@ -1,0 +1,4 @@
+["tests/orders", {"id": 2, "status": "shipped", "canary": "o2-v2"}]
+["tests/orders", {"id": 3, "_meta": {"op": "d"}}]
+["tests/orders", {"id": 4, "status": "new", "canary": "o4"}]
+{"commit": true}

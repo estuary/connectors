@@ -61,6 +61,7 @@ In the future, other open-source materialization connectors from third parties c
 * [Apache Parquet Files in S3](./amazon-s3-parquet.md)
 * [CSV Files in GCS](./google-gcs-csv.md)
 * [CSV Files in S3](./amazon-s3-csv.md)
+* [CSV Files on SMB Shares](./smb.md)
 * [Google Sheets](./Google-sheets.md)
 
 ### Event connectors

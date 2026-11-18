@@ -1,0 +1,218 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/filesink"
+	m "github.com/estuary/connectors/go/materialize"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/stretchr/testify/require"
+)
+
+func TestSpec(t *testing.T) {
+	var resp, err = driver.Spec(context.Background(), &pm.Request_Spec{})
+	require.NoError(t, err)
+
+	formatted, err := json.MarshalIndent(resp, "", "  ")
+	require.NoError(t, err)
+	cupaloy.SnapshotT(t, formatted)
+}
+
+func testConfig() map[string]any {
+	return map[string]any{
+		"host":           "smb.example.test",
+		"share":          "data",
+		"username":       "test",
+		"password":       "factorytest",
+		"directory":      "exports/flow",
+		"uploadInterval": "5m",
+	}
+}
+
+func TestConfig(t *testing.T) {
+	tests := []struct {
+		name  string
+		field string
+		value any
+		err   string
+	}{
+		{name: "defaults"},
+		{name: "custom port", field: "port", value: 1446},
+		{name: "share root", field: "directory", value: ""},
+		{name: "domain", field: "domain", value: "EXAMPLE"},
+		{name: "size limit", field: "fileSizeLimit", value: 1024},
+		{name: "zero port", field: "port", value: 0, err: "port must be between"},
+		{name: "negative port", field: "port", value: -1, err: "port must be between"},
+		{name: "large port", field: "port", value: 65536, err: "port must be between"},
+		{name: "share path", field: "share", value: "data/folder", err: "share must be a share name"},
+		{name: "UNC share", field: "share", value: `\\server\data`, err: "share must be a share name"},
+		{name: "share parent", field: "share", value: "..", err: "share must be a share name"},
+		{name: "bad interval", field: "uploadInterval", value: "soon", err: "parsing upload interval"},
+		{name: "zero interval", field: "uploadInterval", value: "0s", err: "must be positive"},
+		{name: "negative interval", field: "uploadInterval", value: "-1m", err: "must be positive"},
+		{name: "negative size with directory", field: "fileSizeLimit", value: -1, err: "cannot be negative"},
+		{name: "unknown field", field: "typo", value: "value", err: "unknown field"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw := testConfig()
+			if tt.field != "" {
+				raw[tt.field] = tt.value
+			}
+			encoded, err := json.Marshal(raw)
+			require.NoError(t, err)
+			c, err := driver.NewConfig(encoded)
+			if tt.err != "" {
+				require.ErrorContains(t, err, tt.err)
+				return
+			}
+			require.NoError(t, err)
+			cfg := c.(config)
+			if tt.field == "port" {
+				require.Equal(t, tt.value, cfg.Port)
+			} else {
+				require.Equal(t, 445, cfg.Port)
+			}
+			require.Equal(t, raw["directory"], cfg.CommonConfig().Prefix)
+			require.Equal(t, ".csv.gz", cfg.CommonConfig().Extension)
+			require.Equal(t, "5m", cfg.CommonConfig().UploadInterval)
+			if tt.field == "fileSizeLimit" {
+				require.Equal(t, tt.value, cfg.CommonConfig().FileSizeLimit)
+			} else {
+				require.Equal(t, 10*1024*1024*1024, cfg.CommonConfig().FileSizeLimit)
+			}
+		})
+	}
+
+	for _, field := range []string{"host", "share", "username", "password", "uploadInterval"} {
+		t.Run("missing "+field, func(t *testing.T) {
+			raw := testConfig()
+			delete(raw, field)
+			encoded, err := json.Marshal(raw)
+			require.NoError(t, err)
+			_, err = driver.NewConfig(encoded)
+			require.ErrorContains(t, err, "missing '"+field+"'")
+		})
+	}
+}
+
+func TestPaths(t *testing.T) {
+	for _, p := range []string{"orders", "exports/flow", "events/raw", "a..b", "folder with spaces"} {
+		require.NoError(t, validatePath(p))
+	}
+	for _, p := range []string{".", "..", "../orders", "a/../orders", "/orders", "a//b", "a/./b", "orders/", `a\b`, `C:\data`, "a/%Y", "a\x00b", "a\nb", "a/.. ", "a/..foo/..", "a:stream"} {
+		t.Run(p, func(t *testing.T) {
+			raw := testConfig()
+			raw["directory"] = p
+			encoded, err := json.Marshal(raw)
+			require.NoError(t, err)
+			_, err = driver.NewConfig(encoded)
+			require.ErrorContains(t, err, "directory:")
+
+			raw["directory"] = ""
+			encoded, err = json.Marshal(raw)
+			require.NoError(t, err)
+			resource, err := json.Marshal(filesink.Resource{Path: p})
+			require.NoError(t, err)
+			d := driver
+			d.NewStore = func(context.Context, filesink.Config, map[string]bool) (filesink.Store[*smbUpload], error) {
+				t.Fatal("invalid paths must fail before connecting")
+				return nil, nil
+			}
+			_, err = d.Validate(context.Background(), &pm.Request_Validate{
+				ConfigJson: encoded,
+				Bindings:   []*pm.Request_Validate_Binding{{ResourceConfigJson: resource}},
+			})
+			require.ErrorContains(t, err, "resource path:")
+		})
+	}
+}
+
+func TestPathCase(t *testing.T) {
+	d := driver
+	d.NewStore = func(context.Context, filesink.Config, map[string]bool) (filesink.Store[*smbUpload], error) {
+		t.Fatal("paths differing only by case must fail before connecting")
+		return nil, nil
+	}
+	encoded, err := json.Marshal(testConfig())
+	require.NoError(t, err)
+	paths := []string{"orders", "events/raw", "Events/Raw"}
+
+	var validate []*pm.Request_Validate_Binding
+	var open []*pf.MaterializationSpec_Binding
+	for _, p := range paths {
+		resource, err := json.Marshal(filesink.Resource{Path: p})
+		require.NoError(t, err)
+		validate = append(validate, &pm.Request_Validate_Binding{ResourceConfigJson: resource})
+		open = append(open, &pf.MaterializationSpec_Binding{ResourceConfigJson: resource, ResourcePath: []string{p}, StateKey: p})
+	}
+	_, err = d.Validate(context.Background(), &pm.Request_Validate{ConfigJson: encoded, Bindings: validate})
+	require.ErrorContains(t, err, `resource paths "events/raw" and "Events/Raw"`)
+	_, _, _, err = d.NewTransactor(context.Background(), pm.Request_Open{
+		Materialization: &pf.MaterializationSpec{ConfigJson: encoded, Bindings: open},
+	}, m.NewBindingEvents())
+	require.ErrorContains(t, err, `resource paths "events/raw" and "Events/Raw"`)
+}
+
+func TestValidate(t *testing.T) {
+	for _, operation := range []string{"success", "mkdir", "open", "write", "remove"} {
+		t.Run(operation, func(t *testing.T) {
+			store, share := newTestStore(t)
+			if operation != "success" {
+				share.failures[operation] = []error{os.ErrPermission}
+			}
+			d := driver
+			d.NewStore = func(context.Context, filesink.Config, map[string]bool) (filesink.Store[*smbUpload], error) {
+				return store, nil
+			}
+			encoded, err := json.Marshal(testConfig())
+			require.NoError(t, err)
+			resp, err := d.Validate(context.Background(), &pm.Request_Validate{
+				ConfigJson: encoded,
+				Bindings: []*pm.Request_Validate_Binding{{
+					ResourceConfigJson: json.RawMessage(`{"path":"events/raw"}`),
+					Collection: pf.CollectionSpec{Projections: []pf.Projection{{
+						Field: "region", IsPrimaryKey: true,
+					}}},
+				}},
+			})
+			require.Equal(t, 1, share.closes)
+			if operation != "success" {
+				require.ErrorContains(t, err, "writable")
+				require.ErrorIs(t, err, os.ErrPermission)
+				return
+			}
+			require.NoError(t, err)
+			require.True(t, resp.Bindings[0].DeltaUpdates)
+			require.Equal(t, []string{"events/raw"}, resp.Bindings[0].ResourcePath)
+			require.Equal(t, pm.Response_Validated_Constraint_LOCATION_REQUIRED, resp.Bindings[0].ProjectionConstraints[0].Constraint.Type)
+			entries, err := os.ReadDir(filepath.Join(share.root, "exports", "flow"))
+			require.NoError(t, err)
+			require.Empty(t, entries)
+		})
+	}
+}
+
+func TestTransactorClosesStore(t *testing.T) {
+	store, share := newTestStore(t)
+	d := driver
+	d.NewStore = func(context.Context, filesink.Config, map[string]bool) (filesink.Store[*smbUpload], error) {
+		return store, nil
+	}
+	encoded, err := json.Marshal(testConfig())
+	require.NoError(t, err)
+	transactor, _, _, err := d.NewTransactor(context.Background(), pm.Request_Open{
+		Materialization: &pf.MaterializationSpec{ConfigJson: encoded},
+	}, m.NewBindingEvents())
+	require.NoError(t, err)
+	transactor.Destroy()
+	require.Equal(t, 1, share.closes)
+	require.NoError(t, store.Close())
+	require.Equal(t, 1, share.closes)
+}
