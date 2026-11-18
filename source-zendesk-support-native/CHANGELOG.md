@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-23
+
+### Changed
+- `organizations`, `users`, `tickets`, `ticket_audits`, `ticket_comments`, `side_conversations`, `ticket_metrics`, and `ticket_metric_events` read from Zendesk's list endpoints instead of its incremental exports, which Zendesk is ending for third-party apps. This applies to captures created on or after 2026-11-23, and to existing captures with the `use_list_endpoints` feature flag.
+- On the list endpoints, deleted tickets and users arrive as deletion documents instead of `status: "deleted"` tickets and `active: false` users, about 1.5 hours after they're deleted.
+- On the list endpoints, archived tickets and their child records aren't captured, organization deletes aren't captured, and `tickets` documents no longer include `fields`.
+- On the list endpoints, `ticket_metric_events` arrive when their ticket changes and are emitted again on later changes.
+
 ## 2026-11-06
 
 ### Changed

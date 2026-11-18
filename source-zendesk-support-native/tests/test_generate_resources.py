@@ -39,7 +39,7 @@ def _builder(resource: common.Resource[Any, Any, Any]) -> str:
 
 
 def test_use_list_endpoints_switches_only_the_affected_streams() -> None:
-    exports = _resources("")
+    exports = _resources("no_use_list_endpoints")
     list_endpoints = _resources("use_list_endpoints")
 
     assert exports.keys() == list_endpoints.keys()
