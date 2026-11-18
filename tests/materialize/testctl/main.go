@@ -46,6 +46,7 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-boilerplate/testutil"
 	clickhouse "github.com/estuary/connectors/materialize-clickhouse"
+	cosmosdb "github.com/estuary/connectors/materialize-cosmosdb-nosql"
 	databricks "github.com/estuary/connectors/materialize-databricks"
 	dynamodb "github.com/estuary/connectors/materialize-dynamodb"
 	elasticsearch "github.com/estuary/connectors/materialize-elasticsearch"
@@ -89,6 +90,7 @@ var connectors = map[string]opener{
 	"materialize-bigquery":               fromMaterializer(bigquery.NewMaterializer),
 	"materialize-bigtable":               fromMaterializer(bigtable.NewMaterializer),
 	"materialize-clickhouse":             fromMaterializer(clickhouse.NewMaterializer),
+	"materialize-cosmosdb-nosql":         fromMaterializer(cosmosdb.NewMaterializer),
 	"materialize-databricks":             fromSQLDriver(databricks.NewDriver),
 	"materialize-dynamodb":               fromMaterializer(dynamodb.NewMaterializer),
 	"materialize-elasticsearch":          fromMaterializer(elasticsearch.NewMaterializer),

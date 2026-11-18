@@ -1,0 +1,23 @@
+Container: orders
+Partition key: {"kind":"Hash","paths":["/id"],"version":2}
+{"_flow_id":1,"_meta":{"uuid":"UUID"},"canary":"o1","id":"1","note":"keep","status":"paid"}
+{"_flow_id":2,"_meta":{"uuid":"UUID"},"canary":"o2","id":"2","note":null,"status":"new"}
+{"_flow_id":3,"_meta":{"uuid":"UUID"},"canary":"o3","id":"3","note":null,"status":"new"}
+
+Container: events
+Partition key: {"kind":"Hash","paths":["/seq"],"version":2}
+{"_meta":{"uuid":"UUID"},"canary":"e7","id":"us:7","region":"us","seq":7}
+{"_meta":{"uuid":"UUID"},"canary":"e8","id":"eu~2Fwest:8","region":"eu/west","seq":8}
+
+Container: orders_delta
+Partition key: {"kind":"Hash","paths":["/id"],"version":2}
+{"_flow_id":1,"_meta":{"uuid":"UUID"},"canary":null,"id":"1","status":"paid"}
+{"_flow_id":2,"_meta":{"uuid":"UUID"},"canary":"o2","id":"2","status":"new"}
+{"_flow_id":3,"_meta":{"uuid":"UUID"},"canary":"o3","id":"3","status":"new"}
+
+Container: events_delta
+Partition key: {"kind":"Hash","paths":["/seq"],"version":2}
+{"_meta":{"uuid":"UUID"},"canary":"e7","id":"us:7","region":"us","seq":7}
+{"_meta":{"uuid":"UUID"},"canary":"e8","id":"eu~2Fwest:8","region":"eu/west","seq":8}
+
+

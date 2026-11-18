@@ -12,6 +12,7 @@ require (
 	cloud.google.com/go/storage v1.63.0
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.22.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.0
+	github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos v1.5.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.0
 	github.com/ClickHouse/ch-go v0.71.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.43.0

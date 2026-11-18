@@ -482,6 +482,7 @@ jobs:
         env:
           FLOW_TEST_RUNTIME: v1
           FLOW_TEST_FLOWCTL: flowctl-v1
+          TEST_DATABASE: ${{ matrix.connector.name == 'materialize-cosmosdb-nosql' && 'yes' || '' }}
         run: |
           cd ${{ matrix.connector.name }}
           go test -v ./... -run '^TestIntegration' -timeout 20m

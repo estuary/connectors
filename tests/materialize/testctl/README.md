@@ -42,8 +42,9 @@ accepts is one the connector accepts.
   order is whatever the destination returns, so a caller needing a stable
   ordering must sort.
 - `drop` removes the resource named by `-resource`.
-- `sweep` removes every test resource in that resource's namespace, and the task
-  metadata of test materializations, that an earlier run left behind. Anything
+- `sweep` removes every test resource in that resource's namespace (but see
+  below for connectors that cannot list a namespace), and the task metadata of
+  test materializations, that an earlier run left behind. Anything
   recent enough that a run still in flight could be using it is left alone. Pass
   `-dry-run` to see what it would remove, and `-log-level debug` to also see what
   it would leave and why.
@@ -61,12 +62,20 @@ wants to be cleaned up after should name its resources the same way —
 `<name>_flow_test_<unix>`. Resources named any other way are enumerated but
 never touched.
 
+Some connectors only look up the resources they are asked about and cannot list
+the rest of the namespace. For `materialize-azure-fabric-warehouse`,
+`materialize-bigtable`, `materialize-cosmosdb-nosql`, `materialize-dynamodb`,
+`materialize-iceberg`, `materialize-s3-iceberg` and `materialize-snowflake`, a
+sweep considers only the resource named by `-resource`, so the leftovers of other
+runs must be dropped by name.
+
 ## Supported connectors
 
 - `materialize-azure-fabric-warehouse`
 - `materialize-bigquery`
 - `materialize-bigtable`
 - `materialize-clickhouse`
+- `materialize-cosmosdb-nosql`
 - `materialize-databricks`
 - `materialize-dynamodb`
 - `materialize-elasticsearch`
