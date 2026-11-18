@@ -24,3 +24,5 @@
 
 ### Changed
 - Tasks split into multiple shards now fail to start with an error.
+
+<!-- CI trial baseline: this change only selects the connector for CI. Not for merging. -->

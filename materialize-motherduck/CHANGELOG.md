@@ -97,3 +97,5 @@
 
 ## v1, 2023-10-31
 - Beginning of changelog.
+
+<!-- CI trial baseline: this change only selects the connector for CI. Not for merging. -->
