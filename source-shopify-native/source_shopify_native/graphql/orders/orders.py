@@ -13,6 +13,41 @@ from ...models import (
 )
 
 
+# Shared by the order-level discountApplications and each line item's
+# discountAllocations, so both stay aligned.
+discount_application_fragment = """
+fragment _DiscountApplicationFields on DiscountApplication {
+    __typename
+    allocationMethod
+    index
+    targetSelection
+    targetType
+    value {
+        __typename
+        ... on MoneyV2 {
+            amount
+            currencyCode
+        }
+        ... on PricingPercentageValue {
+            percentage
+        }
+    }
+    ... on AutomaticDiscountApplication {
+        title
+    }
+    ... on DiscountCodeApplication {
+        code
+    }
+    ... on ManualDiscountApplication {
+        title
+    }
+    ... on ScriptDiscountApplication {
+        title
+    }
+}
+"""
+
+
 class Orders(ShopifyGraphQLResource):
     NAME = "orders"
     QUERY_ROOT = "orders"
@@ -149,33 +184,7 @@ class Orders(ShopifyGraphQLResource):
     discountApplications {
         edges {
             node {
-                __typename
-                allocationMethod
-                index
-                targetSelection
-                targetType
-                value {
-                    __typename
-                    ... on MoneyV2 {
-                        amount
-                        currencyCode
-                    }
-                    ... on PricingPercentageValue {
-                        percentage
-                    }
-                }
-                ... on AutomaticDiscountApplication {
-                    title
-                }
-                ... on DiscountCodeApplication {
-                    code
-                }
-                ... on ManualDiscountApplication {
-                    title
-                }
-                ... on ScriptDiscountApplication {
-                    title
-                }
+                ..._DiscountApplicationFields
             }
         }
     }
@@ -281,33 +290,7 @@ class Orders(ShopifyGraphQLResource):
                     # discountApplications excludes order edits, so an index
                     # alone may have nothing to join to.
                     discountApplication {
-                        __typename
-                        allocationMethod
-                        index
-                        targetSelection
-                        targetType
-                        value {
-                            __typename
-                            ... on MoneyV2 {
-                                amount
-                                currencyCode
-                            }
-                            ... on PricingPercentageValue {
-                                percentage
-                            }
-                        }
-                        ... on AutomaticDiscountApplication {
-                            title
-                        }
-                        ... on DiscountCodeApplication {
-                            code
-                        }
-                        ... on ManualDiscountApplication {
-                            title
-                        }
-                        ... on ScriptDiscountApplication {
-                            title
-                        }
+                        ..._DiscountApplicationFields
                     }
                 }
                 taxLines {
@@ -397,7 +380,7 @@ class Orders(ShopifyGraphQLResource):
     totalWeight
     # {{ retailLocation }}
     """
-    FRAGMENTS = [money_bag_fragment]
+    FRAGMENTS = [money_bag_fragment, discount_application_fragment]
     CONDITIONAL_FIELDS = [
         # retailLocation requires the read_locations scope, which
         # the orders stream does not otherwise need.
