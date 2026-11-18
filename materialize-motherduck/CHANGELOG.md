@@ -1,5 +1,12 @@
 # materialize-motherduck
 
+## 2026-11-18
+
+### Fixed
+- An "internal MotherDuck error" no longer fails the task when a retry is
+  safe: Apply's statements and the fence installation are retried, and so is
+  the store transaction unless the error came from its COMMIT.
+
 ## 2026-11-04
 
 ### Fixed

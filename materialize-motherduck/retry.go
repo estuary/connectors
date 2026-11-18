@@ -2,6 +2,7 @@ package connector
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/estuary/connectors/go/retry"
@@ -26,7 +27,7 @@ var ddlRetry = retry.Policy{
 }
 
 // commitRetry retries the store transaction, with ddlRetry's delays. COMMIT
-// failing with a connection error may have committed the transaction, and
+// failing with a connection or internal error may have committed the transaction, and
 // running it again would append its inserted rows a second time, so that
 // failure is not retried: the connector restarts and recovers from whichever
 // checkpoint the destination holds.
@@ -37,17 +38,25 @@ var commitRetry = retry.Policy{
 	Jitter:         ddlRetry.Jitter,
 }
 
+// motherDuckInternalError is in the message of the error MotherDuck returns,
+// as an Invalid Error, when a statement fails on its side for no reason the
+// client can see.
+const motherDuckInternalError = "internal MotherDuck error"
+
 // classify sorts the duckdb errors MotherDuck returns intermittently and that
 // resolve on a retry. A transaction error, which includes DuckLake rejecting a
 // commit because a concurrent transaction changed the same catalog state
-// first, refused the statement and is retryable. A connection error may come
-// after MotherDuck applied the statement, so it is ambiguous.
+// first, refused the statement and is retryable. A connection error or an
+// internal MotherDuck error may come after MotherDuck applied the statement,
+// so they are ambiguous.
 func classify(err error) retry.Outcome {
 	if duckdbErr, ok := errors.AsType[*duckdb.Error](err); !ok {
 		return retry.Fatal
 	} else if duckdbErr.Type == duckdb.ErrorTypeTransaction {
 		return retry.Retryable
 	} else if duckdbErr.Type == duckdb.ErrorTypeConnection {
+		return retry.Ambiguous
+	} else if duckdbErr.Type == duckdb.ErrorTypeInvalid && strings.Contains(duckdbErr.Msg, motherDuckInternalError) {
 		return retry.Ambiguous
 	}
 	return retry.Fatal

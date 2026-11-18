@@ -303,6 +303,10 @@ func TestClassifyCommit(t *testing.T) {
 		Type: duckdb.ErrorTypeConnection,
 		Msg:  "Connection Error: connection to MotherDuck lost",
 	}
+	var internalErr = &duckdb.Error{
+		Type: duckdb.ErrorTypeInvalid,
+		Msg:  "Invalid Error: You've encountered an internal MotherDuck error",
+	}
 	var catalogErr = &duckdb.Error{Type: duckdb.ErrorTypeCatalog, Msg: "Catalog Error: no such table"}
 
 	for _, tc := range []struct {
@@ -336,6 +340,24 @@ func TestClassifyCommit(t *testing.T) {
 			err:  fmt.Errorf("committing store transaction: %w", &commitError{connectionErr}),
 			ddl:  retry.Ambiguous,
 			txn:  retry.Ambiguous,
+		},
+		{
+			name: "internal error before COMMIT",
+			err:  fmt.Errorf("executing store query: %w", internalErr),
+			ddl:  retry.Ambiguous,
+			txn:  retry.Retryable,
+		},
+		{
+			name: "internal error at COMMIT",
+			err:  fmt.Errorf("committing store transaction: %w", &commitError{internalErr}),
+			ddl:  retry.Ambiguous,
+			txn:  retry.Ambiguous,
+		},
+		{
+			name: "other invalid error",
+			err:  &duckdb.Error{Type: duckdb.ErrorTypeInvalid, Msg: "Invalid Error: something else"},
+			ddl:  retry.Fatal,
+			txn:  retry.Fatal,
 		},
 		{
 			name: "catalog error",
