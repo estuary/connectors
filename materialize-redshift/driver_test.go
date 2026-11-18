@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"os/exec"
 	"regexp"
 	"testing"
 	"time"
@@ -30,7 +29,7 @@ func mustGetCfg(t *testing.T) config {
 		return config{}
 	}
 
-	jsonBytes, err := exec.Command("sops", "--decrypt", "--output-type", "json", "testdata/config.local.yaml").Output()
+	jsonBytes, err := testutil.ReadConfigFile("testdata/config.local.yaml")
 	require.NoError(t, err)
 
 	var out config

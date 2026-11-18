@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/estuary/connectors/go/common"
-	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
@@ -29,7 +28,7 @@ func mustGetCfg(t *testing.T) config {
 		return config{}
 	}
 
-	jsonBytes, err := exec.Command("sops", "--decrypt", "--output-type", "json", "testdata/config.yaml").Output()
+	jsonBytes, err := testutil.ReadConfigFile("testdata/config.yaml")
 	require.NoError(t, err)
 
 	var out config

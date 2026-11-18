@@ -742,17 +742,9 @@ func decryptConfigRaw(t *testing.T, bundled []byte, taskName string) json.RawMes
 
 	raw := json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
 	if gjson.GetBytes(raw, "sops").Exists() {
-		// Decrypt with sops and strip _sops suffixes.
-		sopsCmd := exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
-		jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
-		sopsCmd.Stdin = bytes.NewReader(raw)
 		var err error
-		jqCmd.Stdin, err = sopsCmd.StdoutPipe()
+		raw, err = DecryptSops(raw, "json")
 		require.NoError(t, err)
-		require.NoError(t, sopsCmd.Start())
-		raw, err = jqCmd.Output()
-		require.NoError(t, err)
-		require.NoError(t, sopsCmd.Wait())
 	}
 
 	return raw
