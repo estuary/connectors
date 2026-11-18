@@ -712,6 +712,9 @@ def test_dense_bindings_limit_concurrent_reads(http, config, monkeypatch):
     active = 0
     peak = 0
     consumed = []
+    # Each read waits briefly for a second one to start, so the overlap does not
+    # depend on scheduling; reads run one at a time leave peak at 1 and fail.
+    overlapped = asyncio.Event()
 
     async def query(log, url, **kwargs):
         query = kwargs["json"]["query"]
@@ -726,6 +729,12 @@ def test_dense_bindings_limit_concurrent_reads(http, config, monkeypatch):
             peak = max(peak, active)
             rows = 0
             try:
+                if active > 1:
+                    overlapped.set()
+                try:
+                    await asyncio.wait_for(overlapped.wait(), 5)
+                except asyncio.TimeoutError:
+                    pass
                 for second in range(0, 3600, 300):
                     timestamp = parse_timestamp(START) + second * 1_000_000_000
                     if start <= timestamp < stop:
