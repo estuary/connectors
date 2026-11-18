@@ -338,7 +338,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		b := t.bindings[idx]
 		deleted, err := t.client.deleteBefore(ctx, b.index, b.publishedAtField, boundary, truncationTagPrefix(t.materializationName, b.index), t.isServerless)
 		if isForbidden(err) {
-			t.be.Warn(b.index, fmt.Sprintf("Documents published before the backfill of index %q were not deleted because the credentials lack the privileges to do so, which requires the maintenance index privilege: %s.", b.index, err))
+			t.be.Warn(b.index, fmt.Sprintf("Documents published before the backfill of index %q were not deleted because the credentials lack the privileges to do so: %s.", b.index, err))
 			continue
 		} else if err != nil {
 			return nil, fmt.Errorf("truncating index %q after backfill: %w", b.index, err)
@@ -396,7 +396,7 @@ func (t *transactor) cancelTruncations(ctx context.Context) error {
 		}
 		err := t.client.cancelTask(ctx, taskID)
 		if isForbidden(err) {
-			t.be.Warn("cancel truncation "+index, fmt.Sprintf("A truncation of index %q from an earlier run is still running and was not cancelled because the credentials lack the cancel_task cluster privilege: %s.", index, err))
+			t.be.Warn("cancel truncation "+index, fmt.Sprintf("A truncation of index %q from an earlier run is still running and was not cancelled because the credentials lack the privileges to do so: %s.", index, err))
 			continue
 		} else if err != nil {
 			t.be.Warn("cancel truncation "+index, fmt.Sprintf("A truncation of index %q from an earlier run is still running and could not be cancelled: %s.", index, err))

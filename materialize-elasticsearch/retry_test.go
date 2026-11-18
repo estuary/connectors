@@ -58,3 +58,41 @@ func TestClassifyTaskPoll(t *testing.T) {
 		})
 	}
 }
+
+func TestErrorBodyMessage(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			name: "same root cause",
+			body: `{"error":{"root_cause":[{"type":"security_exception","reason":"action [indices:admin/refresh] is unauthorized"}],"type":"security_exception","reason":"action [indices:admin/refresh] is unauthorized"},"status":403}`,
+			want: "security_exception: action [indices:admin/refresh] is unauthorized",
+		},
+		{
+			name: "different root cause",
+			body: `{"error":{"root_cause":[{"type":"query_shard_exception","reason":"failed to create query"}],"type":"search_phase_execution_exception","reason":"all shards failed"},"status":400}`,
+			want: "search_phase_execution_exception: all shards failed (root cause query_shard_exception: failed to create query)",
+		},
+		{
+			name: "no root cause",
+			body: `{"error":{"type":"resource_not_found_exception","reason":"task not found"},"status":404}`,
+			want: "resource_not_found_exception: task not found",
+		},
+		{
+			name: "error as a string",
+			body: `{"error":"Not Found"}`,
+			want: `{"error":"Not Found"}`,
+		},
+		{
+			name: "not JSON",
+			body: `<html>Bad Gateway</html>`,
+			want: `<html>Bad Gateway</html>`,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, errorBodyMessage([]byte(tt.body)))
+		})
+	}
+}

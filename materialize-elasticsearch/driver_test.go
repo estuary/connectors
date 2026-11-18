@@ -543,6 +543,9 @@ func testCancelTruncations(t *testing.T, flowYAML string, users []*testUser) {
 	boilerplate.RunTestAllTasks(t, flowYAML, func(t *testing.T, bundled []byte, taskName string, cfg config) {
 		admin, err := cfg.toClient()
 		require.NoError(t, err)
+		info, err := admin.info(t.Context())
+		require.NoError(t, err)
+		var isOpenSearch = info.isOpenSearch()
 
 		const index = "truncate_cancel"
 		var oursPrefix = truncationTagPrefix(taskName, index)
@@ -587,16 +590,23 @@ func testCancelTruncations(t *testing.T, flowYAML string, users []*testUser) {
 				// With no binding events, warnings are logged.
 				hook := logtest.NewGlobal()
 				defer hook.Reset()
-				tr := &transactor{client: c, materializationName: taskName, bindings: []binding{{index: index}}}
+				tr :=&transactor{client: c, materializationName: taskName, bindings: []binding{{index: index}}}
 				require.NoError(t, tr.cancelTruncations(ctx))
 
 				if user.hasOptional {
 					require.Empty(t, truncationWarnings(hook))
 					require.Equal(t, map[string]string{theirsTask: theirs, customerTask: customer}, running(t))
 				} else {
+					// Elasticsearch names the privileges that grant the
+					// action, and OpenSearch names the action, which is
+					// itself a permission.
+					var missing = "cancel_task"
+					if isOpenSearch {
+						missing = "cluster:admin/tasks/cancel"
+					}
 					warnings := truncationWarnings(hook)
 					require.Len(t, warnings, 1)
-					require.Contains(t, warnings[0], "cancel_task")
+					require.Contains(t, warnings[0], missing)
 					require.Contains(t, running(t), oursTask)
 				}
 			})
