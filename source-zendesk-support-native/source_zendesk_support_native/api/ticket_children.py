@@ -1,32 +1,45 @@
 import asyncio
 import functools
 import itertools
-from datetime import datetime
+from datetime import datetime, timedelta, UTC
 from logging import Logger
 from typing import AsyncGenerator, Callable, TypeVar
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
+from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from ..models import (
     ZendeskResource,
     TimestampedResource,
     AbbreviatedTicket,
+    IdAndUpdatedAt,
     IncrementalCursorPaginatedResponse,
     SideConversation,
     SideConversationsResponse,
     TicketChildResourceValidationContext,
+    TicketMetricSet,
+    TicketsListResponse,
+    TicketsWithMetricSetsListResponse,
 )
 
 from .shared import (
     CURSOR_PAGINATION_PAGE_SIZE,
+    INCREMENTAL_LAG,
+    MIN_INCREMENTAL_WINDOW_SIZE,
     url_base,
+    dt_to_s,
     s_to_dt,
     is_timestamp,
 )
 
 from .cursor_exports import (
     _fetch_incremental_cursor_export_resources,
+)
+from .incremental_keyset_paginated import (
+    KeysetWindow,
+    build_seek_cursor,
+    fetch_incremental_keyset_paginated_ids_by_page,
 )
 
 # Zendesk's rate limit is shared account-wide with the customer's other integrations,
@@ -162,6 +175,10 @@ async def backfill_ticket_child_resources(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
+    if page is not None and is_timestamp(page):
+        start_date = s_to_dt(int(page))
+        page = None
+
     tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page, log)
 
     tickets: list[AbbreviatedTicket] = []
@@ -285,6 +302,10 @@ async def backfill_side_conversations(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
+    if page is not None and is_timestamp(page):
+        start_date = s_to_dt(int(page))
+        page = None
+
     tickets_generator = _fetch_incremental_cursor_export_resources(
         http, subdomain, "tickets", start_date, page, log
     )
@@ -366,6 +387,10 @@ async def backfill_ticket_metrics(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
+    if page is not None and is_timestamp(page):
+        start_date = s_to_dt(int(page))
+        page = None
+
     sideload_params = {
         "include": "metric_sets"
     }
@@ -383,3 +408,257 @@ async def backfill_ticket_metrics(
                 yield ZendeskResource.model_validate(metrics)
         else:
             return
+
+
+async def fetch_child_resources_of_tickets(
+    http: HTTPSession,
+    subdomain: str,
+    path: str,
+    response_model: type[IncrementalCursorPaginatedResponse],
+    ticket_ids: list[int],
+    log: Logger,
+) -> AsyncGenerator[ZendeskResource, None]:
+    async for child in _fetch_ticket_children_concurrently(
+        ticket_ids,
+        functools.partial(_fetch_ticket_child_resources, http, subdomain, path, response_model, log=log),
+    ):
+        yield child
+
+
+async def fetch_side_conversations_of_tickets(
+    http: HTTPSession,
+    subdomain: str,
+    ticket_ids: list[int],
+    log: Logger,
+) -> AsyncGenerator[SideConversation, None]:
+    async for side_conversation in _fetch_ticket_children_concurrently(
+        ticket_ids,
+        functools.partial(_fetch_side_conversations, http, subdomain, log=log),
+    ):
+        yield side_conversation
+
+
+async def _fetch_keyset_paginated_tickets_with_metric_sets(
+    http: HTTPSession,
+    subdomain: str,
+    lower_bound: datetime,
+    upper_bound: datetime,
+    log: Logger,
+) -> AsyncGenerator[IdAndUpdatedAt | TicketMetricSet | datetime, None]:
+    """
+    Yields each ticket that `fetch_incremental_keyset_paginated_ids_by_page`
+    would yield, with the same checkpoints, followed by its metric set if it
+    has one.
+    """
+    url = f"{url_base(subdomain)}/tickets"
+
+    params: dict[str, str | int] = {
+        "sort": "updated_at",
+        "page[size]": CURSOR_PAGINATION_PAGE_SIZE,
+        "page[after]": build_seek_cursor(lower_bound),
+        **TicketsWithMetricSetsListResponse.REQUEST_PARAMS,
+    }
+
+    window = KeysetWindow("tickets", lower_bound, upper_bound)
+
+    while True:
+        _, body = await http.request_stream(log, url, params=params)
+        processor = IncrementalJsonProcessor(
+            body(),
+            "tickets.item",
+            IdAndUpdatedAt,
+            TicketsWithMetricSetsListResponse,
+        )
+
+        # /tickets returns a page's metric sets in an array after its tickets,
+        # so the whole page is read before anything is yielded.
+        tickets = [ticket async for ticket in processor]
+        remainder = processor.get_remainder()
+        metric_sets = {metric_set.ticket_id: metric_set for metric_set in remainder.metric_sets}
+
+        for ticket in tickets:
+            is_past_window, checkpoint = window.advance(ticket)
+            if is_past_window:
+                return
+
+            if checkpoint is not None:
+                yield checkpoint
+
+            yield ticket
+
+            if ticket.id in metric_sets:
+                yield metric_sets[ticket.id]
+
+        if not remainder.meta.has_more or remainder.meta.after_cursor is None:
+            return
+
+        params["page[after]"] = remainder.meta.after_cursor
+
+
+async def fetch_incremental_keyset_paginated_ticket_metrics(
+    http: HTTPSession,
+    subdomain: str,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[TicketMetricSet | LogCursor, None]:
+    """
+    Yields the metric set of every ticket updated after `log_cursor` and at or
+    before the horizon, then the last of those tickets' updated_at. A yielded
+    datetime means the metric set of every ticket updated at or before it has
+    been yielded.
+
+              log_cursor      log_cursor + 1s       horizon
+    ───────────────┼─────────────────┼──────────────────┼──────▶ time (1s ticks)
+                   │                 │                  │
+    page[after] ───┼─────────────────[══════════════════╪══════▶
+    tickets ───────┼─────────────────[══════════════════]
+                   │                 │                  └─ now - 5 minutes
+                   │                 └─ seek (log_cursor + 1s, 0)
+                   └─ the metric set of every ticket updated at or
+                      before this second was already emitted
+    """
+    assert isinstance(log_cursor, datetime)
+
+    horizon = (datetime.now(tz=UTC) - INCREMENTAL_LAG).replace(microsecond=0)
+
+    if horizon - log_cursor < MIN_INCREMENTAL_WINDOW_SIZE:
+        return
+
+    generator = _fetch_keyset_paginated_tickets_with_metric_sets(
+        http, subdomain, log_cursor, horizon, log,
+    )
+
+    last_seen_dt: datetime | None = None
+
+    async for result in generator:
+        if isinstance(result, IdAndUpdatedAt):
+            last_seen_dt = result.updated_at
+        else:
+            yield result
+
+    if last_seen_dt is not None:
+        yield last_seen_dt
+
+
+async def backfill_incremental_keyset_paginated_ticket_metrics(
+    http: HTTPSession,
+    subdomain: str,
+    start_date: datetime,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[TicketMetricSet | PageCursor, None]:
+    assert isinstance(cutoff, datetime)
+
+    if page is None:
+        lower_bound = start_date
+    else:
+        assert isinstance(page, int)
+        lower_bound = s_to_dt(page)
+
+    generator = _fetch_keyset_paginated_tickets_with_metric_sets(
+        http, subdomain, lower_bound, cutoff, log,
+    )
+
+    async for result in generator:
+        if isinstance(result, datetime):
+            yield dt_to_s(result)
+        elif isinstance(result, TicketMetricSet):
+            yield result
+
+
+async def fetch_incremental_keyset_paginated_ticket_children[ChildT](
+    http: HTTPSession,
+    subdomain: str,
+    fetch_children: Callable[[list[int], Logger], AsyncGenerator[ChildT, None]],
+    lag: timedelta,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[ChildT | LogCursor, None]:
+    """
+    Yields the children of every ticket updated after `log_cursor` and at or
+    before the horizon, then the last of those tickets' updated_at. A yielded
+    datetime means the children of every ticket updated at or before it have
+    been yielded.
+
+              log_cursor      log_cursor + 1s       horizon
+    ───────────────┼─────────────────┼──────────────────┼──────▶ time (1s ticks)
+                   │                 │                  │
+    page[after] ───┼─────────────────[══════════════════╪══════▶
+    tickets ───────┼─────────────────[══════════════════]
+                   │                 │                  └─ now - lag
+                   │                 └─ seek (log_cursor + 1s, 0)
+                   └─ the children of every ticket updated at or
+                      before this second were already emitted
+
+    A changed ticket's children are all fetched and emitted again. Each page of
+    tickets is read completely before any children are fetched, so no
+    response stays open while they are.
+    """
+    assert isinstance(log_cursor, datetime)
+
+    horizon = (datetime.now(tz=UTC) - lag).replace(microsecond=0)
+
+    if horizon - log_cursor < MIN_INCREMENTAL_WINDOW_SIZE:
+        return
+
+    generator = fetch_incremental_keyset_paginated_ids_by_page(
+        http, subdomain, "tickets", "tickets", TicketsListResponse.REQUEST_PARAMS, log_cursor, horizon, log,
+    )
+
+    ticket_ids: list[int] = []
+    last_seen_dt: datetime | None = None
+
+    async for result in generator:
+        if isinstance(result, datetime):
+            async for child in fetch_children(ticket_ids, log):
+                yield child
+            ticket_ids = []
+            yield result
+        else:
+            ticket_ids.append(result.id)
+            last_seen_dt = result.updated_at
+
+    if ticket_ids:
+        async for child in fetch_children(ticket_ids, log):
+            yield child
+
+    if last_seen_dt is not None:
+        yield last_seen_dt
+
+
+async def backfill_incremental_keyset_paginated_ticket_children[ChildT](
+    http: HTTPSession,
+    subdomain: str,
+    fetch_children: Callable[[list[int], Logger], AsyncGenerator[ChildT, None]],
+    start_date: datetime,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[ChildT | PageCursor, None]:
+    assert isinstance(cutoff, datetime)
+
+    if page is None:
+        lower_bound = start_date
+    else:
+        assert isinstance(page, int)
+        lower_bound = s_to_dt(page)
+
+    generator = fetch_incremental_keyset_paginated_ids_by_page(
+        http, subdomain, "tickets", "tickets", TicketsListResponse.REQUEST_PARAMS, lower_bound, cutoff, log,
+    )
+
+    ticket_ids: list[int] = []
+
+    async for result in generator:
+        if isinstance(result, datetime):
+            async for child in fetch_children(ticket_ids, log):
+                yield child
+            ticket_ids = []
+            yield dt_to_s(result)
+        else:
+            ticket_ids.append(result.id)
+
+    if ticket_ids:
+        async for child in fetch_children(ticket_ids, log):
+            yield child

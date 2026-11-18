@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, UTC
 import functools
 from logging import Logger
-from typing import Any
+from typing import Any, AsyncGenerator, Callable
 
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.capture import common, Task
@@ -52,6 +52,8 @@ from .api import (
     backfill_audit_logs,
     backfill_incremental_time_export_resources,
     backfill_incremental_keyset_paginated_resources,
+    backfill_incremental_keyset_paginated_ticket_children,
+    backfill_incremental_keyset_paginated_ticket_metrics,
     backfill_incremental_cursor_export_resources,
     backfill_incremental_cursor_paginated_resources,
     backfill_satisfaction_ratings,
@@ -61,18 +63,22 @@ from .api import (
     backfill_ticket_metrics,
     cursor_export_cursor_to_dt,
     fetch_audit_logs,
+    fetch_child_resources_of_tickets,
     fetch_client_side_incremental_offset_paginated_resources,
     fetch_client_side_incremental_cursor_paginated_resources,
     fetch_deleted_tickets,
     fetch_deleted_users,
     fetch_incremental_time_export_resources,
     fetch_incremental_keyset_paginated_resources,
+    fetch_incremental_keyset_paginated_ticket_children,
+    fetch_incremental_keyset_paginated_ticket_metrics,
     fetch_incremental_cursor_export_resources,
     fetch_incremental_cursor_paginated_resources,
     fetch_post_child_resources,
     fetch_post_comment_votes,
     fetch_satisfaction_ratings,
     fetch_side_conversations,
+    fetch_side_conversations_of_tickets,
     fetch_talk_incremental_export_resources,
     fetch_ticket_child_resources,
     fetch_ticket_metrics,
@@ -265,13 +271,28 @@ def ticket_metrics(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> common.Resource:
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        migrated = _migrate_keyset_cursor_to_export(state)
+
+        if migrated is not None:
+            state.inc = migrated.inc
+            if migrated.backfill is not None:
+                state.backfill = migrated.backfill
+
+            task.log.info("Migrated state from the keyset sweep to the cursor-based export.", {
+                "resource": binding.resourceConfig.name,
+                "migrated_state": migrated.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: migrated}),
+            )
+
         common.open_binding(
             binding,
             binding_index,
@@ -990,6 +1011,144 @@ def tickets(
     )
 
 
+def _migrate_export_cursor_to_keyset(state: ResourceState, margin: timedelta) -> ResourceState | None:
+    """
+    Returns the state to checkpoint when `state` holds a cursor-based export
+    cursor, or None when it already holds the keyset sweep's datetime. The
+    cursor and an in-progress backfill start `margin` before the export's.
+    """
+    assert isinstance(state.inc, ResourceState.Incremental)
+
+    if isinstance(state.inc.cursor, datetime):
+        return None
+
+    assert isinstance(state.inc.cursor, tuple)
+    export_cursor = state.inc.cursor[0]
+    assert isinstance(export_cursor, str)
+
+    migrated = ResourceState(
+        inc=ResourceState.Incremental(cursor=cursor_export_cursor_to_dt(export_cursor) - margin),
+    )
+
+    if isinstance(state.backfill, ResourceState.Backfill) and isinstance(state.backfill.next_page, str):
+        page = cursor_export_cursor_to_dt(state.backfill.next_page) - margin
+        migrated.backfill = ResourceState.Backfill(
+            cutoff=state.backfill.cutoff,
+            next_page=dt_to_s(page),
+        )
+
+    return migrated
+
+
+# Nothing calls this yet. A later PR adds the feature flag that switches the
+# ticket child streams from the cursor-based export to these resources (#5357).
+def incremental_keyset_paginated_ticket_child_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    async def open(
+        fetch_changes: common.FetchChangesFn[ZendeskResource],
+        fetch_page: common.FetchPageFn[ZendeskResource],
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        migrated = _migrate_export_cursor_to_keyset(state, INCREMENTAL_LAG)
+
+        if migrated is not None:
+            state.inc = migrated.inc
+            if migrated.backfill is not None:
+                state.backfill = migrated.backfill
+
+            task.log.info("Migrated state from the cursor-based export to the keyset sweep.", {
+                "resource": binding.resourceConfig.name,
+                "migrated_state": migrated.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: migrated}),
+            )
+
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=fetch_changes,
+            fetch_page=fetch_page,
+        )
+
+    cutoff = (datetime.now(tz=UTC) - INCREMENTAL_LAG).replace(microsecond=0)
+
+    def resource(
+        name: str,
+        model: type[FullRefreshResource],
+        fetch_changes: common.FetchChangesFn[ZendeskResource],
+        fetch_page: common.FetchPageFn[ZendeskResource],
+    ) -> common.Resource:
+        return common.Resource(
+            name=name,
+            key=["/id"],
+            model=model,
+            open=functools.partial(open, fetch_changes, fetch_page),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=cutoff),
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+
+    def child_resource(
+        name: str,
+        model: type[FullRefreshResource],
+        fetch_children: Callable[[list[int], Logger], AsyncGenerator[Any, None]],
+    ) -> common.Resource:
+        return resource(
+            name,
+            model,
+            functools.partial(
+                fetch_incremental_keyset_paginated_ticket_children,
+                http,
+                config.subdomain,
+                fetch_children,
+                INCREMENTAL_LAG,
+            ),
+            functools.partial(
+                backfill_incremental_keyset_paginated_ticket_children,
+                http,
+                config.subdomain,
+                fetch_children,
+                config.start_date,
+            ),
+        )
+
+    return [
+        *(
+            child_resource(
+                name,
+                ZendeskResource,
+                functools.partial(fetch_child_resources_of_tickets, http, config.subdomain, path, response_model),
+            )
+            for (name, path, response_model) in TICKET_CHILD_RESOURCES
+        ),
+        child_resource(
+            "side_conversations",
+            SideConversation,
+            functools.partial(fetch_side_conversations_of_tickets, http, config.subdomain),
+        ),
+        resource(
+            "ticket_metrics",
+            ZendeskResource,
+            functools.partial(fetch_incremental_keyset_paginated_ticket_metrics, http, config.subdomain),
+            functools.partial(backfill_incremental_keyset_paginated_ticket_metrics, http, config.subdomain, config.start_date),
+        ),
+    ]
+
+
 def talk_incremental_export_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -1084,6 +1243,29 @@ def _migrate_keyset_state_to_export(state: ResourceState) -> CursorExportStatePa
     return patch
 
 
+def _migrate_keyset_cursor_to_export(state: ResourceState) -> ResourceState | None:
+    """
+    Returns the state to checkpoint when `state` holds the keyset sweep's
+    datetime cursor, or None when it already holds a cursor-based export cursor.
+    """
+    assert isinstance(state.inc, ResourceState.Incremental)
+
+    if not isinstance(state.inc.cursor, datetime):
+        return None
+
+    migrated = ResourceState(
+        inc=ResourceState.Incremental(cursor=(str(dt_to_s(state.inc.cursor)),)),
+    )
+
+    if isinstance(state.backfill, ResourceState.Backfill) and isinstance(state.backfill.next_page, int):
+        migrated.backfill = ResourceState.Backfill(
+            cutoff=state.backfill.cutoff,
+            next_page=str(state.backfill.next_page),
+        )
+
+    return migrated
+
+
 def incremental_cursor_export_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -1163,7 +1345,7 @@ def ticket_child_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
-    def open(
+    async def open(
         path: str,
         response_model: type[IncrementalCursorPaginatedResponse],
         binding: CaptureBinding[ResourceConfig],
@@ -1172,6 +1354,21 @@ def ticket_child_resources(
         task: Task,
         all_bindings,
     ):
+        migrated = _migrate_keyset_cursor_to_export(state)
+
+        if migrated is not None:
+            state.inc = migrated.inc
+            if migrated.backfill is not None:
+                state.backfill = migrated.backfill
+
+            task.log.info("Migrated state from the keyset sweep to the cursor-based export.", {
+                "resource": binding.resourceConfig.name,
+                "migrated_state": migrated.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: migrated}),
+            )
+
         common.open_binding(
             binding,
             binding_index,
@@ -1224,13 +1421,28 @@ def side_conversations(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> common.Resource:
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        migrated = _migrate_keyset_cursor_to_export(state)
+
+        if migrated is not None:
+            state.inc = migrated.inc
+            if migrated.backfill is not None:
+                state.backfill = migrated.backfill
+
+            task.log.info("Migrated state from the keyset sweep to the cursor-based export.", {
+                "resource": binding.resourceConfig.name,
+                "migrated_state": migrated.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: migrated}),
+            )
+
         common.open_binding(
             binding,
             binding_index,
