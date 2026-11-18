@@ -362,7 +362,7 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 }
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
-	// A deadlock or snapshot-isolation conflict aborts the whole transaction,
+	// A deadlock, snapshot-isolation conflict or connection failure aborts the whole transaction,
 	// so the entire read-modify-write below is retried from a fresh
 	// transaction rather than just the statement that failed. This can
 	// happen when two materializations install a fence against the same
@@ -460,7 +460,7 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 		txn = nil // Disable deferred rollback.
 
 		if err != nil {
-			return fmt.Errorf("txn.Commit: %w", err)
+			return fmt.Errorf("txn.Commit: %w", &commitError{err})
 		}
 		return nil
 	}); err != nil {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-18
+### Fixed
+- Retry installing the fence and committing a transaction when the connection
+  to Fabric Warehouse fails before the transaction commits, or when Fabric
+  refuses the login during a system update, instead of failing the task.
+
 ## 2026-11-11
 ### Fixed
 - Retry installing the fence and committing a transaction when Fabric

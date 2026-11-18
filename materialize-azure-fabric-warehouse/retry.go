@@ -1,7 +1,9 @@
 package connector
 
 import (
+	"database/sql/driver"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/estuary/connectors/go/retry"
@@ -26,31 +28,59 @@ const (
 	// https://learn.microsoft.com/en-us/fabric/data-warehouse/transactions.
 	fabricSnapshotUpdateConflict    = 24556
 	fabricSnapshotUpdateConflictAlt = 24706
+
+	// fabricSystemUpdate is in the message of the login error Fabric returns
+	// while the warehouse is being updated. Its error number isn't documented.
+	fabricSystemUpdate = "due to a system update"
 )
 
 // commitRetry retries a fence-install or store-commit transaction that
-// Fabric Warehouse rolled back on a conflict with a concurrent writer -
-// another materialization, or this connector's own commit racing a schema
-// change. Jitter keeps conflicting writers from retrying in lockstep.
+// failed before it could commit: rolled back on a conflict with a concurrent
+// writer (another materialization, or this connector's own commit racing a
+// schema change), or cut off by a connection failure. Jitter keeps
+// conflicting writers from retrying in lockstep.
 var commitRetry = retry.Policy{
-	Classify:       classify,
+	Classify:       classifyTxn,
 	MaxAttempts:    5,
 	InitialBackoff: 5 * time.Second,
 	MaxBackoff:     20 * time.Second,
 	Jitter:         0.5,
 }
 
-// classify reports the Outcome of a transaction Fabric Warehouse rolled
-// back: a deadlock victim or a snapshot-isolation update conflict are
-// Retryable, since rolling back a transaction undoes everything it did.
+// classify sorts the errors that resolve on a retry. A deadlock victim or a
+// snapshot-isolation update conflict rolled its transaction back, and a login
+// refused during a system update ran nothing, so both are Retryable. A
+// connection failure is classified by retry.Network.
 func classify(err error) retry.Outcome {
-	mssqlErr, ok := errors.AsType[mssql.Error](err)
-	if !ok {
+	if mssqlErr, ok := errors.AsType[mssql.Error](err); ok {
+		switch {
+		case mssqlErr.Number == sqlServerDeadlockVictim,
+			mssqlErr.Number == fabricSnapshotUpdateConflict,
+			mssqlErr.Number == fabricSnapshotUpdateConflictAlt,
+			strings.Contains(mssqlErr.Message, fabricSystemUpdate):
+			return retry.Retryable
+		}
 		return retry.Fatal
 	}
-	switch mssqlErr.Number {
-	case sqlServerDeadlockVictim, fabricSnapshotUpdateConflict, fabricSnapshotUpdateConflictAlt:
+	if errors.Is(err, driver.ErrBadConn) {
+		return retry.Ambiguous
+	}
+	return retry.Network(err)
+}
+
+// classifyTxn classifies errors from a transaction. Fabric rolls back a
+// transaction whose connection drops, so only an error raised by COMMIT can
+// leave it committed.
+func classifyTxn(err error) retry.Outcome {
+	var outcome = classify(err)
+	if _, atCommit := errors.AsType[*commitError](err); outcome == retry.Ambiguous && !atCommit {
 		return retry.Retryable
 	}
-	return retry.Fatal
+	return outcome
 }
+
+// commitError is an error returned by COMMIT.
+type commitError struct{ err error }
+
+func (e *commitError) Error() string { return e.err.Error() }
+func (e *commitError) Unwrap() error { return e.err }

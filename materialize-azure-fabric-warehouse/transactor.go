@@ -345,8 +345,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 		defer db.Close()
 
-		// A deadlock or snapshot-isolation conflict rolls the whole
-		// transaction back, and the retry below reruns it from the start.
+		// A deadlock, snapshot-isolation conflict or connection failure
+		// before COMMIT rolls the whole transaction back, and the retry below
+		// reruns it from the start.
 		// Only the transaction is retried: the staged files and merge bounds
 		// it loads from are prepared once, here.
 		parameters := make([]*queryParams, len(t.bindings))
@@ -468,7 +469,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			} else if rows != 1 {
 				return fmt.Errorf("this instance was fenced off by another")
 			} else if err := txn.Commit(); err != nil {
-				return fmt.Errorf("committing store transaction: %w", err)
+				return fmt.Errorf("committing store transaction: %w", &commitError{err})
 			}
 
 			return nil
