@@ -79,6 +79,11 @@ func runTests(m *testing.M) int {
 			return 1
 		}
 
+		if err := createCDCWatermarkTable(); err != nil {
+			log.WithField("err", err).Error("error creating CDC watermark table")
+			return 1
+		}
+
 		stopScanner, err := startManualCDCScanner()
 		if err != nil {
 			log.WithField("err", err).Error("error taking over CDC log scanning")
@@ -186,6 +191,78 @@ func startManualCDCScanner() (func(), error) {
 	}, nil
 }
 
+// createCDCWatermarkTable creates a CDC-enabled table which no test captures. waitForCDC
+// writes a row to it and waits for that row to reach the change table.
+func createCDCWatermarkTable() error {
+	controlURI, err := controlConfigURI()
+	if err != nil {
+		return fmt.Errorf("building control connection DSN: %w", err)
+	}
+	conn, err := sql.Open("sqlserver", controlURI)
+	if err != nil {
+		return fmt.Errorf("opening control connection: %w", err)
+	}
+	defer conn.Close()
+
+	for _, query := range []string{
+		`IF OBJECT_ID('dbo.flow_test_cdc_watermarks', 'U') IS NULL CREATE TABLE dbo.flow_test_cdc_watermarks (id UNIQUEIDENTIFIER PRIMARY KEY)`,
+		`IF NOT EXISTS (SELECT 1 FROM cdc.change_tables WHERE capture_instance = 'flow_test_cdc_watermarks') ` +
+			`EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'flow_test_cdc_watermarks', @role_name = NULL, @capture_instance = 'flow_test_cdc_watermarks'`,
+	} {
+		if _, err := conn.ExecContext(context.Background(), query); err != nil {
+			return fmt.Errorf("executing %q: %w", query, err)
+		}
+	}
+	return nil
+}
+
+// waitForCDC waits until CDC has processed every transaction committed before the call, so
+// a run sees the test's preceding writes. The connector's fence alone has ended runs before
+// CDC reached writes committed seconds earlier. CDC reads the log in order, so a watermark
+// committed after those writes reaches its change table only once they have been processed.
+func waitForCDC(conn *sql.DB) error {
+	var ctx, cancel = context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	var id string
+	if err := retryOnDeadlock(ctx, func() error {
+		return conn.QueryRowContext(ctx, `INSERT INTO dbo.flow_test_cdc_watermarks OUTPUT CONVERT(VARCHAR(36), inserted.id) VALUES (NEWID())`).Scan(&id)
+	}); err != nil {
+		return fmt.Errorf("writing CDC watermark: %w", err)
+	}
+
+	for {
+		var found int
+		if err := retryOnDeadlock(ctx, func() error {
+			return conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM cdc.flow_test_cdc_watermarks_CT WHERE id = @p1`, id).Scan(&found)
+		}); err != nil {
+			return fmt.Errorf("waiting for CDC watermark %s: %w", id, err)
+		}
+		if found > 0 {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("CDC watermark %s not captured: %w", id, ctx.Err())
+		case <-time.After(25 * time.Millisecond):
+		}
+	}
+}
+
+func retryOnDeadlock(ctx context.Context, fn func() error) error {
+	for attempt := 1; ; attempt++ {
+		var err = fn()
+		if err == nil || !isDeadlockError(err) || attempt >= maxDeadlockRetries {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(time.Duration(attempt) * deadlockRetryDelay):
+		}
+	}
+}
+
 var documentSanitizers = []blackbox.JSONSanitizer{
 	{Matcher: regexp.MustCompile(`"lsn":"[0-9A-Za-z+/=]+"`), Replacement: `"lsn":"REDACTED"`},
 	{Matcher: regexp.MustCompile(`"seqval":"[0-9A-Za-z+/=]+"`), Replacement: `"seqval":"REDACTED"`},
@@ -251,6 +328,7 @@ func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.Transcri
 
 	var conn = sql.OpenDB(connector)
 	t.Cleanup(func() { conn.Close() })
+	tc.Capture.BeforeRun = func() error { return waitForCDC(conn) }
 
 	// Setup: Create database interface with <NAME> templating
 	var db = &sqlserverTestDatabase{
