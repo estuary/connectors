@@ -13,7 +13,7 @@ To use this connector, you'll need:
 - An Elastic cluster with a known [endpoint](https://www.elastic.co/guide/en/elasticsearch/reference/current/getting-started.html#send-requests-to-elasticsearch)
 - The role used to connect to Elasticsearch must have at least the following privileges (see Elastic's documentation on [defining roles](https://www.elastic.co/guide/en/elasticsearch/reference/current/defining-roles.html#roles-indices-priv) and [security privileges](https://www.elastic.co/guide/en/elasticsearch/reference/current/security-privileges.html#privileges-list-indices)):
   - **Cluster privilege** of `monitor`
-  - For each index to be created: `read`, `write`, `view_index_metadata`, and `create_index`. When creating **Index privileges**, you can use a wildcard `"*"` to grant the privileges to all indices.
+  - For each index to be created: `read`, `write`, `view_index_metadata`, `create_index`, and `delete_index`. The `delete_index` privilege is needed to backfill a binding whose index already exists, which deletes and recreates the index. When creating **Index privileges**, you can use a wildcard `"*"` to grant the privileges to all indices.
 - At least one Estuary collection
 
 :::tip
