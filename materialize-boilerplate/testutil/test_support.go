@@ -1289,7 +1289,9 @@ func shouldCleanup(now time.Time, item string, suffix string) (bool, string) {
 		// A caller with no run of its own passes an empty suffix, which must not
 		// match here: it would otherwise claim every test item, including those
 		// a concurrent run is still using.
-	} else if suffix != "" && strings.HasSuffix(item, suffix) {
+	} else if suffix != "" && strings.HasSuffix(item, suffix) && !strings.HasPrefix(item, flowCheckpointsTableName) {
+		// A test run's own checkpoints table outlives each of its tests, so
+		// only age removes one.
 		return true, "created by this test run"
 	} else if parts := strings.Split(item, "_"); len(parts) < 2 {
 		return false, "malformed test item name"
