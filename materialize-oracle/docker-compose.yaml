@@ -1,6 +1,7 @@
 services:
   oracle:
-    image: 'gvenzl/oracle-free:23-slim-faststart'
+    # 23c Free, the oldest supported release.
+    image: 'gvenzl/oracle-free:23.3-slim-faststart'
     platform: linux/amd64
     environment:
       ORACLE_PASSWORD: 'adminpassword'
@@ -11,7 +12,9 @@ services:
     networks:
       - flow-test
     healthcheck:
-      test: ["CMD", "healthcheck.sh"]
+      # The image's healthcheck.sh passes before the entrypoint has created
+      # APP_USER, so readiness is that user logging in.
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM dual;' | sqlplus -s -L flow/flowpassword@//localhost/FREEPDB1"]
       interval: 5s
       timeout: 10s
       retries: 120
