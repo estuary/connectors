@@ -336,7 +336,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	// transaction just refreshed.
 	for idx, boundary := range t.truncations {
 		b := t.bindings[idx]
-		deleted, err := t.client.deleteBefore(ctx, b.index, b.publishedAtField, boundary, truncationTagPrefix(t.materializationName, b.index))
+		deleted, err := t.client.deleteBefore(ctx, b.index, b.publishedAtField, boundary, truncationTagPrefix(t.materializationName, b.index), t.isServerless)
 		if isForbidden(err) {
 			t.be.Warn(b.index, fmt.Sprintf("Documents published before the backfill of index %q were not deleted because the credentials lack the privileges to do so, which requires the maintenance index privilege: %s.", b.index, err))
 			continue

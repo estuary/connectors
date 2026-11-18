@@ -757,9 +757,12 @@ func (d *materialization) NewTransactor(
 		truncateAfterBackfill: d.featureFlags["truncate_after_backfill"] && !d.featureFlags["retain_existing_data_on_backfill"],
 	}
 
-	err = transactor.cancelTruncations(ctx)
-	if err != nil {
-		log.WithError(err).Warn("unable to cancel pre-existing truncations")
+	// Serverless clusters don't support listing or cancelling tasks.
+	if !isServerless {
+		err = transactor.cancelTruncations(ctx)
+		if err != nil {
+			log.WithError(err).Warn("unable to cancel pre-existing truncations")
+		}
 	}
 	return transactor, nil
 

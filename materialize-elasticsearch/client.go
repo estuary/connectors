@@ -109,7 +109,9 @@ func (c *client) deleteIndex(ctx context.Context, index string) error {
 // value for dateField is left alone, since there's no publication time to
 // compare. The delete is tagged with an opaque ID that starts with tagPrefix,
 // which identifies it as this materialization's truncation of index.
-func (c *client) deleteBefore(ctx context.Context, index string, dateField string, before time.Time, tagPrefix string) (int64, error) {
+// isServerless is true for a serverless cluster, which doesn't support
+// listing tasks.
+func (c *client) deleteBefore(ctx context.Context, index string, dateField string, before time.Time, tagPrefix string, isServerless bool) (int64, error) {
 	// DeleteByQuery finds the documents to delete with a search, and a search
 	// only sees the documents as of the index's last refresh. A bulk store is
 	// durable once it's acknowledged, but its documents don't become visible
@@ -151,11 +153,15 @@ func (c *client) deleteBefore(ctx context.Context, index string, dateField strin
 	// attempt started that task and it's still running, the retry waits on it
 	// instead. The opaque ID ends with a random suffix, so a retry never
 	// mistakes a delete from an earlier run for its own.
+	//
+	// A serverless cluster can't list tasks, so there a retried start always
+	// sends another request. If that starts a second task, the two overlap
+	// and the later one fails with a version conflict.
 	var opaqueID = tagPrefix + uuid.NewString()
 	var taskID string
 	var attempted bool
 	err = requestRetry.Do(ctx, "starting delete by query", func(ctx context.Context) error {
-		if attempted {
+		if attempted && !isServerless {
 			running, err := c.listDeleteByQueryTasks(ctx, []string{tagPrefix})
 			if err != nil {
 				return err
