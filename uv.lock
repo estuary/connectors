@@ -41,6 +41,7 @@ members = [
     "source-hubspot-native",
     "source-impact-native",
     "source-incident-io",
+    "source-influxdb",
     "source-intercom-native",
     "source-iterable",
     "source-iterable-native",
@@ -2227,6 +2228,21 @@ requires-dist = [
 name = "source-incident-io"
 version = "0.1.0"
 source = { editable = "source-incident-io" }
+dependencies = [
+    { name = "estuary-cdk" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "pydantic", specifier = ">=2,<3" },
+]
+
+[[package]]
+name = "source-influxdb"
+version = "0.1.0"
+source = { editable = "source-influxdb" }
 dependencies = [
     { name = "estuary-cdk" },
     { name = "pydantic" },
