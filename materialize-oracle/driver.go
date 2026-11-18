@@ -6,12 +6,14 @@ import (
 	"crypto/x509"
 	stdsql "database/sql"
 	"database/sql/driver"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/estuary/connectors/go/common"
@@ -94,7 +96,7 @@ type config struct {
 	Credentials credentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=2"`
 	Database    string            `json:"database" jsonschema:"title=Database,description=Service name of the database (pluggable database) to materialize to." jsonschema_extras:"order=3"`
 	Schema      string            `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 table. Defaults to the schema of the user." jsonschema_extras:"order=4"`
-	SSLMode     sslMode           `json:"sslmode" jsonschema:"title=SSL Mode,description=How to secure the connection. 'verify-full' connects over TLS (TCPS) and verifies the server certificate and host name. 'require' connects over TLS without verifying them. 'disable' connects over plain TCP and relies on an SSH tunnel or Oracle native network encryption for security.,enum=verify-full,enum=require,enum=disable,default=verify-full" jsonschema_extras:"order=5,nonsensitive=true"`
+	SSLMode     sslMode           `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=How to secure the connection. 'verify-full' connects over TLS (TCPS) and verifies the server certificate and host name. 'require' connects over TLS without verifying them. 'disable' connects over plain TCP and relies on an SSH tunnel or Oracle native network encryption for security.,enum=verify-full,enum=require,enum=disable,default=verify-full" jsonschema_extras:"order=5,nonsensitive=true"`
 	HardDelete  bool              `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=6,nonsensitive=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
@@ -117,9 +119,7 @@ func (c config) Validate() error {
 		return err
 	}
 	switch c.SSLMode {
-	case sslDisable, sslRequire, sslVerifyFull:
-	case "":
-		return errors.New("missing 'sslmode'")
+	case "", sslDisable, sslRequire, sslVerifyFull:
 	default:
 		return fmt.Errorf("invalid 'sslmode' %q", c.SSLMode)
 	}
@@ -150,13 +150,9 @@ func (c config) toURI() string {
 
 	var params = url.Values{}
 	params.Set("PROGRAM", "Estuary Flow Materialization")
-	switch c.SSLMode {
-	case sslRequire:
+	// What is verified is up to tlsConfig.
+	if c.SSLMode != sslDisable {
 		params.Set("SSL", "true")
-		params.Set("SSL VERIFY", "false")
-	case sslVerifyFull:
-		params.Set("SSL", "true")
-		params.Set("SSL VERIFY", "true")
 	}
 
 	var uri = url.URL{
@@ -198,34 +194,36 @@ func (c config) openDB() *stdsql.DB {
 	return stdsql.OpenDB(sessionConnector{connector})
 }
 
-// tlsConfig verifies the server certificate against the configured host, not
-// the address dialed, which is localhost through an SSH tunnel. The driver
-// sets ServerName to the dialed address, so the check is our own.
+// tlsConfig is verify-full unless another SSL mode is set. It verifies the
+// server certificate against the configured host, not the address dialed,
+// which is localhost through an SSH tunnel. The driver sets ServerName to the
+// dialed address, so the check is our own.
 func (c config) tlsConfig() *tls.Config {
 	switch c.SSLMode {
+	case sslDisable:
+		return nil
 	case sslRequire:
 		return &tls.Config{InsecureSkipVerify: true}
-	case sslVerifyFull:
-		var host = c.Address
-		if h, _, err := net.SplitHostPort(c.Address); err == nil {
-			host = h
-		}
-		return &tls.Config{
-			InsecureSkipVerify: true,
-			VerifyConnection: func(cs tls.ConnectionState) error {
-				if len(cs.PeerCertificates) == 0 {
-					return errors.New("the server presented no certificate")
-				}
-				var intermediates = x509.NewCertPool()
-				for _, cert := range cs.PeerCertificates[1:] {
-					intermediates.AddCert(cert)
-				}
-				_, err := cs.PeerCertificates[0].Verify(x509.VerifyOptions{DNSName: host, Intermediates: intermediates})
-				return err
-			},
-		}
 	}
-	return nil
+
+	var host = c.Address
+	if h, _, err := net.SplitHostPort(c.Address); err == nil {
+		host = h
+	}
+	return &tls.Config{
+		InsecureSkipVerify: true,
+		VerifyConnection: func(cs tls.ConnectionState) error {
+			if len(cs.PeerCertificates) == 0 {
+				return errors.New("the server presented no certificate")
+			}
+			var intermediates = x509.NewCertPool()
+			for _, cert := range cs.PeerCertificates[1:] {
+				intermediates.AddCert(cert)
+			}
+			_, err := cs.PeerCertificates[0].Verify(x509.VerifyOptions{DNSName: host, Intermediates: intermediates})
+			return err
+		},
+	}
 }
 
 type tableConfig struct {
@@ -401,7 +399,13 @@ func newTransactor(
 		truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 	}
 	t.store.fence = fence
-	t.fenceSQL = updateFenceSQL(ep.Dialect, fence)
+
+	var templates = renderTemplates(ep.Dialect)
+	var fenceUpdate strings.Builder
+	if err := templates.updateFence.Execute(&fenceUpdate, fence); err != nil {
+		return nil, fmt.Errorf("evaluating fence template: %w", err)
+	}
+	t.fenceSQL = fenceUpdate.String()
 
 	var err error
 	t.db = ep.Config.openDB()
@@ -413,32 +417,40 @@ func newTransactor(
 	}
 
 	for _, target := range bindings {
-		var b = &binding{
-			target:    target,
-			insertSQL: insertSQL(&target),
-			deleteSQL: deleteSQL(&target),
+		if err := t.addBinding(target, templates, is); err != nil {
+			return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 		}
-		var cols []*sql.Column
-		cols, b.order = storeColumns(&target)
-		b.lobStart = len(cols)
-		for i, c := range cols {
-			if isLOB(c) {
-				b.lobStart = i
-				break
-			}
-		}
-		if target.Document != nil {
-			b.loadSQL = loadSQL(&target)
-		}
-		if col, err := target.PublishedAtColumn(); err != nil {
-			b.truncateReason = err
-		} else {
-			b.truncateReason = addTruncation(b, col, is)
-		}
-		t.bindings = append(t.bindings, b)
 	}
 
 	return t, nil
+}
+
+func (t *transactor) addBinding(target sql.Table, templates templates, is *boilerplate.InfoSchema) error {
+	var b = &binding{target: target}
+	_, b.order, b.lobStart = storeColumns(&target)
+
+	for _, m := range []struct {
+		sql *string
+		tpl *template.Template
+	}{
+		{&b.insertSQL, templates.storeInsert},
+		{&b.deleteSQL, templates.deleteQuery},
+		{&b.loadSQL, templates.loadQuery},
+	} {
+		var err error
+		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
+			return err
+		}
+	}
+
+	if col, err := target.PublishedAtColumn(); err != nil {
+		b.truncateReason = err
+	} else {
+		b.truncateReason = addTruncation(b, col, is)
+	}
+
+	t.bindings = append(t.bindings, b)
+	return nil
 }
 
 // addTruncation prepares b to delete the rows whose col is earlier than a
@@ -757,7 +769,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		if t.store.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
-		if res, err := txn.ExecContext(ctx, t.fenceSQL, go_ora.Clob{String: encodeCheckpoint(t.store.fence.Checkpoint), Valid: true}); err != nil {
+		if res, err := txn.ExecContext(ctx, t.fenceSQL, go_ora.Clob{String: base64.StdEncoding.EncodeToString(t.store.fence.Checkpoint), Valid: true}); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("updating flow checkpoint: %w", err))
 		} else if n, err := res.RowsAffected(); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("updating flow checkpoint (rows affected): %w", err))
@@ -778,14 +790,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 // (MAX_STRING_SIZE=EXTENDED). The driver and Oracle each use one of those two
 // limits, so values of one class are on the same side of either.
 func lobSizeClass(v any) byte {
-	var n int
-	switch v := v.(type) {
-	case string:
-		n = len(v)
-	case []byte:
-		n = len(v)
-	}
-	switch {
+	switch n := valueSize(v); {
 	case n <= 4000:
 		return 0
 	case n <= 32767:

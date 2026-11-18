@@ -223,7 +223,9 @@ func TestIntegration(t *testing.T) {
 			},
 			Document: &sql.Column{Identifier: "flow_document"},
 		}
-		_, err = db.ExecContext(ctx, "EXPLAIN PLAN SET STATEMENT_ID = '"+name+"' FOR "+loadSQL(&table))
+		loadQuery, err := sql.RenderTableTemplate(table, testTemplates.loadQuery)
+		require.NoError(t, err)
+		_, err = db.ExecContext(ctx, "EXPLAIN PLAN SET STATEMENT_ID = '"+name+"' FOR "+loadQuery)
 		require.NoError(t, err)
 
 		rows, err := db.QueryContext(ctx, "SELECT operation || ' ' || options || ' ' || object_name FROM plan_table WHERE statement_id = :1 ORDER BY id", name)
@@ -295,11 +297,14 @@ func TestIntegration(t *testing.T) {
 			NewDriver(),
 			"testdata/fence.flow.yaml",
 			makeResourceFn,
-			renderTemplates(newOracleDialect("FLOW")).createTargetTable,
+			testTemplates.createTargetTable,
 			func(ctx context.Context, c sql.Client, fence sql.Fence) error {
-				var cl = c.(*client)
-				_, err := cl.db.ExecContext(ctx, updateFenceSQL(cl.ep.Dialect, fence),
-					go_ora.Clob{String: encodeCheckpoint(fence.Checkpoint), Valid: true})
+				var fenceUpdate strings.Builder
+				if err := testTemplates.updateFence.Execute(&fenceUpdate, fence); err != nil {
+					return fmt.Errorf("evaluating fence template: %w", err)
+				}
+				_, err := c.(*client).db.ExecContext(ctx, fenceUpdate.String(),
+					go_ora.Clob{String: base64.StdEncoding.EncodeToString(fence.Checkpoint), Valid: true})
 				return err
 			},
 		)

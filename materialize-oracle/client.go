@@ -24,14 +24,15 @@ import (
 const minimumMajorVersion = 23
 
 type client struct {
-	db *stdsql.DB
-	ep *sql.Endpoint[config]
+	db        *stdsql.DB
+	ep        *sql.Endpoint[config]
+	templates templates
 }
 
 var _ sql.Client = (*client)(nil)
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	return &client{db: ep.Config.openDB(), ep: ep}, nil
+	return &client{db: ep.Config.openDB(), ep: ep, templates: renderTemplates(ep.Dialect)}, nil
 }
 
 func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.PrereqErr {
@@ -231,6 +232,7 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 		}
 		return []string{fmt.Sprintf("UPDATE %s SET %s", table.Identifier, strings.Join(sets, ", "))}, nil
 	},
+	// One statement, since a DROP rewrites every row of the table.
 	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
 		var cols []string
 		for _, ins := range instructions {
@@ -238,13 +240,7 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 		}
 		return []string{fmt.Sprintf("ALTER TABLE %s DROP (%s)", table.Identifier, strings.Join(cols, ", "))}, nil
 	},
-	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
-		var out []string
-		for _, ins := range instructions {
-			out = append(out, fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s", table.Identifier, ins.TempColumnIdentifier, ins.TypeMigration.Identifier))
-		}
-		return out, nil
-	},
+	sql.StdMigrationSteps[3],
 	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
 		var mods []string
 		for _, ins := range instructions {
@@ -262,20 +258,12 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var stmts []string
 
-	if len(ta.AddColumns) > 0 {
-		var cols []string
-		for _, col := range ta.AddColumns {
-			cols = append(cols, fmt.Sprintf("%s %s", col.Identifier, col.NullableDDL))
+	if len(ta.AddColumns) > 0 || len(ta.DropNotNulls) > 0 {
+		var alterColumns strings.Builder
+		if err := c.templates.alterTableColumns.Execute(&alterColumns, ta); err != nil {
+			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
-		stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s ADD (%s)", ta.Identifier, strings.Join(cols, ", ")))
-	}
-
-	if len(ta.DropNotNulls) > 0 {
-		var cols []string
-		for _, f := range ta.DropNotNulls {
-			cols = append(cols, fmt.Sprintf("%s NULL", c.ep.Dialect.Identifier(f.Name)))
-		}
-		stmts = append(stmts, fmt.Sprintf("ALTER TABLE %s MODIFY (%s)", ta.Identifier, strings.Join(cols, ", ")))
+		stmts = append(stmts, strings.TrimSpace(alterColumns.String()))
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
@@ -313,36 +301,18 @@ func (c *client) checkpointsIdentifier() string {
 }
 
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
-	rows, err := c.db.QueryContext(ctx, fmt.Sprintf("SELECT %s FROM %s",
-		c.ep.Dialect.Identifier("materialization"), c.checkpointsIdentifier()))
-	if err != nil {
-		return nil, fmt.Errorf("querying materializations from checkpoints table: %w", err)
-	}
-	defer rows.Close()
-
-	var out []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
-		out = append(out, name)
-	}
-	return out, rows.Err()
+	return sql.ListCheckpointsEntries(ctx, c.db, c.checkpointsIdentifier())
 }
 
 func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
-	_, err := c.db.ExecContext(ctx, fmt.Sprintf("DELETE FROM %s WHERE %s = :1",
-		c.checkpointsIdentifier(), c.ep.Dialect.Identifier("materialization")), taskName)
-	return err
+	return sql.DeleteCheckpointsEntry(ctx, c.db, c.checkpointsIdentifier(), taskName)
 }
 
 // SnapshotTestTable names the columns of unquoted identifiers in lower case
 // and reads integers as numbers rather than the driver's text, so that
 // snapshots shared with other connectors compare equal.
 func (c *client) SnapshotTestTable(ctx context.Context, path []string) ([]string, [][]any, error) {
-	var ident = c.ep.Dialect.Identifier(path...)
-	cols, rows, err := sql.SnapshotTestTableQuery(ctx, c.db, ident, "SELECT * FROM "+ident)
+	cols, rows, err := sql.SnapshotTestTable(ctx, c.db, c.ep.Dialect.Identifier(path...))
 	if err != nil {
 		return nil, nil, err
 	}

@@ -31,6 +31,9 @@ func TestTLSConfig(t *testing.T) {
 
 	require.Nil(t, config{SSLMode: sslDisable}.tlsConfig())
 	require.True(t, config{SSLMode: sslRequire}.tlsConfig().InsecureSkipVerify)
+	require.Nil(t, config{SSLMode: sslRequire}.tlsConfig().VerifyConnection)
+	// An unset SSL mode verifies like verify-full.
+	require.NotNil(t, config{Address: "example.com:2484"}.tlsConfig().VerifyConnection)
 
 	// The test server's certificate is self-signed for example.com, so it's
 	// rejected for its authority, and for a host name it doesn't cover.

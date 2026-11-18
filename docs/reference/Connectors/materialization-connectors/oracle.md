@@ -63,7 +63,7 @@ Use the below properties to configure an Oracle materialization, which will dire
 | **`/credentials/password`**  | Password      | Password for the user.                                                                                                              | string  | Required         |
 | **`/database`**              | Database      | Service name of the database (pluggable database) to materialize to.                                                                | string  | Required         |
 | `/schema`                    | Schema        | Schema for bound collection tables and the `flow_checkpoints_v1` table. Defaults to the schema of the user.                         | string  |                  |
-| **`/sslmode`**               | SSL Mode      | `verify-full` connects over TLS (TCPS) and verifies the server's certificate and host name. `require` connects over TLS without verifying them. `disable` connects over plain TCP. | string | Required, `verify-full` |
+| `/sslmode`                   | SSL Mode      | `verify-full` connects over TLS (TCPS) and verifies the server's certificate and host name. `require` connects over TLS without verifying them. `disable` connects over plain TCP. | string | `verify-full` |
 | `/hardDelete`                | Hard Delete   | Delete rows from the destination when their documents are deleted in the source. Otherwise `_meta/op` marks deleted documents.      | boolean | `false`          |
 
 #### Bindings

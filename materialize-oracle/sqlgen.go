@@ -35,24 +35,13 @@ func isSimpleIdentifier(s string) bool {
 	return simpleIdentifierRegexp.MatchString(s) && !slices.Contains(reservedWords, strings.ToUpper(s))
 }
 
-// Neither quoted nor unquoted identifiers can contain a double quote.
-func sanitizeIdentifier(s string) string {
-	return strings.ReplaceAll(s, `"`, "_")
-}
-
-// translateIdentifier returns the name Oracle stores for s.
+// translateIdentifier returns the name Oracle stores for s. No identifier can
+// contain a double quote, so a quoted one has them replaced.
 func translateIdentifier(s string) string {
 	if isSimpleIdentifier(s) {
 		return strings.ToUpper(s)
 	}
-	return sanitizeIdentifier(s)
-}
-
-func quoteIdentifier(s string) string {
-	if isSimpleIdentifier(s) {
-		return s
-	}
-	return `"` + sanitizeIdentifier(s) + `"`
+	return strings.ReplaceAll(s, `"`, "_")
 }
 
 // numberConverter renders an integer as decimal text for TO_NUMBER, which
@@ -205,7 +194,8 @@ func newOracleDialect(defaultSchema string) sql.Dialect {
 		}),
 		SchemaLocatorer: sql.SchemaLocatorFn(translateIdentifier),
 		ColumnLocatorer: sql.ColumnLocatorFn(translateIdentifier),
-		Identifierer:    sql.IdentifierFn(sql.JoinTransform(".", quoteIdentifier)),
+		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
+			sql.PassThroughTransform(isSimpleIdentifier, sql.QuoteTransform(`"`, "_")))),
 		Literaler:       sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			return fmt.Sprintf(":%d", index+1)
@@ -331,9 +321,10 @@ func isLOB(c *sql.Column) bool {
 	return strings.Contains(strings.ToUpper(c.BareDDL), "LOB")
 }
 
-// bindExpr wraps a placeholder so the database parses the bound text into the
-// column's type.
-func bindExpr(c *sql.Column, placeholder string) string {
+// bindExpr is the bind at position index, wrapped so the database parses the
+// bound text into the column's type.
+func bindExpr(c sql.Column, index int) string {
+	var placeholder = fmt.Sprintf(":%d", index+1)
 	switch {
 	case strings.HasPrefix(c.BareDDL, "NUMBER"):
 		return "TO_NUMBER(" + placeholder + ")"
@@ -348,51 +339,23 @@ func bindExpr(c *sql.Column, placeholder string) string {
 	}
 }
 
-// storeColumns orders a table's columns for INSERT, with LOB columns last.
-// The returned permutation maps each position to the index of the value from
-// Table.ConvertAll.
-func storeColumns(t *sql.Table) ([]*sql.Column, []int) {
-	var cols = t.Columns()
-	var order = make([]int, len(cols))
-	for i := range order {
-		order[i] = i
-	}
-	slices.SortStableFunc(order, func(a, b int) int {
-		var la, lb = isLOB(cols[a]), isLOB(cols[b])
-		switch {
-		case la == lb:
-			return 0
-		case lb:
-			return -1
-		default:
-			return 1
+// storeColumns orders a table's columns for INSERT, with the LOB columns last
+// from position lobStart. order maps each position to the index of its value
+// in Table.ConvertAll's output.
+func storeColumns(t *sql.Table) (cols []*sql.Column, order []int, lobStart int) {
+	var all = t.Columns()
+	for _, lob := range []bool{false, true} {
+		if lob {
+			lobStart = len(cols)
 		}
-	})
-	var out = make([]*sql.Column, len(cols))
-	for i, idx := range order {
-		out[i] = cols[idx]
+		for i, c := range all {
+			if isLOB(c) == lob {
+				cols = append(cols, c)
+				order = append(order, i)
+			}
+		}
 	}
-	return out, order
-}
-
-// insertSQL inserts one row per element of the bound arrays.
-func insertSQL(t *sql.Table) string {
-	var cols, _ = storeColumns(t)
-	var names, binds []string
-	for i, c := range cols {
-		names = append(names, c.Identifier)
-		binds = append(binds, bindExpr(c, fmt.Sprintf(":%d", i+1)))
-	}
-	return fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", t.Identifier, strings.Join(names, ", "), strings.Join(binds, ", "))
-}
-
-// deleteSQL deletes the row of each bound key.
-func deleteSQL(t *sql.Table) string {
-	var conds []string
-	for i, k := range t.Keys {
-		conds = append(conds, fmt.Sprintf("%s = %s", k.Identifier, bindExpr(&k, fmt.Sprintf(":%d", i+1))))
-	}
-	return fmt.Sprintf("DELETE FROM %s WHERE %s", t.Identifier, strings.Join(conds, " AND "))
+	return cols, order, lobStart
 }
 
 // keyKind is how a key column is sent to JSON_TABLE and compared to the
@@ -419,38 +382,30 @@ func keyKindOf(c *sql.Column) keyKind {
 	}
 }
 
-// loadSQL selects the documents of a JSON array of key tuples, bound as :1.
-// A key that fails to convert is an error rather than a silent miss.
-func loadSQL(t *sql.Table) string {
-	var cols, conds []string
-	for i, k := range t.Keys {
-		var lk = fmt.Sprintf("l.k%d", i)
-		var path = fmt.Sprintf("'$[%d]'", i)
-		switch keyKindOf(&k) {
-		case keyNumber:
-			cols = append(cols, fmt.Sprintf("k%d NUMBER PATH %s ERROR ON ERROR", i, path))
-		case keyString:
-			cols = append(cols, fmt.Sprintf("k%d VARCHAR2(4000) PATH %s ERROR ON ERROR", i, path))
-		case keyRaw:
-			cols = append(cols, fmt.Sprintf("k%d VARCHAR2(4000) PATH %s ERROR ON ERROR", i, path))
-			lk = "HEXTORAW(" + lk + ")"
-		case keyBoolean:
-			cols = append(cols, fmt.Sprintf("k%d VARCHAR2(5) PATH %s ERROR ON ERROR", i, path))
-			lk = "TO_BOOLEAN(" + lk + ")"
-		}
-		conds = append(conds, fmt.Sprintf("r.%s = %s", k.Identifier, lk))
+// loadKeyColumn is the JSON_TABLE column of the key at index. A key that
+// fails to convert is an error rather than a silent miss.
+func loadKeyColumn(c sql.Column, index int) string {
+	var ddl = "VARCHAR2(4000)"
+	switch keyKindOf(&c) {
+	case keyNumber:
+		ddl = "NUMBER"
+	case keyBoolean:
+		ddl = "VARCHAR2(5)"
 	}
+	return fmt.Sprintf("k%d %s PATH '$[%d]' ERROR ON ERROR", index, ddl, index)
+}
 
-	// The optimizer has no row estimate for JSON_TABLE over a bind, and
-	// without one hash-joins it to a full scan of the table, even with join
-	// hints. The cardinality hint makes it look up each key in the primary key.
-	return fmt.Sprintf(
-		"SELECT /*+ LEADING(l r) USE_NL(r) INDEX(r) CARDINALITY(l 10) */ r.%s\nFROM JSON_TABLE(:1, '$[*]' ERROR ON ERROR COLUMNS (%s)) l\nJOIN %s r ON %s",
-		t.Document.Identifier,
-		strings.Join(cols, ", "),
-		t.Identifier,
-		strings.Join(conds, " AND "),
-	)
+// loadKeyExpr converts the JSON_TABLE column of the key at index to the type
+// of the table's column.
+func loadKeyExpr(c sql.Column, index int) string {
+	var lk = fmt.Sprintf("l.k%d", index)
+	switch keyKindOf(&c) {
+	case keyRaw:
+		return "HEXTORAW(" + lk + ")"
+	case keyBoolean:
+		return "TO_BOOLEAN(" + lk + ")"
+	}
+	return lk
 }
 
 // appendLoadKey appends a converted key as a JSON array to buf.
@@ -494,6 +449,11 @@ func appendLoadKey(buf []byte, t *sql.Table, converted []any) ([]byte, error) {
 
 type templates struct {
 	createTargetTable *template.Template
+	alterTableColumns *template.Template
+	loadQuery         *template.Template
+	storeInsert       *template.Template
+	deleteQuery       *template.Template
+	updateFence       *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -514,9 +474,98 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	{{- end }}
 )
 {{- end }}
-`)
+
+-- Adds columns and drops NOT NULL constraints in one statement.
+
+{{ define "alterTableColumns" }}
+ALTER TABLE {{$.Identifier}}
+{{- if $.AddColumns }} ADD (
+	{{- range $ind, $col := $.AddColumns }}
+		{{- if $ind }}, {{ end -}}
+		{{$col.Identifier}} {{$col.NullableDDL}}
+	{{- end -}}
+){{ end }}
+{{- if $.DropNotNulls }} MODIFY (
+	{{- range $ind, $col := $.DropNotNulls }}
+		{{- if $ind }}, {{ end -}}
+		{{ ColumnIdentifier $col.Name }} NULL
+	{{- end -}}
+){{ end }}
+{{ end }}
+
+-- Selects the documents of a JSON array of key tuples, bound as :1.
+--
+-- The optimizer has no row estimate for JSON_TABLE over a bind, and without
+-- one hash-joins it to a full scan of the table, even with join hints. The
+-- cardinality hint makes it look up each key in the primary key.
+
+{{ define "loadQuery" }}
+{{ if $.Document -}}
+SELECT /*+ LEADING(l r) USE_NL(r) INDEX(r) CARDINALITY(l 10) */ r.{{$.Document.Identifier}}
+FROM JSON_TABLE(:1, '$[*]' ERROR ON ERROR COLUMNS (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }}, {{ end -}}
+		{{ LoadKeyColumn $key $ind }}
+	{{- end -}}
+)) l
+JOIN {{$.Identifier}} r ON {{ range $ind, $key := $.Keys }}
+	{{- if $ind }} AND {{ end -}}
+	r.{{$key.Identifier}} = {{ LoadKeyExpr $key $ind }}
+{{- end }}
+{{ end -}}
+{{ end }}
+
+-- Inserts one row per element of the bound arrays, with LOB columns last.
+
+{{ define "storeInsert" }}
+INSERT INTO {{$.Identifier}} (
+	{{- range $ind, $col := StoreColumns $ }}
+		{{- if $ind }}, {{ end -}}
+		{{$col.Identifier}}
+	{{- end -}}
+) VALUES (
+	{{- range $ind, $col := StoreColumns $ }}
+		{{- if $ind }}, {{ end -}}
+		{{ Bind $col $ind }}
+	{{- end -}}
+)
+{{ end }}
+
+-- Deletes the row of each bound key.
+
+{{ define "deleteQuery" }}
+DELETE FROM {{$.Identifier}} WHERE {{ range $ind, $key := $.Keys }}
+	{{- if $ind }} AND {{ end -}}
+	{{$key.Identifier}} = {{ Bind $key $ind }}
+{{- end }}
+{{ end }}
+
+-- Updates the fence's checkpoint, bound as :1, if the fence still holds.
+
+{{ define "updateFence" }}
+UPDATE {{ Identifier $.TablePath }}
+	SET   {{ ColumnIdentifier "checkpoint" }} = :1
+	WHERE {{ ColumnIdentifier "materialization" }} = {{ Literal $.Materialization.String }}
+	AND   {{ ColumnIdentifier "key_begin" }} = {{ $.KeyBegin }}
+	AND   {{ ColumnIdentifier "key_end" }} = {{ $.KeyEnd }}
+	AND   {{ ColumnIdentifier "fence" }} = {{ $.Fence }}
+{{ end }}
+`, template.FuncMap{
+		"StoreColumns": func(t sql.Table) []*sql.Column {
+			var cols, _, _ = storeColumns(&t)
+			return cols
+		},
+		"Bind":          bindExpr,
+		"LoadKeyColumn": loadKeyColumn,
+		"LoadKeyExpr":   loadKeyExpr,
+	})
 
 	return templates{
 		createTargetTable: tplAll.Lookup("createTargetTable"),
+		alterTableColumns: tplAll.Lookup("alterTableColumns"),
+		loadQuery:         tplAll.Lookup("loadQuery"),
+		storeInsert:       tplAll.Lookup("storeInsert"),
+		deleteQuery:       tplAll.Lookup("deleteQuery"),
+		updateFence:       tplAll.Lookup("updateFence"),
 	}
 }

@@ -7,50 +7,30 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
 
 var testDialect = newOracleDialect("FLOW")
+var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
-	snap, tables := sql.RunSqlGenTests(
+	snap, _ := sql.RunSqlGenTests(
 		t,
 		testDialect,
 		func(table string) []string { return []string{table} },
 		sql.TestTemplates{
-			TableTemplates: []*template.Template{renderTemplates(testDialect).createTargetTable},
+			TableTemplates: []*template.Template{
+				testTemplates.createTargetTable,
+				testTemplates.loadQuery,
+				testTemplates.storeInsert,
+				testTemplates.deleteQuery,
+			},
+			TplAddColumns:    testTemplates.alterTableColumns,
+			TplDropNotNulls:  testTemplates.alterTableColumns,
+			TplCombinedAlter: testTemplates.alterTableColumns,
+			TplUpdateFence:   testTemplates.updateFence,
 		},
 	)
-
-	for _, tbl := range tables {
-		for _, tc := range []struct {
-			name string
-			sql  string
-		}{
-			{"insert", insertSQL(&tbl)},
-			{"delete", deleteSQL(&tbl)},
-		} {
-			snap.WriteString("--- Begin " + tbl.Identifier + " " + tc.name + " ---\n")
-			snap.WriteString(tc.sql)
-			snap.WriteString("\n--- End " + tbl.Identifier + " " + tc.name + " ---\n\n")
-		}
-		if tbl.Document != nil {
-			snap.WriteString("--- Begin " + tbl.Identifier + " load ---\n")
-			snap.WriteString(loadSQL(&tbl))
-			snap.WriteString("\n--- End " + tbl.Identifier + " load ---\n\n")
-		}
-	}
-
-	snap.WriteString("--- Begin Fence Update ---\n")
-	snap.WriteString(updateFenceSQL(testDialect, sql.Fence{
-		TablePath:       sql.TablePath{"path", "to", "checkpoints"},
-		Fence:           123,
-		Materialization: pf.Materialization("some/Materialization"),
-		KeyBegin:        0x00112233,
-		KeyEnd:          0xffeeddcc,
-	}))
-	snap.WriteString("\n--- End Fence Update ---\n")
 
 	cupaloy.SnapshotT(t, snap.String())
 }

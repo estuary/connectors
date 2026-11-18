@@ -138,8 +138,7 @@
       "address",
       "user",
       "credentials",
-      "database",
-      "sslmode"
+      "database"
     ],
     "title": "SQL Connection"
   },
