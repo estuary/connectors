@@ -35,9 +35,12 @@ services:
     image: "opensearchproject/opensearch:2.13.0"
     environment:
       - "discovery.type=single-node"
-      # Disable the security plugin for ease of testing, matching the
-      # elasticsearch service which disables TLS and uses simple auth.
-      - "DISABLE_SECURITY_PLUGIN=true"
+      # The security plugin is enabled so that tests can run with restricted
+      # privileges. It requires TLS between nodes, for which the image
+      # installs its demo certificates. TLS for clients is disabled to match
+      # the elasticsearch service.
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=Estuary-Test-1"
+      - "plugins.security.ssl.http.enabled=false"
       - "cluster.routing.allocation.disk.threshold_enabled=false"
       - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g"
     deploy:
@@ -45,10 +48,11 @@ services:
         limits:
           memory: 4g
     healthcheck:
-      test: curl -s http://localhost:9200 >/dev/null || exit 1
+      # Requests fail until the security plugin has initialized.
+      test: curl -sf -u admin:Estuary-Test-1 http://localhost:9200 >/dev/null || exit 1
       interval: 1s
       timeout: 1s
-      retries: 60
+      retries: 120
     ports:
       - "9201:9200"
     networks:
