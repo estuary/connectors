@@ -772,8 +772,7 @@ func (d *materialization) NewTransactor(
 // projection of /_meta/uuid as a date-time, which holds each document's
 // publication time and is used to delete documents published before a
 // completed backfill. The field must also be mapped as a date. The returned
-// error explains why no field qualifies, for use in a warning shown to the
-// user.
+// error explains why no field qualifies.
 func findPublishedAtField(ps []boilerplate.MappedProjection[property]) (string, error) {
 	var reason error
 	for _, p := range ps {
