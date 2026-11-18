@@ -1,0 +1,140 @@
+[
+  {
+    "measurement": "orders",
+    "time": "publication-time",
+    "tags": {
+      "id": "1"
+    },
+    "fields": {
+      "_meta": "{\"uuid\":\"fixture-uuid\"}",
+      "amount": 10.5,
+      "status": "new"
+    },
+    "types": {
+      "_meta": "string",
+      "amount": "double",
+      "status": "string"
+    }
+  },
+  {
+    "measurement": "orders",
+    "time": "publication-time",
+    "tags": {
+      "id": "2"
+    },
+    "fields": {
+      "_meta": "{\"uuid\":\"fixture-uuid\"}",
+      "amount": 20,
+      "status": "paid"
+    },
+    "types": {
+      "_meta": "string",
+      "amount": "double",
+      "status": "string"
+    }
+  },
+  {
+    "measurement": "orders",
+    "time": "publication-time",
+    "tags": {
+      "id": "3"
+    },
+    "fields": {
+      "_meta": "{\"uuid\":\"fixture-uuid\"}",
+      "amount": 7.25,
+      "status": "new"
+    },
+    "types": {
+      "_meta": "string",
+      "amount": "double",
+      "status": "string"
+    }
+  },
+  {
+    "measurement": "orders",
+    "time": "publication-time",
+    "tags": {
+      "id": "3"
+    },
+    "fields": {
+      "_meta": "{\"uuid\":\"fixture-uuid\"}",
+      "amount": 7.25,
+      "status": "paid"
+    },
+    "types": {
+      "_meta": "string",
+      "amount": "double",
+      "status": "string"
+    }
+  },
+  {
+    "measurement": "readings",
+    "time": "2026-01-01T00:00:00.000000001Z",
+    "tags": {
+      "sensor": "lab 1"
+    },
+    "fields": {
+      "_meta": "{\"uuid\":\"fixture-uuid\"}",
+      "temp": 19.6
+    },
+    "types": {
+      "_meta": "string",
+      "temp": "double"
+    }
+  },
+  {
+    "measurement": "readings",
+    "time": "2026-01-01T00:00:00Z",
+    "tags": {
+      "sensor": "lab 1"
+    },
+    "fields": {
+      "_meta": "{\"uuid\":\"fixture-uuid\"}",
+      "temp": 19.5
+    },
+    "types": {
+      "_meta": "string",
+      "temp": "double"
+    }
+  },
+  {
+    "measurement": "readings",
+    "time": "2026-01-01T00:00:00Z",
+    "tags": {
+      "sensor": "s1"
+    },
+    "fields": {
+      "_meta": "{\"uuid\":\"fixture-uuid\"}",
+      "count": 1,
+      "meta": "{\"fw\":\"1.2\"}",
+      "note": "say \"hi\", ok",
+      "ok": true,
+      "temp": 20.5
+    },
+    "types": {
+      "_meta": "string",
+      "count": "long",
+      "meta": "string",
+      "note": "string",
+      "ok": "boolean",
+      "temp": "double"
+    }
+  },
+  {
+    "measurement": "readings",
+    "time": "2026-01-01T00:01:00Z",
+    "tags": {
+      "sensor": "s1"
+    },
+    "fields": {
+      "_meta": "{\"uuid\":\"fixture-uuid\"}",
+      "note": "line 1\nline 2",
+      "temp": 21
+    },
+    "types": {
+      "_meta": "string",
+      "note": "string",
+      "temp": "double"
+    }
+  }
+]

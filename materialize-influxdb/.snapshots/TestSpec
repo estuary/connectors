@@ -1,0 +1,90 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-influxdb/config",
+    "properties": {
+      "url": {
+        "type": "string",
+        "minLength": 1,
+        "title": "InfluxDB URL",
+        "description": "URL of your InfluxDB 2.x instance.",
+        "order": 1
+      },
+      "token": {
+        "type": "string",
+        "minLength": 1,
+        "title": "API Token",
+        "description": "API token with read and write access to your bucket.",
+        "order": 2,
+        "secret": true
+      },
+      "org": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Organization",
+        "description": "Name of your InfluxDB organization.",
+        "order": 3
+      },
+      "bucket": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Bucket",
+        "description": "Name of the existing bucket to write points to.",
+        "order": 4
+      },
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "Delete points when documents are deleted in your source. Otherwise deletion documents are written as points.",
+        "default": false,
+        "order": 5
+      }
+    },
+    "type": "object",
+    "required": [
+      "url",
+      "token",
+      "org",
+      "bucket"
+    ],
+    "title": "Materialize InfluxDB Spec"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-influxdb/resource",
+    "properties": {
+      "measurement": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Measurement",
+        "description": "Name of the measurement to write points to.",
+        "order": 1,
+        "x-collection-name": true
+      },
+      "timestampField": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Timestamp Field",
+        "description": "Projection field containing each point's time as an always-present date-time string.",
+        "default": "flow_published_at",
+        "order": 2
+      },
+      "tagFields": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array",
+        "uniqueItems": true,
+        "title": "Tag Fields",
+        "description": "Projection fields to write as tags. Defaults to the collection key fields other than the timestamp field.",
+        "order": 3
+      }
+    },
+    "type": "object",
+    "required": [
+      "measurement"
+    ],
+    "title": "InfluxDB Measurement"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-influxdb"
+}

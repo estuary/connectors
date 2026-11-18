@@ -36,6 +36,7 @@ In the future, other open-source materialization connectors from third parties c
 * [Google Cloud PostgreSQL](./PostgreSQL/google-cloud-sql-postgres.md)
 * [Google Cloud SQL Server](./SQLServer/google-cloud-sql-sqlserver.md)
 * [Google Spanner](./google-spanner.md)
+* [InfluxDB](./influxdb.md)
 * [MongoDB](./mongodb.md)
 * [MySQL](./MySQL/)
 * [MySQL Heatwave](./mysql-heatwave.md)

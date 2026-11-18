@@ -1,0 +1,5 @@
+url: http://localhost:8088
+token: made-up-influxdb-test-token
+org: estuary
+bucket: sensors
+hardDelete: true
