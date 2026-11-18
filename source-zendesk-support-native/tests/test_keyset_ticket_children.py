@@ -10,6 +10,7 @@ from source_zendesk_support_native.api.ticket_children import (
     backfill_incremental_keyset_paginated_ticket_children,
     fetch_incremental_keyset_paginated_ticket_children,
     fetch_incremental_keyset_paginated_ticket_metrics,
+    fetch_metric_events_of_tickets,
 )
 from source_zendesk_support_native.models import TicketMetricSet
 
@@ -151,3 +152,32 @@ async def test_metric_sets_follow_their_tickets(monkeypatch: pytest.MonkeyPatch)
         101, log_cursor + second, 102, log_cursor + 2 * second,
     ]
     assert all(params["support_type_scope"] == "all" and params["include"] == "metric_sets" for params in http.params)
+
+
+class RecordingHTTP:
+    """Returns queued JSON bodies from http.request and records each request's params."""
+
+    def __init__(self, *bodies: dict[str, Any]) -> None:
+        self._bodies = list(bodies)
+        self.params: list[dict[str, Any]] = []
+
+    async def request(self, log: Any, url: str, **kwargs: Any) -> bytes:
+        self.params.append(dict(kwargs.get("params") or {}))
+        return json.dumps(self._bodies.pop(0)).encode()
+
+
+@pytest.mark.asyncio
+async def test_metric_events_of_a_ticket_are_flattened() -> None:
+    http = RecordingHTTP({
+        "reply_time": [{"id": 1, "ticket_id": 7, "metric": "reply_time"}, {"id": 2, "ticket_id": 7, "metric": "reply_time"}],
+        "resolution_time": [{"id": 3, "ticket_id": 7, "metric": "resolution_time"}],
+    })
+
+    results = [
+        r async for r in fetch_metric_events_of_tickets(
+            http,  # type: ignore[arg-type]
+            "example", [7], log,
+        )
+    ]
+
+    assert [r.id for r in results] == [1, 2, 3]
