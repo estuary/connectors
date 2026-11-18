@@ -64,6 +64,7 @@ Protobuf, W3C Extended Log, and Parquet.
 - [OneDrive](./onedrive.md)
 - [SFTP](./sftp.md)
 - [SharePoint](./sharepoint.md)
+- [SMB](./smb.md)
 
 ### Event connectors
 
