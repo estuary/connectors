@@ -156,7 +156,11 @@
         "list_is_active": true,
         "list_name": "Estuary",
         "recipient_count": 4,
-        "segment_text": ""
+        "segment_text": "",
+        "segments": {
+          "excluded": [],
+          "targets": []
+        }
       },
       "report_summary": {
         "click_rate": 0,
