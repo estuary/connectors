@@ -45,7 +45,7 @@ func boundsLiterals(bounds []sql.MergeBound) []mergeBoundLiterals {
 
 // legacyRangeKey keys a staged entry persisted as the flat fields of its state
 // key, without a range key. It sorts before every range key.
-// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
+// TODO(#5665): remove in about March 2027, after checkpoints have all migrated
 const legacyRangeKey = ""
 
 var rangeKeyRe = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{8}$`)
@@ -69,7 +69,7 @@ var flatItemClear = func() map[string]any {
 
 // legacyItemClear nulls every field of a flat checkpoint item except its
 // streaming v2 channel state.
-// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
+// TODO(#5665): remove in about March 2027, after checkpoints have all migrated
 var legacyItemClear = func() map[string]any {
 	var out = maps.Clone(flatItemClear)
 	delete(out, "StreamV2")
@@ -122,7 +122,7 @@ func (d *transactor) absorbState(doc json.RawMessage, peerPatch bool) error {
 			continue
 		}
 
-		// TODO(#5176): remove in about January 2027, after checkpoints have all migrated
+		// TODO(#5665): remove in about March 2027, after checkpoints have all migrated
 		if len(flat.Query) > 0 || flat.TruncateBefore != nil {
 			if d.primary {
 				var legacy = flat
