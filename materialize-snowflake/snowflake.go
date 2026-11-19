@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strconv"
@@ -294,6 +295,15 @@ type transactor struct {
 	// truncations maps a binding index to the boundary of a backfill that
 	// completed in the current transaction, for staging into the checkpoint.
 	truncations map[int]time.Time
+
+	// warehouse is the quoted identifier of the warehouse to resize. It is
+	// empty unless warehouse sizes are configured.
+	warehouse string
+	// warehouseSize is the size last set in this session, if any.
+	warehouseSize warehouseSize
+	// backfilling maps the state key of a binding to whether a backfill of it
+	// has begun and not completed. The checkpoint carries it.
+	backfilling map[string]bool
 }
 
 func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -397,6 +407,16 @@ func newTransactor(
 
 	if err := requireMultiShardCapable(open.Range, d.bindings); err != nil {
 		return nil, err
+	}
+
+	if cfg.Advanced.BackfillWarehouseSize != "" {
+		if d.warehouse, err = currentWarehouse(ctx, db); err != nil {
+			return nil, err
+		}
+		d.backfilling = make(map[string]bool)
+		if item := d.cp[backfillingStateKey]; item != nil {
+			maps.Copy(d.backfilling, item.Backfilling)
+		}
 	}
 
 	if err := d.syncClustering(ctx, bindings, open); err != nil {
@@ -784,6 +804,10 @@ type checkpointItem struct {
 	// before it, after the item's stores. It is omitted when unset, so that
 	// the item stays readable by a connector build without it.
 	TruncateBefore *time.Time `json:",omitempty"`
+	// Backfilling is transactor.backfilling, set only in the item of
+	// backfillingStateKey. A completed backfill is set to false and not
+	// removed, because a merge patch of the state would keep a removed entry.
+	Backfilling map[string]bool `json:",omitempty"`
 }
 
 type checkpoint = map[string]*checkpointItem
@@ -1013,6 +1037,10 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 	}
 	d.truncations = nil
 
+	if d.warehouse != "" {
+		d.cp[backfillingStateKey] = &checkpointItem{Backfilling: d.backfilling}
+	}
+
 	var checkpointJSON, err = json.Marshal(d.cp)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint json: %w", err)
@@ -1111,7 +1139,37 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 	return items, nil
 }
 
-func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+var _ m.BackfillBeginner = (*transactor)(nil)
+
+func (d *transactor) BackfillsBegan(_ context.Context, begins map[int]time.Time) error {
+	if d.warehouse == "" {
+		return nil
+	}
+	for idx := range begins {
+		if b := d.bindings[idx]; b.usesWarehouse() {
+			d.backfilling[b.target.StateKey] = true
+		}
+	}
+	return nil
+}
+
+func (d *transactor) Flush(ctx context.Context, completes map[int]time.Time) error {
+	if d.warehouse != "" {
+		for idx := range completes {
+			if stateKey := d.bindings[idx].target.StateKey; d.backfilling[stateKey] {
+				d.backfilling[stateKey] = false
+			}
+		}
+		// Scale up ahead of the stores. Scaling down waits for Acknowledge, so
+		// that the transaction which completes the last backfill still commits
+		// at the backfill size.
+		if d.anyBackfilling() {
+			if err := d.setWarehouseSize(ctx, d.cfg.Advanced.BackfillWarehouseSize); err != nil {
+				return err
+			}
+		}
+	}
+
 	d.truncations = make(map[int]time.Time, len(completes))
 
 	for idx, boundary := range completes {
@@ -1134,8 +1192,24 @@ func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error
 	return nil
 }
 
-// Acknowledge merges data from temporary table to main table
 func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
+	var state, err = d.acknowledge(ctx, statePatches, stateKeys)
+	if err != nil {
+		return nil, err
+	}
+
+	// Only an Apply passes state keys, and it leaves the warehouse alone.
+	if d.warehouse != "" && stateKeys == nil && !d.anyBackfilling() {
+		if err := d.setWarehouseSize(ctx, d.cfg.Advanced.StreamingWarehouseSize); err != nil {
+			return nil, err
+		}
+	}
+
+	return state, nil
+}
+
+// acknowledge merges data from temporary table to main table
+func (d *transactor) acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
 	defer func() {
 		d.didRecovery = true
 	}()
