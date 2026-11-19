@@ -1,7 +1,9 @@
 import re
+from typing import Any, Callable
 
 import pytest
 import xmltodict
+from pytest_insta import SnapshotFixture
 
 from source_sage_intacct.models import EndpointConfig
 from source_sage_intacct.sage import (
@@ -148,7 +150,12 @@ ts = "2023-01-02 03:04:56"
         ),
     ],
 )
-def test_xml_requests(snapshot, name, func, args):
+def test_xml_requests(
+    snapshot: SnapshotFixture,
+    name: str,
+    func: Callable[..., str],
+    args: tuple[Any, ...],
+):
     got = func(*args)
     assert snapshot(name) == sanitize_xml(got)
 
@@ -177,7 +184,9 @@ GL_REQUESTS = [
 
 @pytest.mark.parametrize("object", sorted(SHOW_PRIVATE_OBJECTS))
 @pytest.mark.parametrize("func,args", GL_REQUESTS)
-def test_gl_requests_are_filtered_and_show_private(object, func, args):
+def test_gl_requests_are_filtered_and_show_private(
+    object: str, func: Callable[..., str], args: tuple[Any, ...]
+):
     got = func(cfg, session_id, object, *args)
 
     assert "<showprivate>true</showprivate>" in got
@@ -186,7 +195,9 @@ def test_gl_requests_are_filtered_and_show_private(object, func, args):
 
 
 @pytest.mark.parametrize("func,args", GL_REQUESTS[:6])
-def test_other_requests_do_not_show_private(func, args):
+def test_other_requests_do_not_show_private(
+    func: Callable[..., str], args: tuple[Any, ...]
+):
     assert "showprivate" not in func(cfg, session_id, object_name, *args)
 
 
@@ -210,7 +221,9 @@ def assert_one_condition_under_filter(xml_string: str):
         (get_gldetail_batch_request, ("01/01/1900", 5501, "5501-90001-<77>--A")),
     ],
 )
-def test_gldetail_backfill_requests_are_filtered_and_show_private(func, args):
+def test_gldetail_backfill_requests_are_filtered_and_show_private(
+    func: Callable[..., str], args: tuple[Any, ...]
+):
     got = func(cfg, session_id, fields, *args)
 
     assert "<showprivate>true</showprivate>" in got

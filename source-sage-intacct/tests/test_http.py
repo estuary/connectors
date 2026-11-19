@@ -1,9 +1,9 @@
 """Runs the General Ledger bindings through the real `Sage` class and a fake
 HTTP client: session, `lookup`, permission probes, and JSON query pages."""
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from logging import Logger
-from typing import Any
+from typing import Any, AsyncGenerator, Callable
 from unittest.mock import MagicMock
 
 import estuary_cdk.emitted_changes_cache as cache
@@ -27,7 +27,7 @@ def reset_cache():
 
 
 async def open_binding(
-    monkeypatch, http: FakeSageHTTP, obj: str, **advanced: Any
+    monkeypatch: pytest.MonkeyPatch, http: FakeSageHTTP, obj: str, **advanced: Any
 ) -> dict[str, Any]:
     """The functions of the binding of `obj`, as given to `open_binding`."""
     found = await all_resources(
@@ -39,11 +39,13 @@ async def open_binding(
     return await open_subtasks(monkeypatch, resource)
 
 
-async def drain(generator) -> list[Any]:
+async def drain(generator: AsyncGenerator[Any, None]) -> list[Any]:
     return [item async for item in generator]
 
 
-async def run_backfill(fetch_page) -> list[Any]:
+async def run_backfill(
+    fetch_page: Callable[..., AsyncGenerator[Any, None]],
+) -> list[Any]:
     """Runs the backfill as the CDK does: one call for each page cursor."""
     documents: list[Any] = []
     page = None
@@ -82,7 +84,7 @@ async def test_discovery_finds_the_gl_bindings():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("obj", ALL_GL)
-async def test_idle_subtasks_emit_nothing(monkeypatch, obj):
+async def test_idle_subtasks_emit_nothing(monkeypatch: pytest.MonkeyPatch, obj: str):
     opened = await open_binding(monkeypatch, FakeSageHTTP(), obj)
     cursor = datetime.now(UTC) - timedelta(hours=6)
 
@@ -92,7 +94,9 @@ async def test_idle_subtasks_emit_nothing(monkeypatch, obj):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("obj", sorted(GL_OBJECTS))
-async def test_incremental_reads_changes_across_pages(monkeypatch, obj):
+async def test_incremental_reads_changes_across_pages(
+    monkeypatch: pytest.MonkeyPatch, obj: str
+):
     http = FakeSageHTTP({obj: changed_rows(4500)})
     opened = await open_binding(monkeypatch, http, obj)
 
@@ -109,7 +113,9 @@ async def test_incremental_reads_changes_across_pages(monkeypatch, obj):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("obj", sorted(GL_OBJECTS))
-async def test_backfill_reads_all_rows_across_pages(monkeypatch, obj):
+async def test_backfill_reads_all_rows_across_pages(
+    monkeypatch: pytest.MonkeyPatch, obj: str
+):
     http = FakeSageHTTP({obj: changed_rows(4500)})
     opened = await open_binding(monkeypatch, http, obj)
 
@@ -133,12 +139,16 @@ def gldetail_rows(count: int) -> list[dict[str, str]]:
     ]
 
 
-async def open_gldetail(monkeypatch, rows: list[dict[str, str]]) -> dict[str, Any]:
+async def open_gldetail(
+    monkeypatch: pytest.MonkeyPatch, rows: list[dict[str, str]]
+) -> dict[str, Any]:
     return await open_binding(monkeypatch, FakeSageHTTP({"GLDETAIL": rows}), "GLDETAIL")
 
 
 @pytest.mark.asyncio
-async def test_gldetail_incremental_reads_changes_across_pages(monkeypatch):
+async def test_gldetail_incremental_reads_changes_across_pages(
+    monkeypatch: pytest.MonkeyPatch,
+):
     rows = gldetail_rows(4500)
     opened = await open_gldetail(monkeypatch, rows)
 
@@ -154,7 +164,9 @@ async def test_gldetail_incremental_reads_changes_across_pages(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_gldetail_backfill_reads_all_rows_across_pages(monkeypatch):
+async def test_gldetail_backfill_reads_all_rows_across_pages(
+    monkeypatch: pytest.MonkeyPatch,
+):
     # A full page ends inside a batch, so the next page reads that batch again.
     rows = gldetail_rows(4500)
     opened = await open_gldetail(monkeypatch, rows)
@@ -167,7 +179,9 @@ async def test_gldetail_backfill_reads_all_rows_across_pages(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_gldetail_backfill_reads_a_batch_larger_than_a_page(monkeypatch):
+async def test_gldetail_backfill_reads_a_batch_larger_than_a_page(
+    monkeypatch: pytest.MonkeyPatch,
+):
     rows = gldetail_rows(3)
     rows += [
         {**rows[0], "RECORDNO": f"2-{n:05d}---A", "BATCHKEY": "2"} for n in range(4100)

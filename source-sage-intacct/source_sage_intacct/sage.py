@@ -7,7 +7,6 @@ from typing import Any, AsyncGenerator, ClassVar, Optional, TypeVar
 from xml.sax.saxutils import escape
 
 import xmltodict
-from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import AwareDatetime, BaseModel, create_model, model_validator
@@ -96,7 +95,7 @@ class SageRecord(BaseModel):
     field_datatypes: ClassVar[list[str]]
     company_id: ClassVar[str | None] = None
 
-    def model_dump(self, **kwargs):
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         kwargs.setdefault("exclude_none", True)
         res = super().model_dump(**kwargs)
         if self.company_id:
@@ -443,7 +442,7 @@ class Sage:
         parsed.raise_for_error()
 
     async def _req_xml(
-        self, cls: type[XMLRecord], data: Any, skip_refresh=False
+        self, cls: type[XMLRecord], data: Any, skip_refresh: bool = False
     ) -> XMLRecord:
         if not skip_refresh:
             await self._maybe_refresh_session()

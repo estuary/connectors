@@ -2,8 +2,10 @@ import asyncio
 import functools
 from datetime import UTC, datetime, timedelta
 from logging import Logger
+from typing import Any
 
 from estuary_cdk.capture import Task, common
+from estuary_cdk.capture.common import ResourceConfigWithSchedule
 from estuary_cdk.capture.backfill_signals import BackfillCoverage
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPMixin
@@ -22,12 +24,19 @@ from .models import (
     Document,
     EndpointConfig,
     GLDetailDocument,
-    ResourceConfigWithSchedule,
     ResourceState,
     SagePermissionError,
     SnapshotResource,
 )
 from .sage import PAGE_SIZE, Sage
+
+# The other bindings of the task, as the CDK passes them to `open`.
+AllBindings = list[
+    tuple[
+        CaptureBinding[ResourceConfigWithSchedule],
+        common.Resource[Any, ResourceConfigWithSchedule, ResourceState],
+    ]
+]
 
 # REALTIME_LAG defers the "realtime" modified sub-task by this much so that
 # a near-simultaneous create-then-modify can't race the "realtime_creations"
@@ -102,7 +111,7 @@ async def incremental_resource(
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings,
+        all_bindings: AllBindings,
     ):
         task.sourced_schema(binding_index, model.sourced_schema())
 
@@ -234,7 +243,7 @@ async def gldetail_resource(
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings,
+        all_bindings: AllBindings,
     ):
         task.sourced_schema(binding_index, model.sourced_schema())
         await task.checkpoint(state=ConnectorState())
@@ -289,7 +298,7 @@ async def snapshot_resource(sage: Sage, obj: str) -> common.Resource:
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings,
+        all_bindings: AllBindings,
     ):
         task.sourced_schema(binding_index, model.sourced_schema())
         await task.checkpoint(state=ConnectorState())
