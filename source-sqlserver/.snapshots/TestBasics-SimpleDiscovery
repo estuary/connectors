@@ -45,8 +45,14 @@ sql> CREATE TABLE dbo.Basics_SimpleDiscovery_891380 (a INTEGER PRIMARY KEY, b VA
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

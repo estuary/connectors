@@ -49,8 +49,14 @@ sql> CREATE TABLE test.simplediscovery_838908 (a INTEGER PRIMARY KEY, b VARCHAR(
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

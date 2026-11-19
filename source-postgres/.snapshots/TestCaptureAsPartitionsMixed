@@ -36,8 +36,14 @@ sql> CREATE TABLE test.captureaspartitionsmixed_611041_parted_h2 PARTITION OF te
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
@@ -172,8 +178,14 @@ sql> CREATE TABLE test.captureaspartitionsmixed_611041_parted_h2 PARTITION OF te
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
@@ -307,8 +319,14 @@ sql> CREATE TABLE test.captureaspartitionsmixed_611041_parted_h2 PARTITION OF te
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

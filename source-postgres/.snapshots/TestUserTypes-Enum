@@ -33,8 +33,14 @@ sql> CREATE TABLE test.usertypes_enum_211653 (id INTEGER PRIMARY KEY, value User
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

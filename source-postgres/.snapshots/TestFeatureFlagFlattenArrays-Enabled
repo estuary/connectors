@@ -69,8 +69,14 @@ sql> INSERT INTO test.featureflagflattenarrays_enabled_602988 VALUES
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

@@ -6,8 +6,14 @@ expression: snap
 {
   "type": "object",
   "if": {
+    "required": [
+      "_meta"
+    ],
     "properties": {
       "_meta": {
+        "required": [
+          "op"
+        ],
         "properties": {
           "op": {
             "const": "d"

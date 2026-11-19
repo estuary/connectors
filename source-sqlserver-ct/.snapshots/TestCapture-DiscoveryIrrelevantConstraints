@@ -40,8 +40,14 @@ sql> CREATE TABLE dbo.Capture_DiscoveryIrrelevantConstraints_771648 (id VARCHAR(
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"

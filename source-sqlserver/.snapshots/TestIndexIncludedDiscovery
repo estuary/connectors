@@ -45,8 +45,14 @@ sql> CREATE UNIQUE INDEX UX_312546_k23 ON dbo.IndexIncludedDiscovery_312546 (k2,
     "allOf": [
       {
         "if": {
+          "required": [
+            "_meta"
+          ],
           "properties": {
             "_meta": {
+              "required": [
+                "op"
+              ],
               "properties": {
                 "op": {
                   "const": "d"
