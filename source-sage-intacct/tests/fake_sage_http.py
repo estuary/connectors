@@ -2,7 +2,8 @@
 
 import json
 from datetime import datetime
-from typing import Any
+from logging import Logger
+from typing import Any, AsyncGenerator, Callable
 
 import xmltodict
 
@@ -78,7 +79,9 @@ class FakeSageHTTP:
     def __init__(self, rows: dict[str, list[dict[str, str]]] | None = None):
         self.rows = rows or {}
 
-    async def request(self, log, url, method, headers, form) -> bytes:
+    async def request(
+        self, log: Logger, url: str, method: str, headers: dict[str, Any], form: str
+    ) -> bytes:
         function = xmltodict.parse(form)["request"]["operation"]["content"]["function"]
         (name,) = (key for key in function if not key.startswith("@"))
         body = function[name] or {}
@@ -110,7 +113,9 @@ class FakeSageHTTP:
                 return envelope("")
         raise AssertionError(f"unexpected request {name}")
 
-    async def request_stream(self, log, url, method, headers, form):
+    async def request_stream(
+        self, log: Logger, url: str, method: str, headers: dict[str, Any], form: str
+    ) -> tuple[dict[str, str], Callable[[], AsyncGenerator[bytes, None]]]:
         query = xmltodict.parse(form)["request"]["operation"]["content"]["function"][
             "query"
         ]
@@ -125,7 +130,7 @@ class FakeSageHTTP:
         rows.sort(key=lambda row: typed(order_field, row[order_field]))
         page = json.dumps(rows[:PAGE_SIZE]).encode()
 
-        async def body():
+        async def body() -> AsyncGenerator[bytes, None]:
             yield page
 
         return {"Content-Type": "application/json"}, body

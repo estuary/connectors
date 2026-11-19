@@ -1,9 +1,10 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from logging import Logger
-from typing import Any
+from typing import Any, AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from estuary_cdk.capture import common
 from estuary_cdk.capture.backfill_signals import BackfillCoverage
 
 from source_sage_intacct import resources
@@ -11,7 +12,6 @@ from source_sage_intacct.models import (
     EndpointConfig,
     FieldDefinition,
     ObjectDefinition,
-    SagePermissionError,
 )
 from source_sage_intacct.resources import (
     GL_OBJECTS,
@@ -25,6 +25,8 @@ from source_sage_intacct.resources import (
 )
 from source_sage_intacct.sage import Sage
 
+from .conftest import FakeSage
+
 
 def make_config(**advanced: Any) -> EndpointConfig:
     return EndpointConfig(
@@ -37,49 +39,29 @@ def make_config(**advanced: Any) -> EndpointConfig:
     )
 
 
-class FakeSage:
-    """Stands in for `Sage` in `all_resources`. It makes no request."""
-
-    unreadable: set[str] = set()
-
-    def __init__(self, log, http, config):
-        self.config = config
-
-    async def setup(self):
-        pass
-
-    async def probe_query_permission(self, obj: str):
-        if obj in self.unreadable:
-            raise SagePermissionError(f"no access to {obj}")
-
-    async def get_model(self, obj: str):
-        return MagicMock()
-
-
-@pytest.fixture
-def fake_sage(monkeypatch):
-    monkeypatch.setattr(resources, "Sage", FakeSage)
-    monkeypatch.setattr(FakeSage, "unreadable", set())
-    return FakeSage
-
-
-async def open_subtasks(monkeypatch, resource) -> dict[str, Any]:
+async def open_subtasks(
+    monkeypatch: pytest.MonkeyPatch, resource: common.Resource[Any, Any, Any]
+) -> dict[str, Any]:
     """Opens the resource and returns what it passes to `open_binding`."""
     opened: dict[str, Any] = {}
 
-    def open_binding(binding, binding_index, state, task, **kwargs):
+    def open_binding(
+        binding: Any, binding_index: int, state: Any, task: Any, **kwargs: Any
+    ) -> None:
         opened.update(kwargs)
 
     monkeypatch.setattr(resources.common, "open_binding", open_binding)
 
     task = MagicMock()
     task.checkpoint = AsyncMock()
-    await resource.open(MagicMock(), 0, resource.initial_state, task, [])
+    opening = resource.open(MagicMock(), 0, resource.initial_state, task, [])
+    if opening is not None:
+        await opening
     return opened
 
 
 @pytest.mark.asyncio
-async def test_only_gl_resources_declare_a_backfill_coverage(fake_sage):
+async def test_only_gl_resources_declare_a_backfill_coverage(fake_sage: type[FakeSage]):
     found = await all_resources(MagicMock(spec=Logger), MagicMock(), make_config())
     by_name = {r.name: r for r in found}
 
@@ -95,7 +77,9 @@ async def test_only_gl_resources_declare_a_backfill_coverage(fake_sage):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("obj", sorted(GL_OBJECTS))
-async def test_gl_binding_opens_all_six_subtasks(monkeypatch, fake_sage, obj):
+async def test_gl_binding_opens_all_six_subtasks(
+    monkeypatch: pytest.MonkeyPatch, fake_sage: type[FakeSage], obj: str
+):
     found = await all_resources(MagicMock(spec=Logger), MagicMock(), make_config())
     resource = next(r for r in found if r.name == obj)
 
@@ -115,7 +99,7 @@ async def test_gl_binding_opens_all_six_subtasks(monkeypatch, fake_sage, obj):
 
 @pytest.mark.asyncio
 async def test_gl_binding_without_audit_trail_has_no_deletion_subtasks(
-    monkeypatch, fake_sage
+    monkeypatch: pytest.MonkeyPatch, fake_sage: type[FakeSage]
 ):
     monkeypatch.setattr(FakeSage, "unreadable", {"AUDITHISTORY"})
     log = MagicMock(spec=Logger)
@@ -134,7 +118,9 @@ async def test_gl_binding_without_audit_trail_has_no_deletion_subtasks(
 
 
 @pytest.mark.asyncio
-async def test_unreadable_gl_object_is_omitted(fake_sage, monkeypatch):
+async def test_unreadable_gl_object_is_omitted(
+    fake_sage: type[FakeSage], monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.setattr(FakeSage, "unreadable", {"GLENTRY"})
     found = await all_resources(MagicMock(spec=Logger), MagicMock(), make_config())
 
@@ -151,7 +137,9 @@ def make_sage(config: EndpointConfig, lookup: dict[str, list[tuple[str, str]]]) 
     sage.tz_dt = datetime(2024, 1, 1, tzinfo=UTC)
     sage.sent = []  # type: ignore[attr-defined]
 
-    async def req_xml(cls, data, skip_refresh=False):
+    async def req_xml(
+        cls: type[Any], data: str, skip_refresh: bool = False
+    ) -> ObjectDefinition:
         obj = data.split("<object>")[1].split("</object>")[0]
         return ObjectDefinition(
             Type=ObjectDefinition.Type_(
@@ -164,7 +152,7 @@ def make_sage(config: EndpointConfig, lookup: dict[str, list[tuple[str, str]]]) 
             )
         )
 
-    async def req_json(cls, data):
+    async def req_json(cls: type[Any], data: str) -> AsyncGenerator[Any, None]:
         sage.sent.append(data)  # type: ignore[attr-defined]
         return
         yield

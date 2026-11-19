@@ -88,7 +88,9 @@ def test_thing():
 
 
 @pytest.mark.asyncio
-async def test_fetch_changes_spans_and_cycles(mock_sage, mock_logger):
+async def test_fetch_changes_spans_and_cycles(
+    mock_sage: AsyncMock, mock_logger: MagicMock
+):
     page_size = 3
 
     cursor = datetime(2023, 1, 1, tzinfo=UTC)
@@ -197,7 +199,7 @@ async def test_fetch_changes_spans_and_cycles(mock_sage, mock_logger):
 
 
 @pytest.mark.asyncio
-async def test_fetch_changes_no_records(mock_sage, mock_logger):
+async def test_fetch_changes_no_records(mock_sage: AsyncMock, mock_logger: MagicMock):
     mock_sage.fetch_since.return_value = async_iter([])
     cursor = datetime(2023, 1, 1, tzinfo=UTC)
 
@@ -218,7 +220,7 @@ async def test_fetch_changes_no_records(mock_sage, mock_logger):
 
 
 @pytest.mark.asyncio
-async def test_fetch_changes_single_page(mock_sage, mock_logger):
+async def test_fetch_changes_single_page(mock_sage: AsyncMock, mock_logger: MagicMock):
     mock_sage.fetch_since.return_value = async_iter([])
     cursor = datetime(2023, 1, 1, tzinfo=UTC)
     records = [
@@ -251,7 +253,9 @@ async def test_fetch_changes_single_page(mock_sage, mock_logger):
 
 
 @pytest.mark.asyncio
-async def test_fetch_changes_multiple_pages(mock_sage, mock_logger):
+async def test_fetch_changes_multiple_pages(
+    mock_sage: AsyncMock, mock_logger: MagicMock
+):
     page_size = 3
 
     cursor = datetime(2023, 1, 1, tzinfo=UTC)
@@ -304,7 +308,9 @@ async def test_fetch_changes_multiple_pages(mock_sage, mock_logger):
 
 
 @pytest.mark.asyncio
-async def test_fetch_changes_multiple_pages_exact(mock_sage, mock_logger):
+async def test_fetch_changes_multiple_pages_exact(
+    mock_sage: AsyncMock, mock_logger: MagicMock
+):
     page_size = 3
 
     cursor = datetime(2023, 1, 1, tzinfo=UTC)
@@ -353,7 +359,9 @@ async def test_fetch_changes_multiple_pages_exact(mock_sage, mock_logger):
 
 
 @pytest.mark.asyncio
-async def test_fetch_changes_single_page_cycle(mock_sage, mock_logger):
+async def test_fetch_changes_single_page_cycle(
+    mock_sage: AsyncMock, mock_logger: MagicMock
+):
     page_size = 3
 
     cursor = datetime(2023, 1, 1, tzinfo=UTC)
@@ -401,7 +409,7 @@ async def test_fetch_changes_single_page_cycle(mock_sage, mock_logger):
 
 
 @pytest.mark.asyncio
-async def test_fetch_creations_basic(mock_sage, mock_logger):
+async def test_fetch_creations_basic(mock_sage: AsyncMock, mock_logger: MagicMock):
     cursor = datetime(2023, 1, 1, tzinfo=UTC)
     records = [
         MockCreationRecord(RECORDNO=1, WHENCREATED=datetime(2023, 1, 2, tzinfo=UTC)),
@@ -428,7 +436,9 @@ async def test_fetch_creations_basic(mock_sage, mock_logger):
 
 
 @pytest.mark.asyncio
-async def test_fetch_page_routes_by_whenmodified(mock_sage, mock_logger):
+async def test_fetch_page_routes_by_whenmodified(
+    mock_sage: AsyncMock, mock_logger: MagicMock
+):
     # fetch_page must route records with WHENMODIFIED to IncrementalResource
     # and records without WHENMODIFIED to CreationRecord. The cutoff
     # comparison uses cursor_value(), which falls back to WHENCREATED when
@@ -511,7 +521,9 @@ def test_deletion_event_record_no(object_key: str, expected: int | None):
 
 
 @pytest.mark.asyncio
-async def test_fetch_deletions_skips_non_recordno_object_keys(mock_sage, mock_logger):
+async def test_fetch_deletions_skips_non_recordno_object_keys(
+    mock_sage: AsyncMock, mock_logger: MagicMock
+):
     cursor = datetime(2023, 1, 1, tzinfo=UTC)
     events = [
         MockDeletionEvent(

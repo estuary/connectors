@@ -1,7 +1,7 @@
 import functools
-from datetime import UTC, date, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from logging import Logger
-from typing import Any
+from typing import Any, AsyncGenerator
 from unittest.mock import MagicMock
 
 import estuary_cdk.emitted_changes_cache as cache
@@ -24,20 +24,11 @@ from source_sage_intacct.resources import (
     REALTIME_LAG,
     all_resources,
 )
-from source_sage_intacct.sage import (
-    get_gldetail_batch_request,
-    get_gldetail_page_request,
-)
 
 from .sage_fixtures import fixture_rows, lookup_fields
-from .test_gl import fake_sage, make_config, make_sage, open_subtasks  # noqa: F401
-from .test_xml_requests import (
-    assert_one_condition_under_filter,
-    cfg,
-    fields,
-    sanitize_xml,
-    session_id,
-)
+from .conftest import FakeSage
+from .test_gl import make_config, make_sage, open_subtasks
+from .test_xml_requests import assert_one_condition_under_filter
 
 CUTOFF = datetime(2024, 6, 1, tzinfo=UTC)
 OLD = datetime(2024, 1, 1, tzinfo=UTC)
@@ -228,7 +219,7 @@ async def test_backfill_stops_when_a_page_is_not_in_batchkey_order():
     # A page cursor that does not move forward would repeat the request.
     sage = PagedSage([], page_size=4)
 
-    async def unsorted_page(from_batch_key):
+    async def unsorted_page(from_batch_key: int | None) -> AsyncGenerator[Any, None]:
         for rec in (row(7, 1), row(7, 2), row(6, 3), row(5, 4)):
             yield rec
 
@@ -267,7 +258,7 @@ async def test_backfill_fails_on_a_row_without_batchkey():
     rec.model_dump.return_value = {"RECORDNO": "x", "WHENMODIFIED": OLD}
     sage = PagedSage([], page_size=4)
 
-    async def page(from_batch_key):
+    async def page(from_batch_key: int | None) -> AsyncGenerator[Any, None]:
         yield rec
 
     sage.fetch_gldetail_page = page  # type: ignore[method-assign]
@@ -398,7 +389,9 @@ def test_gldetail_lag_is_three_hours():
 
 
 @pytest.mark.asyncio
-async def test_gldetail_resource(monkeypatch, fake_sage):  # noqa: F811
+async def test_gldetail_resource(
+    monkeypatch: pytest.MonkeyPatch, fake_sage: type[FakeSage]
+):
     config = make_config()
     found = await all_resources(MagicMock(spec=Logger), MagicMock(), config)
     resource = next(r for r in found if r.name == "GLDETAIL")

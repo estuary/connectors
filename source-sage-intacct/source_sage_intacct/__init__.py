@@ -9,6 +9,7 @@ from estuary_cdk.capture import (
     request,
     response,
 )
+from estuary_cdk.capture.common import ResourceConfigWithSchedule
 from estuary_cdk.flow import (
     ConnectorSpec,
 )
@@ -16,7 +17,6 @@ from estuary_cdk.flow import (
 from .models import (
     ConnectorState,
     EndpointConfig,
-    ResourceConfigWithSchedule,
 )
 from .resources import all_resources
 

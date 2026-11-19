@@ -1,6 +1,7 @@
 """Runs the responses in `tests/sample_xml_responses` through the connector."""
 
 from datetime import UTC, datetime
+from typing import Any, AsyncGenerator
 from logging import Logger
 from unittest.mock import MagicMock
 
@@ -24,7 +25,7 @@ GL_ROWS = [
 def serve_rows(sage: Sage, rows: list[dict[str, str | None]]) -> None:
     """Makes each query of `sage` return `rows`, parsed as Sage's JSON is."""
 
-    async def req_json(cls, data):
+    async def req_json(cls: type[Any], data: str) -> AsyncGenerator[Any, None]:
         sage.sent.append(data)  # type: ignore[attr-defined]
         for row in rows:
             yield cls.model_validate(row)

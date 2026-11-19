@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import date
 from typing import (
     Any,
     ClassVar,
@@ -9,7 +9,6 @@ from typing import (
 from estuary_cdk.capture.backfill_signals import backfill_signal_flag_defaults
 from estuary_cdk.capture.common import (
     BaseDocument,
-    ResourceConfigWithSchedule,
     ResourceState,
 )
 from estuary_cdk.capture.common import (
