@@ -29,6 +29,9 @@
 #
 # Destroy flags:
 #   --yes                 Skip confirmation prompt
+#
+# A VM deletes itself after 3 days without SSH logins or CPU load. See
+# gcp-vm-idle-delete.sh for what counts as activity and how to opt out.
 
 set -o errexit
 set -o pipefail
@@ -207,8 +210,9 @@ cmd_create() {
   wait_for_ssh
 
   info "running setup script on VM"
-  gcloud compute scp "$SCRIPT_DIR/gcp-vm-setup.sh" \
-    "$VM_NAME:~/gcp-vm-setup.sh" \
+  gcloud compute scp \
+    "$SCRIPT_DIR/gcp-vm-setup.sh" "$SCRIPT_DIR/gcp-vm-idle-delete.sh" \
+    "$VM_NAME:~/" \
     --zone="$ZONE" --project="$PROJECT" --tunnel-through-iap --quiet
   gcloud_ssh --command="bash ~/gcp-vm-setup.sh"
 
@@ -226,6 +230,8 @@ cmd_create() {
   echo "  $0 ssh                  # shell into the VM"
   echo "  $0 sync                 # push local changes"
   echo "  $0 destroy              # tear down when done"
+  echo ""
+  echo "The VM deletes itself after 3 days without SSH logins or CPU load."
   echo ""
   echo "On the VM, run benchmarks with:"
   echo "  ./tests/benchmark/materialize/run.sh \\"

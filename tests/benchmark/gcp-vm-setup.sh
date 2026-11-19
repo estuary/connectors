@@ -3,7 +3,8 @@
 # On-VM setup script for benchmark VMs.
 # Run by gcp-vm.sh during "create" — not intended to be called directly.
 #
-# Installs: Go 1.25, Python 3 + PyYAML + venv, Docker, AWS CLI, build tools.
+# Installs: Go 1.25, Python 3 + PyYAML + venv, Docker, AWS CLI, build tools,
+# and the idle watchdog (gcp-vm-idle-delete.sh, expected next to this script).
 #
 # python3-venv is here for connectors whose local-binary mode needs a Python
 # sidecar built from source, e.g. materialize-snowflake's Snowpipe Streaming
@@ -97,5 +98,8 @@ if [[ -f fetch-flow.sh ]]; then
 else
   echo "    (skipped — fetch-flow.sh not found; run again after sync)"
 fi
+
+echo "==> installing idle watchdog"
+sudo bash "$(dirname "${BASH_SOURCE[0]}")/gcp-vm-idle-delete.sh" install
 
 echo "==> setup complete"
