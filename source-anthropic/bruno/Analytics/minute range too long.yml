@@ -1,0 +1,23 @@
+info:
+  name: minute range too long
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{base_url}}/usage?starting_at=2026-11-11T00:00:00Z&ending_at={{seed_end}}&time_bucket_width=1m"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **LIMITATION (VERIFIED 2026-11-16):** 1m buckets accept at most 24 hours →
+    400 `date range must span at most 24 hours when time_bucket_width is "1m"`.
+    1h/1d accept at most 31 days → 400 `date range must span at most 31 days`.
+    The connector splits windows at these spans.
+  type: text/markdown
