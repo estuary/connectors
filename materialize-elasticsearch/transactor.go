@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -58,24 +60,58 @@ type binding struct {
 	// Index within the collection key to use for the routing parameter. nil if no routing field
 	// is configured.
 	routingField *int
+
+	// publishedAtField is the translated field name of the selected
+	// projection of /_meta/uuid as a date-time, used to find and delete
+	// documents published before a completed backfill. It's empty for
+	// delta-updates bindings, and for standard bindings without a qualifying
+	// field, in which case publishedAtFieldErr explains why.
+	publishedAtField    string
+	publishedAtFieldErr error
 }
 
 type transactor struct {
-	cfg          config
-	client       *client
-	bindings     []binding
-	isServerless bool
-	be           *m.BindingEvents
+	cfg                 config
+	client              *client
+	materializationName string
+	bindings            []binding
+	isServerless        bool
+	be                  *m.BindingEvents
 
 	// Used to correlate the binding number for loaded documents from Elasticsearch.
 	indexToBinding map[string]int
+
+	// truncateAfterBackfill permits deleting the documents published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion after this transaction's stores.
+	truncations map[int]time.Time
 }
 
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, range_ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return nil, nil
 }
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
-func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for idx, boundary := range completes {
+		b := t.bindings[idx]
+		if b.deltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"index":    b.index,
+				"boundary": boundary,
+			}).Info("documents published before the backfill were not deleted because feature flags disable it")
+			continue
+		} else if b.publishedAtField == "" {
+			t.be.Warn(b.index, fmt.Sprintf("Documents published before the backfill of index %q were not deleted because %s.", b.index, b.publishedAtFieldErr))
+			continue
+		}
+		t.truncations[idx] = boundary
+	}
 	return nil
 }
 
@@ -290,10 +326,96 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	close(batchCh)
-	return nil, group.Wait()
+	err := group.Wait()
+	if err != nil {
+		return nil, err
+	}
+
+	// Truncations run after the stores, so deleteBefore's query sees each
+	// document's post-store publication time and doesn't delete one this
+	// transaction just refreshed.
+	for idx, boundary := range t.truncations {
+		b := t.bindings[idx]
+		deleted, err := t.client.deleteBefore(ctx, b.index, b.publishedAtField, boundary, truncationTagPrefix(t.materializationName, b.index), t.isServerless)
+		if isForbidden(err) {
+			t.be.Warn(b.index, fmt.Sprintf("Documents published before the backfill of index %q were not deleted because the credentials lack the privileges to do so: %s.", b.index, err))
+			continue
+		} else if err != nil {
+			return nil, fmt.Errorf("truncating index %q after backfill: %w", b.index, err)
+		}
+		log.WithFields(log.Fields{
+			"index":    b.index,
+			"boundary": boundary,
+			"deleted":  deleted,
+		}).Info("truncated documents published before the backfill")
+		t.be.ReportRowStats(it.Round, b.path, m.ExactRowStats(0, 0, 0).WithTruncated(deleted))
+	}
+	clear(t.truncations)
+
+	return nil, nil
 }
 
 func (t *transactor) Destroy() {}
+
+// truncationTagPrefix is the prefix of the X-Opaque-Id that tags the delete by
+// query tasks of materializationName truncating index. Elasticsearch copies
+// the header onto the task, where listing tasks reports it. Neither name can
+// contain a colon, so the prefix of one materialization and index is never a
+// prefix of another's.
+func truncationTagPrefix(materializationName string, index string) string {
+	return fmt.Sprintf("estuary-truncate:%s:%s:", materializationName, index)
+}
+
+// cancelTruncations cancels this materialization's deletes of documents
+// published before a completed backfill that may still be running from an
+// earlier transaction attempt. It returns an error if they can't be listed.
+// Failing to cancel one is reported as a warning.
+func (t *transactor) cancelTruncations(ctx context.Context) error {
+	prefixes := make([]string, 0, len(t.bindings))
+	for _, b := range t.bindings {
+		prefixes = append(prefixes, truncationTagPrefix(t.materializationName, b.index))
+	}
+
+	var running map[string]string
+	err := requestRetry.Do(ctx, "listing running truncations", func(ctx context.Context) error {
+		var err error
+		running, err = t.client.listDeleteByQueryTasks(ctx, prefixes)
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("listing running truncations: %w", err)
+	}
+
+	for taskID, tag := range running {
+		var index string
+		for _, b := range t.bindings {
+			if strings.HasPrefix(tag, truncationTagPrefix(t.materializationName, b.index)) {
+				index = b.index
+				break
+			}
+		}
+		err := t.client.cancelTask(ctx, taskID)
+		if isForbidden(err) {
+			t.be.Warn("cancel truncation "+index, fmt.Sprintf("A truncation of index %q from an earlier run is still running and was not cancelled because the credentials lack the privileges to do so: %s.", index, err))
+			continue
+		} else if err != nil {
+			t.be.Warn("cancel truncation "+index, fmt.Sprintf("A truncation of index %q from an earlier run is still running and could not be cancelled: %s.", index, err))
+			continue
+		}
+		log.WithFields(log.Fields{
+			"index": index,
+			"task":  taskID,
+		}).Info("cancelled truncation from an earlier run")
+	}
+	return nil
+}
+
+// isForbidden reports whether err is Elasticsearch rejecting a request because
+// the credentials lack the privilege for it.
+func isForbidden(err error) bool {
+	e, ok := errors.AsType[*responseError](err)
+	return ok && e.status == http.StatusForbidden
+}
 
 // storeAction returns the Elasticsearch _bulk action metadata line for storing
 // (not deleting) a single document.
@@ -340,13 +462,8 @@ type gotDoc struct {
 	Index   string                     `json:"_index"`
 	Found   bool                       `json:"found"`
 	Source  map[string]json.RawMessage `json:"_source"`
-	Error   *docError                  `json:"error"`
+	Error   *esError                   `json:"error"`
 	Timeout bool                       `json:"timed_out"`
-}
-
-type docError struct {
-	Type   string `json:"type"`
-	Reason string `json:"reason"`
 }
 
 func (t *transactor) loadDocs(ctx context.Context, getDocs []getDoc, loaded func(int, json.RawMessage) error) error {

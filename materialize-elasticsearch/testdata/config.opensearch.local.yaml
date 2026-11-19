@@ -1,7 +1,7 @@
 endpoint: "http://localhost:9201"
 credentials:
   username: "admin"
-  password: "admin"
+  password: "Estuary-Test-1"
 hardDelete: true
 advanced:
   number_of_replicas: 0

@@ -11,9 +11,9 @@ This connector materializes Estuary collections into indices in an OpenSearch cl
 To use this connector, you'll need:
 
 - An OpenSearch cluster with a known endpoint
-- The role used to connect to OpenSearch must have at least the following privileges:
-  - **Cluster privilege** of `monitor`
-  - For each index to be created: `read`, `write`, `view_index_metadata`, and `create_index`. When creating **Index privileges**, you can use a wildcard `"*"` to grant the privileges to all indices.
+- The role used to connect to OpenSearch must have at least the following permissions (see OpenSearch's documentation on [permissions](https://opensearch.org/docs/latest/security/access-control/permissions/) and [default action groups](https://opensearch.org/docs/latest/security/access-control/default-action-groups/)):
+  - **Cluster permissions** of `cluster_monitor` and `cluster:admin/tasks/cancel`. The `cluster:admin/tasks/cancel` permission is needed to cancel deletions of documents published before a backfill that are still running from an earlier run when the connector starts.
+  - **Index permissions** for each index to be created: `read`, `write`, `create_index`, `indices:admin/get`, `indices:admin/delete`, and `indices:admin/refresh*`. The `indices:admin/delete` permission is needed to backfill a binding whose index already exists, which deletes and recreates the index. The `indices:admin/refresh*` permission is needed to delete the documents published before a backfill once the backfill completes. When creating **Index permissions**, you can use the index pattern `"*"` to grant the permissions on all indices.
 - At least one Estuary collection
 
 ## Configuration

@@ -158,3 +158,7 @@ func TestStoreBulkAmbiguousFailure(t *testing.T) {
 		require.Equal(t, 2, sends)
 	})
 }
+
+func TestTruncationTagPrefix(t *testing.T) {
+	require.Equal(t, "estuary-truncate:acmeCo/materialize:idx:", truncationTagPrefix("acmeCo/materialize", "idx"))
+}
