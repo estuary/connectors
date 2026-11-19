@@ -8,7 +8,11 @@ the files still hold (`GLENTRYKEY` matches a GLENTRY `RECORDNO`).
 - `json-*.xml.gz`: 100 rows of each object from a query that asked for JSON,
   rebuilt as XML.
 - `lookup-*.xml`: the `lookup` response of each object.
-- `sample-glbatch.xml.gz`, `full-glentry.xml`: rows with all fields.
+- `sample-glbatch.xml.gz`, `full-glentry.xml`, `full-gldetail.xml`: rows with
+  all fields.
+- `page-gldetail.xml.gz`, `page-gldetail-2.xml.gz`: two full pages of a
+  GLDETAIL backfill in `BATCHKEY` order. The second page starts at the last
+  batch of the first.
 
 Files larger than 100 KB are compressed with gzip.
 

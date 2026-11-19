@@ -13,6 +13,8 @@ from source_sage_intacct.sage import (
     get_creations_since_request,
     get_deletions_at_request,
     get_deletions_since_request,
+    get_gldetail_batch_request,
+    get_gldetail_page_request,
     get_records_at_request,
     get_records_since_request,
     get_user_by_id_request,
@@ -124,6 +126,26 @@ ts = "2023-01-02 03:04:56"
             get_all_records_from_date_request,
             (cfg, session_id, "GLENTRY", fields, "ENTRY_DATE", "01/01/1900", None),
         ),
+        (
+            "get_gldetail_page_request.txt",
+            get_gldetail_page_request,
+            (cfg, session_id, fields, "01/01/1900", None),
+        ),
+        (
+            "get_gldetail_page_request.txt",
+            get_gldetail_page_request,
+            (cfg, session_id, fields, "01/01/1900", 5501),
+        ),
+        (
+            "get_gldetail_batch_request.txt",
+            get_gldetail_batch_request,
+            (cfg, session_id, fields, "01/01/1900", 5501, None),
+        ),
+        (
+            "get_gldetail_batch_request.txt",
+            get_gldetail_batch_request,
+            (cfg, session_id, fields, "01/01/1900", 5501, "5501-90001-<77>--A"),
+        ),
     ],
 )
 def test_xml_requests(snapshot, name, func, args):
@@ -177,3 +199,20 @@ def assert_one_condition_under_filter(xml_string: str):
     assert len(filter) == 1, filter
     ((operator, body),) = filter.items()
     assert not isinstance(body, list), f"{operator} repeats under <filter>"
+
+
+@pytest.mark.parametrize(
+    "func,args",
+    [
+        (get_gldetail_page_request, ("01/01/1900", None)),
+        (get_gldetail_page_request, ("01/01/1900", 5501)),
+        (get_gldetail_batch_request, ("01/01/1900", 5501, None)),
+        (get_gldetail_batch_request, ("01/01/1900", 5501, "5501-90001-<77>--A")),
+    ],
+)
+def test_gldetail_backfill_requests_are_filtered_and_show_private(func, args):
+    got = func(cfg, session_id, fields, *args)
+
+    assert "<showprivate>true</showprivate>" in got
+    assert "<pagesize>2000</pagesize>" in got
+    assert_one_condition_under_filter(got)

@@ -9,9 +9,11 @@ from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPMixin
 
 from .api import (
+    backfill_gldetail,
     fetch_changes,
     fetch_creations,
     fetch_deletions,
+    fetch_gldetail,
     fetch_page,
     snapshot,
 )
@@ -19,6 +21,7 @@ from .models import (
     ConnectorState,
     Document,
     EndpointConfig,
+    GLDetailDocument,
     ResourceConfigWithSchedule,
     ResourceState,
     SagePermissionError,
@@ -33,6 +36,10 @@ from .sage import PAGE_SIZE, Sage
 REALTIME_LAG = timedelta(minutes=2)
 LOOKBACK_LAG = timedelta(hours=2)
 LOOKBACK_LAG_DELETIONS = timedelta(hours=2, minutes=30)
+# Longer than each delay Sage documents: 2 hours for changes and 2.5 hours for
+# deletions. GLDETAIL has no deletion subtasks, so its lookback subtask is the
+# only reader of late changes between backfills.
+LOOKBACK_LAG_GLDETAIL = timedelta(hours=3)
 
 # The polling interval of a new binding. It is long because Sage bills each
 # API call.
@@ -214,6 +221,65 @@ async def incremental_resource(
     )
 
 
+async def gldetail_resource(
+    sage: Sage,
+    started_at: datetime,
+    backfill_coverage: BackfillCoverage,
+) -> common.Resource:
+    obj = "GLDETAIL"
+    model = await sage.get_model(obj)
+
+    async def open(
+        binding: CaptureBinding[ResourceConfigWithSchedule],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        task.sourced_schema(binding_index, model.sourced_schema())
+        await task.checkpoint(state=ConnectorState())
+
+        # No deletion subtasks: Sage does not audit the rows of this view.
+        # A deleted or replaced row leaves the destination only at a backfill
+        # that sends backfill signals.
+        #
+        # No creation subtasks either. No GLDETAIL row seen so far lacks a
+        # WHENMODIFIED, and each query is billed. A backfill reads a row that
+        # lacks one.
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes={
+                REALTIME: functools.partial(
+                    fetch_gldetail, sage, REALTIME_LAG, PAGE_SIZE
+                ),
+                LOOKBACK: functools.partial(
+                    fetch_gldetail, sage, LOOKBACK_LAG_GLDETAIL, PAGE_SIZE
+                ),
+            },
+            fetch_page=functools.partial(backfill_gldetail, sage, PAGE_SIZE),
+        )
+
+    return common.Resource(
+        name=obj,
+        key=["/RECORDNO"],
+        model=GLDetailDocument,
+        open=open,
+        initial_state=ResourceState(
+            inc={
+                REALTIME: ResourceState.Incremental(cursor=started_at),
+                LOOKBACK: ResourceState.Incremental(cursor=started_at),
+            },
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+        ),
+        initial_config=ResourceConfigWithSchedule(name=obj, interval=DEFAULT_INTERVAL),
+        schema_inference=True,
+        backfill_coverage=backfill_coverage,
+    )
+
+
 async def snapshot_resource(sage: Sage, obj: str) -> common.Resource:
     model = await sage.get_model(obj)
 
@@ -267,7 +333,9 @@ async def all_resources(
         except SagePermissionError as e:
             return obj, str(e)
 
-    object_names = sorted(INCREMENTAL_OBJECTS | GL_OBJECTS | SNAPSHOT_OBJECTS)
+    object_names = sorted(
+        INCREMENTAL_OBJECTS | GL_OBJECTS | {"GLDETAIL"} | SNAPSHOT_OBJECTS
+    )
     probes = await asyncio.gather(*(_probe(obj) for obj in object_names))
     accessible_objects = {obj for obj, denial in probes if denial is None}
     for obj, denial in probes:
@@ -300,6 +368,8 @@ async def all_resources(
         for obj in GL_OBJECTS
         if obj in accessible_objects
     ]
+    if "GLDETAIL" in accessible_objects:
+        gl.append(gldetail_resource(sage, started_at, gl_coverage))
     snap = [
         snapshot_resource(sage, obj)
         for obj in SNAPSHOT_OBJECTS

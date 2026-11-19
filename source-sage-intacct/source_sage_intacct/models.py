@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import (
     Any,
     ClassVar,
@@ -242,6 +242,27 @@ class CreationRecord(Document):
 
     def cursor_value(self) -> AwareDatetime:
         return self.WHENCREATED
+
+
+# GLDETAIL is a view that joins journal entry lines with their AR and AP
+# documents. Its RECORDNO is text, composed of the keys of the rows it joins,
+# so it has its own document models.
+class GLDetailDocument(BaseDocument, extra="allow"):
+    RECORDNO: str
+
+
+class GLDetailRecord(GLDetailDocument):
+    WHENMODIFIED: AwareDatetime
+
+    def cursor_value(self) -> AwareDatetime:
+        return self.WHENMODIFIED
+
+
+class GLDetailBackfillRecord(GLDetailDocument):
+    BATCHKEY: int
+    # Optional because the backfill is the only reader of a row that has no
+    # WHENMODIFIED.
+    WHENMODIFIED: AwareDatetime | None = None
 
 
 def parse_backfill_record(raw: dict) -> "IncrementalResource | CreationRecord":
