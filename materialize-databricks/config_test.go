@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	stdsql "database/sql"
 	"encoding/json"
 	"testing"
 
@@ -89,6 +90,31 @@ func TestDatabricksConfig(t *testing.T) {
 	require.Equal(t, "my-client-secret", oauthWs.ClientSecret)
 	require.Empty(t, oauthWs.Token)
 	require.Nil(t, oauthWs.Credentials)
+}
+
+// The driver fails to parse these with an error that quotes the whole
+// connection string, so they must not reach it.
+func TestValidateRejectsUnparseableAddress(t *testing.T) {
+	for _, creds := range []credentialConfig{
+		{AuthType: PAT_AUTH_TYPE, PersonalAccessToken: "secret1234"},
+		{AuthType: OAUTH_M2M_AUTH_TYPE, ClientID: "my-client-id", ClientSecret: "secret1234"},
+	} {
+		for _, address := range []string{"example.com:prod", "will@example.com", "example.com/db", "example .com:443"} {
+			var cfg = config{
+				Address:     address,
+				CatalogName: "mycatalog",
+				HTTPPath:    "/sql/1.0/warehouses/someid",
+				Credentials: creds,
+				SchemaName:  "default",
+			}
+			_, driverErr := stdsql.Open("databricks", cfg.ToURI(""))
+			require.ErrorContains(t, driverErr, "secret1234", address)
+
+			var err = cfg.Validate()
+			require.ErrorContains(t, err, "invalid 'address'", address)
+			require.NotContains(t, err.Error(), "secret1234", address)
+		}
+	}
 }
 
 func TestSpecification(t *testing.T) {
