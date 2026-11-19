@@ -108,6 +108,18 @@ type Transactor interface {
 	Destroy()
 }
 
+// BackfillBeginner is an optional interface of a Transactor that acts on the
+// backfills that begin.
+type BackfillBeginner interface {
+	// BackfillsBegan is called before Flush with the binding index and
+	// truncation boundary of each backfill that began in this transaction. It
+	// is not called if none began. A backfill that completed in the same
+	// transaction has the same boundary in the `completes` of Flush.
+	//
+	// Runtime v1 does not send backfill begins.
+	BackfillsBegan(ctx context.Context, begins map[int]time.Time) error
+}
+
 // StateKeyFilter returns a predicate reporting whether pending work staged
 // under a state key must be processed by Acknowledge, per its stateKeys
 // contract: a nil stateKeys processes everything, and a non-nil stateKeys
@@ -406,14 +418,15 @@ func RunTransactions(
 		if err = validateIsFlush(&rxRequest); err != nil {
 			return err
 		}
+		var backfillBegins = make(map[int]time.Time, len(rxRequest.Flush.BackfillBegins))
 		for _, bb := range rxRequest.Flush.BackfillBegins {
-			var boundary time.Time
-			if boundary, err = types.TimestampFromProto(bb.Timestamp); err != nil {
+			backfillBegins[int(bb.Binding)], err = types.TimestampFromProto(bb.Timestamp)
+			if err != nil {
 				return fmt.Errorf("invalid timestamp in Flush.BackfillBegins: %w", err)
 			}
 			log.WithFields(log.Fields{
 				"binding":  bb.Binding,
-				"boundary": boundary,
+				"boundary": backfillBegins[int(bb.Binding)],
 			}).Info("backfill began")
 		}
 		var backfillCompletes = make(map[int]time.Time, len(rxRequest.Flush.BackfillCompletes))
@@ -427,6 +440,11 @@ func RunTransactions(
 				"boundary": backfillCompletes[int(bc.Binding)],
 			}).Info("backfill completed")
 			health.observeTruncation(round, int(bc.Binding))
+		}
+		if beginner, ok := transactor.(BackfillBeginner); ok && len(backfillBegins) > 0 {
+			if err = beginner.BackfillsBegan(ctx, backfillBegins); err != nil {
+				return fmt.Errorf("transactor.BackfillsBegan: %w", err)
+			}
 		}
 		if err = transactor.Flush(ctx, backfillCompletes); err != nil {
 			return fmt.Errorf("transactor.Flush: %w", err)

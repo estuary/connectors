@@ -93,6 +93,27 @@ func (t *flushRecorder) Flush(_ context.Context, completes map[int]time.Time) er
 	return t.err
 }
 
+// beginRecorder is a flushRecorder that also implements BackfillBeginner.
+type beginRecorder struct {
+	flushRecorder
+	beginErr error
+	begins   []map[int]time.Time
+	// flushesAtBegin is the number of Flush calls made before each
+	// BackfillsBegan call.
+	flushesAtBegin []int
+}
+
+func (t *beginRecorder) NewTransactor(_ context.Context, _ pm.Request_Open, be *BindingEvents) (Transactor, *pm.Response_Opened, *MaterializeOptions, error) {
+	t.be = be
+	return t, &pm.Response_Opened{}, nil, nil
+}
+
+func (t *beginRecorder) BackfillsBegan(_ context.Context, begins map[int]time.Time) error {
+	t.begins = append(t.begins, begins)
+	t.flushesAtBegin = append(t.flushesAtBegin, len(t.completes))
+	return t.beginErr
+}
+
 func flushRequests(flush *pm.Request_Flush) []pm.Request {
 	return []pm.Request{
 		{Acknowledge: &pm.Request_Acknowledge{}},
@@ -102,7 +123,7 @@ func flushRequests(flush *pm.Request_Flush) []pm.Request {
 	}
 }
 
-func runFlush(t *testing.T, tr *flushRecorder, flush *pm.Request_Flush) (*scriptedStream, error) {
+func runFlush(t *testing.T, tr newTransactorer, flush *pm.Request_Flush) (*scriptedStream, error) {
 	t.Helper()
 	var stream = &scriptedStream{requests: flushRequests(flush)}
 	var done = make(chan error, 1)
@@ -160,6 +181,39 @@ func TestFlushSignals(t *testing.T) {
 		require.Equal(t, log.Fields{"binding": uint32(1), "boundary": begin}, logged["backfill began"])
 		require.Equal(t, log.Fields{"binding": uint32(0), "boundary": complete}, logged["backfill completed"])
 		require.Equal(t, log.Fields{"message": "Starting up: connecting to the destination"}, logged["status"])
+	})
+
+	t.Run("begins reach a BackfillBeginner before Flush", func(t *testing.T) {
+		var tr = &beginRecorder{flushRecorder: flushRecorder{scriptedTransactor: scriptedTransactor{bindings: twoBindings}}}
+		var _, err = runFlush(t, tr, &pm.Request_Flush{
+			BackfillBegins:    []*pm.Request_Flush_BackfillBegin{{Binding: 1, Timestamp: beginProto}},
+			BackfillCompletes: []*pm.Request_Flush_BackfillComplete{{Binding: 0, Timestamp: completeProto}},
+		})
+		require.NoError(t, err)
+		require.Equal(t, []map[int]time.Time{{1: begin}}, tr.begins)
+		require.Equal(t, []int{0}, tr.flushesAtBegin)
+		require.Len(t, tr.completes, 1)
+	})
+
+	t.Run("a BackfillBeginner is not called without begins", func(t *testing.T) {
+		var tr = &beginRecorder{flushRecorder: flushRecorder{scriptedTransactor: scriptedTransactor{bindings: twoBindings}}}
+		var _, err = runFlush(t, tr, &pm.Request_Flush{
+			BackfillCompletes: []*pm.Request_Flush_BackfillComplete{{Binding: 0, Timestamp: completeProto}},
+		})
+		require.NoError(t, err)
+		require.Empty(t, tr.begins)
+		require.Len(t, tr.completes, 1)
+	})
+
+	t.Run("BackfillBeginner error is wrapped", func(t *testing.T) {
+		var boom = errors.New("boom")
+		var tr = &beginRecorder{flushRecorder: flushRecorder{scriptedTransactor: scriptedTransactor{bindings: twoBindings}}, beginErr: boom}
+		var _, err = runFlush(t, tr, &pm.Request_Flush{
+			BackfillBegins: []*pm.Request_Flush_BackfillBegin{{Binding: 1, Timestamp: beginProto}},
+		})
+		require.ErrorIs(t, err, boom)
+		require.ErrorContains(t, err, "transactor.BackfillsBegan: boom")
+		require.Empty(t, tr.completes)
 	})
 
 	t.Run("no signals", func(t *testing.T) {
