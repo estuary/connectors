@@ -38,7 +38,12 @@ type client struct {
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
 	cfg := ep.Config
 
-	db, err := stdsql.Open("databricks", cfg.ToURI(materializationName))
+	uri, err := cfg.ToURI(materializationName)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := stdsql.Open("databricks", uri)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
@@ -251,7 +256,13 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 		return errs
 	}
 
-	db, err := stdsql.Open("databricks", cfg.ToURI(""))
+	uri, err := cfg.ToURI("")
+	if err != nil {
+		errs.Err(err)
+		return errs
+	}
+
+	db, err := stdsql.Open("databricks", uri)
 	if err != nil {
 		errs.Err(fmt.Errorf("opening database: %w", err))
 		return errs

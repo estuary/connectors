@@ -390,7 +390,9 @@ func newTransactor(
 }
 
 func (t *transactor) openDB() (*stdsql.DB, error) {
-	if db, err := stdsql.Open("databricks", t.cfg.ToURI(t.materializationName)); err != nil {
+	if uri, err := t.cfg.ToURI(t.materializationName); err != nil {
+		return nil, err
+	} else if db, err := stdsql.Open("databricks", uri); err != nil {
 		return nil, fmt.Errorf("sql.Open: %w", err)
 	} else {
 		return db, nil

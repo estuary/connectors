@@ -2,7 +2,6 @@ package connector
 
 import (
 	"context"
-	stdsql "database/sql"
 	"encoding/json"
 	"testing"
 
@@ -24,13 +23,15 @@ func TestDatabricksConfig(t *testing.T) {
 		SchemaName: "default",
 	}
 	require.NoError(t, validConfig.Validate())
-	var uri = validConfig.ToURI("my-materialization")
+	uri, err := validConfig.ToURI("my-materialization")
+	require.NoError(t, err)
 	require.Equal(t, "token:secret@db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?catalog=mycatalog&maxDownloadThreads=2&query_tags=materialization_name%3Amy-materialization&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", uri)
 
 	var noPort = validConfig
 	noPort.Address = "db-something.cloud.databricks.com"
 	require.NoError(t, noPort.Validate())
-	uri = noPort.ToURI("")
+	uri, err = noPort.ToURI("")
+	require.NoError(t, err)
 	require.Equal(t, "token:secret@db-something.cloud.databricks.com:443/sql/1.0/warehouses/someid?catalog=mycatalog&maxDownloadThreads=2&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", uri)
 
 	var noAddress = validConfig
@@ -66,7 +67,8 @@ func TestDatabricksConfig(t *testing.T) {
 		SchemaName: "default",
 	}
 	require.NoError(t, validOAuthConfig.Validate())
-	var oauthUri = validOAuthConfig.ToURI("")
+	oauthUri, err := validOAuthConfig.ToURI("")
+	require.NoError(t, err)
 	require.Equal(t, "db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?authType=OauthM2M&catalog=mycatalog&clientID=my-client-id&clientSecret=my-client-secret&maxDownloadThreads=2&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", oauthUri)
 
 	var noClientID = validOAuthConfig
@@ -123,12 +125,11 @@ func TestValidateRejectsUnparseableAddress(t *testing.T) {
 			Credentials: tc.creds,
 			SchemaName:  "default",
 		}
-		_, driverErr := stdsql.Open("databricks", cfg.ToURI(""))
-		require.ErrorContains(t, driverErr, "secret1234", tc.address)
-
-		var err = cfg.Validate()
-		require.ErrorContains(t, err, "invalid 'address'", tc.address)
-		require.NotContains(t, err.Error(), "secret1234", tc.address)
+		_, uriErr := cfg.ToURI("")
+		for _, err := range []error{uriErr, cfg.Validate()} {
+			require.ErrorContains(t, err, "invalid 'address'", tc.address)
+			require.NotContains(t, err.Error(), "secret1234", tc.address)
+		}
 	}
 }
 
