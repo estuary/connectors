@@ -49,7 +49,9 @@ func TestIntegration(t *testing.T) {
 		testutil.RunTestAllTasks(t, "testdata/truncate.flow.yaml", func(t *testing.T, bundled []byte, taskName string, cfg config) {
 			var ctx = context.Background()
 			var task = sql.PrepareTestTask(t, NewDriver(), bundled, taskName, cfg, makeResourceFn)
-			db, err := stdsql.Open("databricks", cfg.ToURI(taskName))
+			uri, err := cfg.ToURI(taskName)
+			require.NoError(t, err)
+			db, err := stdsql.Open("databricks", uri)
 			require.NoError(t, err)
 			defer db.Close()
 
