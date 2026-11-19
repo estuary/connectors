@@ -20,7 +20,7 @@ func requireMultiShardCapable(r *pf.RangeSpec, bindings []*binding) error {
 
 	var tables []string
 	for _, b := range bindings {
-		if !b.streamingV2 && (b.streaming || b.pipeName != "") {
+		if b.streaming || b.pipeName != "" {
 			tables = append(tables, b.target.Identifier)
 		}
 	}
