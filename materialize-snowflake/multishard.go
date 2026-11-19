@@ -12,10 +12,9 @@ import (
 // requireMultiShardCapable refuses a shard of a multi-shard task when any
 // binding writes through snowpipe_streaming or a Snowpipe pipe, because only
 // staged files and snowpipe_streaming_v2 keep their state per shard. A shard
-// is one of several when its range spans less than the full key or r-clock
-// space.
+// is one of several when its range spans less than the full key space.
 func requireMultiShardCapable(r *pf.RangeSpec, bindings []*binding) error {
-	if r.KeyBegin == 0 && r.KeyEnd == math.MaxUint32 && r.RClockBegin == 0 && r.RClockEnd == math.MaxUint32 {
+	if r.KeyBegin == 0 && r.KeyEnd == math.MaxUint32 {
 		return nil
 	}
 

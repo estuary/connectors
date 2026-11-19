@@ -12,7 +12,6 @@ import (
 func TestRequireMultiShardCapable(t *testing.T) {
 	var full = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
 	var keySplit = &pf.RangeSpec{KeyBegin: 0x80000000, KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32}
-	var rClockSplit = &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: 0x7fffffff}
 
 	var bind = func(identifier string, configure func(*binding)) *binding {
 		var b = &binding{target: sql.Table{Identifier: identifier}}
@@ -34,8 +33,6 @@ func TestRequireMultiShardCapable(t *testing.T) {
 		{name: "shards take staged and streaming v2 bindings", r: keySplit, bindings: []*binding{staged, streamV2}},
 		{name: "a key split refuses snowpipe_streaming and Snowpipe bindings", r: keySplit,
 			bindings: []*binding{streamV2, staged, streamV1, pipe}, wantErr: []string{"v1_table", "pipe_table"}},
-		{name: "an r-clock split refuses a Snowpipe binding", r: rClockSplit,
-			bindings: []*binding{pipe}, wantErr: []string{"pipe_table"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var err = requireMultiShardCapable(tc.r, tc.bindings)
