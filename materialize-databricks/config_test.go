@@ -95,25 +95,40 @@ func TestDatabricksConfig(t *testing.T) {
 // The driver fails to parse these with an error that quotes the whole
 // connection string, so they must not reach it.
 func TestValidateRejectsUnparseableAddress(t *testing.T) {
-	for _, creds := range []credentialConfig{
-		{AuthType: PAT_AUTH_TYPE, PersonalAccessToken: "secret1234"},
-		{AuthType: OAUTH_M2M_AUTH_TYPE, ClientID: "my-client-id", ClientSecret: "secret1234"},
-	} {
-		for _, address := range []string{"example.com:prod", "will@example.com", "example.com/db", "example .com:443"} {
-			var cfg = config{
-				Address:     address,
-				CatalogName: "mycatalog",
-				HTTPPath:    "/sql/1.0/warehouses/someid",
-				Credentials: creds,
-				SchemaName:  "default",
-			}
-			_, driverErr := stdsql.Open("databricks", cfg.ToURI(""))
-			require.ErrorContains(t, driverErr, "secret1234", address)
+	var pat = credentialConfig{AuthType: PAT_AUTH_TYPE, PersonalAccessToken: "secret1234"}
+	var oauth = credentialConfig{AuthType: OAUTH_M2M_AUTH_TYPE, ClientID: "my-client-id", ClientSecret: "secret1234"}
 
-			var err = cfg.Validate()
-			require.ErrorContains(t, err, "invalid 'address'", address)
-			require.NotContains(t, err.Error(), "secret1234", address)
+	type testCase struct {
+		creds    credentialConfig
+		address  string
+		httpPath string
+	}
+	var cases []testCase
+	for _, creds := range []credentialConfig{pat, oauth} {
+		for _, address := range []string{"example.com:prod", "will@example.com", "example.com/db", "example .com:443"} {
+			cases = append(cases, testCase{creds, address, "/sql/1.0/warehouses/someid"})
 		}
+	}
+	// These connection strings start with a scheme, so the driver doesn't add one.
+	cases = append(cases,
+		testCase{oauth, "https:", "//example.com:prod/sql"},
+		testCase{oauth, "http:", "//example.com:prod/sql"},
+	)
+
+	for _, tc := range cases {
+		var cfg = config{
+			Address:     tc.address,
+			CatalogName: "mycatalog",
+			HTTPPath:    tc.httpPath,
+			Credentials: tc.creds,
+			SchemaName:  "default",
+		}
+		_, driverErr := stdsql.Open("databricks", cfg.ToURI(""))
+		require.ErrorContains(t, driverErr, "secret1234", tc.address)
+
+		var err = cfg.Validate()
+		require.ErrorContains(t, err, "invalid 'address'", tc.address)
+		require.NotContains(t, err.Error(), "secret1234", tc.address)
 	}
 }
 
