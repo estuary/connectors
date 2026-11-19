@@ -132,10 +132,8 @@ func (c config) Validate() error {
 		}
 	}
 
-	// The driver's own parse error quotes the connection string, password
-	// included, so an address it can't parse is rejected here.
-	if _, err := url.Parse(c.ToURI().String()); err != nil {
-		return fmt.Errorf("invalid 'address' %q: expected host or host:port", c.Address)
+	if _, err := c.ToURI(); err != nil {
+		return err
 	}
 
 	if c.Credentials == nil {
@@ -163,8 +161,10 @@ func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 
 const defaultPort = "1433"
 
-// ToURI converts the Config to a DSN string.
-func (c *config) ToURI() *url.URL {
+// ToURI converts the Config to a DSN string. It fails for an address the
+// driver can't parse, because the driver's own parse error quotes the
+// connection string, password included.
+func (c *config) ToURI() (*url.URL, error) {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:1433
 	// to address through the bastion server, so we use the tunnel's address
@@ -204,12 +204,19 @@ func (c *config) ToURI() *url.URL {
 		RawQuery: params.Encode(),
 	}
 
-	return uri
+	if _, err := url.Parse(uri.String()); err != nil {
+		return nil, fmt.Errorf("invalid 'address' %q: expected host or host:port", c.Address)
+	}
+
+	return uri, nil
 }
 
 // ToSQLConnector converts the Config to a sql Connector for use with OpenDB.
 func (c *config) ToSQLConnector(ctx context.Context) (driver.Connector, error) {
-	uri := c.ToURI()
+	uri, err := c.ToURI()
+	if err != nil {
+		return nil, err
+	}
 
 	if c.Credentials != nil {
 		switch c.Credentials.AuthType {
