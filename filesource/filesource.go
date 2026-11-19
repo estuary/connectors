@@ -75,7 +75,10 @@ type Source struct {
 // Store is a minimal interface of an binary large object storage service.
 // It supports ordered listings of objects, and reading an single object.
 type Store interface {
-	// List objects of the Store.
+	// List objects of the Store. A Listing must return objects in ascending
+	// byte order of Path, because a sweep skips any object whose path sorts
+	// before the last one it read. The same Path may repeat, such as for an
+	// object's versions.
 	List(context.Context, Query) (Listing, error)
 	// Read an object of the Store. The argument ObjectInfo is returned,
 	// and may be enhanced with additional fields which weren't previously
@@ -291,6 +294,7 @@ func (src *Source) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) e
 
 		var r = &reader{
 			connector: &conn,
+			taskName:  string(open.Capture.Name),
 			binding:   i,
 			stream:    stream,
 			pathRe:    pathRe,
@@ -323,6 +327,7 @@ func (src *Source) Main() {
 type reader struct {
 	*connector
 
+	taskName string
 	pathRe   *regexp.Regexp
 	prefix   string
 	stateKey boilerplate.StateKey
@@ -346,6 +351,11 @@ func (r *reader) sweep(ctx context.Context) error {
 		return fmt.Errorf("starting listing: %w", err)
 	}
 
+	// A listing out of path order makes the sweep skip files, so warn the
+	// first time it happens in each sweep.
+	var lastPath string
+	var hasWarnedOutOfOrder bool
+
 	for {
 		var obj, err = listing.Next()
 		if err == io.EOF {
@@ -355,6 +365,17 @@ func (r *reader) sweep(ctx context.Context) error {
 		} else if obj.IsPrefix {
 			panic("implementation error (IsPrefix entry returned with Recursive: true Query)")
 		}
+
+		if obj.Path < lastPath && !hasWarnedOutOfOrder {
+			log.WithFields(log.Fields{
+				"observable":        true,
+				"catalog_task_name": r.taskName,
+				"previous_path":     lastPath,
+				"path":              obj.Path,
+			}).Warn("listing was not in byte order of path, so the sweep may skip files")
+			hasWarnedOutOfOrder = true
+		}
+		lastPath = obj.Path
 
 		if skip, reason := r.shouldSkip(obj); skip {
 			log.WithFields(log.Fields{"path": obj.Path, "reason": reason}).Debug("skipping file")
