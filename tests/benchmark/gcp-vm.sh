@@ -26,6 +26,10 @@
 #                         the fixture in an on-disk shuffle log holding 512 MiB
 #                         plus the transaction in flight, which 100GB covers.
 #                         Raise it for much larger transactions.
+#   --idle-hours N        The VM deletes itself, with its disks and any
+#                         benchmark runs not yet pulled, after N hours with no
+#                         SSH connection and no running benchmark (default:
+#                         168, one week).
 #
 # Destroy flags:
 #   --yes                 Skip confirmation prompt
@@ -43,6 +47,7 @@ VM_NAME="bench-${USER_LABEL}"
 ZONE="us-central1-a"
 MACHINE_TYPE="c3-standard-4-lssd"
 BOOT_DISK_SIZE="100GB"
+IDLE_HOURS="168"
 PROJECT=""
 YES=0
 COMMAND=""
@@ -190,7 +195,7 @@ cmd_create() {
     die "VM '$VM_NAME' already exists in $ZONE. Use 'sync' to update code, or 'destroy' first."
   fi
 
-  info "creating VM: $VM_NAME (zone=$ZONE, type=$MACHINE_TYPE, disk=$BOOT_DISK_SIZE)"
+  info "creating VM: $VM_NAME (zone=$ZONE, type=$MACHINE_TYPE, disk=$BOOT_DISK_SIZE, idle-hours=$IDLE_HOURS)"
   gcloud compute instances create "$VM_NAME" \
     --zone="$ZONE" \
     --project="$PROJECT" \
@@ -210,7 +215,7 @@ cmd_create() {
   gcloud compute scp "$SCRIPT_DIR/gcp-vm-setup.sh" \
     "$VM_NAME:~/gcp-vm-setup.sh" \
     --zone="$ZONE" --project="$PROJECT" --tunnel-through-iap --quiet
-  gcloud_ssh --command="bash ~/gcp-vm-setup.sh"
+  gcloud_ssh --command="bash ~/gcp-vm-setup.sh $IDLE_HOURS"
 
   do_sync
 
@@ -221,6 +226,9 @@ cmd_create() {
   echo "Benchmark VM ready!"
   echo "  name: $VM_NAME"
   echo "  zone: $ZONE"
+  echo ""
+  echo "This VM deletes itself after $IDLE_HOURS idle hours. Pull your runs before then:"
+  echo "  $0 pull-runs"
   echo ""
   echo "Quick start:"
   echo "  $0 ssh                  # shell into the VM"
@@ -308,6 +316,7 @@ while (( $# )); do
     --project) PROJECT="$2";      shift 2 ;;
     --machine-type) MACHINE_TYPE="$2"; shift 2 ;;
     --boot-disk-size) BOOT_DISK_SIZE="$2"; shift 2 ;;
+    --idle-hours) IDLE_HOURS="$2"; shift 2 ;;
     --yes)     YES=1;             shift   ;;
     -h|--help) usage 0 ;;
     --)        shift; SSH_EXTRA_ARGS=("$@"); break ;;
@@ -316,6 +325,7 @@ while (( $# )); do
 done
 
 [[ -n "$COMMAND" ]] || { echo "No command specified."; usage 1; }
+[[ "$IDLE_HOURS" =~ ^[0-9]+$ ]] || die "--idle-hours must be a whole number of hours, got: $IDLE_HOURS"
 
 command -v gcloud >/dev/null || die "gcloud CLI not found; install from https://cloud.google.com/sdk/docs/install"
 
