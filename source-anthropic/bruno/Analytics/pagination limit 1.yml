@@ -1,0 +1,28 @@
+info:
+  name: pagination limit 1
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/usage?starting_at={{seed_start}}&ending_at={{seed_end}}&time_bucket_width=1m&order_by=time&order=asc&limit=1&group_by[]=actor&group_by[]=model&group_by[]=product&group_by[]=api_key_id&group_by[]=workspace_id"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **WHY:** forces has_more to prove the page cursor shape.
+    
+    **VERIFIED (2026-11-16):** has_more=true with next_page `page_…` (opaque);
+    passing it as `page` with identical params returns the next row.
+    
+    **LIMITATION (VERIFIED 2026-11-16): cursors are bound to their query.**
+    Reusing a cursor with different params → 400 `page cursor does not match
+    current query parameters`. **UNOBSERVABLE:** the documented 410 on cursor
+    expiry after a data refresh; the connector restarts the window on 410.
+  type: text/markdown

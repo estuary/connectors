@@ -1,0 +1,83 @@
+opencollection: 1.0.0
+
+info:
+  name: Anthropic
+
+request:
+  scripts:
+    - type: before-request
+      code: |-
+        // Anthropic auth via the connector's sops-encrypted config.yaml. The key is
+        // re-derived from sops on every request and lives only on `req` — never
+        // persisted to a var or env file. Requires the developer JS sandbox:
+        //   CLI: `bru run <request>.yml --env Anthropic --sandbox developer`
+        //   GUI: jsSandboxMode "developer" in ~/.config/bruno/collection-security.json
+        const { execFileSync } = require('child_process');
+        const path = require('path');
+        const configured = bru.getEnvVar('config_path');
+        if (!configured) throw new Error('config_path env var is not set');
+        const configPath = path.isAbsolute(configured)
+          ? configured
+          : path.resolve(bru.cwd(), configured);
+        const decrypted = execFileSync(
+          'sops', ['-d', '--output-type=json', configPath], { encoding: 'utf8' },
+        );
+        // Raw `sops -d` keeps the `_sops` suffix on key names — accept both.
+        const creds = JSON.parse(decrypted)?.credentials;
+        const key = creds?.access_token ?? creds?.access_token_sops;
+        if (!key) throw new Error('credentials.access_token(_sops) missing from decrypted config');
+        // Matches TokenSource(authorization_header="x-api-key") in resources.py.
+        req.setHeader('x-api-key', key);
+        req.setHeader('anthropic-version', '2026-10-21');
+        req.setHeader('anthropic-beta', 'analytics-usage-cost-2026-08-24');
+    - type: after-response
+      code: |-
+        // Redact actor PII so any Response Example saved from a run is clean.
+        const REDACTED_FIELDS = ['email_address', 'name'];
+        function redact(v) {
+          if (Array.isArray(v)) return v.map(redact);
+          if (v && typeof v === 'object') {
+            const o = {};
+            for (const k of Object.keys(v)) {
+              o[k] = REDACTED_FIELDS.includes(k) && v[k] != null ? 'REDACTED' : redact(v[k]);
+            }
+            return o;
+          }
+          return v;
+        }
+        const body = res.getBody();
+        if (body && typeof body === 'object') res.setBody(redact(body));
+
+docs:
+  content: |-
+    ## API constraints (account-wide)
+
+    - **Auth:** `x-api-key: <key>` and `Authorization: Bearer <key>` both return
+      200 on `/usage` and `/cost` with an Admin key (VERIFIED 2026-11-16). The
+      connector uses `x-api-key`. `anthropic-beta:
+      analytics-usage-cost-2026-08-24` is required (DOCUMENTED,
+      https://platform.claude.com/docs/en/api/http/beta/organization/analytics/usage).
+    - **Rate limit:** 60 requests/minute per organization across all analytics
+      endpoints, not per key (DOCUMENTED,
+      https://platform.claude.com/docs/en/manage-claude/usage-cost-analytics-api).
+      **UNOBSERVABLE:** 429 body and Retry-After behavior were not triggered;
+      429 is handled by the CDK's adaptive rate limiter + retry.
+    - **Freshness:** `data_refreshed_at` is per granularity and per queried
+      window: an old 1m window reports when that window was last exported
+      (2026-11-13T01:58:58Z) while a window ending now reports the current
+      export (2026-11-16T14:50:10Z); 1h/1d report 14:48:10Z (VERIFIED
+      2026-11-16, `Analytics / freshness by window`). Data typically lands
+      within 4h, up to 24h, and may be revised until ~7 days after month end
+      (DOCUMENTED).
+    - **Boundaries:** `starting_at` is inclusive and `ending_at` exclusive at
+      bucket edges, for 1h and 1m (VERIFIED 2026-11-16, `Analytics /
+      starting_at inclusive probe`, `Analytics / ending_at exclusive probe`).
+    - **History floor:** nothing before 2026-01-01 → 400 `data prior to
+      2026-01-01 is not available` (VERIFIED 2026-11-16, `Analytics / before
+      2026 probe`); and no more than 365 days back (DOCUMENTED).
+
+    Endpoint-specific limitations: `grep -rl LIMITATION bruno/`.
+
+    Run: `bru run Analytics --env Anthropic --sandbox developer` from this
+    directory.
+  type: text/markdown

@@ -1,0 +1,22 @@
+info:
+  name: unaligned bounds
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{base_url}}/usage?starting_at=2026-11-12T10:17:00Z&ending_at=2026-11-12T23:45:00Z&time_bucket_width=1h&order_by=time&order=asc"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **VERIFIED (2026-11-16):** unaligned bounds are accepted and rounded to
+    buckets server-side (one 21:00–22:00 row). The connector still sends
+    bucket-aligned bounds so windows tile exactly.
+  type: text/markdown

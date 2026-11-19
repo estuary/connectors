@@ -1,0 +1,24 @@
+info:
+  name: freshness by window
+  type: http
+  seq: 7
+
+http:
+  method: GET
+  url: "{{base_url}}/usage?starting_at={{seed_start}}&ending_at={{seed_end}}&time_bucket_width=1m"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **WHY:** compare data_refreshed_at against a 1m window ending now.
+    
+    **VERIFIED (2026-11-16):** this old window reports 2026-11-13T01:58:58Z while
+    a 1m window ending now reports the current export time. The connector does
+    not use the watermark as its cursor; it re-reads a lookback each sweep.
+  type: text/markdown
