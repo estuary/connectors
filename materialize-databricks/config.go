@@ -166,6 +166,12 @@ func (c config) Validate() error {
 		}
 	}
 
+	// The driver's own parse error quotes the connection string, credentials
+	// included, so an address it can't parse is rejected here.
+	if _, err := url.Parse("https://" + c.ToURI("")); err != nil {
+		return fmt.Errorf("invalid 'address' %q: expected host or host:port", c.Address)
+	}
+
 	if err := c.Schedule.Validate(); err != nil {
 		return err
 	}
