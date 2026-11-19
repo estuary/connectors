@@ -1494,7 +1494,7 @@ func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 // staged is positive. A result that can't be read is logged and skipped; only
 // the query itself can fail the commit.
 func (d *transactor) runStoreQuery(ctx context.Context, item *checkpointItem, query string, staged int64, binding int, path []string) error {
-	isMerge := strings.HasPrefix(query, "\nMERGE INTO")
+	isMerge := isMergeQuery(query)
 
 	var queryCtx, trace = d.commitProfile.Trace(ctx, binding, boilerplate.StatementKind(query))
 	rows, err := d.db.QueryContext(queryCtx, query)
