@@ -85,13 +85,17 @@ jobs:
       - uses: actions/checkout@v4
 
       # These tests only invoke flowctl, but flowctl shells out to sops to
-      # decrypt each test.flow.yaml's encrypted config, so both are uploaded.
-      - name: Fetch flowctl and sops
+      # decrypt each test.flow.yaml's encrypted config, and runs each image
+      # through flow-connector-init. flowctl uses the flow-connector-init
+      # beside it, and otherwise one from an image that flowctl pins, which can
+      # be older than flowctl itself. So all three are uploaded.
+      - name: Fetch flowctl, sops and flow-connector-init
         uses: ./.github/actions/fetch-flow-artifact
         with:
           paths: |
             flow-bin/flowctl
             flow-bin/sops
+            flow-bin/flow-connector-init
 
   py_connector:
     runs-on: ubuntu-24.04
