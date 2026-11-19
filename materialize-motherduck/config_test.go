@@ -59,12 +59,11 @@ func TestValidateRejectsMalformedDatabase(t *testing.T) {
 			Database: database,
 			Schema:   "main",
 		}
-		_, driverErr := cfg.bareOpen()
-		require.ErrorContains(t, driverErr, token, database)
-
-		var err = cfg.Validate()
-		require.ErrorContains(t, err, "invalid 'database'", database)
-		require.NotContains(t, err.Error(), token, database)
+		_, openErr := cfg.bareOpen()
+		for _, err := range []error{openErr, cfg.Validate()} {
+			require.ErrorContains(t, err, "invalid 'database'", database)
+			require.NotContains(t, err.Error(), token, database)
+		}
 	}
 }
 
