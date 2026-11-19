@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"regexp"
@@ -162,6 +163,10 @@ func testTableName(t *testing.T, uniqueID string) (name, id string) {
 	return fmt.Sprintf("%s.%s_%s", *testSchema, baseName, uniqueID), uniqueID
 }
 
+// testRunSuffix gives each test run its own tables, so overlapping CI runs
+// sharing the database don't drop each other's. snapshot removes it.
+var testRunSuffix = fmt.Sprintf("_%08x", rand.Uint32())
+
 func uniqueTableID(t testing.TB, extra ...string) string {
 	t.Helper()
 	var h = sha256.New()
@@ -171,7 +176,12 @@ func uniqueTableID(t testing.TB, extra ...string) string {
 		h.Write([]byte(x))
 	}
 	var x = binary.BigEndian.Uint32(h.Sum(nil)[0:4])
-	return fmt.Sprintf("%d", (x%900000)+100000)
+	return fmt.Sprintf("%d%s", (x%900000)+100000, testRunSuffix)
+}
+
+func snapshot(t *testing.T, s string) {
+	t.Helper()
+	cupaloy.SnapshotT(t, strings.ReplaceAll(s, testRunSuffix, ""))
 }
 
 func createTestTable(t testing.TB, control *sql.DB, tableName, definition string) {
@@ -227,7 +237,7 @@ func TestSpec(t *testing.T) {
 
 	formatted, err := json.MarshalIndent(response, "", "  ")
 	require.NoError(t, err)
-	cupaloy.SnapshotT(t, string(formatted))
+	snapshot(t, string(formatted))
 }
 
 func TestQueryTemplate(t *testing.T) {
@@ -261,7 +271,7 @@ func TestQueryTemplate(t *testing.T) {
 				"SchemaName":   res.SchemaName,
 				"TableName":    res.TableName,
 			}))
-			cupaloy.SnapshotT(t, buf.String())
+			snapshot(t, buf.String())
 		})
 	}
 }
@@ -281,7 +291,7 @@ func TestBasicCapture(t *testing.T) {
 
 	// Discover the table and verify discovery snapshot
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
-	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+	t.Run("Discovery", func(t *testing.T) { snapshot(t, summarizeBindings(t, cs.Bindings)) })
 
 	// Edit the discovered binding to use the ID column as a cursor
 	var res Resource
@@ -325,7 +335,7 @@ func TestBasicCapture(t *testing.T) {
 		}
 		// Fail fast if the inserting goroutine reports an error.
 		require.NoError(t, insertErr)
-		cupaloy.SnapshotT(t, cs.Summary())
+		snapshot(t, cs.Summary())
 	})
 }
 
@@ -337,7 +347,7 @@ func TestBasicDatatypes(t *testing.T) {
 
 	// Discover the table and verify discovery snapshot
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
-	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+	t.Run("Discovery", func(t *testing.T) { snapshot(t, summarizeBindings(t, cs.Bindings)) })
 
 	t.Run("Capture", func(t *testing.T) {
 		executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s(id, a_real, a_bool, a_date, a_ts, a_tstz) VALUES ($1,$2,$3,$4,$5,$6)", tableName),
@@ -345,7 +355,7 @@ func TestBasicDatatypes(t *testing.T) {
 
 		setShutdownAfterQuery(t, true)
 		cs.Capture(ctx, t, nil)
-		cupaloy.SnapshotT(t, cs.Summary())
+		snapshot(t, cs.Summary())
 	})
 }
 
@@ -362,7 +372,7 @@ func TestTemporalTypes(t *testing.T) {
     )`)
 
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
-	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+	t.Run("Discovery", func(t *testing.T) { snapshot(t, summarizeBindings(t, cs.Bindings)) })
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
@@ -405,7 +415,7 @@ func TestTemporalTypes(t *testing.T) {
 				row...)
 		}
 		cs.Capture(ctx, t, nil)
-		cupaloy.SnapshotT(t, cs.Summary())
+		snapshot(t, cs.Summary())
 	})
 }
 
@@ -417,14 +427,14 @@ func TestFloatNaNs(t *testing.T) {
 
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
 
-	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+	t.Run("Discovery", func(t *testing.T) { snapshot(t, summarizeBindings(t, cs.Bindings)) })
 
 	t.Run("Capture", func(t *testing.T) {
 		executeControlQuery(t, control, fmt.Sprintf(`INSERT INTO %s VALUES (0, 2.0, 'NaN'), (1, 'NaN', 3.0), (2, 'Infinity', '-Infinity')`, tableName))
 
 		setShutdownAfterQuery(t, true)
 		cs.Capture(ctx, t, nil)
-		cupaloy.SnapshotT(t, cs.Summary())
+		snapshot(t, cs.Summary())
 	})
 }
 
@@ -447,7 +457,7 @@ func TestFieldLengthDiscovery(t *testing.T) {
     )`)
 
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
-	cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings))
+	snapshot(t, summarizeBindings(t, cs.Bindings))
 }
 
 func TestSchemaFilter(t *testing.T) {
@@ -459,15 +469,15 @@ func TestSchemaFilter(t *testing.T) {
 	// Run discovery with several schema filters and snapshot the results
 	t.Run("Unfiltered", func(t *testing.T) {
 		cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{}
-		cupaloy.SnapshotT(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
+		snapshot(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
 	})
 	t.Run("FilteredOut", func(t *testing.T) {
 		cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"foo", "bar"}
-		cupaloy.SnapshotT(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
+		snapshot(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
 	})
 	t.Run("FilteredIn", func(t *testing.T) {
 		cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"foo", *testSchema}
-		cupaloy.SnapshotT(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
+		snapshot(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
 	})
 }
 
@@ -477,7 +487,7 @@ func TestKeyDiscovery(t *testing.T) {
 
 	createTestTable(t, control, tableName, "(k_smallint SMALLINT, k_int INTEGER, k_bigint BIGINT, k_bool BOOLEAN, k_str VARCHAR(8), data TEXT, PRIMARY KEY (k_smallint, k_int, k_bigint, k_bool, k_str))")
 	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{*testSchema}
-	cupaloy.SnapshotT(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
+	snapshot(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
 }
 
 func TestKeylessDiscovery(t *testing.T) {
@@ -486,7 +496,7 @@ func TestKeylessDiscovery(t *testing.T) {
 
 	createTestTable(t, control, tableName, "(v_smallint SMALLINT, v_int INTEGER, v_bigint BIGINT, v_bool BOOLEAN, v_str VARCHAR(8), v_ts TIMESTAMP, v_tstz TIMESTAMP WITH TIME ZONE, v_text TEXT, v_int_notnull INTEGER NOT NULL, v_text_notnull TEXT NOT NULL)")
 	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{*testSchema}
-	cupaloy.SnapshotT(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
+	snapshot(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
 }
 
 func TestFeatureFlagUseSchemaInference(t *testing.T) {
@@ -500,7 +510,7 @@ func TestFeatureFlagUseSchemaInference(t *testing.T) {
 
 	// Discover the table and verify discovery snapshot
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
-	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+	t.Run("Discovery", func(t *testing.T) { snapshot(t, summarizeBindings(t, cs.Bindings)) })
 }
 
 // TestQueryTemplateOverride exercises a capture configured with an explicit query template
@@ -525,7 +535,7 @@ func TestQueryTemplateOverride(t *testing.T) {
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
 	cs.Bindings[0].ResourceConfigJson = bs
 
-	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+	t.Run("Discovery", func(t *testing.T) { snapshot(t, summarizeBindings(t, cs.Bindings)) })
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
@@ -544,7 +554,7 @@ func TestQueryTemplateOverride(t *testing.T) {
 				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i+5)*time.Minute).Format("2006-01-02 15:04:05"))
 		}
 		cs.Capture(ctx, t, nil)
-		cupaloy.SnapshotT(t, cs.Summary())
+		snapshot(t, cs.Summary())
 	})
 }
 
@@ -557,7 +567,7 @@ func TestKeylessCapture(t *testing.T) {
 
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
 	setResourceCursor(t, cs.Bindings[0], "updated_at")
-	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+	t.Run("Discovery", func(t *testing.T) { snapshot(t, summarizeBindings(t, cs.Bindings)) })
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
@@ -594,7 +604,7 @@ func TestKeylessCapture(t *testing.T) {
 			"Reinserted row 6", 6, baseTime.Add(20*time.Minute).Format("2006-01-02 15:04:05"))
 		cs.Capture(ctx, t, nil)
 
-		cupaloy.SnapshotT(t, cs.Summary())
+		snapshot(t, cs.Summary())
 	})
 }
 
@@ -608,7 +618,7 @@ func TestKeylessFullRefreshCapture(t *testing.T) {
 
 	// Discover the table and verify discovery snapshot
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
-	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+	t.Run("Discovery", func(t *testing.T) { snapshot(t, summarizeBindings(t, cs.Bindings)) })
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
@@ -642,7 +652,7 @@ func TestKeylessFullRefreshCapture(t *testing.T) {
 			"New row B", 21)
 		cs.Capture(ctx, t, nil)
 
-		cupaloy.SnapshotT(t, cs.Summary())
+		snapshot(t, cs.Summary())
 	})
 }
 
@@ -674,7 +684,7 @@ func TestFeatureFlagKeylessRowID(t *testing.T) {
 			setResourceCursor(t, cs.Bindings[0])
 
 			t.Run("Discovery", func(t *testing.T) {
-				cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings))
+				snapshot(t, summarizeBindings(t, cs.Bindings))
 			})
 
 			t.Run("Capture", func(t *testing.T) {
@@ -706,7 +716,7 @@ func TestFeatureFlagKeylessRowID(t *testing.T) {
 					"New row A", 20)
 				cs.Capture(ctx, t, nil)
 
-				cupaloy.SnapshotT(t, cs.Summary())
+				snapshot(t, cs.Summary())
 			})
 		})
 	}
@@ -735,12 +745,12 @@ func TestCaptureFromView(t *testing.T) {
 
 	// By default views should not be discovered.
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(tableID), regexp.MustCompile(viewID))
-	t.Run("DiscoveryWithoutViews", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+	t.Run("DiscoveryWithoutViews", func(t *testing.T) { snapshot(t, summarizeBindings(t, cs.Bindings)) })
 
 	// Enable view discovery and re-discover bindings, then set a cursor for capturing the view.
 	cs.EndpointSpec.(*Config).Advanced.DiscoverViews = true
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(tableID), regexp.MustCompile(viewID))
-	t.Run("DiscoveryWithViews", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+	t.Run("DiscoveryWithViews", func(t *testing.T) { snapshot(t, summarizeBindings(t, cs.Bindings)) })
 
 	// Update both the base table and the view incrementally using the updated_at column.
 	setResourceCursor(t, cs.Bindings[0], "updated_at")
@@ -773,7 +783,7 @@ func TestCaptureFromView(t *testing.T) {
 			baseTime.Add(20*time.Minute).Format("2006-01-02 15:04:05"))
 		cs.Capture(ctx, t, nil)
 
-		cupaloy.SnapshotT(t, cs.Summary())
+		snapshot(t, cs.Summary())
 	})
 }
 
@@ -800,7 +810,7 @@ func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
 			setShutdownAfterQuery(t, true)
 
 			cs.Capture(ctx, t, nil)
-			cupaloy.SnapshotT(t, cs.Summary())
+			snapshot(t, cs.Summary())
 		})
 	}
 }
@@ -816,12 +826,12 @@ func TestNonexistentCursor(t *testing.T) {
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
 	setResourceCursor(t, cs.Bindings[0], "updated_at") // Nonexistent column
 
-	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+	t.Run("Discovery", func(t *testing.T) { snapshot(t, summarizeBindings(t, cs.Bindings)) })
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
 		cs.Capture(ctx, t, nil)
-		cupaloy.SnapshotT(t, cs.Summary())
+		snapshot(t, cs.Summary())
 	})
 }
 
@@ -833,7 +843,7 @@ func TestSourceTag(t *testing.T) {
 	cs.EndpointSpec.(*Config).Advanced.SourceTag = "example_source_tag_1234"
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
 
-	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+	t.Run("Discovery", func(t *testing.T) { snapshot(t, summarizeBindings(t, cs.Bindings)) })
 
 	t.Run("Capture", func(t *testing.T) {
 		setShutdownAfterQuery(t, true)
@@ -841,6 +851,6 @@ func TestSourceTag(t *testing.T) {
 		cs.Capture(ctx, t, nil)
 		executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data) VALUES (3, 'three'), (4, 'four')", tableName))
 		cs.Capture(ctx, t, nil)
-		cupaloy.SnapshotT(t, cs.Summary())
+		snapshot(t, cs.Summary())
 	})
 }
