@@ -3,13 +3,16 @@ package connector
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -96,6 +99,13 @@ func applyReq(spec, last *pf.MaterializationSpec) *pm.Request_Apply {
 	return req
 }
 
+// testTableName gives each test run its own table, so overlapping CI runs
+// sharing the dataset don't drop each other's. The test sweep removes any a
+// failed run leaves behind.
+func testTableName(base string) string {
+	return fmt.Sprintf("%s_%s_flow_test_%d", base, uuid.NewString()[:8], time.Now().Unix())
+}
+
 // bqTestClient opens a raw BigQuery client for inspecting and cleaning up the
 // tables a test touches. Every named table is dropped now and at cleanup.
 func bqTestClient(t *testing.T, cfg config, tables ...string) *bigquery.Client {
@@ -140,7 +150,7 @@ func TestValidatePartitionBy(t *testing.T) {
 
 	testutil.RunTestAllTasks(t, "testdata/apply.flow.yaml", func(t *testing.T, _ []byte, _ string, cfg config) {
 		var ctx = t.Context()
-		var tableName = "partition_by_test_validate"
+		var tableName = testTableName("partition_by_test_validate")
 
 		t.Run("dry-run accepts a valid expression", func(t *testing.T) {
 			resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "DATE(flow_published_at)", 0, nil))
@@ -217,7 +227,7 @@ func TestApplyPartitionBy(t *testing.T) {
 		var ctx = t.Context()
 
 		t.Run("backfill re-creates for a changed expression and truncates for an unchanged one", func(t *testing.T) {
-			var tableName = "partition_by_test_backfill"
+			var tableName = testTableName("partition_by_test_backfill")
 			var bq = bqTestClient(t, cfg, tableName)
 
 			var specA = specWithPartitionBy(t, cfg, tableName, "DATE(flow_published_at)", 0)
@@ -250,7 +260,7 @@ func TestApplyPartitionBy(t *testing.T) {
 		})
 
 		t.Run("delta-updates binding is created partitioned", func(t *testing.T) {
-			var tableName = "partition_by_test_delta"
+			var tableName = testTableName("partition_by_test_delta")
 			var bq = bqTestClient(t, cfg, tableName)
 
 			var spec = specWithResource(t, cfg, tableConfig{Table: tableName, Delta: true, PartitionBy: "DATE(flow_published_at)"}, 0)
