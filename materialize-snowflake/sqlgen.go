@@ -491,6 +491,19 @@ func stagedDirsPattern(dirs []string) string {
 	return ".*(" + strings.Join(names, "|") + ")/.*"
 }
 
+// stagedDirsPath is the longest path of the flow_v1 stage that leads every
+// staged dir in dirs. Snowflake lists the files under a query's stage path
+// before it applies the query's pattern.
+func stagedDirsPath(dirs []string) string {
+	var p = dirs[0]
+	for _, d := range dirs[1:] {
+		for !strings.HasPrefix(d, p) {
+			p = p[:len(p)-1]
+		}
+	}
+	return p
+}
+
 func renderTableAndFileTemplate(table sql.Table, file string, tpl *template.Template) (string, error) {
 	var w strings.Builder
 	if err := tpl.Execute(&w, &tableAndFile{Table: table, File: file}); err != nil {

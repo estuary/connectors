@@ -562,6 +562,8 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, cp checkp
 	b.load.stage = newStagedFile(os.TempDir(), d.uploads)
 	b.store.mergeStage = newStagedFile(os.TempDir(), d.uploads)
 	b.store.copyStage = newStagedFile(os.TempDir(), d.uploads)
+	b.store.mergeStage.prefix = sanitizeAndAppendHash(target.StateKey) + "-"
+	b.store.copyStage.prefix = b.store.mergeStage.prefix
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT {
 		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)

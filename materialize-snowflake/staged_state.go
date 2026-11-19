@@ -266,7 +266,7 @@ func (d *transactor) commitStaged(ctx context.Context, idx int, entries map[stri
 			dirs, rows = append(dirs, item.StagedDir), rows+item.Rows
 		}
 		var bounds = combineBounds(b.target.Keys, merges)
-		var files = fmt.Sprintf("@flow_v1 (PATTERN => '%s')", stagedDirsPattern(dirs))
+		var files = fmt.Sprintf("%s (PATTERN => '%s')", stagedDirsPath(dirs), stagedDirsPattern(dirs))
 		query, err := renderBoundedQueryTemplate(d.templates.mergeInto, b.target, files, bounds)
 		if err != nil {
 			return fmt.Errorf("mergeInto template: %w", err)
@@ -296,7 +296,7 @@ func (d *transactor) commitStaged(ctx context.Context, idx int, entries map[stri
 			}
 		}
 		var query strings.Builder
-		if err := d.templates.copyInto.Execute(&query, &tableAndFile{Table: b.target, File: "@flow_v1", Pattern: stagedDirsPattern(dirs)}); err != nil {
+		if err := d.templates.copyInto.Execute(&query, &tableAndFile{Table: b.target, File: stagedDirsPath(dirs), Pattern: stagedDirsPattern(dirs)}); err != nil {
 			return fmt.Errorf("copyInto template: %w", err)
 		} else if err := d.runStoreQuery(ctx, copies[0], query.String(), rows, idx, path); err != nil {
 			return err

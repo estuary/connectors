@@ -373,7 +373,7 @@ func TestAcknowledgeCoalescesShardCopies(t *testing.T) {
 	require.Len(t, queries, 2, "the peer's MERGE, then one COPY of every shard's new rows")
 	require.Equal(t, peer.Query, queries[0])
 	require.True(t, strings.HasPrefix(queries[1], "\nCOPY INTO a_table"), queries[1])
-	require.Contains(t, queries[1], "FROM @flow_v1\n) PATTERN = '.*(al|auc)/.*';")
+	require.Contains(t, queries[1], "FROM @flow_v1/a\n) PATTERN = '.*(al|auc)/.*';")
 	require.JSONEq(t, `{"a_table.v1":{}}`, reduce(t, string(patch), update.UpdatedJson))
 }
 
@@ -545,7 +545,7 @@ func TestTwoShardsApplyEveryEntryOnce(t *testing.T) {
 			}
 		}
 		require.Len(t, merges, 1, "transaction %d", txn)
-		require.Contains(t, merges[0], "FROM @flow_v1 (PATTERN => '"+stagedDirsPattern([]string{lowerDir, upperDir})+"')")
+		require.Contains(t, merges[0], "FROM @flow_v1/ (PATTERN => '"+stagedDirsPattern([]string{lowerDir, upperDir})+"')")
 		require.Contains(t, merges[0], "LEAST(")
 		require.Contains(t, merges[0], "GREATEST(")
 		require.Len(t, truncations, map[bool]int{true: 1}[txn == 1], "transaction %d", txn)
@@ -575,7 +575,7 @@ func TestAcknowledgeRunsLegacyEntryBeforeRangeEntries(t *testing.T) {
 	require.GreaterOrEqual(t, len(statements), 2)
 	require.Equal(t, legacy.Query, statements[0])
 	require.True(t, strings.HasPrefix(statements[1], "\nMERGE INTO"), statements[1])
-	require.Contains(t, statements[1], "FROM @flow_v1 (PATTERN => '.*(al|au)/.*')")
+	require.Contains(t, statements[1], "FROM @flow_v1/a (PATTERN => '.*(al|au)/.*')")
 	require.JSONEq(t, `{"a_table.v1":{}}`, reduce(t, persisted, update.UpdatedJson))
 }
 

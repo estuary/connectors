@@ -87,7 +87,7 @@ func TestIntegration(t *testing.T) {
 
 	actionDescSanitizers := []func(string) string{
 		func(s string) string {
-			return regexp.MustCompile(`@flow_v1/[a-fA-F0-9\-]{36}`).ReplaceAllString(s, `<uuid>`)
+			return regexp.MustCompile(`@flow_v1/(?:\w+-)?[a-fA-F0-9\-]{36}`).ReplaceAllString(s, `<uuid>`)
 		},
 		func(s string) string {
 			return regexp.MustCompile(`"Path":\s*"[^"]*"`).ReplaceAllString(s, `"Path": "<uuid>"`)
