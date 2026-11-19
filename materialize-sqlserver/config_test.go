@@ -19,14 +19,16 @@ func TestConfig(t *testing.T) {
 		Database: "namegame",
 	}
 	require.NoError(t, validConfig.Validate())
-	var uri = validConfig.ToURI().String()
-	require.Equal(t, "sqlserver://youser:shmassword@post.toast:1234?TrustServerCertificate=true&app+name=Flow+Materialization+Connector&database=namegame&encrypt=true", uri)
+	uri, err := validConfig.ToURI()
+	require.NoError(t, err)
+	require.Equal(t, "sqlserver://youser:shmassword@post.toast:1234?TrustServerCertificate=true&app+name=Flow+Materialization+Connector&database=namegame&encrypt=true", uri.String())
 
 	var noPort = validConfig
 	noPort.Address = "post.toast"
 	require.NoError(t, noPort.Validate())
-	uri = noPort.ToURI().String()
-	require.Equal(t, "sqlserver://youser:shmassword@post.toast:1433?TrustServerCertificate=true&app+name=Flow+Materialization+Connector&database=namegame&encrypt=true", uri)
+	uri, err = noPort.ToURI()
+	require.NoError(t, err)
+	require.Equal(t, "sqlserver://youser:shmassword@post.toast:1433?TrustServerCertificate=true&app+name=Flow+Materialization+Connector&database=namegame&encrypt=true", uri.String())
 
 	var noAddress = validConfig
 	noAddress.Address = ""
@@ -55,12 +57,11 @@ func TestValidateRejectsUnparseableAddress(t *testing.T) {
 			Password: "secret1234",
 			Database: "namegame",
 		}
-		_, driverErr := cfg.ToSQLConnector(context.Background())
-		require.ErrorContains(t, driverErr, "secret1234", address)
-
-		var err = cfg.Validate()
-		require.ErrorContains(t, err, "invalid 'address'", address)
-		require.NotContains(t, err.Error(), "secret1234", address)
+		_, connectorErr := cfg.ToSQLConnector(context.Background())
+		for _, err := range []error{connectorErr, cfg.Validate()} {
+			require.ErrorContains(t, err, "invalid 'address'", address)
+			require.NotContains(t, err.Error(), "secret1234", address)
+		}
 	}
 }
 
@@ -89,7 +90,8 @@ func TestConfigURI(t *testing.T) {
 			if err := cfg.Validate(); err != nil {
 				valid = err.Error()
 			}
-			var uri = cfg.ToURI().String()
+			uri, err := cfg.ToURI()
+			require.NoError(t, err)
 			cupaloy.SnapshotT(t, fmt.Sprintf("%s\n%s", uri, valid))
 		})
 	}
