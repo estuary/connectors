@@ -132,6 +132,12 @@ func (c config) Validate() error {
 		}
 	}
 
+	// The driver's own parse error quotes the connection string, password
+	// included, so an address it can't parse is rejected here.
+	if _, err := url.Parse(c.ToURI().String()); err != nil {
+		return fmt.Errorf("invalid 'address' %q: expected host or host:port", c.Address)
+	}
+
 	if c.Credentials == nil {
 		if c.Password == "" {
 			return errors.New("missing 'password'")

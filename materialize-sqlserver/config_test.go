@@ -45,6 +45,25 @@ func TestConfig(t *testing.T) {
 	require.Error(t, noDatabase.Validate(), "expected validation error")
 }
 
+// The driver fails to parse these with an error that quotes the whole
+// connection string, so they must not reach it.
+func TestValidateRejectsUnparseableAddress(t *testing.T) {
+	for _, address := range []string{"example.com:prod", "will@example.com", "example.com/db", "example .com:1433"} {
+		var cfg = config{
+			Address:  address,
+			User:     "will",
+			Password: "secret1234",
+			Database: "namegame",
+		}
+		_, driverErr := cfg.ToSQLConnector(context.Background())
+		require.ErrorContains(t, driverErr, "secret1234", address)
+
+		var err = cfg.Validate()
+		require.ErrorContains(t, err, "invalid 'address'", address)
+		require.NotContains(t, err.Error(), "secret1234", address)
+	}
+}
+
 func TestSpecification(t *testing.T) {
 	var resp, err = NewDriver().
 		Spec(context.Background(), &pm.Request_Spec{})
