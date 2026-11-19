@@ -93,7 +93,22 @@ type flowctlCmd struct {
 	cmd        *exec.Cmd
 	Stdout     io.ReadCloser
 	stderrDone <-chan struct{}
-	lastError  string // Last error-level log message, populated by stderr goroutine
+	lastError  string // Explanation of a failed run, folded from error-level logs by the stderr goroutine
+}
+
+// connectorExitMessage is the message of the error log with which flowctl
+// reports a connector's non-zero exit status.
+const connectorExitMessage = "connector failed"
+
+// failureMessage folds the next error-level log message into the one held as
+// the explanation of a failed run. The latest message wins, except that
+// connectorExitMessage never replaces a held message, because it says only
+// that the connector failed and the held message says why.
+func failureMessage(held, next string) string {
+	if next == connectorExitMessage && held != "" {
+		return held
+	}
+	return next
 }
 
 // Wait waits for stderr streaming to complete and then waits for the command to exit.
@@ -153,9 +168,8 @@ func (c *Capture) startFlowctl(ctx context.Context, args ...string) (*flowctlCmd
 				continue
 			}
 
-			// Track the last error-level message
 			if logEntry.Level == "error" {
-				fc.lastError = logEntry.Message
+				fc.lastError = failureMessage(fc.lastError, logEntry.Message)
 			}
 
 			// Format: "LEVEL  message  {fields}" or "LEVEL  message" if no fields
