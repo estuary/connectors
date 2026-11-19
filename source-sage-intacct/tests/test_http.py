@@ -14,13 +14,14 @@ from source_sage_intacct.resources import GL_OBJECTS, all_resources
 from .fake_sage_http import TIMESTAMP_FORMAT, FakeSageHTTP
 from .test_gl import make_config, open_subtasks
 
+ALL_GL = sorted(GL_OBJECTS | {"GLDETAIL"})
 START = datetime(2024, 1, 15, tzinfo=UTC)
 CUTOFF = datetime(2025, 1, 1, tzinfo=UTC)
 
 
 @pytest.fixture(autouse=True)
 def reset_cache():
-    for obj in GL_OBJECTS:
+    for obj in ALL_GL:
         cache.cleanup(obj, datetime.now(UTC))
     yield
 
@@ -76,11 +77,11 @@ async def test_discovery_finds_the_gl_bindings():
         make_config(),
     )
 
-    assert GL_OBJECTS <= {r.name for r in found}
+    assert set(ALL_GL) <= {r.name for r in found}
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("obj", sorted(GL_OBJECTS))
+@pytest.mark.parametrize("obj", ALL_GL)
 async def test_idle_subtasks_emit_nothing(monkeypatch, obj):
     opened = await open_binding(monkeypatch, FakeSageHTTP(), obj)
     cursor = datetime.now(UTC) - timedelta(hours=6)
@@ -115,3 +116,67 @@ async def test_backfill_reads_all_rows_across_pages(monkeypatch, obj):
     documents = await run_backfill(opened["fetch_page"])
 
     assert [doc.RECORDNO for doc in documents] == list(range(1, 4501))
+
+
+def gldetail_rows(count: int) -> list[dict[str, str]]:
+    """`count` GLDETAIL rows in batches of three, each modified one second
+    after the row before it."""
+    return [
+        {
+            "RECORDNO": f"{n // 3 + 1}-{n + 1}---A",
+            "BATCHKEY": str(n // 3 + 1),
+            "ENTRY_DATE": "01/15/2024",
+            "WHENCREATED": "",
+            "WHENMODIFIED": (START + timedelta(seconds=n)).strftime(TIMESTAMP_FORMAT),
+        }
+        for n in range(count)
+    ]
+
+
+async def open_gldetail(monkeypatch, rows: list[dict[str, str]]) -> dict[str, Any]:
+    return await open_binding(monkeypatch, FakeSageHTTP({"GLDETAIL": rows}), "GLDETAIL")
+
+
+@pytest.mark.asyncio
+async def test_gldetail_incremental_reads_changes_across_pages(monkeypatch):
+    rows = gldetail_rows(4500)
+    opened = await open_gldetail(monkeypatch, rows)
+
+    got = await drain(
+        opened["fetch_changes"]["realtime"](
+            MagicMock(spec=Logger), START - timedelta(seconds=1)
+        )
+    )
+
+    documents = [item for item in got if not isinstance(item, datetime)]
+    assert [doc.RECORDNO for doc in documents] == [row["RECORDNO"] for row in rows]
+    assert got[-1] == START + timedelta(seconds=4499)
+
+
+@pytest.mark.asyncio
+async def test_gldetail_backfill_reads_all_rows_across_pages(monkeypatch):
+    # A full page ends inside a batch, so the next page reads that batch again.
+    rows = gldetail_rows(4500)
+    opened = await open_gldetail(monkeypatch, rows)
+
+    documents = await run_backfill(opened["fetch_page"])
+
+    emitted = [doc.RECORDNO for doc in documents]
+    assert sorted(emitted) == sorted(row["RECORDNO"] for row in rows)
+    assert len(emitted) == len(set(emitted))
+
+
+@pytest.mark.asyncio
+async def test_gldetail_backfill_reads_a_batch_larger_than_a_page(monkeypatch):
+    rows = gldetail_rows(3)
+    rows += [
+        {**rows[0], "RECORDNO": f"2-{n:05d}---A", "BATCHKEY": "2"} for n in range(4100)
+    ]
+    rows += [{**rows[0], "RECORDNO": "3-1---A", "BATCHKEY": "3"}]
+    opened = await open_gldetail(monkeypatch, rows)
+
+    documents = await run_backfill(opened["fetch_page"])
+
+    emitted = [doc.RECORDNO for doc in documents]
+    assert sorted(emitted) == sorted(row["RECORDNO"] for row in rows)
+    assert len(emitted) == len(set(emitted))

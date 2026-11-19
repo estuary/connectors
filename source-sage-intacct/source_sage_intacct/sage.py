@@ -28,7 +28,7 @@ endpoint_url = "https://api.intacct.com/ia/xml/xmlgw.phtml"
 
 # Objects whose queries set `showprivate`. Without it, a query from the top
 # level of a multi-entity company skips the records made inside an entity.
-SHOW_PRIVATE_OBJECTS: frozenset[str] = frozenset({"GLBATCH", "GLENTRY"})
+SHOW_PRIVATE_OBJECTS: frozenset[str] = frozenset({"GLBATCH", "GLENTRY", "GLDETAIL"})
 
 # Sage warns that General Ledger queries without a filter can time out, so
 # their backfills filter on the posting date, from GL_START_DATE on.
@@ -42,6 +42,7 @@ GL_START_DATE = "01/01/1900"
 BACKFILL_DATE_FIELDS: dict[str, str] = {
     "GLBATCH": "BATCH_DATE",
     "GLENTRY": "ENTRY_DATE",
+    "GLDETAIL": "ENTRY_DATE",
 }
 
 
@@ -303,6 +304,35 @@ class Sage:
             data = get_all_records_request(
                 self.config, self.session_id, obj, model.field_names, after
             )
+        async for rec in self._req_json(model, data):
+            yield rec
+
+    async def fetch_gldetail_page(
+        self, from_batch_key: int | None
+    ) -> AsyncGenerator[SageRecord, None]:
+        model = await self.get_model("GLDETAIL")
+        data = get_gldetail_page_request(
+            self.config,
+            self.session_id,
+            model.field_names,
+            GL_START_DATE,
+            from_batch_key,
+        )
+        async for rec in self._req_json(model, data):
+            yield rec
+
+    async def fetch_gldetail_batch(
+        self, batch_key: int, after: str | None
+    ) -> AsyncGenerator[SageRecord, None]:
+        model = await self.get_model("GLDETAIL")
+        data = get_gldetail_batch_request(
+            self.config,
+            self.session_id,
+            model.field_names,
+            GL_START_DATE,
+            batch_key,
+            after,
+        )
         async for rec in self._req_json(model, data):
             yield rec
 
@@ -690,7 +720,7 @@ def get_records_at_request(
               </equalto>
               <greaterthan>
                 <field>RECORDNO</field>
-                <value>{after}</value>
+                <value>{escape(str(after))}</value>
               </greaterthan>
             </and>"""
 
@@ -730,7 +760,7 @@ def get_all_records_request(
           <filter>
               <greaterthan>
                   <field>RECORDNO</field>
-                  <value>{after}</value>
+                  <value>{escape(str(after))}</value>
               </greaterthan>
           </filter>"""
 
@@ -821,6 +851,46 @@ def get_all_records_from_date_request(
     )
 
 
+def get_gldetail_page_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    fields: list[str],
+    start_date: str,  # ex: 12/08/2024
+    from_batch_key: int | None,
+) -> str:
+    date_field = BACKFILL_DATE_FIELDS["GLDETAIL"]
+    conditions = [
+        condition("greaterthanorequalto", date_field, start_date),
+    ]
+    if from_batch_key is not None:
+        conditions.append(condition("greaterthanorequalto", "BATCHKEY", from_batch_key))
+
+    return filtered_query_request(
+        cfg, session_id, "GLDETAIL", fields, conditions, "BATCHKEY"
+    )
+
+
+def get_gldetail_batch_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    fields: list[str],
+    start_date: str,  # ex: 12/08/2024
+    batch_key: int,
+    after: str | None,
+) -> str:
+    date_field = BACKFILL_DATE_FIELDS["GLDETAIL"]
+    conditions = [
+        condition("greaterthanorequalto", date_field, start_date),
+        condition("equalto", "BATCHKEY", batch_key),
+    ]
+    if after is not None:
+        conditions.append(condition("greaterthan", "RECORDNO", after))
+
+    return filtered_query_request(
+        cfg, session_id, "GLDETAIL", fields, conditions, "RECORDNO"
+    )
+
+
 def get_creations_since_request(
     cfg: EndpointConfig,
     session_id: str,
@@ -873,7 +943,7 @@ def get_creations_at_request(
         return f"""
               <greaterthan>
                 <field>RECORDNO</field>
-                <value>{after}</value>
+                <value>{escape(str(after))}</value>
               </greaterthan>"""
 
     exec = f"""
@@ -964,7 +1034,7 @@ def get_deletions_at_request(
         return f"""
               <greaterthan>
                 <field>ID</field>
-                <value>{after}</value>
+                <value>{escape(str(after))}</value>
               </greaterthan>"""
 
     exec = f"""

@@ -11,7 +11,15 @@ from source_sage_intacct.sage import PAGE_SIZE
 TIMESTAMP_FORMAT = "%m/%d/%Y %H:%M:%S"
 
 # The fields of an object that is not listed in DEFAULT_LOOKUP's place.
-LOOKUPS: dict[str, list[tuple[str, str]]] = {}
+LOOKUPS: dict[str, list[tuple[str, str]]] = {
+    "GLDETAIL": [
+        ("RECORDNO", "TEXT"),
+        ("BATCHKEY", "INTEGER"),
+        ("ENTRY_DATE", "DATE"),
+        ("WHENCREATED", "DATE"),
+        ("WHENMODIFIED", "TIMESTAMP"),
+    ],
+}
 DEFAULT_LOOKUP = [
     ("RECORDNO", "INTEGER"),
     ("BATCH_DATE", "DATE"),

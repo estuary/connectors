@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from logging import Logger
-from typing import Any, AsyncGenerator, Callable, TypeVar
+from typing import Any, AsyncGenerator, Callable
 
 import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.capture.common import LogCursor, PageCursor
@@ -9,14 +9,14 @@ from .models import (
     CreationRecord,
     DeletionEvent,
     DeletionRecord,
+    GLDetailBackfillRecord,
+    GLDetailRecord,
     IncrementalResource,
     ObjectKeyNotRecordNo,
     SnapshotResource,
     parse_backfill_record,
 )
 from .sage import Sage
-
-T = TypeVar("T", IncrementalResource, CreationRecord, DeletionEvent)
 
 
 # This function is kind of intense, but what it's doing is repeatedly issuing
@@ -40,7 +40,14 @@ T = TypeVar("T", IncrementalResource, CreationRecord, DeletionEvent)
 # we have seen all the records for is checkpointed, and a separate query can be
 # used for cycle breaking which is based on sorting by `id_field` at a specific
 # WHENMODIFIED timestamp.
-async def _fetch_records_generic(
+async def _fetch_records_generic[
+    T: (
+        IncrementalResource,
+        CreationRecord,
+        DeletionEvent,
+        GLDetailRecord,
+    )
+](
     object: str,
     cls: type[T],
     id_field: str,
@@ -227,6 +234,117 @@ async def fetch_page(
         return
 
     yield last
+
+
+async def fetch_gldetail(
+    sage: Sage,
+    horizon: timedelta | None,
+    page_size: int,
+    log: Logger,
+    cursor: LogCursor,
+) -> AsyncGenerator[GLDetailRecord | LogCursor, None]:
+    async for item in _fetch_records_generic(
+        object="GLDETAIL",
+        cls=GLDetailRecord,
+        id_field="RECORDNO",
+        horizon=horizon,
+        page_size=page_size,
+        cursor=cursor,
+        fetch_since=sage.fetch_since,
+        fetch_at=sage.fetch_at,
+    ):
+        yield item
+
+
+async def backfill_gldetail(
+    sage: Sage,
+    page_size: int,
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+) -> AsyncGenerator[GLDetailBackfillRecord | PageCursor, None]:
+    """The page cursor is the BATCHKEY at which the next page starts.
+
+    Pages are in BATCHKEY order because a sort on the text RECORDNO of the
+    whole object is slow, and its text order is not the order of the batches.
+
+    Do not add a WHENMODIFIED filter to the request for the cutoff. Sage
+    drops the rows where it is empty, and a backfill that sends backfill
+    signals then removes those rows from the destination.
+    """
+    assert isinstance(page, int | None)
+    assert isinstance(cutoff, datetime)
+
+    def is_before_cutoff(doc: GLDetailBackfillRecord) -> bool:
+        return doc.WHENMODIFIED is None or doc.WHENMODIFIED < cutoff
+
+    count = 0
+    first_batch_key: int | None = None
+    # Hold the newest batch back until the next batch starts. A full page can
+    # end inside a batch, and the next page starts with that batch again, so
+    # an early emit would emit its rows two times.
+    batch: list[GLDetailBackfillRecord] = []
+    async for rec in sage.fetch_gldetail_page(page):
+        doc = GLDetailBackfillRecord.model_validate(rec.model_dump())
+        count += 1
+        if first_batch_key is None:
+            first_batch_key = doc.BATCHKEY
+
+        if batch and doc.BATCHKEY != batch[-1].BATCHKEY:
+            for held in batch:
+                if is_before_cutoff(held):
+                    yield held
+            batch = []
+
+        batch.append(doc)
+
+    if count < page_size:
+        for held in batch:
+            if is_before_cutoff(held):
+                yield held
+        return
+
+    last_batch_key = batch[-1].BATCHKEY
+    if last_batch_key != first_batch_key:
+        # The CDK does not check that a page cursor moves forward. A cursor
+        # that does not move would repeat this request without end, and Sage
+        # bills each call.
+        if page is not None and last_batch_key <= page:
+            raise RuntimeError(
+                f"GLDETAIL page from BATCHKEY {page} is not in BATCHKEY order: "
+                f"it ends at {last_batch_key}"
+            )
+        yield last_batch_key
+        return
+
+    # One batch fills the page, so a page that starts at this batch can never
+    # get past it. Read this batch alone, in RECORDNO order.
+    after: str | None = None
+    seen: set[str] = set()
+    while True:
+        count = 0
+        seen_before = len(seen)
+        async for rec in sage.fetch_gldetail_batch(last_batch_key, after):
+            doc = GLDetailBackfillRecord.model_validate(rec.model_dump())
+            after = doc.RECORDNO
+            count += 1
+            if doc.RECORDNO in seen:
+                continue
+            seen.add(doc.RECORDNO)
+            if is_before_cutoff(doc):
+                yield doc
+
+        if count < page_size:
+            break
+        if len(seen) == seen_before:
+            # A page with no new row means the RECORDNO bound does not move.
+            # Stop, because the loop would not end and Sage bills each call.
+            raise RuntimeError(
+                f"GLDETAIL batch {last_batch_key} cannot be read in RECORDNO "
+                f"order: the page after {after!r} returned no new row"
+            )
+
+    yield last_batch_key + 1
 
 
 async def snapshot(

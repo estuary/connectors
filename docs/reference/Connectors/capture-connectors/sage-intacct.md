@@ -44,13 +44,15 @@ These objects support capturing via periodic snapshotting:
 These General Ledger objects use the same incremental strategy:
 * GLBATCH (journal entries)
 * GLENTRY (journal entry lines)
+* GLDETAIL (journal entry lines joined with their AR and AP documents)
 
 General Ledger bindings include the records made inside an entity of a
 multi-entity company. Their backfills read all entries.
 
 :::info
-Sage does not record every General Ledger deletion in AUDITHISTORY. A deleted
-or replaced row can remain in the collection until the binding is backfilled.
+Sage does not record every General Ledger deletion in AUDITHISTORY, and
+records none for GLDETAIL. A deleted or replaced row can remain in the
+collection until the binding is backfilled.
 A backfill removes the rows that no longer exist in Sage from your
 destination. For captures created before 2026-12-01, contact
 Estuary support to enable this.
