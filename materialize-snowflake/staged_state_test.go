@@ -596,6 +596,57 @@ func TestCombineBounds(t *testing.T) {
 	got = combineBounds(keys, []*checkpointItem{bounded("1", "5"), {Bounds: []mergeBoundLiterals{{}}}})
 	require.Empty(t, got[0].LiteralLower)
 	require.Empty(t, got[0].LiteralUpper)
+
+	require.Nil(t, combineBounds(keys, []*checkpointItem{bounded("1", "5"), bounded("10", "20")})[0].Ranges)
+
+	var ranged = func(ranges ...[2]string) *checkpointItem {
+		return &checkpointItem{Bounds: []mergeBoundLiterals{{Lower: ranges[0][0], Upper: ranges[len(ranges)-1][1], Ranges: ranges}}}
+	}
+	var rangesOf = func(items ...*checkpointItem) [][2]string {
+		var out [][2]string
+		for _, r := range combineBounds(keys, items)[0].Ranges {
+			out = append(out, [2]string{r.LiteralLower, r.LiteralUpper})
+		}
+		return out
+	}
+
+	// Ranges that overlap or repeat become one, and an item without ranges
+	// adds its whole bound.
+	var split = ranged([2]string{"'c'", "'e'"}, [2]string{"'m'", "'p'"})
+	got = combineBounds(keys, []*checkpointItem{bounded("'a'", "'b'"), split, split, ranged([2]string{"'d'", "'f'"}, [2]string{"'o'", "'o'"})})
+	require.Equal(t, "LEAST('a'::INTEGER, 'c'::INTEGER, 'd'::INTEGER)", got[0].LiteralLower)
+	require.Equal(t, "GREATEST('b'::INTEGER, 'p'::INTEGER, 'o'::INTEGER)", got[0].LiteralUpper)
+	require.Equal(t, []sql.MergeRange{{LiteralLower: "'a'", LiteralUpper: "'b'"}, {LiteralLower: "'c'", LiteralUpper: "'f'"}, {LiteralLower: "'m'", LiteralUpper: "'p'"}}, got[0].Ranges)
+
+	// Keys compare unquoted: "it's" sorts before "it0", though its literal
+	// sorts after.
+	require.Equal(t, [][2]string{{"'a'", "'it''s'"}, {"'it0'", "'z'"}},
+		rangesOf(ranged([2]string{"'a'", "'it''s'"}, [2]string{"'y'", "'z'"}), ranged([2]string{"'it0'", "'y'"})))
+
+	// Ranges that cover everything between them leave no split.
+	require.Nil(t, rangesOf(ranged([2]string{"'a'", "'c'"}, [2]string{"'x'", "'z'"}), bounded("'b'", "'y'")))
+
+	// Past the most ranges of a bound, the narrowest gaps close.
+	var many []*checkpointItem
+	for _, c := range "acegikmoqs" {
+		many = append(many, ranged([2]string{"'" + string(c) + "'", "'" + string(c) + "'"}, [2]string{"'" + string(c) + "z'", "'" + string(c) + "z'"}))
+	}
+	var capped = rangesOf(many...)
+	require.Len(t, capped, 8)
+	require.Equal(t, "'a'", capped[0][0])
+	require.Equal(t, "'sz'", capped[7][1])
+}
+
+func TestUnquoteLiteral(t *testing.T) {
+	for _, s := range []string{"", "plain", "it's", `a\b`, `\'`, `'\`, `\\''`, `''\\`, "2026-11-20"} {
+		var got, ok = unquoteLiteral(testDialect.Literal(s))
+		require.True(t, ok, s)
+		require.Equal(t, s, got)
+	}
+	for _, literal := range []string{"", "'", "5", "'a", "a'", "NULL"} {
+		var _, ok = unquoteLiteral(literal)
+		require.False(t, ok, literal)
+	}
 }
 
 // Only the primary reads the shards' state patches.

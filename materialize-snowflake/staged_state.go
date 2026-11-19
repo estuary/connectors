@@ -33,12 +33,17 @@ func (s stagedCheckpoint) add(stateKey, rangeKey string, item *checkpointItem) {
 type mergeBoundLiterals struct {
 	Lower string `json:",omitempty"`
 	Upper string `json:",omitempty"`
+	// Ranges are the lower and upper literals of the bound's ranges.
+	Ranges [][2]string `json:",omitempty"`
 }
 
 func boundsLiterals(bounds []sql.MergeBound) []mergeBoundLiterals {
 	var out = make([]mergeBoundLiterals, len(bounds))
 	for i, b := range bounds {
 		out[i] = mergeBoundLiterals{Lower: b.LiteralLower, Upper: b.LiteralUpper}
+		for _, r := range b.Ranges {
+			out[i].Ranges = append(out[i].Ranges, [2]string{r.LiteralLower, r.LiteralUpper})
+		}
 	}
 	return out
 }
@@ -331,13 +336,17 @@ func (d *transactor) commitStaged(ctx context.Context, idx int, entries map[stri
 }
 
 // combineBounds bounds each key column by the extremes of the items' bounds.
-// A column is unbounded if any item leaves it unbounded.
+// A column is unbounded if any item leaves it unbounded. If any item's bound
+// has ranges, the column's bound has the union of every item's ranges, where
+// an item without ranges adds its whole bound as one.
 func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound {
 	var out = make([]sql.MergeBound, len(keys))
 	for i, key := range keys {
 		out[i] = sql.MergeBound{Column: key}
 
 		var lowers, uppers []string
+		var ranges []sql.MergeRange
+		var split bool
 		var bounded = true
 		for _, item := range items {
 			var lit = item.Bounds[i]
@@ -351,13 +360,36 @@ func combineBounds(keys []sql.Column, items []*checkpointItem) []sql.MergeBound 
 			if !slices.Contains(uppers, lit.Upper) {
 				uppers = append(uppers, lit.Upper)
 			}
+
+			var itemRanges = [][2]string{{lit.Lower, lit.Upper}}
+			if len(lit.Ranges) > 0 {
+				itemRanges, split = lit.Ranges, true
+			}
+			for _, r := range itemRanges {
+				ranges = append(ranges, sql.MergeRange{LiteralLower: r[0], LiteralUpper: r[1]})
+			}
 		}
 		if bounded {
 			out[i].LiteralLower = extremumExpr("LEAST", lowers, key)
 			out[i].LiteralUpper = extremumExpr("GREATEST", uppers, key)
+			if split {
+				out[i].Ranges = sql.UnionStringRanges(ranges, unquoteLiteral)
+			}
 		}
 	}
 	return out
+}
+
+// literalUnescaper undoes the escaping within the dialect's string literals.
+var literalUnescaper = strings.NewReplacer(`\\`, `\`, `''`, `'`)
+
+// unquoteLiteral is the string that literal renders in the dialect, if literal
+// is a string literal.
+func unquoteLiteral(literal string) (string, bool) {
+	if len(literal) < 2 || literal[0] != '\'' || literal[len(literal)-1] != '\'' {
+		return "", false
+	}
+	return literalUnescaper.Replace(literal[1 : len(literal)-1]), true
 }
 
 // profileBounds are the bounds an entry's own query is restricted to, or nil

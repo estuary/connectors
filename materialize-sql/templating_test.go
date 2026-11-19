@@ -592,6 +592,55 @@ func TestDatetimeSortKeyOrdersInstants(t *testing.T) {
 	require.InDelta(t, math.Log2(3600), gap(time.Hour)-gap(time.Second), 1e-9)
 }
 
+func TestUnionStringRanges(t *testing.T) {
+	var unquote = func(literal string) (string, bool) {
+		if len(literal) < 2 || literal[0] != '\'' || literal[len(literal)-1] != '\'' {
+			return "", false
+		}
+		return strings.ReplaceAll(literal[1:len(literal)-1], "''", "'"), true
+	}
+	var ranges = func(literals ...string) []MergeRange {
+		var out []MergeRange
+		for i := 0; i < len(literals); i += 2 {
+			out = append(out, MergeRange{LiteralLower: literals[i], LiteralUpper: literals[i+1]})
+		}
+		return out
+	}
+
+	for _, tc := range []struct {
+		name     string
+		in, want []MergeRange
+	}{
+		{"disjoint ranges sort", ranges("'m'", "'p'", "'a'", "'c'"), ranges("'a'", "'c'", "'m'", "'p'")},
+		{"an overlap merges", ranges("'a'", "'d'", "'c'", "'f'", "'m'", "'p'"), ranges("'a'", "'f'", "'m'", "'p'")},
+		{"a shared end merges", ranges("'a'", "'c'", "'c'", "'f'", "'m'", "'p'"), ranges("'a'", "'f'", "'m'", "'p'")},
+		{"an enclosed range adds nothing", ranges("'a'", "'f'", "'b'", "'c'", "'m'", "'p'"), ranges("'a'", "'f'", "'m'", "'p'")},
+		{"a repeat adds nothing", ranges("'a'", "'c'", "'a'", "'c'", "'m'", "'p'"), ranges("'a'", "'c'", "'m'", "'p'")},
+		{"keys order unquoted", ranges("'it0'", "'y'", "'a'", "'it''s'"), ranges("'a'", "'it''s'", "'it0'", "'y'")},
+		{"a prefix orders before its extensions", ranges("'ab'", "'ac'", "'a'", "'a'"), ranges("'a'", "'a'", "'ab'", "'ac'")},
+		{"one range is no split", ranges("'a'", "'c'"), nil},
+		{"full cover is no split", ranges("'a'", "'c'", "'x'", "'z'", "'b'", "'y'"), nil},
+		{"no ranges", nil, nil},
+		{"a literal that doesn't unquote", ranges("'a'", "'c'", "5", "'p'"), nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, UnionStringRanges(tc.in, unquote))
+		})
+	}
+
+	t.Run("the narrowest gaps close past the most ranges", func(t *testing.T) {
+		// Ten ranges, of which "ja" and "na" sit nearest their predecessors.
+		var got = UnionStringRanges(ranges(
+			"'a'", "'a'", "'c'", "'c'", "'e'", "'e'", "'g'", "'g'", "'j'", "'j'",
+			"'ja'", "'ja'", "'l'", "'l'", "'n'", "'n'", "'na'", "'na'", "'pz'", "'pz'",
+		), unquote)
+		require.Equal(t, ranges(
+			"'a'", "'a'", "'c'", "'c'", "'e'", "'e'", "'g'", "'g'",
+			"'j'", "'ja'", "'l'", "'l'", "'n'", "'na'", "'pz'", "'pz'",
+		), got)
+	})
+}
+
 // TestDateBoundsEncloseEverySpelling checks the property the date widening
 // relies on: any RFC3339 spelling of an instant within a transaction's range
 // sorts, as text, between the widened bounds.
