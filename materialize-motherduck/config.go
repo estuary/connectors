@@ -57,9 +57,10 @@ func (c config) Validate() error {
 		}
 	}
 
-	// The driver's own parse error quotes the connection string, token
-	// included, so a database it can't parse is rejected here.
-	if _, err := url.Parse(c.dsn()); err != nil {
+	// The driver's own errors quote the token when it can't parse the
+	// connection string, or when URL syntax in the database makes the token
+	// part of another option. So the database must read back unchanged.
+	if u, err := url.Parse(c.dsn()); err != nil || u.Opaque != c.Database {
 		return fmt.Errorf("invalid 'database' %q: expected a database name", c.Database)
 	}
 
