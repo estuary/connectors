@@ -13,6 +13,10 @@
   instead of one binding after another.
 - Tasks that run on more than one shard now fail at startup only if a
   delta-updates binding writes through `snowpipe_streaming` or Snowpipe.
+- The connector now keeps staged transactions in a new checkpoint layout that
+  older images do not read. Reverting a task to an older image loses a
+  transaction that was committed but not yet applied, so let the task finish
+  applying its pending transactions before reverting.
 
 ### Fixed
 - High-performance Snowpipe Streaming no longer rejects a null value in a
