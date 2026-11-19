@@ -28,8 +28,8 @@ func requireMultiShardCapable(r *pf.RangeSpec, bindings []*binding) error {
 		return nil
 	}
 
-	var err = fmt.Errorf("bindings %s write through Snowpipe, which supports only one shard", strings.Join(tables, ", "))
+	var err = fmt.Errorf("bindings %s write through Snowpipe or Snowpipe Streaming v1, which support only one shard", strings.Join(tables, ", "))
 	return cerrors.NewUserError(err, fmt.Sprintf(
-		"This task runs on more than one shard, but its delta updates bindings for tables %s write through Snowpipe, which supports only one shard. Run the task on one shard, disable delta updates on those bindings, or use JWT authentication with the %q and %q feature flags enabled.",
+		"This task runs on more than one shard, but its delta updates bindings for tables %s write through Snowpipe or Snowpipe Streaming v1, which support only one shard. Run the task on one shard, disable delta updates on those bindings, or use JWT authentication with the %q and %q feature flags enabled.",
 		strings.Join(tables, ", "), flagSnowpipeStreaming, flagSnowpipeStreamingV2))
 }
