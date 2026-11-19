@@ -57,6 +57,12 @@ func (c config) Validate() error {
 		}
 	}
 
+	// The driver's own parse error quotes the connection string, token
+	// included, so a database it can't parse is rejected here.
+	if _, err := url.Parse(c.dsn()); err != nil {
+		return fmt.Errorf("invalid 'database' %q: expected a database name", c.Database)
+	}
+
 	if err := c.Schedule.Validate(); err != nil {
 		return err
 	}
@@ -261,11 +267,14 @@ func (c *config) isDuckLake(ctx context.Context) (bool, error) {
 	return databaseType == "DUCKLAKE", nil
 }
 
+// dsn is the connection string for the configured database.
+func (c config) dsn() string {
+	return fmt.Sprintf("md:%s?motherduck_token=%s&custom_user_agent=%s", c.Database, c.Token, "Estuary")
+}
+
 // bareOpen connects to the configured database without any staging bucket setup.
 func (c *config) bareOpen() (*stdsql.DB, error) {
-	var userAgent = "Estuary"
-
-	db, err := stdsql.Open("duckdb", fmt.Sprintf("md:%s?motherduck_token=%s&custom_user_agent=%s", c.Database, c.Token, userAgent))
+	db, err := stdsql.Open("duckdb", c.dsn())
 	if err != nil {
 		if strings.Contains(err.Error(), "Jwt header is an invalid JSON") {
 			return nil, fmt.Errorf("invalid token: unauthenticated")

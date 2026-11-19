@@ -48,6 +48,25 @@ func TestS3ConfigWithEndpoint(t *testing.T) {
 	})
 }
 
+// The driver fails to parse these with an error that quotes the whole
+// connection string, so they must not reach it.
+func TestValidateRejectsUnparseableDatabase(t *testing.T) {
+	const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+	for _, database := range []string{"test_db\n", "test\tdb", "//test:db", "//[test_db"} {
+		var cfg = config{
+			Token:    token,
+			Database: database,
+			Schema:   "main",
+		}
+		_, driverErr := cfg.bareOpen()
+		require.ErrorContains(t, driverErr, token, database)
+
+		var err = cfg.Validate()
+		require.ErrorContains(t, err, "invalid 'database'", database)
+		require.NotContains(t, err.Error(), token, database)
+	}
+}
+
 func TestBucketPathValidation(t *testing.T) {
 	// Validate() only checks that each dot-separated part is valid base64url,
 	// so this doesn't need to look like a real JWT.
