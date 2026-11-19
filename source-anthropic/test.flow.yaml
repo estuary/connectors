@@ -1,0 +1,36 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-anthropic:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_anthropic
+        config: config.yaml
+    bindings:
+    - resource:
+        name: usage_minutely
+        interval: PT1H
+      target: acmeCo/usage_minutely
+    - resource:
+        name: usage_hourly
+        interval: PT1H
+      target: acmeCo/usage_hourly
+    - resource:
+        name: usage_daily
+        interval: PT1H
+      target: acmeCo/usage_daily
+    - resource:
+        name: cost_minutely
+        interval: PT1H
+      target: acmeCo/cost_minutely
+    - resource:
+        name: cost_hourly
+        interval: PT1H
+      target: acmeCo/cost_hourly
+    - resource:
+        name: cost_daily
+        interval: PT1H
+      target: acmeCo/cost_daily

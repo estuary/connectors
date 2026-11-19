@@ -1,0 +1,14 @@
+credentials:
+    credentials_title: API Key
+    access_token_sops: ENC[AES256_GCM,data:C4mgLWQkRFOUWtR+1+EkHH/tg4hs3kFyIVI2ApFEP0G5BzGDoWC4pQFrY6dAe+dpAX/4o+R4rulwJWqk7xnqIcFOhVbVg5kbc1SdQeghugZiYuDDP4RWk9JMwj+lZOdnYHGFnwsCk+IFEcChfEY=,iv:EGVizmt+OOzbo3XmXTe1gJA1JYEPSIWMsMZVRLUsZ6g=,tag:/SdQCOmjRWwYkny1CalgrQ==,type:str]
+start_date: "2026-11-10T00:00:00Z"
+organization_type: Claude Console
+sops:
+    encrypted_suffix: _sops
+    gcp_kms:
+        - created_at: "2026-11-16T15:16:53Z"
+          enc: CiUAdmEdwsh40b33VqyqbQ6PFycaER72FeR/jmvA/tF6kQV1MAb1EkkAvE+nk7OFmqsoTIcQsFkJOoXpbO2pEV0gFG5fC8/CBRgz+Lgay43C+IDafr8kNn31lA3cnIOLKnZK9UluOXWp8cODcU6QvObg
+          resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+    lastmodified: "2026-11-19T16:29:34Z"
+    mac: ENC[AES256_GCM,data:CuMY+2VMrfxPvwjv/6IvjTOYI/kDoX5efcdHQ4MplfqfZbEsXE24/qq+NN6GScaxjf0SypnVcvbBjlQ2x6Rf6uax3Gk8mUbTB+k1L9HfDZhtz1SYsapqmsUX0p52DyHnOAo9UtiHD8AIG1Kz5G9pOQuYI7nEWMDRkYV/1yKmJKI=,iv:w2zV08Gy2ZTskQIvofVtnwMRG8HVW2bz0C8BvmRi/Y4=,tag:uylSUNSWU4lT1NUHD+N1uQ==,type:str]
+    version: 3.13.1
