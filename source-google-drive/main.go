@@ -20,6 +20,8 @@ import (
 	"google.golang.org/api/option"
 )
 
+const folderMimeType = "application/vnd.google-apps.folder"
+
 var (
 	scopes            = []string{drive.DriveReadonlyScope}
 	folderURLReString = "https://drive.google.com/drive/folders/([^/?]+).*"
@@ -133,7 +135,7 @@ func (s *gdStore) List(ctx context.Context, query filesource.Query) (filesource.
 			if query.StartAt > path && !strings.HasPrefix(query.StartAt, path) {
 				// File or folder is entirely skipped by StartAt.
 				continue
-			} else if file.MimeType != "application/vnd.google-apps.folder" {
+			} else if file.MimeType != folderMimeType {
 
 				if strings.HasPrefix(file.MimeType, "application/vnd.google-apps") {
 					logrus.WithFields(logrus.Fields{
@@ -225,10 +227,23 @@ func readdirAll(client *drive.FilesService, ctx context.Context, folderID string
 		}
 	}
 
-	// Ensure files are in Name order.
-	sort.SliceStable(files, func(i, j int) bool { return files[i].Name < files[j].Name })
+	sortByPath(files)
 
 	return files, nil
+}
+
+// sortByPath sorts a folder's files so their full paths are in byte order, as
+// filesource requires.
+func sortByPath(files []*drive.File) {
+	// A folder sorts as its name plus "/". That puts "report.csv" before the
+	// folder "report", just as "report.csv" sorts before "report/a.csv".
+	var sortName = func(file *drive.File) string {
+		if file.MimeType == folderMimeType {
+			return file.Name + "/"
+		}
+		return file.Name
+	}
+	sort.SliceStable(files, func(i, j int) bool { return sortName(files[i]) < sortName(files[j]) })
 }
 
 func configSchema(parserSchema json.RawMessage) json.RawMessage {
