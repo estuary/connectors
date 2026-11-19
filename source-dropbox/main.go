@@ -163,7 +163,7 @@ func (dbStore *dropboxStore) List(ctx context.Context, query filesource.Query) (
 
 		// Only add files and folders that are lexicographically
 		// greater than or equal to the query's StartAt property.
-		if query.StartAt < obj.Path {
+		if query.StartAt <= obj.Path {
 			objects = append(objects, obj)
 		}
 	}
