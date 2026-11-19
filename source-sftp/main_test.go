@@ -143,3 +143,22 @@ func TestListing(t *testing.T) {
 		})
 	}
 }
+
+func TestListingOrder(t *testing.T) {
+	var file = &fstest.MapFile{Data: []byte(`first,second,third`)}
+	testTree := &tree{fs: fstest.MapFS{
+		"root/report/a.csv": file,
+		"root/report.csv":   file,
+		"root/report-2.csv": file,
+	}}
+
+	l, err := newSftpListing(nil, testTree, "root", true, "")
+	require.NoError(t, err)
+
+	var paths []string
+	for info, err := l.Next(); err != io.EOF; info, err = l.Next() {
+		require.NoError(t, err)
+		paths = append(paths, info.Path)
+	}
+	require.Equal(t, []string{"root/report-2.csv", "root/report.csv", "root/report/a.csv"}, paths)
+}

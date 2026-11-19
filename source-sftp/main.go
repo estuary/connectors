@@ -392,7 +392,7 @@ func (l *sftpListing) pushDir(dir string) error {
 	// ordering is filesystem dependent. The filesource framework requires listings to be in lexical
 	// order, so an explicit sort is required.
 	sort.Slice(visits, func(i, j int) bool {
-		return visits[i].path > visits[j].path
+		return sortPath(visits[i]) > sortPath(visits[j])
 	})
 
 	l.stack = append(l.stack, visits...)
@@ -405,6 +405,16 @@ func (l *sftpListing) pushDir(dir string) error {
 type visit struct {
 	fs.FileInfo
 	path string
+}
+
+// sortPath is the path a visit sorts by. A directory sorts as its path plus
+// "/". That puts "report.csv" before the directory "report", just as
+// "report.csv" sorts before "report/a.csv".
+func sortPath(v visit) string {
+	if v.IsDir() {
+		return v.path + "/"
+	}
+	return v.path
 }
 
 func (s *sftpSource) Read(_ context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
