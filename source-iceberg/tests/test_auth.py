@@ -3,7 +3,10 @@ import logging
 import pyarrow.fs as pafs
 import pytest
 import requests_mock
+from botocore.awsrequest import AWSRequest
 from estuary_cdk.flow import ValidationError
+from pyiceberg.catalog.rest.auth import AUTH_MANAGER
+from pyiceberg.io.fsspec import FsspecFileIO, S3V4RestSigner
 from pyiceberg.partitioning import UNPARTITIONED_PARTITION_SPEC
 from pyiceberg.schema import Schema
 from pyiceberg.table.metadata import new_table_metadata
@@ -19,6 +22,36 @@ from .conftest import CATALOG_URI
 
 
 LOG = logging.getLogger(__name__)
+
+
+def test_oauth_client_credential_authenticates_remote_s3_signer(catalog_api, register_table):
+    # Guard forwarding the catalog's OAuth manager to FileIO for authenticated remote signing.
+    oauth = catalog_api.post(
+        f"{CATALOG_URI}/v1/oauth/tokens",
+        json={"access_token": "made-up-token", "token_type": "Bearer", "expires_in": 3600},
+    )
+    register_table(("shop",), "orders", Schema(NestedField(1, "id", LongType())), config={
+        "py-io-impl": "pyiceberg.io.fsspec.FsspecFileIO", "s3.signer": "S3V4RestSigner",
+    })
+
+    def sign(request, context):
+        if request.headers.get("Authorization") != "Bearer made-up-token":
+            context.status_code = 401
+            return {"error": "Bearer token required"}
+        return {"uri": request.json()["uri"], "headers": {"Authorization": ["AWS4 signed"]}}
+
+    signer = catalog_api.post(f"{CATALOG_URI}/v1/aws/s3/sign", json=sign)
+    with IcebergCatalog("test", {}, uri=CATALOG_URI, credential="made-up-client:made-up-secret") as catalog:
+        table = catalog.load_table(("shop", "orders"))
+        assert isinstance(table.io, FsspecFileIO)
+        assert "token" not in table.io.properties
+        request = AWSRequest(method="GET", url="https://warehouse.s3.amazonaws.com/shop/orders/data.parquet")
+        request.context["client_region"] = "us-east-1"
+        S3V4RestSigner(table.io.properties)(request)
+        assert table.io.properties[AUTH_MANAGER] is catalog._auth_manager
+        assert request.headers["Authorization"] == "AWS4 signed"
+    assert oauth.called and signer.called
+    assert signer.last_request.json()["method"] == "GET"
 
 
 @pytest.fixture

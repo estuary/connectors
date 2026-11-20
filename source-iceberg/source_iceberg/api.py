@@ -13,6 +13,7 @@ from estuary_cdk.capture.common import LogCursor
 from pydantic import ValidationError
 from pyiceberg.catalog import Catalog
 from pyiceberg.catalog.rest import RestCatalog
+from pyiceberg.catalog.rest.auth import AUTH_MANAGER
 from pyiceberg.exceptions import ForbiddenError, NoSuchNamespaceError, ServerError, ServiceUnavailableError
 from pyiceberg.io import FileIO, load_file_io
 from pyiceberg.io.pyarrow import (
@@ -85,7 +86,10 @@ class IcebergCatalog(RestCatalog):
             for prefix in ("s3", "client"):
                 for credential in ("access-key-id", "secret-access-key", "session-token"):
                     merged.pop(f"{prefix}.{credential}", None)
-        return load_file_io({**merged, **self.file_io_properties}, location)
+        merged.update(self.file_io_properties)
+        if self._auth_manager:
+            merged[AUTH_MANAGER] = self._auth_manager
+        return load_file_io(merged, location)
 
 
 def list_table_identifiers(log: Logger, catalog: Catalog, namespaces: list[str]) -> list[Identifier]:

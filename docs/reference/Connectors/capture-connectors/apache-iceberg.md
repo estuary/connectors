@@ -47,7 +47,7 @@ Discovery uses the table's identifier fields as the collection key when they are
 
 ### Data types
 
-The collection schema is generated from the Iceberg table schema. Optional fields allow `null`.
+The collection schema is generated from the Iceberg table schema. Optional fields allow `null`. Field IDs preserve renamed fields when reading older files, including struct fields inside nested lists and maps.
 
 | Iceberg type | JSON representation |
 |---|---|
@@ -102,6 +102,8 @@ You configure connectors either in the Estuary web app, or by directly editing t
 | `/s3/path_style_access` | Path Style Access | Use path-style addressing for S3-compatible storage. | boolean | `false` |
 
 Use the authentication method your REST catalog supports: an OAuth2 client credential, a bearer token, or `catalog_auth` for AWS. Omit all three for a catalog that does not require authentication. An `s3` object that sets keys but omits `auth_type` is treated as `AWSAccessKey`. The S3 `endpoint`, `region`, and `path_style_access` options apply to `AWSAccessKey` authentication.
+
+When the catalog configures `pyiceberg.io.fsspec.FsspecFileIO` with `S3V4RestSigner`, remote S3 signing requests use the catalog's authentication session, including bearer tokens obtained through OAuth2 client credentials.
 
 ### AWS catalogs and IAM roles
 

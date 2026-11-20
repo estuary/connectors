@@ -19,11 +19,11 @@ from pyiceberg.utils.schema_conversion import AvroSchemaConversion
 
 
 class ArrowProjection(ArrowProjectionVisitor):
-    # PyIceberg 0.12 drops container validity when rebuilding struct children.
+    # Rebuild from projected children at every nesting level, preserving container validity.
     def list(self, list_type: ListType, list_array: pa.Array | None, value_array: pa.Array | None) -> pa.Array | None:
         if list_array is None or value_array is None:
             return None
-        if isinstance(list_array, (pa.ListArray, pa.LargeListArray)) and isinstance(value_array, pa.StructArray):
+        if isinstance(list_array, (pa.ListArray, pa.LargeListArray)):
             values = self._cast_if_needed(list_type.element_field, value_array)
             list_initializer = pa.large_list if isinstance(list_array, pa.LargeListArray) else pa.list_
             arrow_field = list_initializer(self._construct_field(list_type.element_field, values.type))
@@ -38,7 +38,7 @@ class ArrowProjection(ArrowProjectionVisitor):
     ) -> pa.Array | None:
         if map_array is None or key_result is None or value_result is None:
             return None
-        if isinstance(map_array, pa.MapArray) and isinstance(value_result, pa.StructArray):
+        if isinstance(map_array, pa.MapArray):
             keys = self._cast_if_needed(map_type.key_field, key_result)
             values = self._cast_if_needed(map_type.value_field, value_result)
             arrow_field = pa.map_(

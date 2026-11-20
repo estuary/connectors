@@ -15,7 +15,7 @@ import pytest
 from fsspec.implementations.memory import MemoryFileSystem
 from pyiceberg.avro.file import AvroFileHeader, AvroOutputFile, MAGIC, META_SCHEMA
 from pyiceberg.avro.resolver import SchemaPartnerAccessor, WriteSchemaResolver, construct_writer
-from pyiceberg.io.pyarrow import PyArrowFile, schema_to_pyarrow
+from pyiceberg.io.pyarrow import ArrowAccessor, PyArrowFile, schema_to_pyarrow
 from pyiceberg.manifest import DataFile, DataFileContent, FileFormat
 from pyiceberg.schema import Schema, visit, visit_with_partner
 from pyiceberg.table import DataScan, TableProperties
@@ -163,6 +163,76 @@ async def test_formats_project_field_ids_after_evolution(table_factory, tmp_path
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("file_format", [FileFormat.PARQUET, FileFormat.ORC])
+@pytest.mark.parametrize("container", ["list", "map"])
+async def test_nested_container_renames(monkeypatch, table_factory, tmp_path, file_format, container):
+    # Guard field-ID projection below nested containers, including null and empty values.
+    inner = ListType(5, StructType(NestedField(6, "old", LongType())), element_required=False)
+    if container == "list":
+        field_type = ListType(3, inner, element_required=False)
+        path = "data.element.element.old"
+        before = [[[{"old": 42}, None], None, []], None, [], [[{"old": 7}]]]
+        after = [[[{"new": 42}, None], None, []], None, [], [[{"new": 7}]]]
+    else:
+        field_type = MapType(3, StringType(), 4, inner, value_required=False)
+        path = "data.value.element.old"
+        before = [{"k": [{"old": 42}, None], "missing": None, "empty": []}, None, {}, {"k": [{"old": 7}]}]
+        after = [{"k": [{"new": 42}, None], "missing": None, "empty": []}, None, {}, {"k": [{"new": 7}]}]
+    table = table_factory(schema=Schema(
+        NestedField(1, "id", LongType(), required=True), NestedField(2, "data", field_type),
+    ))
+    write_file(table, tmp_path / "data", file_format, [{"id": index, "data": value} for index, value in enumerate(before)])
+    snapshot_id = table.current_snapshot().snapshot_id
+    transaction = table.transaction()
+    with transaction.update_schema() as update:
+        update.rename_column(path, "new")
+    table.metadata = transaction.table_metadata
+    assert table.current_snapshot().snapshot_id == snapshot_id
+
+    records, state, error = await capture(monkeypatch, [table])
+    assert error is None
+    docs = [record["captured"]["doc"] for record in records if "captured" in record]
+    assert [{key: value for key, value in doc.items() if key != "_meta"} for doc in docs] == [
+        {"id": index, "data": value} for index, value in enumerate(after)
+    ]
+    assert state.bindingStateV1["shop/orders"].inc.cursor == (str(snapshot_id),)
+
+
+@pytest.mark.parametrize("container", ["list", "large_list", "map"])
+def test_nested_container_renames_in_sliced_arrays(container):
+    # Guard projected children and validity masks when container offsets start beyond zero.
+    def schema(name):
+        inner = ListType(5, StructType(NestedField(6, name, LongType())), element_required=False)
+        outer = (
+            MapType(3, StringType(), 4, inner, value_required=False)
+            if container == "map" else ListType(3, inner, element_required=False)
+        )
+        return Schema(NestedField(2, "data", outer))
+
+    file_schema = schema("old")
+    inner = pa.list_(pa.struct([pa.field("old", pa.int64())]))
+    if container == "map":
+        arrow_type = pa.map_(pa.string(), inner)
+        before = [
+            {"skip": [{"old": -1}]}, None, {},
+            {"k": [{"old": 42}, None], "missing": None, "empty": []}, {"skip": [{"old": -2}]},
+        ]
+        after = [None, [], [("k", [{"new": 42}, None]), ("missing", None), ("empty", [])]]
+    else:
+        arrow_type = (pa.large_list if container == "large_list" else pa.list_)(inner)
+        before = [[[{"old": -1}]], None, [], [[{"old": 42}, None], None, []], [[{"old": -2}]]]
+        after = [None, [], [[{"new": 42}, None], None, []]]
+    array = pa.array(before, type=arrow_type).slice(1, 3)
+    assert array.offset > 0 and array.offsets[0].as_py() > 0
+    projected = visit_with_partner(
+        schema("new"), pa.RecordBatch.from_arrays([array], names=["data"]),
+        files.ArrowProjection(file_schema), ArrowAccessor(file_schema),
+    ).field("data")
+    assert projected.to_pylist() == after
+    assert type(projected) is type(array)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("file_format, codec", [(FileFormat.ORC, "null"), (FileFormat.AVRO, "null"), (FileFormat.AVRO, "deflate"), (FileFormat.AVRO, "snappy")])
 async def test_format_logical_types(table_factory, tmp_path, file_format, codec):
     table = table_factory(schema=Schema(
@@ -200,7 +270,10 @@ async def test_format_logical_types(table_factory, tmp_path, file_format, codec)
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "case", ["logical_types", "evolution", "timestamps_v2", "timestamps_v3", "timestamps_v3_ns", "null_containers"],
+    "case", [
+        "logical_types", "evolution", "timestamps_v2", "timestamps_v3", "timestamps_v3_ns", "null_containers",
+        "nested_list_rename", "nested_map_rename",
+    ],
 )
 async def test_orc_projection_with_batch_reader(monkeypatch, table_factory, tmp_path, case):
     written = []
@@ -229,6 +302,8 @@ async def test_orc_projection_with_batch_reader(monkeypatch, table_factory, tmp_
         await test_formats_project_field_ids_after_evolution(table_factory, tmp_path, FileFormat.ORC)
     elif case == "null_containers":
         await test_projection_preserves_null_containers(monkeypatch, table_factory, tmp_path, FileFormat.ORC)
+    elif case in ("nested_list_rename", "nested_map_rename"):
+        await test_nested_container_renames(monkeypatch, table_factory, tmp_path, FileFormat.ORC, case.split("_")[1])
     else:
         test_orc_timestamps_by_format_version(table_factory, tmp_path, int(case[12]), case.endswith("_ns"))
 

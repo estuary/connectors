@@ -6,8 +6,10 @@
 - Initial release of the Apache Iceberg capture connector.
 - AWS SigV4 REST catalog authentication for Glue Data Catalog and S3 Tables, including AWS IAM roles for catalog and S3 access.
 - OAuth2 scope and token server URI configuration for Polaris, Snowflake Open Catalog, and external token endpoints.
+- Remote S3 signing authenticated with the catalog's OAuth client credential session.
 - Capture Parquet, ORC, and Avro data files, including position delete files in all three formats.
 - Read imported ORC and Avro data files without field IDs through the table's Iceberg name mapping.
+- Schema evolution support for renamed struct fields inside nested lists and maps when reading older data files.
 - Skip incremental replace snapshots, including compaction, without re-emitting rows; still read them during initial backfills.
 - Discovery skips tables and namespaces that it cannot read or does not support.
 - Reload catalog-supplied storage credentials during long reads and after an expired token.
