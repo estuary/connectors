@@ -255,6 +255,7 @@ jobs:
             "source-postgres",
             "source-postgres-batch",
             "source-sftp",
+            "source-smb",
             "source-sqlserver",
             "source-sqlserver-batch",
             "source-sqlserver-ct",
@@ -273,6 +274,12 @@ jobs:
         if: matrix.connector.name == 'source-mongodb'
         run: |
           bash source-mongodb/docker-compose-init.sh
+
+      - name: Test setup for source-smb
+        if: matrix.connector.name == 'source-smb'
+        run: |
+          docker compose --file source-smb/docker-compose.yaml exec -T db sh -eu -c \
+            'mkdir -p /share/inbox && chmod a+rX /share /share/inbox'
 
       # Run the tests of every in-repo helper package which this connector
       # transitively depends on. This list is computed on the fly so that we
@@ -403,6 +410,7 @@ jobs:
             "source-postgres",
             "source-s3",
             "source-sftp",
+            "source-smb",
             "source-sqlserver"
             ]'), matrix.connector.name)
         run: CONNECTOR=${{ matrix.connector.name }} VERSION=local ./tests/smoke.sh;
@@ -413,7 +421,8 @@ jobs:
             "source-gcs",
             "source-kinesis",
             "source-s3",
-            "source-sftp"
+            "source-sftp",
+            "source-smb"
             ]'), matrix.connector.name)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
@@ -436,7 +445,8 @@ jobs:
             "source-gcs",
             "source-kinesis",
             "source-s3",
-            "source-sftp"
+            "source-sftp",
+            "source-smb"
             ]'), matrix.connector.name)
         uses: actions/upload-artifact@v4
         with:

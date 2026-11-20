@@ -1,0 +1,41 @@
+{
+  "bindings": [
+    {
+      "recommended_name": "inbox",
+      "resource_config_json": {
+        "stream": "/inbox"
+      },
+      "document_schema_json": {
+        "x-infer-schema": true,
+        "type": "object",
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "properties": {
+              "file": {
+                "description": "The key of the source file, added automatically by Flow",
+                "type": "string"
+              },
+              "offset": {
+                "description": "The offset of the record within the source file, added automatically by Flow",
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "file",
+              "offset"
+            ]
+          }
+        },
+        "required": [
+          "_meta"
+        ]
+      },
+      "key": [
+        "/_meta/file",
+        "/_meta/offset"
+      ]
+    }
+  ]
+}
