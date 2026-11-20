@@ -89,7 +89,7 @@ Objects without nested fields in their schema are always written as JSON. The co
 | Full document (`flow_document`), when selected | JSON in a string field |
 | Null or missing field | Omitted |
 
-Tag values are strings. Integer tags use decimal notation, and boolean tags use `true` or `false`. Missing or null tags are omitted. A document with no non-null fields remaining after removing its timestamp and tags is skipped with a warning.
+Tag values are strings. Numeric tags use decimal notation without exponents; for example, `1000000` and `1000000.0` both become `1000000`. Boolean tags use `true` or `false`. Missing or null tags are omitted. A document with no non-null fields remaining after removing its timestamp and tags is skipped with a warning.
 
 ## Updates and deletes
 
@@ -102,7 +102,7 @@ With `hardDelete: true`, source deletion documents, including documents with `_m
 * If the timestamp field is part of the collection key, the connector deletes only that instant. Points at adjacent nanoseconds are preserved.
 * Otherwise, it deletes matching points across the entire supported time range, from `1677-09-21T00:12:43.145224194Z` to `2262-04-11T23:47:16.854775806Z`.
 
-Hard deletes require every collection key field to be a tag field, except a timestamp field that is part of the key. Non-key tags do not restrict the delete, so all of the document's points are removed even if a non-key tag changed. A deletion document with an empty key tag cannot be matched to its points, so it is skipped with a warning and its points remain. Estuary selects the source operation field, or the full document when needed, to identify deletions.
+Hard deletes require every collection key field to be a tag field, except a timestamp field that is part of the key. Non-key tags do not restrict the delete, so all of the document's points are removed even if a non-key tag changed. A deletion document with an empty key tag cannot be matched to its points, so it is skipped with a warning and its points remain. Estuary selects the source operation field, or the full document when needed, to identify deletions. The `_meta` and `op` keys are case-sensitive.
 
 Deletes run one API call per deleted document and can be slow for large delete bursts. Pending writes are completed before each delete.
 

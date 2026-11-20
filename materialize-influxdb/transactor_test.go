@@ -76,6 +76,33 @@ func TestStoreBatches(t *testing.T) {
 	require.Equal(t, []int{5000, 5000, 1}, sizes)
 }
 
+func TestStoreNumericTags(t *testing.T) {
+	var rec recorder
+	tx, _, _, err := rec.driver(t).NewTransactor(context.Background(), *testOpen(), nil)
+	require.NoError(t, err)
+	defer tx.Destroy()
+
+	// Equivalent integer and float keys must share a series and delete predicate.
+	floatDelete := storeRequest(1, tuple.Tuple{float64(1000000)}, tuple.Tuple{nil, nil, nil})
+	floatDelete.Store.Delete = true
+	intDelete := storeRequest(1, tuple.Tuple{int64(1000000)}, tuple.Tuple{nil, nil, nil})
+	intDelete.Store.Delete = true
+	_, err = tx.Store(storeIterator(context.Background(),
+		storeRequest(1, tuple.Tuple{float64(1000000)}, tuple.Tuple{7.25, "2026-01-01T00:00:00Z", "new"}),
+		storeRequest(1, tuple.Tuple{int64(1000000)}, tuple.Tuple{7.25, "2026-01-01T00:00:01Z", "new"}),
+		intDelete, floatDelete,
+	))
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		"orders,id=1000000 amount=7.25,status=\"new\" 1767225600000000000\n" +
+			"orders,id=1000000 amount=7.25,status=\"new\" 1767225601000000000\n",
+	}, rec.writes)
+	require.Equal(t, []deleteRequest{
+		{Start: "1677-09-21T00:12:43.145224194Z", Stop: "2262-04-11T23:47:16.854775806Z", Predicate: `_measurement="orders" AND "id"="1000000"`},
+		{Start: "1677-09-21T00:12:43.145224194Z", Stop: "2262-04-11T23:47:16.854775806Z", Predicate: `_measurement="orders" AND "id"="1000000"`},
+	}, rec.deletes)
+}
+
 func TestStoreBatchBytes(t *testing.T) {
 	var sizes []int
 	var lines int
@@ -346,6 +373,17 @@ func TestStoreDeleteSignals(t *testing.T) {
 		{"source metadata", `{"_meta":{"op":"d"}}`, false, true},
 		{"escaped metadata", `{"_m\u0065ta":{"op":"\u0064"}}`, false, true},
 		{"source update", `{"_meta":{"op":"u"}}`, false, false},
+		// Differently cased keys must neither trigger nor override a source deletion.
+		{"uppercase metadata", `{"_META":{"op":"d"},"id":7}`, false, false},
+		{"uppercase metadata without operation", `{"_META":{"op":"d"},"_meta":{"uuid":"x"},"id":7}`, false, false},
+		{"uppercase operation without operation", `{"_meta":{"OP":"d","uuid":"x"},"id":7}`, false, false},
+		{"uppercase metadata after update", `{"id":7,"_meta":{"op":"u"},"_META":{"op":"d"}}`, false, false},
+		{"uppercase metadata before update", `{"_META":{"op":"d"},"_meta":{"op":"u","uuid":"x"},"id":7}`, false, false},
+		{"uppercase operation after update", `{"_meta":{"op":"u","OP":"d"},"id":7}`, false, false},
+		{"uppercase operation before update", `{"_meta":{"OP":"d","op":"u"},"id":7}`, false, false},
+		{"uppercase metadata after delete", `{"_meta":{"op":"d"},"_META":{"op":"u"}}`, false, true},
+		{"uppercase operation after delete", `{"_meta":{"op":"d","OP":"u"}}`, false, true},
+		{"uppercase operation value", `{"_meta":{"op":"D"}}`, false, false},
 		{"nested metadata", `{"data":{"_meta":{"op":"d"}}}`, false, false},
 		{"string containing metadata", `{"note":"\"_meta\":{\"op\":\"d\"}"}`, false, false},
 		{"null metadata", `{"_meta":null}`, false, false},

@@ -145,7 +145,13 @@ func encodeTag(value any) (string, error) {
 	case uint64:
 		return strconv.FormatUint(v, 10), nil
 	case float64:
-		return encodeFloat(v)
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return "", fmt.Errorf("InfluxDB fields and tags must contain finite numbers")
+		}
+		if math.Trunc(v) == v && v >= math.MinInt64 && v < math.MaxInt64 {
+			return strconv.FormatInt(int64(v), 10), nil
+		}
+		return strconv.FormatFloat(v, 'f', -1, 64), nil
 	case bool:
 		return strconv.FormatBool(v), nil
 	case []byte:

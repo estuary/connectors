@@ -102,6 +102,42 @@ func TestPointInvalidTimestamp(t *testing.T) {
 	}
 }
 
+func TestNumericTagEncoding(t *testing.T) {
+	// Numeric tags use decimal notation without losing integral float precision.
+	for _, tc := range []struct {
+		name  string
+		value any
+		want  string
+		err   string
+	}{
+		{name: "integer", value: int64(1000000), want: "1000000"},
+		{name: "integral float", value: float64(1000000), want: "1000000"},
+		{name: "non-round integral float", value: float64(1234567), want: "1234567"},
+		{name: "negative integral float", value: float64(-1234567), want: "-1234567"},
+		{name: "negative zero", value: math.Copysign(0, -1), want: "0"},
+		{name: "minimum integer", value: float64(math.MinInt64), want: "-9223372036854775808"},
+		{name: "near maximum integer", value: math.Nextafter(float64(math.MaxInt64), 0), want: "9223372036854774784"},
+		{name: "integer upper bound", value: float64(math.MaxInt64), want: "9223372036854776000"},
+		{name: "above integer range", value: 1e21, want: "1000000000000000000000"},
+		{name: "below integer range", value: -1e21, want: "-1000000000000000000000"},
+		{name: "large fraction", value: 1234567.5, want: "1234567.5"},
+		{name: "small fraction", value: 1e-7, want: "0.0000001"},
+		{name: "infinity", value: math.Inf(1), err: "finite numbers"},
+		{name: "negative infinity", value: math.Inf(-1), err: "finite numbers"},
+		{name: "NaN", value: math.NaN(), err: "finite numbers"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := encodeTag(tc.value)
+			if tc.err != "" {
+				require.ErrorContains(t, err, tc.err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.want, got)
+			}
+		})
+	}
+}
+
 func TestFieldEncoding(t *testing.T) {
 	for _, tc := range []struct {
 		name        string

@@ -37,12 +37,17 @@ func (b *measurementBinding) isDelete(it *m.StoreIterator) bool {
 			return true
 		}
 	}
-	var doc struct {
-		Meta struct {
-			Op string `json:"op"`
-		} `json:"_meta"`
+	// Maps match metadata keys exactly; struct decoding also accepts different casing.
+	var doc map[string]json.RawMessage
+	if len(it.RawJSON) == 0 || json.Unmarshal(it.RawJSON, &doc) != nil {
+		return false
 	}
-	return len(it.RawJSON) != 0 && json.Unmarshal(it.RawJSON, &doc) == nil && doc.Meta.Op == "d"
+	var meta map[string]json.RawMessage
+	if json.Unmarshal(doc["_meta"], &meta) != nil {
+		return false
+	}
+	var op string
+	return json.Unmarshal(meta["op"], &op) == nil && op == "d"
 }
 
 func isDeleteOperation(value any) bool {
