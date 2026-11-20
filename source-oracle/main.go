@@ -445,13 +445,7 @@ func (db *oracleDatabase) RequestTxIDs(schema, table string) {
 	db.includeTxIDs[sqlcapture.JoinStreamID(schema, table)] = true
 }
 
+// quoteColumnName needs no escaping because Oracle names can't contain a double quote.
 func quoteColumnName(name string) string {
-	var u = strings.ToUpper(name)
-	if slices.Contains(reservedWords, u) {
-		return `"` + name + `"`
-	}
-	if name == u {
-		return name
-	}
 	return `"` + name + `"`
 }
