@@ -648,22 +648,14 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		var b = t.bindings[lastBinding]
 		var s = stats[lastBinding]
 
-		var deleted, replaced int64
-		for _, del := range []struct {
-			args [][]any
-			n    *int64
-		}{{batch.deletes, &deleted}, {batch.replaces, &replaced}} {
-			if len(del.args[0]) == 0 {
-				continue
-			}
-			res, err := txn.ExecContext(ctx, b.deleteSQL, asArgs(del.args)...)
-			if err != nil {
-				return fmt.Errorf("deleting rows of %s: %w", b.target.Identifier, err)
-			} else if *del.n, err = res.RowsAffected(); err != nil {
-				return fmt.Errorf("deleting rows of %s (rows affected): %w", b.target.Identifier, err)
-			}
+		deleted, err := deleteRows(ctx, txn, b.deleteSQL, batch.deletes)
+		if err != nil {
+			return fmt.Errorf("deleting rows of %s: %w", b.target.Identifier, err)
 		}
-
+		replaced, err := deleteRows(ctx, txn, b.deleteSQL, batch.replaces)
+		if err != nil {
+			return fmt.Errorf("deleting replaced rows of %s: %w", b.target.Identifier, err)
+		}
 		inserted, err := insertRows(ctx, txn, b.insertSQL, batch.inserts, b.lobStart)
 		if err != nil {
 			return fmt.Errorf("inserting rows of %s: %w", b.target.Identifier, err)
@@ -843,6 +835,18 @@ func insertRows(ctx context.Context, txn *stdsql.Tx, insertSQL string, columns [
 		total += want
 	}
 	return total, nil
+}
+
+// deleteRows deletes the rows of keys, and returns how many it found.
+func deleteRows(ctx context.Context, txn *stdsql.Tx, deleteSQL string, keys [][]any) (int64, error) {
+	if len(keys[0]) == 0 {
+		return 0, nil
+	}
+	res, err := txn.ExecContext(ctx, deleteSQL, asArgs(keys)...)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 func asArgs(arrays [][]any) []any {
