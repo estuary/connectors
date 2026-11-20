@@ -57,6 +57,7 @@
 - name: materialize-s3-iceberg
 - name: materialize-s3-parquet
 - name: materialize-slack
+- name: materialize-smb
 - name: materialize-snowflake
 - name: materialize-sns
 - name: materialize-spanner
