@@ -23,6 +23,11 @@ SELECT * FROM "public"."special_users" ORDER BY "user-id", "group.name" COLLATE 
 
 SELECT * FROM "public"."special_users" WHERE ("user-id", "group.name" COLLATE "C") > ($1, $2) ORDER BY "user-id", "group.name" COLLATE "C" LIMIT 100;
 
+--- quoted_table_name ---
+SELECT * FROM "my""schema"."special""users" ORDER BY "id" LIMIT 100;
+
+SELECT * FROM "my""schema"."special""users" WHERE ("id") > ($1) ORDER BY "id" LIMIT 100;
+
 --- integer_key_with_backfill_filter ---
 SELECT * FROM "public"."users" WHERE (created_at > '2025-01-01' OR updated_at > '2025-01-01') ORDER BY "id" LIMIT 100;
 
