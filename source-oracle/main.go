@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -72,6 +73,11 @@ func connectOracle(ctx context.Context, name string, cfg json.RawMessage, _ comm
 		return nil, fmt.Errorf("error parsing config json: %w", err)
 	}
 	config.SetDefaults(name)
+	// This check runs after SetDefaults so that it also covers the default name,
+	// which is built from `user`.
+	if !watermarksTableRegex.MatchString(config.Advanced.WatermarksTable) {
+		return nil, fmt.Errorf("invalid 'watermarksTable' configuration: %q must be in \"<schema>.<table>\" form, where each name starts with a letter and contains only letters, digits, '_', '$', and '#' (when unset, it defaults to the lowercased user name followed by \".flow_watermarks\")", config.Advanced.WatermarksTable)
+	}
 
 	var featureFlags = common.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
 	if config.Advanced.FeatureFlags != "" {
@@ -191,10 +197,6 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
-		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
-	}
-
 	if !slices.Contains([]string{"", DictionaryModeExtract, DictionaryModeOnline, DictionaryModeSmart}, c.Advanced.DictionaryMode) {
 		return fmt.Errorf("dictionary mode must be one of %s or %s or %s", DictionaryModeExtract, DictionaryModeOnline, DictionaryModeSmart)
 	}
@@ -205,6 +207,11 @@ func (c *Config) Validate() error {
 
 	return nil
 }
+
+// watermarksTableRegex matches two valid unquoted identifiers joined by a dot.
+// The name has to stay unquoted because existing configs, including the
+// lowercase default, rely on Oracle uppercasing it.
+var watermarksTableRegex = regexp.MustCompile(`^\p{L}[\p{L}\p{N}_$#]*\.\p{L}[\p{L}\p{N}_$#]*$`)
 
 const (
 	DictionaryModeExtract = "extract"
