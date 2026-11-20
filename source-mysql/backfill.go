@@ -246,7 +246,7 @@ func backfillSelectFrom(info *sqlcapture.DiscoveryInfo) string {
 			selectList = "*, row_start, row_end"
 		}
 	}
-	return fmt.Sprintf("SELECT %s FROM `%s`.`%s`%s", selectList, info.Schema, info.Name, suffix)
+	return fmt.Sprintf("SELECT %s FROM %s.%s%s", selectList, quoteIdentifier(info.Schema), quoteIdentifier(info.Name), suffix)
 }
 
 func (db *mysqlDatabase) buildScanQuery(info *sqlcapture.DiscoveryInfo, start, isPrecise bool, keyColumns []string, columnTypes map[string]interface{}, backfillFilter string) string {
