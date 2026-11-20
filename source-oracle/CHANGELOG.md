@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-19
+
+### Fixed
+- Backfill queries now quote every column name. This lets the connector backfill a column whose uppercase name isn't a valid unquoted Oracle identifier, such as `_ID`.
+- Discovery and backfill queries now pass schema and table names as bound parameters, so a name containing `'` no longer breaks them.
+
+### Changed
+- The connector now fails at startup if `watermarksTable` isn't two valid unquoted Oracle identifiers joined by a dot.
+
 ## 2026-10-30
 
 ### Changed
