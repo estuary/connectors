@@ -1,0 +1,65 @@
+[
+  {
+    "binding": 0,
+    "doc": {
+      "time": "2026-11-10T12:00:00Z",
+      "measurement": "readings",
+      "tags": {
+        "host": "a",
+        "region": "west"
+      },
+      "fields": {
+        "ok": true,
+        "value": 1.0
+      },
+      "series": "readings,host=a,region=west"
+    }
+  },
+  {
+    "binding": 0,
+    "doc": {
+      "time": "2026-11-10T12:01:00Z",
+      "measurement": "readings",
+      "tags": {
+        "host": "a",
+        "region": "west"
+      },
+      "fields": {
+        "ok": true,
+        "value": 2.0
+      },
+      "series": "readings,host=a,region=west"
+    }
+  },
+  {
+    "binding": 0,
+    "doc": {
+      "time": "2026-11-10T12:02:00Z",
+      "measurement": "readings",
+      "tags": {
+        "host": "a",
+        "region": "west"
+      },
+      "fields": {
+        "ok": false,
+        "value": 3.0
+      },
+      "series": "readings,host=a,region=west"
+    }
+  },
+  {
+    "binding": 1,
+    "doc": {
+      "time": "2026-11-10T12:00:00Z",
+      "measurement": "status",
+      "tags": {
+        "host": "a"
+      },
+      "fields": {
+        "count": 7,
+        "state": "up"
+      },
+      "series": "status,host=a"
+    }
+  }
+]

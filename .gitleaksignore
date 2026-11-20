@@ -11,3 +11,6 @@ docs/reference/Connectors/materialization-connectors/alloydb.md:private-key:72
 docs/reference/Connectors/materialization-connectors/PostgreSQL/google-cloud-sql-postgres.md:private-key:32
 docs/reference/Connectors/materialization-connectors/PostgreSQL/amazon-rds-postgres.md:private-key:37
 docs/reference/Connectors/materialization-connectors/Snowflake.md:private-key:180
+
+# Throwaway key for the self-signed test CA used by unit tests.
+source-influxdb/tests/fixtures/test-key.pem:private-key:1

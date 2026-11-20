@@ -54,6 +54,7 @@ members = [
     "source-hubspot-native",
     "source-impact-native",
     "source-incident-io",
+    "source-influxdb",
     "source-intercom-native",
     "source-iterable",
     "source-iterable-native",
