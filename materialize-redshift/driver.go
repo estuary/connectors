@@ -1,7 +1,6 @@
 package connector
 
 import (
-	"bytes"
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
@@ -333,15 +332,12 @@ type transactor struct {
 	caseSensitiveIdentifierEnabled bool
 	dialect                        sql.Dialect
 
-	rangeKey string
-	// The shard whose key range begins at 0 applies every shard's staged
-	// work; the others only stage.
-	primary          bool
 	checkpointsTable *checkpointsTable
 	// IDs of every stateItem already committed, across the materialization.
 	committedTokens map[string]bool
-	// The whole state: staged transactions not yet applied, from every shard.
-	state connectorState
+	// Staged transactions not yet applied. The shard whose key range begins
+	// at 0 applies every shard's; the others only stage.
+	state *boilerplate.ShardedState[*stateItem]
 	// truncateAfterBackfill permits deleting the rows published before a
 	// completed backfill.
 	truncateAfterBackfill bool
@@ -398,8 +394,6 @@ func prepareNewTransactor(
 			cfg:                            cfg,
 			be:                             be,
 			caseSensitiveIdentifierEnabled: caseSensitiveIdentifierEnabled,
-			rangeKey:                       rangeKeyOf(fence.KeyBegin, fence.KeyEnd),
-			primary:                        fence.KeyBegin == 0,
 			dialect:                        ep.Dialect,
 			checkpointsTable: &checkpointsTable{
 				table:           ep.Dialect.Identifier(fence.TablePath...),
@@ -408,9 +402,14 @@ func prepareNewTransactor(
 				keyEnd:          fence.KeyEnd,
 			},
 			committedTokens:       make(map[string]bool),
-			state:                 make(connectorState),
 			truncateAfterBackfill: sql.TruncateAfterBackfill(featureFlags),
 		}
+
+		var stateKeys []string
+		for _, b := range bindings {
+			stateKeys = append(stateKeys, b.StateKey)
+		}
+		d.state = boilerplate.NewShardedState[*stateItem](fence.KeyBegin, fence.KeyEnd, stateKeys)
 
 		client, err := d.cfg.toS3Client(ctx, featureFlags)
 		if err != nil {
@@ -426,8 +425,7 @@ func prepareNewTransactor(
 
 		// The crossover decision below needs the state before the runtime
 		// hands it over separately.
-		state, err := parseState(open.StateJson)
-		if err != nil {
+		if err := d.state.Recover(open.StateJson); err != nil {
 			return nil, err
 		}
 
@@ -446,9 +444,6 @@ func prepareNewTransactor(
 		if d.committedTokens, legacyCheckpoint, crossedOver, err = d.checkpointsTable.readAll(ctx, conn); err != nil {
 			return nil, err
 		}
-		if d.primary {
-			d.state = state
-		}
 
 		// A shard's row is authoritative only until it has staged a
 		// transaction: after that the recovery log is, and returning the
@@ -456,7 +451,7 @@ func prepareNewTransactor(
 		// transaction twice. A row this connector has already written to
 		// once is never authoritative again, even though it keeps mirroring
 		// a legacy checkpoint from then on.
-		if legacyCheckpoint != nil && !crossedOver && !state.hasRange(d.rangeKey) {
+		if legacyCheckpoint != nil && !crossedOver && !d.state.OwnRecovered() {
 			d.runtimeCheckpoint = legacyCheckpoint
 		}
 
@@ -580,50 +575,7 @@ func (t *transactor) copyFromS3(target string, manifestKey string, truncateColum
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error {
-	if !t.primary {
-		return nil
-	}
-	pending, err := parseState(state)
-	if err != nil {
-		return err
-	}
-	t.state = pending
-	return nil
-}
-
-// mergePeerStatePatches folds the other shards' StartedCommit patches of the
-// just-committed transaction into the primary's state. Runtime v1 never
-// sends any, so the primary's own entries can't come from here: StartCommit
-// records them directly, and runtime v2's echo of them is skipped.
-func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
-	if !t.primary {
-		return nil
-	}
-	for _, patch := range patches {
-		if bytes.Equal(bytes.TrimSpace(patch), []byte("null")) {
-			// The runtime's encoding of a peer's full (non-merge-patch) state
-			// replacement, which no shard here ever produces.
-			return fmt.Errorf("unexpected state reset patch in aggregated shard state")
-		}
-		state, err := parseState(patch)
-		if err != nil {
-			return fmt.Errorf("parsing aggregated state patch: %w", err)
-		}
-		for sk, bucket := range state {
-			for rk, e := range bucket {
-				if rk == t.rangeKey {
-					continue // Own range: already recorded by StartCommit.
-				}
-				// The previous transaction's entry is applied before the next
-				// one's patch arrives, so a collision would lose staged work.
-				if t.state[sk][rk] != nil {
-					return fmt.Errorf("shard %s staged a new transaction for %s while its previous one is still pending", rk, sk)
-				}
-				t.state.add(sk, rk, e)
-			}
-		}
-	}
-	return nil
+	return t.state.Recover(state)
 }
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
@@ -903,34 +855,25 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			d.lastRuntimeCheckpoint = raw
 		}
 
-		// Only this transaction's entries: an entry whose state key no longer
-		// has a binding stays pending forever and must not be re-sent. The
-		// primary records its own entries here rather than waiting for
-		// Acknowledge's statePatches to echo them: runtime v1 sends none.
-		var update = make(connectorState)
+		var staged = make(map[string]*stateItem)
 		for _, b := range d.bindings {
-			if b.staged == nil {
-				continue
+			if b.staged != nil {
+				staged[b.target.StateKey] = b.staged
+				b.staged = nil
 			}
-			update.add(b.target.StateKey, d.rangeKey, b.staged)
-			if d.primary {
-				d.state.add(b.target.StateKey, d.rangeKey, b.staged)
-			}
-			b.staged = nil
 		}
-
-		patch, err := json.Marshal(update)
+		state, err := d.state.StartCommit(staged)
 		if err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("marshalling staged transactions: %w", err))
+			return nil, m.FinishedOperation(err)
 		}
-		return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
+		return state, nil
 	}, nil
 }
 
 // Flush records completed backfills on the primary only, since every shard
 // receives the same completions and only the primary applies staged work.
 func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
-	if !d.primary {
+	if !d.state.Primary() {
 		return nil
 	}
 	d.truncations = make(map[int]time.Time, len(completes))
@@ -956,64 +899,31 @@ func (d *transactor) Flush(_ context.Context, completes map[int]time.Time) error
 }
 
 func (d *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) {
-	if err := d.mergePeerStatePatches(statePatches); err != nil {
-		return nil, err
-	}
-	if !d.primary {
-		return nil, nil
-	}
-
-	// Entries of a binding with no live table are left pending. Clearing an
-	// entry from the state is a null at its place.
-	var shouldProcess = m.StateKeyFilter(stateKeys)
-	var pending = make(connectorState)
-	var clear = make(connectorState)
-	var toDelete []string
-	for _, b := range d.bindings {
-		var sk = b.target.StateKey
-		if !shouldProcess(sk) {
-			continue
+	return d.state.Acknowledge(statePatches, stateKeys, func(pending boilerplate.ShardedEntries[*stateItem]) error {
+		// Mirror the runtime checkpoint into the checkpoints row, for a
+		// downgraded connector to resume from, only when this call settles
+		// every pending entry (not a partial, Apply-RPC-scoped commit) and a
+		// StartCommit has actually run in this process to produce one. See
+		// lastRuntimeCheckpoint's comment for the accepted downgrade gap this
+		// leaves open on a recovery Acknowledge.
+		var legacyCheckpoint []byte
+		if pending.Len() == d.state.Pending().Len() {
+			legacyCheckpoint = d.lastRuntimeCheckpoint
 		}
-		for rk, e := range d.state[sk] {
-			pending.add(sk, rk, e)
-			clear.add(sk, rk, nil)
-			toDelete = append(toDelete, e.objects()...)
+
+		if err := d.commit(ctx, pending, legacyCheckpoint); err != nil {
+			return err
 		}
-	}
-	if len(pending) == 0 {
-		return nil, nil
-	}
 
-	// Mirror the runtime checkpoint into the checkpoints row, for a
-	// downgraded connector to resume from, only when this call settles
-	// every pending entry (not a partial, Apply-RPC-scoped commit) and a
-	// StartCommit has actually run in this process to produce one. See
-	// lastRuntimeCheckpoint's comment for the accepted downgrade gap this
-	// leaves open on a recovery Acknowledge.
-	var legacyCheckpoint []byte
-	if pending.entryCount() == d.state.entryCount() {
-		legacyCheckpoint = d.lastRuntimeCheckpoint
-	}
-
-	if err := d.commit(ctx, pending, legacyCheckpoint); err != nil {
-		return nil, err
-	}
-
-	d.store.deleteObjects(ctx, toDelete)
-	for sk, bucket := range pending {
-		for rk := range bucket {
-			delete(d.state[sk], rk)
+		var toDelete []string
+		for _, bucket := range pending {
+			for _, e := range bucket {
+				toDelete = append(toDelete, e.objects()...)
+			}
 		}
-		if len(d.state[sk]) == 0 {
-			delete(d.state, sk)
-		}
-	}
-
-	patch, err := json.Marshal(clear)
-	if err != nil {
-		return nil, fmt.Errorf("marshalling state clearing patch: %w", err)
-	}
-	return &pf.ConnectorState{UpdatedJson: patch, MergePatch: true}, nil
+		d.store.deleteObjects(ctx, toDelete)
+		return nil
+	})
 }
 
 // lastCopyCount is the number of rows the session's most recent COPY loaded.
@@ -1042,7 +952,7 @@ type commitGroup struct {
 // commit runs the staged transactions of pending as one Redshift
 // transaction, skipping any whose token is already committed. legacyCheckpoint,
 // when non-nil, is mirrored into the checkpoints row alongside the tokens.
-func (d *transactor) commit(ctx context.Context, pending connectorState, legacyCheckpoint []byte) error {
+func (d *transactor) commit(ctx context.Context, pending boilerplate.ShardedEntries[*stateItem], legacyCheckpoint []byte) error {
 	var groups []*commitGroup
 	var tokensMap = make(checkpointTokensMap)
 	for _, b := range d.bindings {
@@ -1067,7 +977,7 @@ func (d *transactor) commit(ctx context.Context, pending connectorState, legacyC
 			if e.TruncateBefore != nil && (g.merged.TruncateBefore == nil || e.TruncateBefore.After(*g.merged.TruncateBefore)) {
 				g.merged.TruncateBefore = e.TruncateBefore
 			}
-			if rk == d.rangeKey || !g.hasRound {
+			if rk == d.state.RangeKey() || !g.hasRound {
 				g.round, g.hasRound = e.Round, true
 			}
 			for _, column := range e.Widen {
