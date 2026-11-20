@@ -110,9 +110,14 @@ jobs:
         run: |
           set -euo pipefail -o noglob
 
+          # Anyone can open an issue with this title, so only reuse one this
+          # workflow opened. Otherwise a failure would comment on someone
+          # else's issue instead of opening one that tags the teams and assigns
+          # people.
           title="Image Scan failed on main"
-          issue=$(gh issue list --state open --search "in:title \"${title}\"" --json number,title \
-            --jq "map(select(.title == \"${title}\")) | first | .number // empty")
+          issue=$(gh issue list --state open --search "in:title \"${title}\" author:app/github-actions" \
+            --json number,title,author \
+            --jq "map(select(.title == \"${title}\" and .author.login == \"app/github-actions\")) | first | .number // empty")
 
           if [ "$RESULT" = failure ]; then
             if [ -n "$FAILED" ]; then
