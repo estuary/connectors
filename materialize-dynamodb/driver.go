@@ -498,24 +498,20 @@ func (d *materialization) NewTransactor(
 // suited for an operator to act on.
 func publishedAtField(b *boilerplate.MappedBinding[config, resource, mappedType]) (string, error) {
 	var reason error
-	for _, p := range b.Values {
+	for i := range b.Values {
+		var p = &b.Values[i]
 		if p.Ptr != "/_meta/uuid" {
 			continue
 		}
-		if s := p.Inference.String_; s == nil {
-			if reason == nil {
-				reason = fmt.Errorf("field %s projects /_meta/uuid without a string type, where a date-time with uuid encoding is required", p.Field)
-			}
-		} else if s.Format != "date-time" || s.ContentEncoding != "uuid" {
-			if reason == nil {
-				reason = fmt.Errorf("field %s projects /_meta/uuid with the unexpected format %q and content encoding %q, where a date-time with uuid encoding is required", p.Field, s.Format, s.ContentEncoding)
-			}
-		} else {
-			return p.Field, nil
+		var err = boilerplate.PublishedAtMismatch(&p.Projection.Projection)
+		if err != nil {
+			reason = err
+			continue
 		}
+		return p.Field, nil
 	}
 	if reason == nil {
-		reason = fmt.Errorf("the binding excludes the flow_published_at field, which must be included to enable deletion after a backfill")
+		reason = boilerplate.ErrPublishedAtExcluded
 	}
 	return "", reason
 }

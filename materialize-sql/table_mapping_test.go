@@ -57,9 +57,9 @@ func TestPublishedAtColumn(t *testing.T) {
 			field:  "flow_published_at",
 		},
 		{
-			name:    "first mismatch is reported",
+			name:    "last mismatch is reported",
 			values:  []Column{column("custom", "/_meta/uuid", timestamp, true), column("flow_published_at", "/_meta/uuid", nil, false)},
-			wantErr: "field custom has a user-defined DDL type",
+			wantErr: "field flow_published_at projects /_meta/uuid without a string type, where a date-time with uuid encoding is required",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

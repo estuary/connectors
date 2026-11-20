@@ -116,9 +116,9 @@ func TestPublishedAtField(t *testing.T) {
 			field:  "flow_published_at",
 		},
 		{
-			name:    "first mismatch is reported",
+			name:    "last mismatch is reported",
 			values:  []boilerplate.MappedProjection[mappedType]{projection("custom", "/_meta/uuid", nil), projection("flow_published_at", "/_meta/uuid", &pf.Inference_String{Format: "uuid"})},
-			wantErr: "field custom projects /_meta/uuid without a string type, where a date-time with uuid encoding is required",
+			wantErr: `field flow_published_at projects /_meta/uuid with the unexpected format "uuid" and content encoding "", where a date-time with uuid encoding is required`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
