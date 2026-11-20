@@ -47,6 +47,10 @@ def test_capture(request, snapshot):
 
     for line in lines:
         stream = line[0]
+        # Minutely streams re-read the lookback, so their documents depend on
+        # the dev org's recent usage. The offline tests cover them.
+        if stream.endswith("_minutely"):
+            continue
         if stream not in seen:
             unique_stream_lines.append(line)
             seen.add(stream)
