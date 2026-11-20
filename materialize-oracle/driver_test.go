@@ -245,42 +245,39 @@ func TestIntegration(t *testing.T) {
 		require.NotContains(t, plan, "TABLE ACCESS FULL", plan)
 	})
 
-	// The boundary keeps its fraction, and rounds like stored values into
-	// columns of lesser precision.
+	// The boundary keeps its fraction.
 	t.Run("truncation-boundary", func(t *testing.T) {
 		var ctx = context.Background()
 		var db = testConfig().openDB()
 		defer db.Close()
 
 		var boundary = time.Date(2026, 11, 13, 10, 0, 0, 123_456_789, time.UTC)
-		for _, ddl := range []string{"TIMESTAMP(9) WITH TIME ZONE", "TIMESTAMP(6) WITH TIME ZONE", "TIMESTAMP(6)"} {
-			var table = fmt.Sprintf("truncation_boundary_%d", time.Now().UnixNano())
-			_, err := db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s (id NUMBER, published %s)", table, ddl))
-			require.NoError(t, err)
+		var table = fmt.Sprintf("truncation_boundary_%d", time.Now().UnixNano())
+		_, err := db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s (id NUMBER, published %s)", table, timestampDDL))
+		require.NoError(t, err)
 
-			var offsets = []time.Duration{-time.Second, -time.Microsecond, 0, time.Nanosecond, time.Second}
-			for i, off := range offsets {
-				_, err := db.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s VALUES (:1, TO_TIMESTAMP_TZ(:2, '%s'))", table, timestampFormat),
-					i, boundary.Add(off).Format(goTimestampFormat))
-				require.NoError(t, err)
-			}
-			_, err = db.ExecContext(ctx, truncateSQL(table, "published", ddl), boundary.Format(goTimestampFormat))
+		var offsets = []time.Duration{-time.Second, -time.Nanosecond, 0, time.Nanosecond, time.Second}
+		for i, off := range offsets {
+			_, err := db.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s VALUES (:1, TO_TIMESTAMP_TZ(:2, '%s'))", table, timestampFormat),
+				i, boundary.Add(off).Format(goTimestampFormat))
 			require.NoError(t, err)
-
-			var kept []int
-			rows, err := db.QueryContext(ctx, "SELECT id FROM "+table+" ORDER BY id")
-			require.NoError(t, err)
-			for rows.Next() {
-				var id int
-				require.NoError(t, rows.Scan(&id))
-				kept = append(kept, id)
-			}
-			require.NoError(t, rows.Close())
-			_, err = db.ExecContext(ctx, "DROP TABLE "+table+" PURGE")
-			require.NoError(t, err)
-
-			require.Equal(t, []int{2, 3, 4}, kept, ddl)
 		}
+		_, err = db.ExecContext(ctx, truncateSQL(table, "published"), boundary.Format(goTimestampFormat))
+		require.NoError(t, err)
+
+		var kept []int
+		rows, err := db.QueryContext(ctx, "SELECT id FROM "+table+" ORDER BY id")
+		require.NoError(t, err)
+		for rows.Next() {
+			var id int
+			require.NoError(t, rows.Scan(&id))
+			kept = append(kept, id)
+		}
+		require.NoError(t, rows.Close())
+		_, err = db.ExecContext(ctx, "DROP TABLE "+table+" PURGE")
+		require.NoError(t, err)
+
+		require.Equal(t, []int{2, 3, 4}, kept)
 	})
 
 	t.Run("apply", func(t *testing.T) {

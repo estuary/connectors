@@ -25,6 +25,9 @@ const (
 
 	timestampFormat   = `YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM`
 	goTimestampFormat = "2006-01-02T15:04:05.000000000-07:00"
+
+	// timestampDDL is the column type of a date-time value.
+	timestampDDL = "TIMESTAMP(9) WITH TIME ZONE"
 )
 
 // Unquoted identifiers start with a letter, and Oracle stores them in upper
@@ -149,7 +152,7 @@ func newOracleDialect(defaultSchema string) sql.Dialect {
 					// Keys are strings: a TIMESTAMP WITH TIME ZONE can't be in a
 					// primary key, and the text round-trips exactly.
 					"date":      sql.MapPrimaryKey(stringKey, sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))),
-					"date-time": sql.MapPrimaryKey(stringKey, sql.MapStatic("TIMESTAMP(9) WITH TIME ZONE", sql.UsingConverter(timestampConverter))),
+					"date-time": sql.MapPrimaryKey(stringKey, sql.MapStatic(timestampDDL, sql.UsingConverter(timestampConverter))),
 					"time":      sql.MapPrimaryKey(stringKey, mapVarchar(maxVarcharChars)),
 				},
 			}),

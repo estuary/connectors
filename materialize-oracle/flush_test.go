@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/go/common"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
@@ -35,62 +34,20 @@ func TestFlushFeatureFlags(t *testing.T) {
 }
 
 func TestAddTruncation(t *testing.T) {
-	var identity = func(s string) string { return s }
-	var col = &sql.Column{
-		Identifier: "flow_published_at",
-		Projection: sql.Projection{Projection: pf.Projection{Field: "flow_published_at"}},
+	var column = func(fc sql.FieldConfig) *sql.Column {
+		var p = sql.Projection{Projection: pf.Projection{Inference: pf.Inference{
+			Types:   []string{"string"},
+			String_: &pf.Inference_String{Format: "date-time"},
+			Exists:  pf.Inference_MUST,
+		}}}
+		return &sql.Column{Identifier: "flow_published_at", MappedType: testDialect.MapType(&p, fc)}
 	}
 
-	for _, tc := range []struct {
-		name       string
-		field      *boilerplate.ExistingField
-		noTable    bool
-		wantSQL    string
-		wantReason string
-	}{
-		{
-			name:    "TIMESTAMP WITH TIME ZONE",
-			field:   &boilerplate.ExistingField{Name: "flow_published_at", Type: "TIMESTAMP(9) WITH TIME ZONE"},
-			wantSQL: `DELETE FROM the_table WHERE flow_published_at < CAST(TO_TIMESTAMP_TZ(:1, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM') AS TIMESTAMP(9) WITH TIME ZONE)`,
-		},
-		{
-			name:    "TIMESTAMP at microseconds",
-			field:   &boilerplate.ExistingField{Name: "flow_published_at", Type: "TIMESTAMP(6)"},
-			wantSQL: `DELETE FROM the_table WHERE flow_published_at < CAST(TO_TIMESTAMP_TZ(:1, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM') AS TIMESTAMP(6))`,
-		},
-		{
-			name:       "not a timestamp",
-			field:      &boilerplate.ExistingField{Name: "flow_published_at", Type: "VARCHAR2"},
-			wantReason: "column flow_published_at is not a TIMESTAMP",
-		},
-		{
-			name:       "missing column",
-			wantReason: "column flow_published_at was not found in the table",
-		},
-		{
-			name:       "missing table",
-			noTable:    true,
-			wantReason: "table the_table was not found in the database",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var is = boilerplate.NewInfoSchema(func(p []string) []string { return p }, identity, identity, false, false)
-			if !tc.noTable {
-				var res = is.PushResource("the_table")
-				if tc.field != nil {
-					res.PushField(*tc.field)
-				}
-			}
-			var b = &binding{target: sql.Table{Identifier: "the_table", TableShape: sql.TableShape{Path: []string{"the_table"}}}}
+	var b = &binding{target: sql.Table{Identifier: "the_table"}}
+	require.NoError(t, addTruncation(b, column(sql.FieldConfig{})))
+	require.Equal(t, `DELETE FROM the_table WHERE flow_published_at < TO_TIMESTAMP_TZ(:1, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM')`, b.truncateSQL)
 
-			var reason = addTruncation(b, col, is)
-			if tc.wantReason != "" {
-				require.EqualError(t, reason, tc.wantReason)
-				require.Empty(t, b.truncateSQL)
-				return
-			}
-			require.NoError(t, reason)
-			require.Equal(t, tc.wantSQL, b.truncateSQL)
-		})
-	}
+	b = &binding{target: sql.Table{Identifier: "the_table"}}
+	require.EqualError(t, addTruncation(b, column(sql.FieldConfig{CastToString_: true})), "column flow_published_at is not a TIMESTAMP")
+	require.Empty(t, b.truncateSQL)
 }

@@ -393,7 +393,7 @@ func newTransactor(
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
-	is *boilerplate.InfoSchema,
+	_ *boilerplate.InfoSchema,
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
 	if err := boilerplate.RequireSingleShard(open); err != nil {
@@ -424,7 +424,7 @@ func newTransactor(
 	}
 
 	for _, target := range bindings {
-		if err := t.addBinding(target, templates, is); err != nil {
+		if err := t.addBinding(target, templates); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 		}
 	}
@@ -432,7 +432,7 @@ func newTransactor(
 	return t, nil
 }
 
-func (t *transactor) addBinding(target sql.Table, templates templates, is *boilerplate.InfoSchema) error {
+func (t *transactor) addBinding(target sql.Table, templates templates) error {
 	var b = &binding{target: target}
 	_, b.order, b.lobStart = storeColumns(&target)
 
@@ -453,7 +453,7 @@ func (t *transactor) addBinding(target sql.Table, templates templates, is *boile
 	if col, err := target.PublishedAtColumn(); err != nil {
 		b.truncateReason = err
 	} else {
-		b.truncateReason = addTruncation(b, col, is)
+		b.truncateReason = addTruncation(b, col)
 	}
 
 	t.bindings = append(t.bindings, b)
@@ -461,31 +461,21 @@ func (t *transactor) addBinding(target sql.Table, templates templates, is *boile
 }
 
 // addTruncation prepares b to delete the rows whose col is earlier than a
-// boundary, compared in the type that col has in the table. It returns why b
-// cannot be truncated, as a clause suited for an operator.
-func addTruncation(b *binding, col *sql.Column, is *boilerplate.InfoSchema) error {
-	var res = is.GetResource(b.target.Path)
-	if res == nil {
-		return fmt.Errorf("table %s was not found in the database", b.target.Identifier)
-	}
-	var existing = res.GetField(col.Field)
-	if existing == nil {
-		return fmt.Errorf("column %s was not found in the table", col.Identifier)
-	}
-	var ddl = strings.ToUpper(existing.Type)
-	if !strings.HasPrefix(ddl, "TIMESTAMP") {
+// boundary. It returns why b cannot be truncated, as a clause suited for an
+// operator.
+func addTruncation(b *binding, col *sql.Column) error {
+	// With castToString the column holds text.
+	if col.BareDDL != timestampDDL {
 		return fmt.Errorf("column %s is not a TIMESTAMP", col.Identifier)
 	}
-	b.truncateSQL = truncateSQL(b.target.Identifier, col.Identifier, ddl)
+	b.truncateSQL = truncateSQL(b.target.Identifier, col.Identifier)
 	return nil
 }
 
-// truncateSQL deletes the rows whose column of type ddl is earlier than the
-// boundary bound as :1. Stored values reach the column by conversion from the
-// bound TIMESTAMP WITH TIME ZONE, so the boundary takes the same conversion
-// and rounds the same way: a row published at or after it is never deleted.
-func truncateSQL(table, column, ddl string) string {
-	return fmt.Sprintf("DELETE FROM %s WHERE %s < CAST(TO_TIMESTAMP_TZ(:1, '%s') AS %s)", table, column, timestampFormat, ddl)
+// truncateSQL deletes the rows whose column is earlier than the boundary
+// bound as :1, which is parsed like a stored value.
+func truncateSQL(table, column string) string {
+	return fmt.Sprintf("DELETE FROM %s WHERE %s < TO_TIMESTAMP_TZ(:1, '%s')", table, column, timestampFormat)
 }
 
 func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
