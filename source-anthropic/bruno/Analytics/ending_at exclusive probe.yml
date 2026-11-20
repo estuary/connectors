@@ -1,0 +1,25 @@
+info:
+  name: ending_at exclusive probe
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{base_url}}/usage?starting_at=2026-11-12T20:00:00Z&ending_at=2026-11-12T21:00:00Z&time_bucket_width=1h&group_by[]=model&order_by=time&order=asc"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **WHY:** pins boundary inclusivity at an exact bucket edge, so the
+    connector's windows tile without gaps or overlap
+    (FETCH-SERVER-SIDE-BOUNDARIES). The seeded traffic sits in the
+    2026-11-12 21:00 hour (minutes 21:34–21:36).
+
+    **VERIFIED (2026-11-16):** 0 rows: the 21:00 bucket holding the seeded traffic is excluded when `ending_at` equals its start. Same at minute width: [21:00, 21:34) → 0 rows though 21:34 has 2.
+  type: text/markdown

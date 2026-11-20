@@ -1,0 +1,27 @@
+info:
+  name: cost hourly grouped
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/cost?starting_at={{seed_start}}&ending_at={{seed_end}}&time_bucket_width=1h&order_by=time&order=asc&limit=1000&group_by[]=actor&group_by[]=model&group_by[]=product&group_by[]=api_key_id&group_by[]=workspace_id&group_by[]=cost_type&group_by[]=token_type"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://platform.claude.com/docs/en/api/http/beta/organization/analytics/cost
+    
+    **WHY:** the connector's exact request shape for cost_hourly.
+    
+    **LIMITATION (VERIFIED 2026-11-16): cost is not sparse like usage.** 24 rows
+    for 4 requests, including zero-amount rows ("0.000000") for unused cache
+    token types and web_search. requests is null when grouped by
+    cost_type/token_type. amount/list_amount are decimal strings in cents.
+  type: text/markdown

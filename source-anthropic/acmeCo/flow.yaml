@@ -1,0 +1,31 @@
+collections:
+  acmeCo/cost_daily:
+    schema: cost_daily.schema.yaml
+    key:
+    - /starting_at
+    - /group_key
+  acmeCo/cost_hourly:
+    schema: cost_hourly.schema.yaml
+    key:
+    - /starting_at
+    - /group_key
+  acmeCo/cost_minutely:
+    schema: cost_minutely.schema.yaml
+    key:
+    - /starting_at
+    - /group_key
+  acmeCo/usage_daily:
+    schema: usage_daily.schema.yaml
+    key:
+    - /starting_at
+    - /group_key
+  acmeCo/usage_hourly:
+    schema: usage_hourly.schema.yaml
+    key:
+    - /starting_at
+    - /group_key
+  acmeCo/usage_minutely:
+    schema: usage_minutely.schema.yaml
+    key:
+    - /starting_at
+    - /group_key

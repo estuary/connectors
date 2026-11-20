@@ -10,6 +10,7 @@ members = [
     "source-aircall-native",
     "source-airtable",
     "source-airtable-native",
+    "source-anthropic",
     "source-apple-app-store",
     "source-appsflyer",
     "source-asana",
@@ -1723,6 +1724,21 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.13.4,<4.0.0" },
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "pydantic", specifier = ">=2,<3" },
+]
+
+[[package]]
+name = "source-anthropic"
+version = "0.1.0"
+source = { editable = "source-anthropic" }
+dependencies = [
+    { name = "estuary-cdk" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
     { name = "estuary-cdk", editable = "estuary-cdk" },
     { name = "pydantic", specifier = ">=2,<3" },
 ]

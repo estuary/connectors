@@ -1,0 +1,52 @@
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  starting_at:
+    format: date-time
+    title: Starting At
+    type: string
+  group_key:
+    description: The grouped dimensions joined into one string, with empty values for null dimensions.
+    title: Group Key
+    type: string
+required:
+- starting_at
+- group_key
+title: CostRow
+type: object
+x-infer-schema: true
+if:
+  required:
+  - _meta
+  properties:
+    _meta:
+      required:
+      - op
+      properties:
+        op:
+          const: d
+then:
+  reduce:
+    strategy: merge
+    delete: true
