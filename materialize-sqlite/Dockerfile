@@ -37,16 +37,21 @@ RUN DEBIAN_FRONTEND=noninteractive apt update && apt install sqlite3 -y --no-ins
 # install datasette, taken from https://github.com/simonw/datasette/blob/main/Dockerfile
 ENV DATASETTE_VERSION="0.64.2"
 
+# pip is only needed to install datasette, so it's purged in the same layer,
+# along with the python3-wheel and python3-packaging it pulls in. They lag
+# their security fixes, and nothing at runtime uses them. python3 is installed
+# explicitly so the purge's autoremove keeps it. The purge has to run before
+# /var/lib/dpkg/info is deleted, since apt needs it.
 RUN apt-get update && \
   apt-get install -y --no-install-recommends libsqlite3-mod-spatialite \
-  python3-pip && \
+  python3 python3-pip && \
+  pip install https://github.com/simonw/datasette/archive/refs/tags/${DATASETTE_VERSION}.zip --break-system-packages && \
+  DEBIAN_FRONTEND=noninteractive apt-get purge -y --auto-remove python3-pip && \
+  find /usr/local/lib -name '__pycache__' | xargs rm -r && \
+  rm -rf /root/.cache/pip && \
   apt clean && \
   rm -rf /var/lib/apt && \
   rm -rf /var/lib/dpkg/info/*
-
-RUN pip install https://github.com/simonw/datasette/archive/refs/tags/${DATASETTE_VERSION}.zip --break-system-packages && \
-  find /usr/local/lib -name '__pycache__' | xargs rm -r && \
-  rm -rf /root/.cache/pip
 
 EXPOSE 8001
 
