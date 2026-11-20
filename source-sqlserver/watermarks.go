@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/estuary/connectors/go/capture/sqlserver/backfill"
 	"github.com/estuary/connectors/sqlcapture"
 	log "github.com/sirupsen/logrus"
 )
@@ -16,7 +17,7 @@ func (db *sqlserverDatabase) WatermarksTable() sqlcapture.StreamID {
 }
 
 func (db *sqlserverDatabase) createWatermarksTable(ctx context.Context) error {
-	var tableName = db.config.Advanced.WatermarksTable
+	var tableName = backfill.QuoteTableName(splitStreamID(db.config.Advanced.WatermarksTable))
 	rows, err := db.conn.QueryContext(ctx, fmt.Sprintf(`CREATE TABLE %s(slot INTEGER PRIMARY KEY, watermark TEXT);`, tableName))
 	if err != nil {
 		return fmt.Errorf("error creating watermarks table: %w", err)
@@ -27,7 +28,7 @@ func (db *sqlserverDatabase) createWatermarksTable(ctx context.Context) error {
 
 // WriteWatermark writes the provided string into the 'watermarks' table.
 func (db *sqlserverDatabase) WriteWatermark(ctx context.Context, watermark string) error {
-	var table = db.config.Advanced.WatermarksTable
+	var table = backfill.QuoteTableName(splitStreamID(db.config.Advanced.WatermarksTable))
 	var query = strings.ReplaceAll(`
     BEGIN TRAN
         UPDATE <watermarks> SET watermark = @p1 WHERE slot = 0;
