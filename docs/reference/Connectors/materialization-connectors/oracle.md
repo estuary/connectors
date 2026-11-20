@@ -163,18 +163,6 @@ before a completed backfill, can make for a large transaction.
 This connector supports both standard (merge) and [delta updates](/concepts/materialization/#delta-updates).
 The default is to use standard updates.
 
-## How rows are updated
-
-With standard updates, the connector updates a row by deleting it and inserting
-it again, in the same transaction. As a result:
-
-- Columns of the table that the materialization doesn't write are reset to
-  their defaults when the row is updated.
-- Foreign keys that reference the table must allow the delete, and an
-  `ON DELETE CASCADE` foreign key deletes the referencing rows.
-- Triggers and change data capture tools see a delete and an insert rather
-  than an update.
-
 ## Reserved words
 
 Oracle reserves words such as `DATE`, `NUMBER` and `ORDER`. The connector quotes

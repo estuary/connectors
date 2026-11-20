@@ -348,14 +348,30 @@ func bindExpr(c sql.Column, index int) string {
 // from position lobStart. order maps each position to the index of its value
 // in Table.ConvertAll's output.
 func storeColumns(t *sql.Table) (cols []*sql.Column, order []int, lobStart int) {
-	var all = t.Columns()
+	return lobsLast(t.Columns(), 0)
+}
+
+// updateColumns orders a table's columns for UPDATE: the values to set, with
+// the LOB columns last from position lobStart, and then the keys, which only
+// order covers.
+func updateColumns(t *sql.Table) (set []*sql.Column, order []int, lobStart int) {
+	set, order, lobStart = lobsLast(t.Columns(), len(t.Keys))
+	for i := range t.Keys {
+		order = append(order, i)
+	}
+	return set, order, lobStart
+}
+
+// lobsLast orders the columns from index first on, with the LOB columns last
+// from position lobStart. order maps each position to the column's index.
+func lobsLast(all []*sql.Column, first int) (cols []*sql.Column, order []int, lobStart int) {
 	for _, lob := range []bool{false, true} {
 		if lob {
 			lobStart = len(cols)
 		}
-		for i, c := range all {
-			if isLOB(c) == lob {
-				cols = append(cols, c)
+		for i := first; i < len(all); i++ {
+			if isLOB(all[i]) == lob {
+				cols = append(cols, all[i])
 				order = append(order, i)
 			}
 		}
@@ -378,6 +394,7 @@ type templates struct {
 	loadInsert        *template.Template
 	loadQuery         *template.Template
 	storeInsert       *template.Template
+	storeUpdate       *template.Template
 	deleteQuery       *template.Template
 	updateFence       *template.Template
 }
@@ -476,6 +493,19 @@ INSERT INTO {{$.Identifier}} (
 )
 {{ end }}
 
+-- Updates the row of each bound key, with LOB columns last among the values.
+
+{{ define "storeUpdate" }}
+{{- $set := UpdateColumns $ }}
+UPDATE {{$.Identifier}} SET {{ range $ind, $col := $set }}
+	{{- if $ind }}, {{ end -}}
+	{{$col.Identifier}} = {{ Bind $col $ind }}
+{{- end }} WHERE {{ range $ind, $key := $.Keys }}
+	{{- if $ind }} AND {{ end -}}
+	{{$key.Identifier}} = {{ Bind $key (Add $ind (len $set)) }}
+{{- end }}
+{{ end }}
+
 -- Deletes the row of each bound key.
 
 {{ define "deleteQuery" }}
@@ -500,6 +530,10 @@ UPDATE {{ Identifier $.TablePath }}
 			var cols, _, _ = storeColumns(&t)
 			return cols
 		},
+		"UpdateColumns": func(t sql.Table) []*sql.Column {
+			var set, _, _ = updateColumns(&t)
+			return set
+		},
 		"Bind":      bindExpr,
 		"LoadTable": loadTableName,
 	})
@@ -511,6 +545,7 @@ UPDATE {{ Identifier $.TablePath }}
 		loadInsert:        tplAll.Lookup("loadInsert"),
 		loadQuery:         tplAll.Lookup("loadQuery"),
 		storeInsert:       tplAll.Lookup("storeInsert"),
+		storeUpdate:       tplAll.Lookup("storeUpdate"),
 		deleteQuery:       tplAll.Lookup("deleteQuery"),
 		updateFence:       tplAll.Lookup("updateFence"),
 	}

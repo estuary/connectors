@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -152,51 +153,67 @@ func TestIntegration(t *testing.T) {
 		})
 	})
 
-	// Array inserts whose LOB columns mix values of different bind types keep
-	// every value in its own column (see insertRows).
+	// Array inserts and updates whose LOB columns mix values of different bind
+	// types keep every value in its own column (see writeRows).
 	t.Run("lob-binds", func(t *testing.T) {
 		var ctx = context.Background()
 		var db = testConfig().openDB()
 		defer db.Close()
 
 		var small, mid, long = "x", strings.Repeat("m", 5000), strings.Repeat("l", 3<<20)
-		var columns = [][]any{
-			{"1", "2", "3", "4", "5"},
+		var ids = []any{"1", "2", "3", "4", "5"}
+		var inserted = [][]any{
 			{[]byte(long), nil, []byte(mid), []byte(small), []byte(long)},
 			{mid, long, nil, small, long},
 			{long, small, mid, nil, ""},
+		}
+		// The update moves every value to another row.
+		var updated = [][]any{
+			{nil, []byte(mid), []byte(small), []byte(long), []byte(long)},
+			{long, mid, long, nil, small},
+			{"", long, small, mid, nil},
 		}
 		var table = fmt.Sprintf("lob_binds_%d", time.Now().UnixNano())
 		_, err := db.ExecContext(ctx, "CREATE TABLE "+table+" (id NUMBER PRIMARY KEY, b BLOB, c0 CLOB, c1 CLOB)")
 		require.NoError(t, err)
 		defer db.ExecContext(ctx, "DROP TABLE "+table+" PURGE")
 
-		txn, err := db.BeginTx(ctx, nil)
-		require.NoError(t, err)
-		n, err := insertRows(ctx, txn, "INSERT INTO "+table+" (id, b, c0, c1) VALUES (TO_NUMBER(:1), :2, :3, :4)", columns, 1)
-		require.NoError(t, err)
-		require.NoError(t, txn.Commit())
-		require.Equal(t, int64(5), n)
+		for _, tc := range []struct {
+			query    string
+			columns  [][]any
+			lobStart int
+			want     [][]any
+		}{
+			{"INSERT INTO " + table + " (id, b, c0, c1) VALUES (TO_NUMBER(:1), :2, :3, :4)", append([][]any{ids}, inserted...), 1, inserted},
+			{"UPDATE " + table + " SET b = :1, c0 = :2, c1 = :3 WHERE id = TO_NUMBER(:4)", append(slices.Clone(updated), ids), 0, updated},
+		} {
+			txn, err := db.BeginTx(ctx, nil)
+			require.NoError(t, err)
+			n, err := writeRows(ctx, txn, tc.query, tc.columns, tc.lobStart)
+			require.NoError(t, err)
+			require.NoError(t, txn.Commit())
+			require.Equal(t, int64(5), n)
 
-		rows, err := db.QueryContext(ctx, "SELECT b, c0, c1 FROM "+table+" ORDER BY id")
-		require.NoError(t, err)
-		defer rows.Close()
-		for r := 0; rows.Next(); r++ {
-			var b []byte
-			var c0, c1 *string
-			require.NoError(t, rows.Scan(&b, &c0, &c1))
-			for i, got := range []any{b, c0, c1} {
-				var want = columns[i+1][r]
-				if want == nil || want == "" {
-					require.Empty(t, got, "row %d column %d", r, i)
-				} else if w, ok := want.([]byte); ok {
-					require.Equal(t, w, got, "row %d column %d", r, i)
-				} else {
-					require.Equal(t, want, *(got.(*string)), "row %d column %d", r, i)
+			rows, err := db.QueryContext(ctx, "SELECT b, c0, c1 FROM "+table+" ORDER BY id")
+			require.NoError(t, err)
+			for r := 0; rows.Next(); r++ {
+				var b []byte
+				var c0, c1 *string
+				require.NoError(t, rows.Scan(&b, &c0, &c1))
+				for i, got := range []any{b, c0, c1} {
+					var want = tc.want[i][r]
+					if want == nil || want == "" {
+						require.Empty(t, got, "row %d column %d", r, i)
+					} else if w, ok := want.([]byte); ok {
+						require.Equal(t, w, got, "row %d column %d", r, i)
+					} else {
+						require.Equal(t, want, *(got.(*string)), "row %d column %d", r, i)
+					}
 				}
 			}
+			require.NoError(t, rows.Err())
+			require.NoError(t, rows.Close())
 		}
-		require.NoError(t, rows.Err())
 	})
 
 	// Loads find the rows of keys of every type, and look up each key in the

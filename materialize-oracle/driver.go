@@ -347,6 +347,7 @@ const (
 type binding struct {
 	target    sql.Table
 	insertSQL string
+	updateSQL string
 	deleteSQL string
 	// loadInsertSQL fills the binding's load table with keys, loadSQL selects
 	// their documents, and loadClearSQL empties the table again.
@@ -355,9 +356,11 @@ type binding struct {
 	loadClearSQL  string
 	// order maps each INSERT bind position to its index in
 	// Table.ConvertAll's output, and lobStart is the first position of a LOB
-	// column.
-	order    []int
-	lobStart int
+	// column. updateOrder and updateLobStart are those of the UPDATE.
+	order          []int
+	lobStart       int
+	updateOrder    []int
+	updateLobStart int
 
 	// truncateSQL deletes the rows published before a boundary. It is empty
 	// when truncateReason states why the table cannot be truncated.
@@ -439,6 +442,7 @@ func newTransactor(
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, templates templates) error {
 	var b = &binding{target: target, loadClearSQL: "TRUNCATE TABLE " + loadTableName(target.Binding)}
 	_, b.order, b.lobStart = storeColumns(&target)
+	_, b.updateOrder, b.updateLobStart = updateColumns(&target)
 
 	var createLoadTable string
 	for _, m := range []struct {
@@ -446,6 +450,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, templates
 		tpl *template.Template
 	}{
 		{&b.insertSQL, templates.storeInsert},
+		{&b.updateSQL, templates.storeUpdate},
 		{&b.deleteSQL, templates.deleteQuery},
 		{&createLoadTable, templates.createLoadTable},
 		{&b.loadInsertSQL, templates.loadInsert},
@@ -618,19 +623,17 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 // storeBatch accumulates one binding's array-bound statements.
 type storeBatch struct {
-	// inserts holds one array per INSERT bind position.
-	inserts [][]any
-	// replaces and deletes hold one array per key, for the rows to delete
-	// before re-inserting them and the rows to delete outright.
-	replaces, deletes [][]any
-	rows, bytes       int
+	// inserts and updates hold one array per bind position of their
+	// statement, and deletes one array per key.
+	inserts, updates, deletes [][]any
+	rows, bytes               int
 }
 
 func newStoreBatch(b *binding) *storeBatch {
 	return &storeBatch{
-		inserts:  make([][]any, len(b.order)),
-		replaces: make([][]any, len(b.target.Keys)),
-		deletes:  make([][]any, len(b.target.Keys)),
+		inserts: make([][]any, len(b.order)),
+		updates: make([][]any, len(b.updateOrder)),
+		deletes: make([][]any, len(b.target.Keys)),
 	}
 }
 
@@ -671,20 +674,16 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		if err != nil {
 			return fmt.Errorf("deleting rows of %s: %w", b.target.Identifier, err)
 		}
-		replaced, err := deleteRows(ctx, txn, b.deleteSQL, batch.replaces)
+		updated, err := writeRows(ctx, txn, b.updateSQL, batch.updates, b.updateLobStart)
 		if err != nil {
-			return fmt.Errorf("deleting replaced rows of %s: %w", b.target.Identifier, err)
+			return fmt.Errorf("updating rows of %s: %w", b.target.Identifier, err)
 		}
-		inserted, err := insertRows(ctx, txn, b.insertSQL, batch.inserts, b.lobStart)
+		inserted, err := writeRows(ctx, txn, b.insertSQL, batch.inserts, b.lobStart)
 		if err != nil {
 			return fmt.Errorf("inserting rows of %s: %w", b.target.Identifier, err)
 		}
 
-		stats[lastBinding] = m.ExactRowStats(
-			s.Inserted+inserted-replaced,
-			s.Updated+replaced,
-			s.Deleted+deleted,
-		)
+		stats[lastBinding] = m.ExactRowStats(s.Inserted+inserted, s.Updated+updated, s.Deleted+deleted)
 		batch = newStoreBatch(b)
 		return nil
 	}
@@ -707,18 +706,19 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
 
-		if it.Exists {
-			var dst = batch.replaces
-			if t.cfg.HardDelete && it.Delete {
-				dst = batch.deletes
+		if t.cfg.HardDelete && it.Delete {
+			if it.Exists {
+				for i := range b.target.Keys {
+					batch.deletes[i] = append(batch.deletes[i], converted[i])
+				}
 			}
-			for i := range b.target.Keys {
-				dst[i] = append(dst[i], converted[i])
+		} else {
+			var dst, order = batch.inserts, b.order
+			if it.Exists {
+				dst, order = batch.updates, b.updateOrder
 			}
-		}
-		if !(t.cfg.HardDelete && it.Delete) {
-			for pos, idx := range b.order {
-				batch.inserts[pos] = append(batch.inserts[pos], converted[idx])
+			for pos, idx := range order {
+				dst[pos] = append(dst[pos], converted[idx])
 				batch.bytes += valueSize(converted[idx])
 			}
 		}
@@ -808,15 +808,16 @@ func lobSizeClass(v any) byte {
 	}
 }
 
-// insertRows inserts the rows of columns, which holds one array per bind
-// position, with the LOB columns from position lobStart. It runs one array
-// insert per group of rows whose LOB values are of the same size classes.
+// writeRows inserts or updates the rows of columns, which holds one array per
+// bind position, with no LOB column before position lobStart. It runs one
+// array statement per group of rows whose values from lobStart on are of the
+// same size classes, and each row must affect exactly one row of the table.
 //
 // The driver types an array bind from its last non-NULL element, and Oracle
 // from its largest. Where they disagree on whether a bind is a LONG, the
 // driver sends the bind's values in a different position than Oracle reads
 // them from, and Oracle stores them into the wrong columns without error.
-func insertRows(ctx context.Context, txn *stdsql.Tx, insertSQL string, columns [][]any, lobStart int) (int64, error) {
+func writeRows(ctx context.Context, txn *stdsql.Tx, query string, columns [][]any, lobStart int) (int64, error) {
 	var rows = len(columns[0])
 	var groups = make(map[string][]int)
 	var order []string
@@ -843,13 +844,13 @@ func insertRows(ctx context.Context, txn *stdsql.Tx, insertSQL string, columns [
 			}
 		}
 		var want = int64(len(groups[k]))
-		res, err := txn.ExecContext(ctx, insertSQL, asArgs(args)...)
+		res, err := txn.ExecContext(ctx, query, asArgs(args)...)
 		if err != nil {
 			return 0, err
 		} else if n, err := res.RowsAffected(); err != nil {
 			return 0, fmt.Errorf("rows affected: %w", err)
 		} else if n != want {
-			return 0, fmt.Errorf("inserted %d rows of %d", n, want)
+			return 0, fmt.Errorf("affected %d rows of %d", n, want)
 		}
 		total += want
 	}

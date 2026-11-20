@@ -78,6 +78,16 @@ INSERT INTO key_value (key1, key2, "key!binary", boolean, flow_published_at, "in
 INSERT INTO delta_updates (theKey, aValue, flow_published_at) VALUES (:1, TO_NUMBER(:2), TO_TIMESTAMP_TZ(:3, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM'))
 --- End delta_updates storeInsert ---
 
+--- Begin key_value storeUpdate ---
+
+UPDATE key_value SET boolean = :1, flow_published_at = TO_TIMESTAMP_TZ(:2, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM'), "integer" = TO_NUMBER(:3), integerGt128Bit = :4, integerGt256Bit = :5, integerGt64Bit = TO_NUMBER(:6), integerWithUserDDL = :7, "number" = TO_BINARY_DOUBLE(:8), stringInteger = TO_NUMBER(:9), stringInteger18Chars = TO_NUMBER(:10), stringInteger38Chars = TO_NUMBER(:11), stringInteger39Chars = :12, stringInteger66Chars = :13, stringInteger77Chars = :14, stringNumber = TO_BINARY_DOUBLE(:15), array = :16, binary = :17, field_with_projection = :18, multiple = :19, "nonAsciiκόσμε" = :20, numberCastToString = :21, object = :22, string = :23, flow_document = :24 WHERE key1 = TO_NUMBER(:25) AND key2 = :26 AND "key!binary" = :27
+--- End key_value storeUpdate ---
+
+--- Begin delta_updates storeUpdate ---
+
+UPDATE delta_updates SET aValue = TO_NUMBER(:1), flow_published_at = TO_TIMESTAMP_TZ(:2, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM') WHERE theKey = :3
+--- End delta_updates storeUpdate ---
+
 --- Begin key_value deleteQuery ---
 
 DELETE FROM key_value WHERE key1 = TO_NUMBER(:1) AND key2 = :2 AND "key!binary" = :3
