@@ -110,3 +110,30 @@ func TestBackfillFilter(t *testing.T) {
 		})
 	}
 }
+
+// TestBackfillTableNameQuoting checks that a `]` in a schema or table name is doubled
+// in every backfill query shape.
+func TestBackfillTableNameQuoting(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		state     *sqlcapture.TableState
+		wantQuery string
+	}{
+		{
+			name:      "keyless",
+			state:     &sqlcapture.TableState{Mode: sqlcapture.TableStateKeylessBackfill},
+			wantQuery: "SELECT * FROM [my]]schema].[ev]]ents] ORDER BY %%physloc%% OFFSET @p1 ROWS FETCH FIRST 1000 ROWS ONLY;",
+		},
+		{
+			name:      "keyed",
+			state:     &sqlcapture.TableState{Mode: sqlcapture.TableStatePreciseBackfill, KeyColumns: []string{"k"}},
+			wantQuery: "BEGIN SELECT * FROM [my]]schema].[ev]]ents] ORDER BY [k] OFFSET 0 ROWS FETCH FIRST 1000 ROWS ONLY; END",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			query, _, err := BuildBackfillQuery(tc.state, "my]schema", "ev]ents", map[string]any{"k": "int"}, 1000, "")
+			require.NoError(t, err)
+			require.Equal(t, tc.wantQuery, query)
+		})
+	}
+}

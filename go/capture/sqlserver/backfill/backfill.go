@@ -110,7 +110,7 @@ func keylessScanQuery(schemaName, tableName string, chunkSize int, backfillFilte
 	}
 
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, "SELECT * FROM [%s].[%s]", schemaName, tableName)
+	fmt.Fprintf(query, "SELECT * FROM %s", QuoteTableName(schemaName, tableName))
 	if len(whereClauses) > 0 {
 		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
 	}
@@ -167,7 +167,7 @@ func buildScanQuery(start bool, keyColumns []string, columnTypes map[string]any,
 			}
 		}
 	}
-	fmt.Fprintf(query, "SELECT * FROM [%s].[%s]", schemaName, tableName)
+	fmt.Fprintf(query, "SELECT * FROM %s", QuoteTableName(schemaName, tableName))
 	if len(whereClauses) > 0 {
 		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
 	}
