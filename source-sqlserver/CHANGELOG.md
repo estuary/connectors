@@ -1,5 +1,12 @@
 # source-sqlserver
 
+## 2026-11-19
+
+### Fixed
+- Backfill queries now escape `]` in schema and table names, so a table whose name contains `]` can be backfilled.
+- Queries that read change data from capture instances now quote the instance name, so a space or `]` in it no longer breaks the query.
+- Statements that create and write to the watermarks table now quote its schema and table names, so a watermarks table name containing a space works.
+
 ## 2026-11-17
 
 ### Changed
