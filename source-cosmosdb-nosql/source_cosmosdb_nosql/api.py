@@ -125,6 +125,13 @@ def fill_partition_keys(
                     f"'/{'/'.join(segments)}', which does not match the collection key type "
                     f"({KEY_TYPE_NAMES[type(default)]}). {remedy}"
                 )
+            if (
+                isinstance(default, int) and not isinstance(default, bool)
+                and isinstance(value, float) and value.is_integer()
+                and -(2**63) <= value < 2**64
+            ):
+                # Flow packs floats and integers differently, even for equal values.
+                node[segments[-1]] = int(value)
             states.append("value")
             continue
         node[segments[-1]] = default

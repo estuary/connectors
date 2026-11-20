@@ -2,6 +2,7 @@ import asyncio
 import base64
 import io
 import json
+import math
 from collections import deque
 from logging import getLogger
 from unittest.mock import MagicMock
@@ -237,12 +238,57 @@ async def test_partition_key_of_another_type_fails(monkeypatch, key_type, value,
 
 
 @pytest.mark.asyncio
-async def test_integral_float_matches_integer_key(monkeypatch):
-    install_cosmos(monkeypatch, [*initialization(), page([{"id": "o1", "customer": 42.0}], '"2"'), caught_up('"2"')])
+@pytest.mark.parametrize("value", [
+    42.0, -42.0, 0.0, -0.0, float(-(2**63)), float(2**63), math.nextafter(float(2**64), 0),
+])
+async def test_integral_float_matches_integer_key(monkeypatch, value):
+    # Flow packs floats differently from integers, even when their values match.
+    install_cosmos(monkeypatch, [*initialization(), page([{"id": "o1", "customer": value}], '"2"'), caught_up('"2"')])
     output = await poll(schema={"properties": {"customer": {"type": "integer"}}})
-    assert [item.model_dump(by_alias=True, exclude_unset=True) for item in output if isinstance(item, Document)] == [
-        {"id": "o1", "customer": 42.0, "_meta": VALUE},
+    documents = [
+        json.loads(item.model_dump_json(by_alias=True, exclude_unset=True)) for item in output if isinstance(item, Document)
     ]
+    assert documents == [{"id": "o1", "customer": int(value), "_meta": VALUE}]
+    assert type(documents[0]["customer"]) is int
+
+
+@pytest.mark.asyncio
+async def test_integral_float_partition_key_is_stable_on_resume(monkeypatch):
+    # The same item must retain its Flow key when a writer changes 42 to 42.0.
+    schema = {"properties": {"customer": {"type": "integer"}}}
+    cursor = ("",)
+    documents = []
+    for value, etag in ((42, '"1"'), (42.0, '"2"')):
+        transport = install_cosmos(monkeypatch, [
+            *initialization(), page([{"id": "o1", "customer": value, "amount": 42.0}], etag), caught_up(etag),
+        ])
+        output = await poll(cursor, schema=schema)
+        documents.extend(
+            json.loads(item.model_dump_json(by_alias=True, exclude_unset=True))
+            for item in output if isinstance(item, Document)
+        )
+        cursor = output[-1]
+        assert not transport.replies
+        assert transport.closed
+    assert documents == [{"id": "o1", "customer": 42, "amount": 42.0, "_meta": VALUE}] * 2
+    assert [type(doc["customer"]) for doc in documents] == [int, int]
+    assert [type(doc["amount"]) for doc in documents] == [float, float]
+    assert feed_headers(transport)[0]["if-none-match"] == '"1"'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("value", [
+    math.nextafter(float(-(2**63)), -math.inf), float(2**64), 1e100,
+])
+async def test_integral_float_outside_integer_range_is_preserved(monkeypatch, value):
+    # Normalization must not produce integers outside Flow's int64/uint64 range.
+    install_cosmos(monkeypatch, [*initialization(), page([{"id": "o1", "customer": value}], '"2"'), caught_up('"2"')])
+    output = await poll(schema={"properties": {"customer": {"type": "integer"}}})
+    documents = [
+        json.loads(item.model_dump_json(by_alias=True, exclude_unset=True)) for item in output if isinstance(item, Document)
+    ]
+    assert documents == [{"id": "o1", "customer": value, "_meta": VALUE}]
+    assert type(documents[0]["customer"]) is float
 
 
 @pytest.mark.asyncio
