@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"fmt"
 	"net/http/httptest"
 	"testing"
 
@@ -43,16 +42,32 @@ func TestTLSConfig(t *testing.T) {
 	require.Error(t, verify(tls.ConnectionState{}))
 }
 
-// The driver fails to parse these with an error that quotes the whole
-// connection string, so they must not reach it.
-func TestValidateRejectsUnparseableAddress(t *testing.T) {
+func exampleConfig() config {
+	return config{
+		Address:     "example.com:2484",
+		User:        "will",
+		Credentials: credentialsConfig{AuthType: UserPassword, userPasswordConfig: userPasswordConfig{Password: "secret1234"}},
+		Database:    "ORCLPDB1",
+	}
+}
+
+func TestConfigValidate(t *testing.T) {
+	// SSL mode is optional.
+	require.NoError(t, exampleConfig().Validate())
+
+	var cfg = exampleConfig()
+	cfg.Credentials.Password = ""
+	require.ErrorContains(t, cfg.Validate(), "missing 'password'")
+
+	cfg = exampleConfig()
+	cfg.SSLMode = "prefer"
+	require.ErrorContains(t, cfg.Validate(), "invalid 'sslmode'")
+
+	// The driver fails to parse these addresses with an error that quotes the
+	// whole connection string, so they must not reach it.
 	for _, address := range []string{"example.com:prod", "will@example.com", "example.com/db", "example .com:1521"} {
-		var cfg = config{
-			Address:     address,
-			User:        "will",
-			Credentials: credentialsConfig{AuthType: UserPassword, userPasswordConfig: userPasswordConfig{Password: "secret1234"}},
-			Database:    "ORCLPDB1",
-		}
+		cfg = exampleConfig()
+		cfg.Address = address
 		_, driverErr := go_ora.ParseConfig(cfg.toURI())
 		require.ErrorContains(t, driverErr, "secret1234", address)
 
@@ -63,31 +78,38 @@ func TestValidateRejectsUnparseableAddress(t *testing.T) {
 }
 
 func TestConfigURI(t *testing.T) {
-	var base = config{
-		Address:     "example.com",
-		User:        "will",
-		Credentials: credentialsConfig{AuthType: UserPassword, userPasswordConfig: userPasswordConfig{Password: "secret1234"}},
-		Database:    "ORCLPDB1",
-		SSLMode:     sslVerifyFull,
+	var uri = func(edit func(*config)) string {
+		var cfg = exampleConfig()
+		edit(&cfg)
+		return cfg.toURI()
 	}
-	for name, edit := range map[string]func(*config){
-		"VerifyFull": func(*config) {},
-		"Require":    func(c *config) { c.SSLMode = sslRequire; c.Address = "example.com:2484" },
-		"Disable":    func(c *config) { c.SSLMode = sslDisable },
-		"NoSSLMode":  func(c *config) { c.SSLMode = "" },
-		"NoPassword": func(c *config) { c.Credentials.Password = "" },
-		"Tunnel": func(c *config) {
+
+	// What a TLS connection verifies is up to tlsConfig, so every mode but
+	// disable builds the same URI, an unset mode included.
+	for _, mode := range []sslMode{"", sslVerifyFull, sslRequire} {
+		require.Equal(t,
+			"oracle://will:secret1234@example.com:2484/ORCLPDB1?PROGRAM=Estuary+Flow+Materialization&SSL=true",
+			uri(func(c *config) { c.SSLMode = mode }), "mode %q", mode)
+	}
+	require.Equal(t,
+		"oracle://will:secret1234@example.com:2484/ORCLPDB1?PROGRAM=Estuary+Flow+Materialization",
+		uri(func(c *config) { c.SSLMode = sslDisable }))
+
+	// An address without a port gets 1521, whatever the SSL mode.
+	require.Equal(t,
+		"oracle://will:secret1234@example.com:1521/ORCLPDB1?PROGRAM=Estuary+Flow+Materialization&SSL=true",
+		uri(func(c *config) { c.Address = "example.com" }))
+
+	// Through an SSH tunnel the connection goes to the tunnel's local end.
+	require.Equal(t,
+		"oracle://will:secret1234@localhost:1521/ORCLPDB1?PROGRAM=Estuary+Flow+Materialization&SSL=true",
+		uri(func(c *config) {
 			c.NetworkTunnel = &tunnelConfig{SshForwarding: &sshForwarding{SshEndpoint: "ssh://user@bastion"}}
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			var cfg = base
-			edit(&cfg)
-			var valid = "config valid"
-			if err := cfg.Validate(); err != nil {
-				valid = err.Error()
-			}
-			cupaloy.SnapshotT(t, fmt.Sprintf("%s\n%s", cfg.toURI(), valid))
-		})
-	}
+		}))
+
+	// Reserved characters in the credentials reach the driver intact.
+	parsed, err := go_ora.ParseConfig(uri(func(c *config) { c.User, c.Credentials.Password = "wi:ll", "p@ss/w:rd?#" }))
+	require.NoError(t, err)
+	require.Equal(t, "wi:ll", parsed.UserID)
+	require.Equal(t, "p@ss/w:rd?#", parsed.Password)
 }

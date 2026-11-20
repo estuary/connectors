@@ -1,2 +1,0 @@
-oracle://will:secret1234@example.com:2484/ORCLPDB1?PROGRAM=Estuary+Flow+Materialization&SSL=true
-config valid
