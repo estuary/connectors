@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -249,6 +251,15 @@ var featureFlagDefaults = map[string]bool{
 	"activate_streams_before_catchup": false,
 }
 
+// slotNameRegex and watermarksTableRegex match valid unquoted identifiers. The
+// names have to stay unquoted because quoting would stop Postgres from
+// lowercasing them, so a name like `public.Flow_Watermarks` would refer to a
+// different table.
+var (
+	slotNameRegex        = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	watermarksTableRegex = regexp.MustCompile(`^[\p{L}_][\p{L}\p{N}_$]*\.[\p{L}_][\p{L}\p{N}_$]*$`)
+)
+
 // Validate checks that the configuration possesses all required properties.
 func (c *Config) Validate() error {
 	if c.Address == "" {
@@ -287,6 +298,17 @@ func (c *Config) Validate() error {
 
 	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
 		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
+	}
+	if c.Advanced.WatermarksTable != "" && !c.Advanced.ReadOnlyCapture && !watermarksTableRegex.MatchString(c.Advanced.WatermarksTable) {
+		return fmt.Errorf("invalid 'watermarksTable' configuration: in %q, the schema and table names must each start with a letter or '_' and contain only letters, digits, '_', and '$'", c.Advanced.WatermarksTable)
+	}
+	if c.Advanced.SlotName != "" && !slotNameRegex.MatchString(c.Advanced.SlotName) {
+		return fmt.Errorf("invalid 'slotName' configuration: %q must start with a letter or '_' and contain only letters, digits, and '_'", c.Advanced.SlotName)
+	}
+	if c.Advanced.MinimumBackfillXID != "" {
+		if _, err := strconv.ParseUint(c.Advanced.MinimumBackfillXID, 10, 64); err != nil {
+			return fmt.Errorf("invalid 'min_backfill_xid' configuration: %q must be a non-negative integer", c.Advanced.MinimumBackfillXID)
+		}
 	}
 	if c.Advanced.SkipBackfills != "" {
 		for _, skipStreamID := range strings.Split(c.Advanced.SkipBackfills, ",") {
