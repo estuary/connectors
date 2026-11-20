@@ -1,0 +1,38 @@
+info:
+  name: not in channel
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: "{{base_url}}/conversations.history?channel={{unjoined_channel_id}}&limit=1"
+  params:
+    - name: channel
+      value: "{{unjoined_channel_id}}"
+      type: query
+    - name: limit
+      value: "1"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('unjoined_channel_id')) throw new Error('unjoined_channel_id not set — run `Channels / bare` first in this session');
+
+settings:
+  encodeUrl: true
+  timeout: 30000
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [conversations.history](https://docs.slack.dev/reference/methods/conversations.history)
+
+  **WHY:** the documented error for a public channel the bot hasn't joined is
+  `not_in_channel`. Confirms it, and its HTTP status. This is why
+  `resolve_channels` keeps channels the bot can't read out of scope instead of
+  discovering the problem mid-capture.
+
+  **PENDING:** run once credentials are in place.

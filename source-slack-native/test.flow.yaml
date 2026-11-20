@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-slack-native:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_slack_native
+        config: config.yaml
+    bindings: []

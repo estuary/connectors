@@ -1,0 +1,33 @@
+info:
+  name: invalid token
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/auth.test"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Deliberately overrides the collection's Authorization header with a
+        // malformed bot token. No real credential is involved.
+        req.setHeader('Authorization', 'Bearer xoxb-invalid');
+
+settings:
+  encodeUrl: true
+  timeout: 30000
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [auth.test](https://docs.slack.dev/reference/methods/auth.test)
+
+  **WHY:** pins the HTTP status Slack uses for an `ok: false` response. The
+  connector checks the envelope on every response; if Slack answered failures
+  with a 4xx instead, the CDK would raise `HTTPError` first and the
+  `invalid_auth` message in `validate_credentials` would never be reached.
+
+  **PENDING:** run once credentials are in place.
