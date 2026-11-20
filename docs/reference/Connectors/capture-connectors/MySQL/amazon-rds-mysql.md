@@ -292,7 +292,7 @@ The connector handles most DDL on actively-captured tables automatically:
 - `DROP TABLE`, `RENAME TABLE`, and `DROP DATABASE` deactivate the affected binding. If the table is later recreated, the connector automatically re-backfills it and resumes capturing.
 - `TRUNCATE TABLE` on an active table is ignored — truncated rows are not propagated to the destination as deletes. If you need the destination to reflect the truncate, trigger a backfill of the binding.
 
-If a column type change results in captured documents that don't match the existing collection schema, autodiscovery will update the schema on its next run. To apply the new schema immediately, edit the capture, click **Refresh**, and republish.
+If an `ALTER TABLE` lets a table hold values the collection schema doesn't allow, such as `NULL` in a formerly `NOT NULL` column or a new `ENUM` value, the capture fails until the next discovery updates the schema. See [Schema changes that fail validation](/reference/Connectors/capture-connectors/MySQL/#schema-changes-that-fail-validation).
 
 ### Data Manipulation Queries
 
