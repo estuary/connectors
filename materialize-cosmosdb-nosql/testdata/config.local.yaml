@@ -1,0 +1,8 @@
+endpoint: http://localhost:8092/
+# Public emulator key, not a credential for an Azure account.
+key: C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
+database: test
+hardDelete: true
+advanced:
+  # Each preview starts with fresh runtime state over the previous run's items.
+  feature_flags: allow_existing_tables_for_new_bindings

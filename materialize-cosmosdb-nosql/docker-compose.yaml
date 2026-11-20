@@ -1,0 +1,22 @@
+services:
+  db:
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview
+    # Integration tests run the connector on the host. Advertise that same
+    # address and port because the SDK follows the account's gateway endpoint.
+    command: ["--protocol", "http", "--port", "8092", "--gateway-endpoint", "localhost"]
+    environment:
+      ENABLE_TELEMETRY: "false"
+    ports:
+      - "8092:8092"
+    networks:
+      - flow-test
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null http://127.0.0.1:8092/ || wget -q -O /dev/null http://127.0.0.1:8092/ || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true

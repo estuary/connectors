@@ -1,0 +1,8 @@
+["tests/orders", {"id": 1, "status": "new", "canary": "o1", "note": "keep"}]
+["tests/orders", {"id": 2, "status": "new", "canary": "o2"}]
+["tests/events", {"region": "us", "seq": 7, "canary": "e7"}]
+["tests/events", {"region": "eu/west", "seq": 8, "canary": "e8"}]
+{"commit": true}
+["tests/orders", {"id": 3, "status": "new", "canary": "o3"}]
+["tests/orders", {"id": 1, "status": "paid"}]
+{"commit": true}

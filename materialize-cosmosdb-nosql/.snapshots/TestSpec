@@ -1,0 +1,88 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-cosmosdb-nosql/config",
+    "properties": {
+      "endpoint": {
+        "type": "string",
+        "title": "Endpoint",
+        "description": "The account URI of your Azure Cosmos DB for NoSQL account. For example https://myaccount.documents.azure.com:443/.",
+        "order": 0
+      },
+      "key": {
+        "type": "string",
+        "title": "Account Key",
+        "description": "A read-write account key for your Azure Cosmos DB account.",
+        "order": 1,
+        "secret": true
+      },
+      "database": {
+        "type": "string",
+        "title": "Database",
+        "description": "Name of the database to materialize to. The database is created if it does not exist.",
+        "order": 2
+      },
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "If enabled documents deleted in the source are also deleted from the destination. Otherwise the destination retains documents with deletion metadata.",
+        "default": false,
+        "nonsensitive": true,
+        "order": 3
+      },
+      "advanced": {
+        "properties": {
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "nonsensitive": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "endpoint",
+      "key",
+      "database"
+    ],
+    "title": "Materialize Cosmos DB for NoSQL Spec"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-cosmosdb-nosql/resource",
+    "properties": {
+      "container": {
+        "type": "string",
+        "title": "Container Name",
+        "description": "Name of the container to materialize to.",
+        "x-collection-name": true
+      },
+      "partition_key": {
+        "type": "string",
+        "title": "Partition Key",
+        "description": "A collection key JSON pointer to use as the container partition key. Defaults to the first collection key pointer."
+      },
+      "delta_updates": {
+        "type": "boolean",
+        "title": "Delta Updates",
+        "description": "Skip loading existing documents and replace each item with the latest document for its key.",
+        "default": false,
+        "nonsensitive": true,
+        "x-delta-updates": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "container"
+    ],
+    "title": "Cosmos DB for NoSQL Container"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-cosmosdb-nosql"
+}
