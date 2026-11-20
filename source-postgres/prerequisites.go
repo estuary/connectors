@@ -105,7 +105,7 @@ func (db *postgresDatabase) prerequisiteReplicationUser(ctx context.Context) err
 	// As a first resort, check if the user has the REPLICATION role. This check
 	// covers all managed Postgres providers except for RDS.
 	var rolreplication bool
-	if err := db.conn.QueryRow(ctx, fmt.Sprintf(`SELECT rolreplication FROM pg_catalog.pg_roles WHERE rolname = '%s'`, db.config.User)).Scan(&rolreplication); err != nil {
+	if err := db.conn.QueryRow(ctx, `SELECT rolreplication FROM pg_catalog.pg_roles WHERE rolname = $1`, db.config.User).Scan(&rolreplication); err != nil {
 		return fmt.Errorf("error querying REPLICATION role for user %q: %w", db.config.User, err)
 	}
 	if rolreplication {
@@ -117,7 +117,7 @@ func (db *postgresDatabase) prerequisiteReplicationUser(ctx context.Context) err
 	// Note that this query will result in an error on non-RDS Postgres instances,
 	// so we ignore errors from this query.
 	var rdsreplication bool
-	if err := db.conn.QueryRow(ctx, fmt.Sprintf(`SELECT pg_has_role('%s', 'rds_replication', 'member');`, db.config.User)).Scan(&rdsreplication); err == nil {
+	if err := db.conn.QueryRow(ctx, `SELECT pg_has_role($1::name, 'rds_replication', 'member');`, db.config.User).Scan(&rdsreplication); err == nil {
 		if rdsreplication {
 			return nil
 		}
@@ -135,7 +135,7 @@ func (db *postgresDatabase) prerequisiteReplicationSlot(ctx context.Context) err
 		"database": configuredDatabase,
 	})
 	var slotDatabase string
-	if err := db.conn.QueryRow(ctx, fmt.Sprintf(`SELECT database FROM pg_catalog.pg_replication_slots WHERE slot_name = '%s' AND slot_type = 'logical';`, slotName)).Scan(&slotDatabase); err != nil {
+	if err := db.conn.QueryRow(ctx, `SELECT database FROM pg_catalog.pg_replication_slots WHERE slot_name = $1 AND slot_type = 'logical';`, slotName).Scan(&slotDatabase); err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("error querying replication slots: %w", err)
 		}
@@ -173,7 +173,7 @@ func (db *postgresDatabase) prerequisitePublication(ctx context.Context) error {
 	var logEntry = logrus.WithField("publication", pubName)
 
 	var count int
-	if err := db.conn.QueryRow(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM pg_catalog.pg_publication WHERE pubname = '%s';`, pubName)).Scan(&count); err != nil {
+	if err := db.conn.QueryRow(ctx, `SELECT COUNT(*) FROM pg_catalog.pg_publication WHERE pubname = $1;`, pubName).Scan(&count); err != nil {
 		return fmt.Errorf("error querying publications: %w", err)
 	}
 	if count == 1 {
