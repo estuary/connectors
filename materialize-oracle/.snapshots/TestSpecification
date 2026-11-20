@@ -1,0 +1,109 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-oracle/config",
+    "properties": {
+      "address": {
+        "type": "string",
+        "title": "Address",
+        "description": "Host and port of the database (in the form of host[:port]). Port 1521 is used as the default if no specific port is provided.",
+        "order": 0
+      },
+      "service_name": {
+        "type": "string",
+        "title": "Service Name",
+        "description": "Oracle service name to connect to (for example FREEPDB1).",
+        "order": 1
+      },
+      "user": {
+        "type": "string",
+        "title": "User",
+        "description": "Database user to connect as.",
+        "order": 2
+      },
+      "password": {
+        "type": "string",
+        "title": "Password",
+        "description": "Password for the specified database user.",
+        "order": 3,
+        "secret": true
+      },
+      "schema": {
+        "type": "string",
+        "title": "Database Schema",
+        "description": "Schema for bound tables and the FLOW_CHECKPOINTS_V1 metadata table. Defaults to the database user's schema.",
+        "order": 4
+      },
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "If enabled items deleted in the source will also be deleted from the destination. By default _meta/op in the destination signifies whether rows have been deleted.",
+        "default": false,
+        "nonsensitive": true,
+        "order": 5
+      },
+      "advanced": {
+        "properties": {
+          "no_flow_document": {
+            "type": "boolean",
+            "title": "Exclude Flow Document",
+            "description": "When enabled the root document will not be required for standard updates.",
+            "default": false,
+            "nonsensitive": true
+          },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "nonsensitive": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "address",
+      "service_name",
+      "user",
+      "password"
+    ],
+    "title": "SQL Connection"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-oracle/table-config",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table",
+        "description": "Name of the database table",
+        "x-collection-name": true
+      },
+      "schema": {
+        "type": "string",
+        "title": "Alternative Schema",
+        "description": "Alternative schema for this table (optional)",
+        "x-schema-name": true
+      },
+      "delta_updates": {
+        "type": "boolean",
+        "title": "Delta Update",
+        "description": "Should updates to this table be done via delta updates. Default is false.",
+        "default": false,
+        "nonsensitive": true,
+        "x-delta-updates": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "table"
+    ],
+    "title": "SQL Table"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-oracle"
+}

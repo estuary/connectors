@@ -1,0 +1,5 @@
+address: localhost:1522
+service_name: FREEPDB1
+user: test
+password: factorytest
+hardDelete: true

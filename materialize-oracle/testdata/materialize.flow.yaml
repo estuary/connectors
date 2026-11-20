@@ -1,0 +1,62 @@
+import:
+  - collections.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-oracle:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+      - resource:
+          table: orders
+        source: tests/orders
+        fields:
+          recommended: false
+          include:
+            id: {}
+            amount: {}
+            canary: {}
+            status: {}
+            flow_published_at: {}
+      - resource:
+          table: orders_delta
+          delta_updates: true
+        source: tests/orders
+        fields:
+          recommended: false
+          include:
+            id: {}
+            amount: {}
+            canary: {}
+            status: {}
+            flow_published_at: {}
+      - resource:
+          table: Type Samples
+        source: tests/types
+        fields:
+          recommended: false
+          include:
+            id: {}
+            active: {}
+            event_time: {}
+            small_text: {}
+            long_text: {}
+            details: {}
+            tags: {}
+            select: {}
+            field.with.dots: {}
+            flow_published_at: {}
+      - resource:
+          table: keyed
+        source: tests/keyed
+        fields:
+          recommended: false
+          include:
+            tenant_id: {}
+            sku: {}
+            event_time: {}
+            code: {}
+            note: {}
+            flow_published_at: {}
