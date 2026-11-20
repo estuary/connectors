@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -171,11 +172,13 @@ func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*
 	logrus.Debug("listing all tables in the database")
 	var tables []*sqlcapture.DiscoveryInfo
 	var q = queryDiscoverTables
+	var args []any
 	if len(selectedSchemas) > 0 {
-		var schemasComma = strings.Join(selectedSchemas, "','")
-		q = q + fmt.Sprintf(" AND owner IN ('%s')", schemasComma)
+		var placeholders string
+		placeholders, args = bindList(selectedSchemas)
+		q = q + fmt.Sprintf(" AND owner IN (%s)", placeholders)
 	}
-	var rows, err = conn.QueryContext(ctx, q)
+	var rows, err = conn.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, fmt.Errorf("fetching tables: %w", err)
 	}
@@ -213,17 +216,21 @@ func getTableObjectMappings(ctx context.Context, watermarksTable string, conn *s
 	var watermarkSchema = watermarksTableSplit[0]
 	var watermarkTableName = watermarksTableSplit[1]
 
-	var mapping = make(map[string]tableObject, len(tables))
-	var tablesCondition = ""
+	// Binding an owner and a name for every table could take thousands of bind
+	// variables, so the query selects by owner and the loop skips unrequested tables.
+	var requested = map[[2]string]bool{{watermarkSchema, watermarkTableName}: true}
+	var owners = map[string]bool{watermarkSchema: true}
 	for _, table := range tables {
-		tablesCondition += fmt.Sprintf("(OWNER = '%s' AND OBJECT_NAME = '%s') OR ", table.Schema, table.Name)
+		requested[[2]string{table.Schema, table.Name}] = true
+		owners[table.Schema] = true
 	}
-	tablesCondition += fmt.Sprintf("(OWNER = '%s' AND OBJECT_NAME = '%s')", watermarkSchema, watermarkTableName)
+	var placeholders, args = bindList(slices.Sorted(maps.Keys(owners)))
 
-	var fullQuery = fmt.Sprintf("%s AND (%s)", queryTableObjectIdentifiers, tablesCondition)
+	var mapping = make(map[string]tableObject, len(tables))
+	var fullQuery = fmt.Sprintf("%s AND OWNER IN (%s)", queryTableObjectIdentifiers, placeholders)
 	logrus.WithField("query", fullQuery).Debug("fetching object identifiers for tables")
 
-	var rows, err = conn.QueryContext(ctx, fullQuery)
+	var rows, err = conn.QueryContext(ctx, fullQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("fetching table identifiers: %w", err)
 	}
@@ -234,6 +241,9 @@ func getTableObjectMappings(ctx context.Context, watermarksTable string, conn *s
 	for rows.Next() {
 		if err := rows.Scan(&owner, &tableName, &objectID, &dataObjectID); err != nil {
 			return nil, fmt.Errorf("scanning table object identifier row: %w", err)
+		}
+		if !requested[[2]string{owner, tableName}] {
+			continue
 		}
 
 		mapping[joinObjectID(objectID, dataObjectID)] = tableObject{streamID: sqlcapture.JoinStreamID(owner, tableName), objectID: objectID, dataObjectID: dataObjectID}
@@ -246,6 +256,16 @@ func getTableObjectMappings(ctx context.Context, watermarksTable string, conn *s
 
 func joinObjectID(objectID, dataObjectID int) string {
 	return fmt.Sprintf("%d.%d", objectID, dataObjectID)
+}
+
+func bindList(values []string) (string, []any) {
+	var placeholders = make([]string, len(values))
+	var args = make([]any, len(values))
+	for i, value := range values {
+		placeholders[i] = fmt.Sprintf(":%d", i+1)
+		args[i] = value
+	}
+	return strings.Join(placeholders, ", "), args
 }
 
 const queryDiscoverColumns = `
@@ -290,12 +310,17 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 	for k := range ownersMap {
 		owners = append(owners, k)
 	}
-	var ownersCondition = " WHERE t.owner IN ('" + strings.Join(owners, "','") + "')"
+	// Oracle rejects an empty IN list.
+	if len(owners) == 0 {
+		return columns, pks, nil
+	}
+	var placeholders, args = bindList(owners)
+	var ownersCondition = " WHERE t.owner IN (" + placeholders + ")"
 
 	var ordering = " ORDER BY t.table_name, c.position"
 
 	var fullQuery = queryDiscoverColumns + ownersCondition + ordering
-	var rows, err = conn.QueryContext(ctx, fullQuery)
+	var rows, err = conn.QueryContext(ctx, fullQuery, args...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fetching columns: %w", err)
 	}

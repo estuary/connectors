@@ -216,7 +216,7 @@ func (db *oracleDatabase) fetchBackfillRowIDRange(ctx context.Context, schemaNam
 	// 1gb based on db_block_size, then dividing up the blocks into buckets using width_bucket,
 	// calculating the range begin end values necessary to construct rowids and
 	// finally generating ROWID ranges based on these buckets so we can do backfills 1gb at a time
-	var query = fmt.Sprintf(`
+	var query = `
     with extents_data as (
       select o.data_object_id, e.file_id, e.block_id, e.blocks
       from dba_extents e
@@ -224,8 +224,8 @@ func (db *oracleDatabase) fetchBackfillRowIDRange(ctx context.Context, schemaNam
       on (e.owner, e.segment_name, e.segment_type) = ((o.owner, o.object_name, o.object_type))
         and decode(e.partition_name, o.subobject_name, 0, 1) = 0
       where e.segment_type in ('TABLE', 'TABLE PARTITION', 'TABLE SUBPARTITION')
-        and e.owner = '%s'
-        and e.segment_name = '%s'
+        and e.owner = :1
+        and e.segment_name = :2
     )
     , extents_with_sums as (
       select sum(blocks) over() total_blocks,
@@ -279,9 +279,9 @@ func (db *oracleDatabase) fetchBackfillRowIDRange(ctx context.Context, schemaNam
     ) rowid_start
     from answer
     order by bucket
-    `, schemaName, tableName)
+    `
 
-	var rows, err = db.conn.QueryContext(ctx, query)
+	var rows, err = db.conn.QueryContext(ctx, query, schemaName, tableName)
 	if err != nil {
 		return fmt.Errorf("querying rowid range: %w", err)
 	}
