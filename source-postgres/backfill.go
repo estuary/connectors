@@ -10,6 +10,7 @@ import (
 
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
@@ -359,9 +360,9 @@ func (db *postgresDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schema
 
 	// Include xmin when using XID filtering
 	if xidFiltered {
-		fmt.Fprintf(query, `SELECT xmin::text AS xmin, * FROM "%s"."%s"`, schemaName, tableName)
+		fmt.Fprintf(query, `SELECT xmin::text AS xmin, * FROM %s`, pgx.Identifier{schemaName, tableName}.Sanitize())
 	} else {
-		fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
+		fmt.Fprintf(query, `SELECT * FROM %s`, pgx.Identifier{schemaName, tableName}.Sanitize())
 	}
 
 	fmt.Fprintf(query, ` WHERE %s`, strings.Join(whereClauses, " AND "))
@@ -401,9 +402,9 @@ func (db *postgresDatabase) buildScanQuery(start, isPrecise bool, keyColumns []s
 	// Construct the query itself
 	var query = new(strings.Builder)
 	if xidFiltered {
-		fmt.Fprintf(query, `SELECT xmin::text AS xmin, * FROM "%s"."%s"`, schemaName, tableName)
+		fmt.Fprintf(query, `SELECT xmin::text AS xmin, * FROM %s`, pgx.Identifier{schemaName, tableName}.Sanitize())
 	} else {
-		fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
+		fmt.Fprintf(query, `SELECT * FROM %s`, pgx.Identifier{schemaName, tableName}.Sanitize())
 	}
 
 	if len(whereClauses) > 0 {

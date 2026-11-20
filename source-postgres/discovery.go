@@ -984,7 +984,7 @@ func getColumnDescriptions(ctx context.Context, conn *pgxpool.Pool, requested []
 			    isc.table_schema,
 				isc.table_name,
 				isc.column_name,
-				pg_catalog.col_description(format('"%%s"."%%s"',isc.table_schema,isc.table_name)::regclass::oid,isc.ordinal_position) description
+				pg_catalog.col_description(format('%%I.%%I',isc.table_schema,isc.table_name)::regclass::oid,isc.ordinal_position) description
 			FROM information_schema.columns isc
 			WHERE (isc.table_schema, isc.table_name) IN (%s)
 		) as descriptions WHERE description != '';

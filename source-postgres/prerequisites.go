@@ -238,7 +238,7 @@ func (db *postgresDatabase) SetupTablePrerequisites(ctx context.Context, tables 
 }
 
 func (db *postgresDatabase) setupTablePrerequisite(ctx context.Context, schema, table string) error {
-	var rows, err = db.conn.Query(ctx, fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 0;`, schema, table))
+	var rows, err = db.conn.Query(ctx, fmt.Sprintf(`SELECT * FROM %s LIMIT 0;`, pgx.Identifier{schema, table}.Sanitize()))
 	rows.Close()
 	if err != nil {
 		var streamID = sqlcapture.JoinStreamID(schema, table)
@@ -268,7 +268,7 @@ func (db *postgresDatabase) addTableToPublication(ctx context.Context, schema st
 
 	// Otherwise add the table to the publication
 	logEntry.Info("attempting to add table to publication")
-	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`ALTER PUBLICATION "%s" ADD TABLE "%s"."%s";`, pubName, schema, table)); err != nil {
+	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`ALTER PUBLICATION %s ADD TABLE %s;`, pgx.Identifier{pubName}.Sanitize(), pgx.Identifier{schema, table}.Sanitize())); err != nil {
 		return fmt.Errorf("table %q is not in publication %s and couldn't be added automatically", streamID, pubName)
 	}
 	db.tablesPublished[streamID] = true // Probably unnecessary but good hygiene
