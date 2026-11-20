@@ -707,10 +707,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if t.cfg.HardDelete && it.Delete {
-			if it.Exists {
-				for i := range b.target.Keys {
-					batch.deletes[i] = append(batch.deletes[i], converted[i])
-				}
+			// Next has skipped the deletions of rows that don't exist.
+			for i := range b.target.Keys {
+				batch.deletes[i] = append(batch.deletes[i], converted[i])
 			}
 		} else {
 			var dst, order = batch.inserts, b.order
