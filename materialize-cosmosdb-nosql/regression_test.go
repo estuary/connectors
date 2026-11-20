@@ -39,6 +39,78 @@ func itemErrorResponse(req *http.Request, status int) *http.Response {
 	}
 }
 
+// Nullable string keys with defaults must remain distinct from "null" through
+// upserts, loads and hard deletes, both for /id and for compound keys.
+func TestNullKeyTransactions(t *testing.T) {
+	for _, delta := range []bool{false, true} {
+		t.Run(fmt.Sprintf("delta=%t", delta), func(t *testing.T) {
+			f, d := newCosmosFixture()
+			cfg := testConfig()
+			cfg.HardDelete = true
+			spec := testMaterialization(t, cfg, delta)
+			for _, b := range spec.Bindings {
+				p := b.Collection.GetProjection(b.FieldSelection.Keys[0])
+				p.Inference.Types = []string{"null", "string"}
+				p.Inference.DefaultJson = json.RawMessage(`"unknown"`)
+			}
+			_, err := d.Validate(context.Background(), validateRequest(spec))
+			require.NoError(t, err)
+			applySpec(t, d, spec)
+
+			rows := []struct {
+				binding uint32
+				key     tuple.Tuple
+				doc     string
+				itemKey string
+				stored  string
+			}{
+				{0, tuple.Tuple{nil}, `{"id":null,"who":"null-key"}`, `["~N"]:~N`, `{"id":"~N","_flow_id":null,"who":"null-key"}`},
+				{0, tuple.Tuple{"null"}, `{"id":"null","who":"string-key"}`, `["null"]:null`, `{"id":"null","_flow_id":"null","who":"string-key"}`},
+				{1, tuple.Tuple{nil, int64(7)}, `{"region":null,"seq":7,"who":"null-key"}`, `[7]:~N:7`, `{"id":"~N:7","region":null,"seq":7,"who":"null-key"}`},
+				{1, tuple.Tuple{"null", int64(7)}, `{"region":"null","seq":7,"who":"string-key"}`, `[7]:null:7`, `{"id":"null:7","region":"null","seq":7,"who":"string-key"}`},
+			}
+			for _, deleted := range []int{0, 1} {
+				stream := &transactionStream{requests: []pm.Request{ack(), flush()}}
+				for _, row := range rows {
+					stream.requests = append(stream.requests, storeRequestFor(row.binding, row.key, row.doc))
+				}
+				stream.requests = append(stream.requests, startCommit(), ack())
+				runTransactions(t, d, spec, stream)
+				for _, container := range []string{"orders", "events"} {
+					require.Len(t, f.containers[container].items, 2)
+				}
+				for _, row := range rows {
+					container := spec.Bindings[row.binding].ResourcePath[1]
+					require.JSONEq(t, row.stored, string(f.containers[container].items[row.itemKey]))
+					if !delta {
+						stream = &transactionStream{requests: []pm.Request{
+							ack(), loadRequestFor(row.binding, row.key), flush(), startCommit(), ack(),
+						}}
+						runTransactions(t, d, spec, stream)
+						require.Equal(t, []string{row.doc}, loadedDocs(stream.responses))
+					}
+				}
+
+				stream = &transactionStream{requests: []pm.Request{ack(), flush()}}
+				for _, i := range []int{deleted, deleted + 2} {
+					row := rows[i]
+					req := storeRequestFor(row.binding, row.key, row.doc)
+					req.Store.Delete = true
+					stream.requests = append(stream.requests, req)
+				}
+				stream.requests = append(stream.requests, startCommit(), ack())
+				runTransactions(t, d, spec, stream)
+				for _, i := range []int{1 - deleted, 3 - deleted} {
+					row := rows[i]
+					container := spec.Bindings[row.binding].ResourcePath[1]
+					require.Len(t, f.containers[container].items, 1)
+					require.JSONEq(t, row.stored, string(f.containers[container].items[row.itemKey]))
+				}
+			}
+		})
+	}
+}
+
 func TestItemNotFoundSubstatus(t *testing.T) {
 	for _, method := range []string{http.MethodGet, http.MethodDelete} {
 		for _, substatus := range []string{"", "0", "1002"} {

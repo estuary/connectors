@@ -34,8 +34,9 @@ document.
 
 Cosmos DB requires a string `id`. The connector derives it from the collection's
 key values, in key order, joined with `:`. Integers and booleans use their JSON
-representation. String values keep their text, except that each byte of these
-characters is written as `~` followed by two uppercase hex digits:
+representation. Null uses `~N`, which cannot be produced by a string value.
+String values keep their text, except that each UTF-8 byte of these characters
+is written as `~` followed by two uppercase hex digits:
 
 | Character | Encoding |
 | --------- | -------- |
@@ -46,7 +47,7 @@ characters is written as `~` followed by two uppercase hex digits:
 | `\` | `~5C` |
 | `?` | `~3F` |
 | `#` | `~23` |
-| Control characters | for example `~0A` for a newline |
+| Control characters | for example `~0A` for a newline or `~C2~81` for U+0081 |
 | Trailing whitespace | for example `~20` for a space |
 | A value of exactly `.` or `..` | `~2E` or `~2E~2E` |
 | A single key that is the empty string | `~` |

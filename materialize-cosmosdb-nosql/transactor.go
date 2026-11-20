@@ -282,12 +282,13 @@ func escapeKeyString(s string) string {
 	}
 	trailing := len(strings.TrimRightFunc(s, unicode.IsSpace))
 	var out strings.Builder
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if i >= trailing || c < 0x20 || c == 0x7f || strings.IndexByte(`~%:/\?#`, c) >= 0 {
-			fmt.Fprintf(&out, "~%02X", c)
+	for i, r := range s {
+		if i >= trailing || unicode.IsControl(r) || strings.ContainsRune(`~%:/\?#`, r) {
+			for _, c := range []byte(string(r)) {
+				fmt.Fprintf(&out, "~%02X", c)
+			}
 		} else {
-			out.WriteByte(c)
+			out.WriteRune(r)
 		}
 	}
 	return out.String()
@@ -299,7 +300,11 @@ func encodeKey(key tuple.Tuple) (string, error) {
 		switch v := value.(type) {
 		case string:
 			parts[i] = escapeKeyString(v)
-		case nil, bool, int, int64, uint64, float32, float64:
+		case nil:
+			// Escaped strings always follow `~` with two hex digits, so they
+			// cannot produce this sentinel.
+			parts[i] = "~N"
+		case bool, int, int64, uint64, float32, float64:
 			encoded, err := json.Marshal(v)
 			if err != nil {
 				return "", fmt.Errorf("encoding key: %w", err)
