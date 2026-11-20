@@ -123,7 +123,7 @@ func (t *Table) PublishedAtColumn() (*Column, error) {
 			continue
 		}
 		if col.UserDefinedDDL {
-			reason = fmt.Errorf("field %s has a user-defined DDL type", col.Field)
+			reason = fmt.Errorf("field %q has a user-defined DDL type", col.Field)
 			continue
 		}
 		var err = boilerplate.PublishedAtMismatch(&col.Projection.Projection)

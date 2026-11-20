@@ -786,7 +786,7 @@ func findPublishedAtField(ps []boilerplate.MappedProjection[property]) (string, 
 			continue
 		}
 		if p.Mapped.Type != elasticTypeDate {
-			reason = fmt.Errorf("field %s is mapped as type %q, where a %q mapping is required", p.Field, p.Mapped.Type, elasticTypeDate)
+			reason = fmt.Errorf("field %q is mapped as type %q, where a %q mapping is required", p.Field, p.Mapped.Type, elasticTypeDate)
 			continue
 		}
 		return translateField(p.Field), nil

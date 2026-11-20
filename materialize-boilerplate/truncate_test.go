@@ -19,17 +19,17 @@ func TestPublishedAtMismatch(t *testing.T) {
 		},
 		{
 			name:    "not a string",
-			wantErr: "field flow_published_at projects /_meta/uuid without a string type, where a date-time with uuid encoding is required",
+			wantErr: `field "flow_published_at" projects /_meta/uuid without a string type, where a date-time with uuid encoding is required`,
 		},
 		{
 			name:    "unexpected format",
 			str:     &pf.Inference_String{Format: "uuid"},
-			wantErr: `field flow_published_at projects /_meta/uuid with the unexpected format "uuid" and content encoding "", where a date-time with uuid encoding is required`,
+			wantErr: `field "flow_published_at" projects /_meta/uuid with the unexpected format "uuid" and content encoding "", where a date-time with uuid encoding is required`,
 		},
 		{
 			name:    "unexpected content encoding",
 			str:     &pf.Inference_String{Format: "date-time"},
-			wantErr: `field flow_published_at projects /_meta/uuid with the unexpected format "date-time" and content encoding "", where a date-time with uuid encoding is required`,
+			wantErr: `field "flow_published_at" projects /_meta/uuid with the unexpected format "date-time" and content encoding "", where a date-time with uuid encoding is required`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
