@@ -101,10 +101,9 @@ materializations:
 Oracle serves TLS (TCPS) and plain TCP on separate listener ports, commonly
 `2484` and `1521`, so choose the SSL Mode that matches the port in the address.
 `verify-full` checks the server's certificate against public certificate
-authorities and the host of the address, also through an SSH tunnel. Use
-`disable` only through an SSH tunnel or with Oracle native network encryption
-configured on the server, which the connector accepts when the server requests
-it.
+authorities and the host of the address, also through an SSH tunnel. `disable`
+connects over plain TCP. The session is then encrypted only if the server
+requests Oracle native network encryption, which the connector accepts.
 
 ### Changing the schema
 

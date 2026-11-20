@@ -72,7 +72,7 @@
           "disable"
         ],
         "title": "SSL Mode",
-        "description": "How to secure the connection. 'verify-full' connects over TLS (TCPS) and verifies the server certificate and host name. 'require' connects over TLS without verifying them. 'disable' connects over plain TCP and relies on an SSH tunnel or Oracle native network encryption for security.",
+        "description": "How to secure the connection. 'verify-full' connects over TLS (TCPS) and verifies the server certificate and host name. 'require' connects over TLS without verifying them. 'disable' connects over plain TCP.",
         "default": "verify-full",
         "nonsensitive": true,
         "order": 5
