@@ -16,18 +16,25 @@ type smbSigningConn struct {
 	buffer  []byte
 	pending []byte
 	err     error
+
+	mu sync.Mutex
 	// Set only by responses to requests the client sent, which go-smb2 accepts.
 	encryption    bool
 	authenticated bool
 
-	mu       sync.Mutex
-	requests map[uint64]uint16 // Unanswered NEGOTIATE and SESSION_SETUP requests by MessageId.
-	written  []byte            // Start of the outgoing direct-TCP frame.
-	skip     int               // Remaining bytes of the outgoing frame.
+	sessionEnabled bool
+	requests       map[uint64]uint16 // Unanswered NEGOTIATE and SESSION_SETUP requests by MessageId.
+	written        []byte            // Start of the outgoing direct-TCP frame.
+	skip           int               // Remaining bytes of the outgoing frame.
 }
 
 func (c *smbSigningConn) Write(p []byte) (int, error) {
 	c.mu.Lock()
+	if c.authenticated && len(p) != 0 {
+		// go-smb2 enables its session before DialContext returns, so a later
+		// request (TREE_CONNECT) proves its receiver can handle encrypted frames.
+		c.sessionEnabled = true
+	}
 	c.recordRequests(p)
 	c.mu.Unlock()
 	return c.Conn.Write(p)
@@ -70,10 +77,8 @@ func (c *smbSigningConn) headerSize() int {
 
 // answers reports whether a response matches an unanswered request for the same
 // command. go-smb2 drops responses with unknown MessageIds and forgets answered
-// ones, but keeps a request after an interim response.
+// ones, but keeps a request after an interim response. The caller holds c.mu.
 func (c *smbSigningConn) answers(command uint16, messageID uint64, interim bool) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	var requested, ok = c.requests[messageID]
 	if !interim {
 		delete(c.requests, messageID)
@@ -167,7 +172,9 @@ func (c *smbSigningConn) passInterimResponses() {
 }
 
 func (c *smbSigningConn) checkSmbSessionFlags(packet []byte) error {
-	if len(packet) >= 4 && string(packet[:4]) == "\xfdSMB" && c.authenticated && c.encryption {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(packet) > 52 && string(packet[:4]) == "\xfdSMB" && c.sessionEnabled && c.encryption {
 		// Encrypted SMB3 frames are authenticated and decoded by go-smb2, which has
 		// a decryption key only once an authenticated session negotiated encryption.
 		return nil

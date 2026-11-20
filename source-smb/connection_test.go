@@ -180,6 +180,92 @@ func TestConnectionRejectsUnsignedSessions(t *testing.T) {
 	}
 }
 
+func TestConnectionRejectsEarlyEncryptedFrames(t *testing.T) {
+	// Guard against a panic in go-smb2's receiver when a transform follows the
+	// final SESSION_SETUP response before the setup goroutine enables decryption.
+	for _, tt := range []struct {
+		name string
+		size int
+	}{
+		{"short", 4},
+		{"transform header", 52},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			client, server := net.Pipe()
+			defer client.Close()
+			defer server.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			var result = make(chan error, 1)
+			go func() {
+				var dialer = newSmbDialer(config{Username: "test", Password: "test"})
+				session, err := dialer.DialContext(ctx, &smbSigningConn{Conn: client})
+				if err == nil {
+					_, err = session.WithContext(ctx).Mount(`\\smb.example\data`)
+				}
+				result <- err
+			}()
+			require.NoError(t, server.SetDeadline(time.Now().Add(5*time.Second)))
+
+			request, err := readSmbPacket(server)
+			require.NoError(t, err)
+			require.Equal(t, uint16(0), binary.LittleEndian.Uint16(request[12:]))
+			var negotiate = make([]byte, 64)
+			binary.LittleEndian.PutUint16(negotiate, 65)
+			binary.LittleEndian.PutUint16(negotiate[2:], 1) // Signing enabled.
+			binary.LittleEndian.PutUint16(negotiate[4:], 0x302)
+			for _, offset := range []int{28, 32, 36} {
+				binary.LittleEndian.PutUint32(negotiate[offset:], 65536)
+			}
+			writeSmbPacket(t, server, smbResponse(request, 0, negotiate))
+
+			request, err = readSmbPacket(server)
+			require.NoError(t, err)
+			require.Equal(t, uint16(1), binary.LittleEndian.Uint16(request[12:]))
+			var challenge = make([]byte, 52)
+			copy(challenge, "NTLMSSP\x00")
+			binary.LittleEndian.PutUint32(challenge[8:], 2)
+			binary.LittleEndian.PutUint32(challenge[20:], 0x00888215)
+			copy(challenge[24:], "12345678")
+			binary.LittleEndian.PutUint16(challenge[40:], 4)
+			binary.LittleEndian.PutUint16(challenge[42:], 4)
+			binary.LittleEndian.PutUint32(challenge[44:], 48) // Empty target-info list.
+			token, err := asn1.MarshalWithParams(struct {
+				State     asn1.Enumerated       `asn1:"explicit,tag:0"`
+				Mechanism asn1.ObjectIdentifier `asn1:"explicit,tag:1"`
+				Token     []byte                `asn1:"explicit,tag:2"`
+			}{1, asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 2, 2, 10}, challenge}, "explicit,tag:1")
+			require.NoError(t, err)
+			var setup = make([]byte, 8+len(token))
+			binary.LittleEndian.PutUint16(setup, 9)
+			binary.LittleEndian.PutUint16(setup[4:], 72)
+			binary.LittleEndian.PutUint16(setup[6:], uint16(len(token)))
+			copy(setup[8:], token)
+			writeSmbPacket(t, server, smbResponse(request, 0xc0000016, setup))
+
+			request, err = readSmbPacket(server)
+			require.NoError(t, err)
+			require.Equal(t, uint16(1), binary.LittleEndian.Uint16(request[12:]))
+			setup = make([]byte, 8)
+			binary.LittleEndian.PutUint16(setup, 9)
+			var transform = make([]byte, 52)
+			copy(transform, "\xfdSMB")
+			binary.LittleEndian.PutUint32(transform[20:], 0x10000) // Nonce, not NextCommand.
+			binary.LittleEndian.PutUint16(transform[42:], 1)       // Encrypted.
+			binary.LittleEndian.PutUint64(transform[44:], 1)
+			_, err = server.Write(append(smbFrame(smbResponse(request, 0, setup)), smbFrame(transform[:tt.size])...))
+			require.NoError(t, err)
+			require.NoError(t, server.Close())
+			select {
+			case err := <-result:
+				require.ErrorContains(t, err, "connection error:")
+			case <-ctx.Done():
+				t.Fatal(ctx.Err())
+			}
+		})
+	}
+}
+
 func TestConnectionAcceptsUnsignedInterimResponse(t *testing.T) {
 	client, server := net.Pipe()
 	defer client.Close()
@@ -496,7 +582,20 @@ func TestSigningConnFraming(t *testing.T) {
 					require.NoError(t, err)
 					requests = requests[n:]
 				}
+				var prefix []byte
+				if tt.wantErr == "" {
+					for !conn.authenticated {
+						packet, err := readSmbPacket(conn)
+						require.NoError(t, err)
+						prefix = append(prefix, smbFrame(packet)...)
+					}
+					// A client request after SESSION_SETUP enables encrypted replies.
+					var treeRequest = append([]byte(nil), request...)
+					binary.LittleEndian.PutUint16(treeRequest[12:], 3)
+					writeSmbPacket(t, conn, treeRequest)
+				}
 				data, err := io.ReadAll(iotest.OneByteReader(conn))
+				data = append(prefix, data...)
 				if tt.wantErr == "" {
 					require.NoError(t, err)
 					require.Equal(t, tt.wire, data)
@@ -558,6 +657,77 @@ func TestSigningConnResponseBeforeRequest(t *testing.T) {
 			}
 			require.ErrorContains(t, err, "unexpected SMB2 response")
 			writer.Close()
+		})
+	}
+}
+
+func TestSigningConnEncryptedFrames(t *testing.T) {
+	// Guard the gap between the final SESSION_SETUP response and go-smb2 enabling
+	// decryption, including a full transform header whose nonce looks like NextCommand.
+	var request = make([]byte, 64)
+	copy(request, "\xfeSMB")
+	var negotiateRequest = append([]byte(nil), request...)
+	var body = make([]byte, 64)
+	binary.LittleEndian.PutUint16(body, 65)
+	binary.LittleEndian.PutUint16(body[4:], 0x302)
+	var negotiate = smbResponse(request, 0, body)
+	binary.LittleEndian.PutUint16(request[12:], 1)
+	binary.LittleEndian.PutUint64(request[24:], 1)
+	var setupRequest = append([]byte(nil), request...)
+	body = make([]byte, 8)
+	binary.LittleEndian.PutUint16(body, 9)
+	var setup = smbResponse(request, 0, body)
+	binary.LittleEndian.PutUint16(request[12:], 3) // TREE_CONNECT
+	binary.LittleEndian.PutUint64(request[24:], 2)
+
+	for _, tt := range []struct {
+		name    string
+		size    int
+		write   bool
+		wantErr bool
+	}{
+		{"short before request", 4, false, true},
+		{"transform before request", 52, false, true},
+		{"short after request", 4, true, true},
+		{"truncated after request", 51, true, true},
+		{"transform after request", 52, true, true},
+		{"one-byte encrypted payload after request", 53, true, false},
+		{"encrypted payload after request", 68, true, false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var transform = make([]byte, 68)
+			copy(transform, "\xfdSMB")
+			binary.LittleEndian.PutUint32(transform[20:], 0x10000)
+			binary.LittleEndian.PutUint16(transform[42:], 1) // Encrypted.
+			binary.LittleEndian.PutUint64(transform[44:], 1)
+			transform = transform[:tt.size]
+			var wire = append(smbFrame(negotiate), smbFrame(setup)...)
+			wire = append(wire, smbFrame(transform)...)
+			for _, fragmented := range []bool{false, true} {
+				var reader io.Reader = bytes.NewReader(wire)
+				if fragmented {
+					reader = iotest.OneByteReader(reader)
+				}
+				var conn = &smbSigningConn{Conn: &smbReadConn{reader: reader}}
+				writeSmbPacket(t, conn, negotiateRequest)
+				writeSmbPacket(t, conn, setupRequest)
+				for _, expected := range [][]byte{negotiate, setup} {
+					packet, err := readSmbPacket(conn)
+					require.NoError(t, err)
+					require.Equal(t, expected, packet)
+				}
+				if tt.write {
+					writeSmbPacket(t, conn, request)
+				}
+				packet, err := readSmbPacket(conn)
+				if tt.wantErr {
+					require.ErrorContains(t, err, "invalid SMB2 response header")
+					require.Empty(t, packet, "must not deliver a rejected transform")
+				} else {
+					require.NoError(t, err)
+					require.Equal(t, transform, packet)
+				}
+			}
 		})
 	}
 }
