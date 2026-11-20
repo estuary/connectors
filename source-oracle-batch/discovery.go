@@ -217,12 +217,17 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 	fmt.Fprintf(query, " AND owner NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'RDSADMIN', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS', 'GGS_ADMIN', 'GSMADMIN_INTERNAL')")
 	fmt.Fprintf(query, " AND table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')")
 
+	var args []any
 	if len(discoverSchemas) > 0 {
-		var schemasComma = strings.Join(discoverSchemas, "','")
-		fmt.Fprintf(query, " AND owner IN ('%s')", schemasComma)
+		var placeholders = make([]string, len(discoverSchemas))
+		for i, schema := range discoverSchemas {
+			placeholders[i] = fmt.Sprintf(":%d", i+1)
+			args = append(args, schema)
+		}
+		fmt.Fprintf(query, " AND owner IN (%s)", strings.Join(placeholders, ", "))
 	}
 
-	rows, err := db.QueryContext(ctx, query.String())
+	rows, err := db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
 	}
