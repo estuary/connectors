@@ -1,5 +1,10 @@
 # source-sqlserver-ct
 
+## 2026-11-19
+
+### Fixed
+- Backfill queries now escape `]` in schema and table names, so a table whose name contains `]` can be backfilled.
+
 ## 2026-10-30
 
 ### Changed
