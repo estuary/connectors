@@ -281,22 +281,39 @@ func TestAsyncCapture(t *testing.T) {
 	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
 
 	t.Run("Capture", func(t *testing.T) {
-		// Spawn a worker thread which will insert 250 rows of data over the course of 25 seconds.
+		// Spawn a worker thread which will insert 250 rows of data in parallel with the
+		// capture. It reports its outcome over a channel.
+		var insertResult = make(chan error, 1)
 		go func() {
 			for i := 0; i < 250; i++ {
 				time.Sleep(100 * time.Millisecond)
-				control.Execute(fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName), i, fmt.Sprintf("Value for row %d", i))
+				var query = fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName)
+				if _, err := control.Execute(query, i, fmt.Sprintf("Value for row %d", i)); err != nil {
+					insertResult <- fmt.Errorf("inserting row %d: %w", i, err)
+					return
+				}
 				log.WithField("i", i).Debug("inserted row")
 			}
+			time.Sleep(1 * time.Second)
+			insertResult <- nil
 		}()
 
-		// Perform six captures each running for 5 seconds, then verify that
-		// the resulting data is correct.
-		for i := 0; i < 6; i++ {
+		// Run the capture over and over for 5 seconds each time until all inserts have finished, then verify results.
+		var insertErr error
+		var insertsDone bool
+		for !insertsDone {
 			var captureCtx, cancelCapture = context.WithCancel(ctx)
 			time.AfterFunc(5*time.Second, cancelCapture)
 			cs.Capture(captureCtx, t, nil)
+
+			select {
+			case insertErr = <-insertResult:
+				insertsDone = true
+			default:
+			}
 		}
+		// Fail fast if the inserting goroutine reports an error.
+		require.NoError(t, insertErr)
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
