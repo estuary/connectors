@@ -253,7 +253,7 @@ func (db *mysqlDatabase) buildScanQuery(info *sqlcapture.DiscoveryInfo, start, i
 	// Construct lists of key specifiers and placeholders. They will be joined with commas and used in the query itself.
 	var pkey []string
 	for _, colName := range keyColumns {
-		var quotedName = quoteColumnName(colName)
+		var quotedName = quoteIdentifier(colName)
 		// If a precise backfill is requested *and* the column type requires binary ordering for precise
 		// backfill comparisons to work, add the 'BINARY' qualifier to the column name.
 		if colType, ok := columnTypes[colName].(string); ok && isPrecise && columnBinaryKeyComparison[colType] {
@@ -297,7 +297,7 @@ func (db *mysqlDatabase) buildScanQuery(info *sqlcapture.DiscoveryInfo, start, i
 	return query.String()
 }
 
-func quoteColumnName(name string) string {
+func quoteIdentifier(name string) string {
 	// Per https://dev.mysql.com/doc/refman/8.0/en/identifiers.html, the identifier quote character
 	// is the backtick (`). If the identifier itself contains a backtick, it must be doubled.
 	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
