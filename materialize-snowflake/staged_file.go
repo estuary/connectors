@@ -85,6 +85,9 @@ type stagedFile struct {
 	// temporary directory to store local files
 	tempdir string
 
+	// Leads the name of every stage directory of this stagedFile.
+	prefix string
+
 	// Bounds in-flight PUTs across every stagedFile of the transactor.
 	uploads *semaphore.Weighted
 
@@ -152,7 +155,7 @@ func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 		return nil
 	}
 	f.started = true
-	f.uuid = uuid.NewString()
+	f.uuid = f.prefix + uuid.NewString()
 	f.dir = filepath.Join(f.tempdir, f.uuid)
 	f.uploaded = nil
 

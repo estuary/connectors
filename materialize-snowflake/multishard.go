@@ -10,17 +10,17 @@ import (
 )
 
 // requireMultiShardCapable refuses a shard of a multi-shard task when any
-// binding writes through a path other than snowpipe_streaming_v2, because only
-// that path keeps its state per shard. A shard is one of several when its range
-// spans less than the full key or r-clock space.
+// binding writes through snowpipe_streaming or a Snowpipe pipe, because only
+// staged files and snowpipe_streaming_v2 keep their state per shard. A shard
+// is one of several when its range spans less than the full key space.
 func requireMultiShardCapable(r *pf.RangeSpec, bindings []*binding) error {
-	if r.KeyBegin == 0 && r.KeyEnd == math.MaxUint32 && r.RClockBegin == 0 && r.RClockEnd == math.MaxUint32 {
+	if r.KeyBegin == 0 && r.KeyEnd == math.MaxUint32 {
 		return nil
 	}
 
 	var tables []string
 	for _, b := range bindings {
-		if !b.streamingV2 {
+		if b.streaming || b.pipeName != "" {
 			tables = append(tables, b.target.Identifier)
 		}
 	}
@@ -28,8 +28,8 @@ func requireMultiShardCapable(r *pf.RangeSpec, bindings []*binding) error {
 		return nil
 	}
 
-	var err = fmt.Errorf("bindings %s do not write through %s, which is the only write path that supports more than one shard", strings.Join(tables, ", "), flagSnowpipeStreamingV2)
+	var err = fmt.Errorf("bindings %s write through Snowpipe or Snowpipe Streaming v1, which support only one shard", strings.Join(tables, ", "))
 	return cerrors.NewUserError(err, fmt.Sprintf(
-		"This task runs on more than one shard, but its bindings for tables %s do not write through Snowpipe Streaming v2, which is the only write path that supports more than one shard. Run the task on one shard, or make every binding a delta updates binding with JWT authentication and the %q and %q feature flags enabled.",
+		"This task runs on more than one shard, but its delta updates bindings for tables %s write through Snowpipe or Snowpipe Streaming v1, which support only one shard. Run the task on one shard, disable delta updates on those bindings, or use JWT authentication with the %q and %q feature flags enabled.",
 		strings.Join(tables, ", "), flagSnowpipeStreaming, flagSnowpipeStreamingV2))
 }

@@ -86,7 +86,7 @@ func TestIntegration(t *testing.T) {
 
 	actionDescSanitizers := []func(string) string{
 		func(s string) string {
-			return regexp.MustCompile(`@flow_v1/[a-fA-F0-9\-]{36}`).ReplaceAllString(s, `<uuid>`)
+			return regexp.MustCompile(`@flow_v1/(?:\w+-)?[a-fA-F0-9\-]{36}`).ReplaceAllString(s, `<uuid>`)
 		},
 		func(s string) string {
 			return regexp.MustCompile(`"Path":\s*"[^"]*"`).ReplaceAllString(s, `"Path": "<uuid>"`)
@@ -146,6 +146,13 @@ func TestIntegration(t *testing.T) {
 		// the exact bindings still fail the suite.
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers,
 			sql.RuntimeConfig{Shards: 1, Fidelity: m.FidelityNone})
+	})
+
+	t.Run("materialize-sharded", func(t *testing.T) {
+		// Every binding of the fixture stages files, which the primary shard
+		// applies on behalf of both shards.
+		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize-sharded.flow.yaml", makeResourceFn, actionDescSanitizers,
+			sql.RuntimeConfig{Shards: 2, Fidelity: m.FidelityExact})
 	})
 
 	t.Run("materialize-no-flow-document", func(t *testing.T) {
