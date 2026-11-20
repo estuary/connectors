@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/estuary/connectors/go/capture/sqlserver/backfill"
 	"github.com/estuary/connectors/go/capture/sqlserver/change"
 	"github.com/estuary/connectors/go/capture/sqlserver/datatypes"
 	"github.com/estuary/connectors/go/encrow"
@@ -1078,7 +1079,7 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 	//	"toLSN":    info.ToLSN,
 	//}).Trace("polling stream")
 
-	var query = fmt.Sprintf(`SELECT * FROM cdc.fn_cdc_get_all_changes_%s(@p1, @p2, N'all');`, info.InstanceName)
+	var query = fmt.Sprintf(`SELECT * FROM cdc.%s(@p1, @p2, N'all');`, backfill.QuoteIdentifier("fn_cdc_get_all_changes_"+info.InstanceName))
 	rows, err := rs.conn.QueryContext(ctx, query, info.FromLSN, info.ToLSN)
 	if err != nil {
 		return fmt.Errorf("error requesting changes: %w", err)
@@ -1423,10 +1424,7 @@ func cdcInstanceMaxLSNsQuery(instanceNames []string) (string, []string) {
 
 	var subqueries []string
 	for idx, instanceName := range sorted {
-		// TODO(wgd): It would probably be a good idea to properly quote the CDC table name instead of just splatting
-		// the instance name into the query string. But currently we don't do that for backfills or for the actual
-		// replication polling query, so it would be premature to worry about it only here.
-		var subquery = fmt.Sprintf("SELECT %d AS idx, MAX(__$start_lsn) AS lsn FROM [cdc].[%s_CT]", idx, instanceName)
+		var subquery = fmt.Sprintf("SELECT %d AS idx, MAX(__$start_lsn) AS lsn FROM [cdc].%s", idx, backfill.QuoteIdentifier(instanceName+"_CT"))
 		subqueries = append(subqueries, subquery)
 	}
 	return strings.Join(subqueries, " UNION ALL "), sorted
