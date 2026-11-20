@@ -775,30 +775,24 @@ func (d *materialization) NewTransactor(
 // error explains why no field qualifies.
 func findPublishedAtField(ps []boilerplate.MappedProjection[property]) (string, error) {
 	var reason error
-	for _, p := range ps {
+	for i := range ps {
+		var p = &ps[i]
 		if p.Ptr != "/_meta/uuid" {
 			continue
 		}
-
-		s := p.Inference.String_
-		if s == nil {
-			if reason == nil {
-				reason = fmt.Errorf("field %q projects /_meta/uuid without a string type, where a date-time with uuid encoding is required", p.Field)
-			}
-		} else if s.Format != "date-time" || s.ContentEncoding != "uuid" {
-			if reason == nil {
-				reason = fmt.Errorf("field %q projects /_meta/uuid with the unexpected format %q and content encoding %q, where a date-time with uuid encoding is required", p.Field, s.Format, s.ContentEncoding)
-			}
-		} else if p.Mapped.Type != elasticTypeDate {
-			if reason == nil {
-				reason = fmt.Errorf("field %q is mapped as type %q, where a %q mapping is required", p.Field, p.Mapped.Type, elasticTypeDate)
-			}
-		} else {
-			return translateField(p.Field), nil
+		var err = boilerplate.PublishedAtMismatch(&p.Projection.Projection)
+		if err != nil {
+			reason = err
+			continue
 		}
+		if p.Mapped.Type != elasticTypeDate {
+			reason = fmt.Errorf("field %q is mapped as type %q, where a %q mapping is required", p.Field, p.Mapped.Type, elasticTypeDate)
+			continue
+		}
+		return translateField(p.Field), nil
 	}
 	if reason == nil {
-		reason = fmt.Errorf("the binding excludes the flow_published_at field, which must be included to enable deletion after a backfill")
+		reason = boilerplate.ErrPublishedAtExcluded
 	}
 	return "", reason
 }

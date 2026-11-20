@@ -39,17 +39,17 @@ func TestPublishedAtColumn(t *testing.T) {
 		{
 			name:    "user-defined DDL",
 			values:  []Column{column("flow_published_at", "/_meta/uuid", timestamp, true)},
-			wantErr: "field flow_published_at has a user-defined DDL type",
+			wantErr: `field "flow_published_at" has a user-defined DDL type`,
 		},
 		{
 			name:    "not a string",
 			values:  []Column{column("flow_published_at", "/_meta/uuid", nil, false)},
-			wantErr: "field flow_published_at projects /_meta/uuid without a string type, where a date-time with uuid encoding is required",
+			wantErr: `field "flow_published_at" projects /_meta/uuid without a string type, where a date-time with uuid encoding is required`,
 		},
 		{
 			name:    "unexpected format",
 			values:  []Column{column("flow_published_at", "/_meta/uuid", &pf.Inference_String{Format: "uuid"}, false)},
-			wantErr: `field flow_published_at projects /_meta/uuid with the unexpected format "uuid" and content encoding "", where a date-time with uuid encoding is required`,
+			wantErr: `field "flow_published_at" projects /_meta/uuid with the unexpected format "uuid" and content encoding "", where a date-time with uuid encoding is required`,
 		},
 		{
 			name:   "later qualifying column wins over earlier mismatch",
@@ -57,9 +57,9 @@ func TestPublishedAtColumn(t *testing.T) {
 			field:  "flow_published_at",
 		},
 		{
-			name:    "first mismatch is reported",
+			name:    "last mismatch is reported",
 			values:  []Column{column("custom", "/_meta/uuid", timestamp, true), column("flow_published_at", "/_meta/uuid", nil, false)},
-			wantErr: "field custom has a user-defined DDL type",
+			wantErr: `field "flow_published_at" projects /_meta/uuid without a string type, where a date-time with uuid encoding is required`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
