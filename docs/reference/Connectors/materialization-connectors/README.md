@@ -80,6 +80,7 @@ of Estuary's [Dekaf connectors](#dekaf-connectors).
 
 * [HubSpot](./hubspot.md)
 * [Slack](./slack.md)
+* [Twenty](./twenty.md)
 
 ### Dekaf connectors
 
