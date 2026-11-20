@@ -52,7 +52,7 @@ func preReqs(ctx context.Context, cfg config, _ map[string]bool) *cerrors.Prereq
 
 	var version string
 	if err := db.QueryRowContext(ctx,
-		"SELECT version_full FROM product_component_version WHERE product LIKE 'Oracle%' FETCH FIRST 1 ROWS ONLY",
+		"SELECT version_full FROM product_component_version",
 	).Scan(&version); err != nil {
 		errs.Err(fmt.Errorf("querying the database version: %w", err))
 	} else if major, err := strconv.Atoi(strings.Split(version, ".")[0]); err != nil {
