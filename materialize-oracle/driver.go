@@ -199,16 +199,18 @@ func (c config) openDB() *stdsql.DB {
 	return stdsql.OpenDB(sessionConnector{connector})
 }
 
-// tlsConfig is verify-full unless another SSL mode is set. It verifies the
-// server certificate against the configured host, not the address dialed,
-// which is localhost through an SSH tunnel. The driver sets ServerName to the
-// dialed address, so the check is our own.
+// tlsConfig is verify-full unless another SSL mode is set. The driver sets
+// ServerName to the address it dials, which is localhost through an SSH
+// tunnel, so there the check against the configured host is our own.
 func (c config) tlsConfig() *tls.Config {
 	switch c.SSLMode {
 	case sslDisable:
 		return nil
 	case sslRequire:
 		return &tls.Config{InsecureSkipVerify: true}
+	}
+	if !c.tunnelEnabled() {
+		return &tls.Config{}
 	}
 
 	var host = c.Address

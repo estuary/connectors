@@ -32,12 +32,30 @@ func TestTLSConfig(t *testing.T) {
 	require.Nil(t, config{SSLMode: sslDisable}.tlsConfig())
 	require.True(t, config{SSLMode: sslRequire}.tlsConfig().InsecureSkipVerify)
 	require.Nil(t, config{SSLMode: sslRequire}.tlsConfig().VerifyConnection)
-	// An unset SSL mode verifies like verify-full.
-	require.NotNil(t, config{Address: "example.com:2484"}.tlsConfig().VerifyConnection)
 
-	// The test server's certificate is self-signed for example.com, so it's
-	// rejected for its authority, and for a host name it doesn't cover.
-	var verify = config{SSLMode: sslVerifyFull, Address: "example.com:2484"}.tlsConfig().VerifyConnection
+	// An unset SSL mode verifies like verify-full, with the built-in check.
+	for _, mode := range []sslMode{"", sslVerifyFull} {
+		var direct = config{SSLMode: mode, Address: "example.com:2484"}.tlsConfig()
+		require.False(t, direct.InsecureSkipVerify)
+		require.Nil(t, direct.VerifyConnection)
+	}
+
+	// The driver applies that check: the test server's certificate isn't
+	// trusted.
+	var cfg = exampleConfig()
+	cfg.Address = server.Listener.Addr().String()
+	var db = cfg.openDB()
+	defer db.Close()
+	require.ErrorContains(t, db.PingContext(context.Background()), "certificate signed by unknown authority")
+
+	// Through a tunnel the check is our own. The test server's certificate is
+	// self-signed for example.com, so it's rejected for its authority.
+	var tunneled = config{
+		Address:       "example.com:2484",
+		NetworkTunnel: &tunnelConfig{SshForwarding: &sshForwarding{SshEndpoint: "ssh://user@bastion"}},
+	}.tlsConfig()
+	require.True(t, tunneled.InsecureSkipVerify)
+	var verify = tunneled.VerifyConnection
 	require.ErrorContains(t, verify(state), "certificate signed by unknown authority")
 	require.Error(t, verify(tls.ConnectionState{}))
 }
