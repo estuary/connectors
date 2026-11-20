@@ -2,8 +2,10 @@ package connector
 
 import (
 	"context"
+	stdsql "database/sql"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -68,6 +70,76 @@ func TestExistingTable(t *testing.T) {
 			defer transactor.Destroy()
 			require.Equal(t, !tc.wantError, opened.DisableLoadOptimization)
 			require.NotNil(t, opened.RuntimeCheckpoint)
+		})
+	}
+}
+
+func TestDeltaUpdatesTransition(t *testing.T) {
+	// Switching to append-only stores must remove the standard table's primary key.
+	for _, tc := range []struct {
+		name      string
+		lastDelta bool
+		nextDelta bool
+		backfill  uint32
+		wantError bool
+	}{
+		{name: "standard to delta requires backfill", nextDelta: true, wantError: true},
+		{name: "standard to delta with backfill", nextDelta: true, backfill: 1},
+		{name: "delta to standard with backfill", lastDelta: true, backfill: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			recording := new(recordingSQL)
+			db := stdsql.OpenDB(recording)
+			t.Cleanup(func() { require.NoError(t, db.Close()) })
+			c := &client{db: db, ep: &sql.Endpoint[config]{Dialect: testDialect}}
+			d := testDriver(t, &validationTestClient{
+				Client: c,
+				tables: map[string][]boilerplate.ExistingField{
+					"ORDERS": {
+						{Name: "ID", Type: "NUMBER(38)"},
+						{Name: "STATUS", Type: "CLOB", Nullable: true},
+						{Name: "FLOW_DOCUMENT", Type: "CLOB"},
+					},
+					"FLOW_CHECKPOINTS_V1": {},
+				},
+			})
+			last := testMaterialization(t, testConfig())
+			last.Bindings[0].DeltaUpdates = tc.lastDelta
+			var err error
+			last.Bindings[0].ResourceConfigJson, err = json.Marshal(tableConfig{Table: "orders", Delta: tc.lastDelta})
+			require.NoError(t, err)
+			next := testMaterialization(t, testConfig())
+			b := next.Bindings[0]
+			b.DeltaUpdates, b.Backfill = tc.nextDelta, tc.backfill
+			b.ResourceConfigJson, err = json.Marshal(tableConfig{Table: "orders", Delta: tc.nextDelta})
+			require.NoError(t, err)
+			_, err = d.Validate(t.Context(), &pm.Request_Validate{
+				Name: next.Name, ConfigJson: next.ConfigJson, ConnectorType: next.ConnectorType, LastMaterialization: last,
+				Bindings: []*pm.Request_Validate_Binding{{ResourceConfigJson: b.ResourceConfigJson, Collection: b.Collection, Backfill: b.Backfill}},
+			})
+			if tc.wantError {
+				require.ErrorContains(t, err, "changing delta_updates requires a backfill")
+				require.Empty(t, recording.queries())
+				return
+			}
+			require.NoError(t, err)
+			req := &pm.Request_Apply{Materialization: next, LastMaterialization: last, Version: "next", LastVersion: "previous"}
+			recreate, err := c.MustRecreateResource(req, last.Bindings[0], b)
+			require.NoError(t, err)
+			require.True(t, recreate)
+			_, err = d.Apply(t.Context(), req)
+			require.NoError(t, err)
+			queries := recording.queries()
+			require.Contains(t, queries, "DROP TABLE TEST.ORDERS")
+			require.NotContains(t, queries, "TRUNCATE TABLE TEST.ORDERS")
+			var created bool
+			for _, query := range queries {
+				if strings.HasPrefix(strings.TrimSpace(query), "CREATE TABLE TEST.ORDERS") {
+					created = true
+					require.Equal(t, !tc.nextDelta, strings.Contains(query, "PRIMARY KEY (ID)"))
+				}
+			}
+			require.True(t, created)
 		})
 	}
 }

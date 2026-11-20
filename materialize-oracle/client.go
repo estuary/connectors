@@ -183,7 +183,7 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 }
 
 func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
-	return !slices.Equal(lastBinding.FieldSelection.Keys, newBinding.FieldSelection.Keys), nil
+	return lastBinding.DeltaUpdates != newBinding.DeltaUpdates || !slices.Equal(lastBinding.FieldSelection.Keys, newBinding.FieldSelection.Keys), nil
 }
 
 func (c *client) checkpointsIdentifier() string {

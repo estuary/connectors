@@ -112,7 +112,12 @@ SMALL_TEXT, DBMS_LOB.GETLENGTH(LONG_TEXT) AS LONG_LENGTH, DETAILS, TAGS, "select
 				var actualText string
 				require.NoError(t, db.QueryRowContext(t.Context(), "SELECT LONG_TEXT FROM "+typesTable+" WHERE ID = 1").Scan(&actualText))
 				require.Equal(t, longText, actualText)
-				if !tc.noFlowDocument {
+				if tc.noFlowDocument {
+					// Optional metadata must carry the UUID needed by backfill-aware loads.
+					var metadata string
+					require.NoError(t, db.QueryRowContext(t.Context(), `SELECT "_meta" FROM `+dialect.Identifier(task.Path(t, "orders")...)+" WHERE ID = 2").Scan(&metadata))
+					require.NotEmpty(t, gjson.Get(metadata, "uuid").Str)
+				} else {
 					var document string
 					require.NoError(t, db.QueryRowContext(t.Context(), "SELECT FLOW_DOCUMENT FROM "+dialect.Identifier(task.Path(t, "orders")...)+" WHERE ID = 2").Scan(&document))
 					var decoded map[string]any
@@ -136,8 +141,11 @@ SMALL_TEXT, DBMS_LOB.GETLENGTH(LONG_TEXT) AS LONG_LENGTH, DETAILS, TAGS, "select
 				"FLOW_PUBLISHED_AT": "TIMESTAMP(9) WITH TIME ZONE",
 			}
 			if tc.noFlowDocument {
+				orderTypes["_meta"] = "CLOB"
 				orderTypes["_meta/op"] = "CLOB"
+				sampleTypes["_meta"] = "CLOB"
 				sampleTypes["_meta/op"] = "CLOB"
+				keyedTypes["_meta"] = "CLOB"
 				keyedTypes["_meta/op"] = "CLOB"
 			}
 			checkColumnTypes(t, db, dialect, task.Path(t, "orders"), orderTypes, !tc.noFlowDocument)

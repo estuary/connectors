@@ -21,6 +21,7 @@ import (
 	go_ora "github.com/sijms/go-ora/v2"
 	"github.com/sijms/go-ora/v2/network"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 	pb "go.gazette.dev/core/broker/protocol"
 	"go.gazette.dev/core/consumer/protocol"
 )
@@ -253,6 +254,45 @@ func TestStagingTables(t *testing.T) {
 	recording.calls = nil
 	transactor.Destroy()
 	require.NotContains(t, strings.Join(recording.queries(), "\n"), "DROP")
+}
+
+func TestLoadUUIDWithoutFlowDocument(t *testing.T) {
+	// Both reconstructed metadata and the required root-document fallback retain the UUID.
+	for _, document := range []bool{false, true} {
+		t.Run(fmt.Sprintf("document=%t", document), func(t *testing.T) {
+			transactor, recording := newStoreTest(t)
+			transactor.cfg.User = "test"
+			transactor.cfg.Advanced.NoFlowDocument = true
+			shape := transactor.bindings[0].target.TableShape
+			if !document {
+				shape.Document = nil
+				shape.Values = append(shape.Values, sql.Projection{Projection: pf.Projection{
+					Field: "metadata", Ptr: "/_meta", Inference: pf.Inference{Types: []string{"object"}, Exists: pf.Inference_MAY},
+				}})
+			}
+			target, err := sql.ResolveTable(shape, testDialect)
+			require.NoError(t, err)
+			require.NoError(t, transactor.addBinding(t.Context(), testDialect, testTemplates, "test/materialization", target, testInfoSchema()))
+			b := transactor.bindings[len(transactor.bindings)-1]
+			if document {
+				require.Contains(t, b.loadQuery, "SELECT r.FLOW_DOCUMENT FROM")
+				require.Empty(t, b.nullFieldsToStrip)
+			} else {
+				require.Contains(t, b.loadQuery, "'_meta' VALUE r.METADATA FORMAT JSON")
+			}
+			recording.rows = []string{`{"id":2,"status":"shipped","_meta":{"uuid":"849f4a66-be21-11f1-8001-000000000001"}}`}
+			txn, err := transactor.storeConn.BeginTx(t.Context(), nil)
+			require.NoError(t, err)
+			defer txn.Rollback()
+			var loaded []json.RawMessage
+			require.NoError(t, loadBinding(t.Context(), txn, 0, b, func(_ int, doc json.RawMessage) error {
+				loaded = append(loaded, doc)
+				return nil
+			}))
+			require.Len(t, loaded, 1)
+			require.Equal(t, "849f4a66-be21-11f1-8001-000000000001", gjson.GetBytes(loaded[0], "_meta.uuid").String())
+		})
+	}
 }
 
 func TestRestoreEmptyStrings(t *testing.T) {

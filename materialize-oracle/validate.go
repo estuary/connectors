@@ -35,6 +35,9 @@ func (d *oracleDriver) Validate(ctx context.Context, req *pm.Request_Validate) (
 		// must fit as well.
 		last := boilerplate.FindLastBinding(binding.ResourcePath, req.LastMaterialization)
 		exists := materializer.infoSchema.GetResource(binding.ResourcePath) != nil
+		if exists && last != nil && last.DeltaUpdates != binding.DeltaUpdates && last.Backfill == req.Bindings[idx].Backfill {
+			return nil, fmt.Errorf("binding %q: changing delta_updates requires a backfill to recreate the table", binding.ResourcePath)
+		}
 		if binding.DeltaUpdates || (exists && (last == nil || last.Backfill == req.Bindings[idx].Backfill)) {
 			continue
 		}
@@ -43,7 +46,7 @@ func (d *oracleDriver) Validate(ctx context.Context, req *pm.Request_Validate) (
 		}
 	}
 	if !endpointCfg.Advanced.NoFlowDocument {
-		return validated, forbidLongIdentifiers(req, validated)
+		return validated, forbidLongIdentifiers(req, validated, dialect, materializer.infoSchema)
 	}
 	for idx, binding := range validated.Bindings {
 		if binding.DeltaUpdates {
@@ -91,7 +94,53 @@ func (d *oracleDriver) Validate(ctx context.Context, req *pm.Request_Validate) (
 			}
 		}
 	}
-	return validated, forbidLongIdentifiers(req, validated)
+	if err := forbidLongIdentifiers(req, validated, dialect, materializer.infoSchema); err != nil {
+		return nil, err
+	}
+	for idx, binding := range validated.Bindings {
+		if !binding.DeltaUpdates {
+			if err := requireUUIDProjection(req.Bindings[idx].Collection, binding); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return validated, nil
+}
+
+func requireUUIDProjection(collection pf.CollectionSpec, binding *pm.Response_Validated_Binding) error {
+	var document, metadata *pm.Response_Validated_ProjectionConstraint
+	for _, pc := range binding.ProjectionConstraints {
+		p := collection.GetProjection(pc.Field)
+		if pc.Constraint.Type == pm.Response_Validated_Constraint_FIELD_FORBIDDEN || (!p.IsRootDocumentProjection() && p.Ptr != "/_meta") {
+			continue
+		} else if pc.Constraint.Type == pm.Response_Validated_Constraint_LOCATION_REQUIRED || pc.Constraint.Type == pm.Response_Validated_Constraint_FIELD_REQUIRED {
+			return nil
+		}
+		if p.Ptr == "/_meta" {
+			metadata = pc
+		} else if document == nil {
+			document = pc
+		}
+	}
+	required := metadata
+	reason := "Loads require /_meta to preserve the document UUID when the root document is excluded"
+	if required == nil {
+		required = document
+		reason = "Loads require the root document to preserve the UUID unless the collection projects /_meta"
+	}
+	if required == nil {
+		return fmt.Errorf("collection %s: standard updates require a projection of /_meta or the root document to preserve the UUID", collection.Name)
+	}
+	// Keep compatibility constraints intact while requiring the UUID carrier.
+	binding.ProjectionConstraints = append(binding.ProjectionConstraints, &pm.Response_Validated_ProjectionConstraint{
+		Field: required.Field,
+		Constraint: &pm.Response_Validated_Constraint{
+			Type:        pm.Response_Validated_Constraint_LOCATION_REQUIRED,
+			Reason:      reason,
+			FoldedField: required.Constraint.FoldedField,
+		},
+	})
+	return nil
 }
 
 func requireDeleteProjection(collection pf.CollectionSpec, binding *pm.Response_Validated_Binding) {
@@ -221,16 +270,38 @@ func invalidIdentifier(name string) string {
 }
 
 // forbidLongIdentifiers forbids fields whose column names Oracle cannot use:
-// names over its 128-byte identifier limit, which the shared validator counts
-// in characters, and names with a double quote or NUL, which Oracle
-// identifiers cannot contain even when quoted.
-func forbidLongIdentifiers(req *pm.Request_Validate, validated *pm.Response_Validated) error {
+// names over its byte limit (including room for migrations), uppercase ROWID,
+// and names with a double quote or NUL, even when quoted.
+func forbidLongIdentifiers(req *pm.Request_Validate, validated *pm.Response_Validated, dialect sql.Dialect, is *boilerplate.InfoSchema) error {
 	for idx, binding := range validated.Bindings {
 		collection := req.Bindings[idx].Collection
+		resource := is.GetResource(binding.ResourcePath)
 		required, allowed := make(map[string]bool), make(map[string]bool)
 		for _, pc := range binding.ProjectionConstraints {
-			ptr := collection.GetProjection(pc.Field).Ptr
+			p := collection.GetProjection(pc.Field)
+			ptr := p.Ptr
 			invalid := invalidIdentifier(pc.Field)
+			if invalid == "" && locateIdentifier(pc.Field) == "ROWID" {
+				invalid = "cannot be uppercase ROWID, even when quoted"
+			}
+			if invalid == "" && !p.IsPrimaryKey && len(locateIdentifier(pc.Field+sql.ColumnMigrationTemporarySuffix)) > maxIdentifierBytes {
+				var fc sql.FieldConfig
+				if raw := req.Bindings[idx].FieldConfigJsonMap[pc.Field]; len(raw) != 0 {
+					if err := json.Unmarshal(raw, &fc); err != nil {
+						return fmt.Errorf("parsing field configuration for %q: %w", pc.Field, err)
+					}
+				}
+				mapped := dialect.MapType(&sql.Projection{Projection: *p}, fc)
+				needsMigrationName := strings.HasPrefix(mapped.BareDDL, "VARCHAR2")
+				if resource != nil {
+					if existing := resource.GetField(pc.Field); existing != nil && dialect.MigratableTypes.FindMigrationSpec(*existing, mapped) != nil {
+						needsMigrationName = true
+					}
+				}
+				if needsMigrationName {
+					invalid = fmt.Sprintf("exceeds the %d-byte limit for columns that may need a string migration", maxIdentifierBytes-len(sql.ColumnMigrationTemporarySuffix))
+				}
+			}
 			required[ptr] = required[ptr] || pc.Constraint.Type == pm.Response_Validated_Constraint_LOCATION_REQUIRED
 			allowed[ptr] = allowed[ptr] || invalid == ""
 			if invalid == "" {
@@ -246,7 +317,7 @@ func forbidLongIdentifiers(req *pm.Request_Validate, validated *pm.Response_Vali
 		}
 		for ptr := range required {
 			if required[ptr] && !allowed[ptr] {
-				return fmt.Errorf("location %q is required, but none of its field names are valid Oracle identifiers: add a projection with a shorter name that has no double quote", ptr)
+				return fmt.Errorf("location %q is required, but none of its field names are valid Oracle identifiers: add a projection with a valid column name", ptr)
 			}
 		}
 	}

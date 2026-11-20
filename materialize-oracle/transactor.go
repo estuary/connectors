@@ -164,7 +164,7 @@ func (t *transactor) addBinding(ctx context.Context, dialect sql.Dialect, templa
 		b.truncateReason = addTruncation(b, col, is)
 	}
 	var loadQuery = templates.loadQuery
-	if t.cfg.Advanced.NoFlowDocument {
+	if t.cfg.Advanced.NoFlowDocument && target.Document == nil {
 		loadQuery = templates.loadQueryNoFlowDocument
 		b.nullFieldsToStrip = target.NullablePropertiesToStrip()
 		for _, col := range target.RootPropertyColumns() {

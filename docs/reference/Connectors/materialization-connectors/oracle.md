@@ -105,11 +105,20 @@ document identifies them.
 With `delta_updates: true`, each transaction appends its updates, and a table
 can contain multiple rows with the same key. Delta tables retain source
 delete events as appended records. See [delta updates](/concepts/materialization/#delta-updates).
+Changing `delta_updates` requires a binding backfill, which drops and
+recreates the table with the appropriate primary key definition.
 
 Standard updates normally require `FLOW_DOCUMENT`, which stores the full
 JSON document. To omit it, enable `advanced.no_flow_document` and exclude
 the root document in field selection. Loads then reconstruct documents from
-the selected columns. See [excluding flow_document with standard updates](/guides/customize-materialization-fields/#excluding-flow_document-with-standard-updates).
+the selected columns. This requires a projection of the whole `/_meta`
+object, even when `_meta` is optional in the collection schema, to retain the
+document UUID during source backfills. Without that projection, the root
+document remains required. `flow_published_at` stores only the UUID's
+timestamp and cannot replace it. A selected root document is always used
+for loads. See [excluding flow_document with standard updates](/guides/customize-materialization-fields/#excluding-flow_document-with-standard-updates).
+Existing tables that stored neither `_meta` nor the root document need a
+binding backfill to populate UUIDs for their existing rows.
 
 With `hardDelete: true`, excluding the root document requires a collection
 projection of `/_meta/op`. The connector requires that projection in field
@@ -146,6 +155,9 @@ characters. Oracle identifiers can't contain a double quote, even when
 quoted. Fields with longer names or with a double quote can't be selected;
 use a projection with a different name instead. Table and schema names
 can't contain a double quote.
+Uppercase `ROWID` is forbidden as a column name even when quoted; use an
+alternate projection such as `source_rowid`. Quoted `rowid` and `RowId` are
+legal.
 
 | Collection type | Oracle column type |
 |---|---|
@@ -166,6 +178,9 @@ strings use `VARCHAR2(4000)` only when `maxLength` is at most 1000. If a
 string's `maxLength` later grows past 1000 or is removed, its `VARCHAR2`
 column is changed to `CLOB` in place. An existing `CLOB` column is kept if
 `maxLength` shrinks.
+Non-key `VARCHAR2` column names are limited to 119 bytes to leave room for
+the temporary column suffix used during this migration. An existing column
+with a longer name cannot migrate to `CLOB`; use a shorter projection name.
 
 Oracle can't index CLOB or `TIMESTAMP WITH TIME ZONE` primary key columns, so
 key columns use `VARCHAR2`. A string key with a `maxLength` of at most 1000

@@ -51,6 +51,9 @@ func TestValidateWithoutFlowDocument(t *testing.T) {
 				cfg.Advanced.FeatureFlags = tc.flags
 			}
 			spec := testMaterialization(t, cfg)
+			spec.Bindings[0].Collection.Projections = append([]pf.Projection{{
+				Field: "_meta", Ptr: "/_meta", Inference: pf.Inference{Types: []string{"object"}},
+			}}, spec.Bindings[0].Collection.Projections...)
 			resource, err := json.Marshal(tableConfig{Table: "orders", Delta: tc.delta})
 			require.NoError(t, err)
 			req := &pm.Request_Validate{
@@ -114,6 +117,9 @@ func TestValidateMixedDocumentTables(t *testing.T) {
 	cfg := testConfig()
 	cfg.Advanced.NoFlowDocument = true
 	spec := testMaterialization(t, cfg)
+	spec.Bindings[0].Collection.Projections = append([]pf.Projection{{
+		Field: "_meta", Ptr: "/_meta", Inference: pf.Inference{Types: []string{"object"}},
+	}}, spec.Bindings[0].Collection.Projections...)
 	client := &validationTestClient{tables: map[string][]boilerplate.ExistingField{
 		"ORDERS":               {{Name: "ID", Type: "NUMBER"}},
 		"ORDERS_WITH_DOCUMENT": {{Name: "ID", Type: "NUMBER"}, {Name: "FLOW_DOCUMENT", Type: "CLOB"}},
@@ -140,6 +146,75 @@ func TestValidateMixedDocumentTables(t *testing.T) {
 			want = pm.Response_Validated_Constraint_FIELD_REQUIRED
 		}
 		require.Equal(t, []pm.Response_Validated_Constraint_Type{want}, constraints)
+	}
+}
+
+func TestValidateUUIDWithoutFlowDocument(t *testing.T) {
+	// Loaded documents must retain the UUID used to enforce source backfill boundaries.
+	for _, tc := range []struct {
+		name         string
+		metaField    string
+		metaExists   pf.Inference_Exists
+		delta        bool
+		existingType string
+		wantMeta     bool
+		wantDocument bool
+	}{
+		{name: "optional metadata", metaField: "_meta", metaExists: pf.Inference_MAY, wantMeta: true},
+		{name: "required metadata", metaField: "_meta", metaExists: pf.Inference_MUST, wantMeta: true},
+		{name: "aliased metadata", metaField: "metadata", metaExists: pf.Inference_MAY, wantMeta: true},
+		{name: "existing metadata", metaField: "metadata", existingType: "CLOB", wantMeta: true},
+		{name: "incompatible metadata", metaField: "metadata", existingType: "NUMBER", wantMeta: true},
+		{name: "missing metadata", wantDocument: true},
+		{name: "forbidden metadata name", metaField: "ROWID", wantDocument: true},
+		{name: "quoted metadata name", metaField: `a"b`, wantDocument: true},
+		{name: "delta updates", metaField: "_meta", delta: true},
+		{name: "delta without metadata", delta: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := testConfig()
+			cfg.Advanced.NoFlowDocument = true
+			spec := testMaterialization(t, cfg)
+			collection := spec.Bindings[0].Collection
+			collection.Projections = append(collection.Projections, pf.Projection{
+				Field: "flow_published_at", Ptr: "/_meta/uuid",
+				Inference: pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{Format: "date-time", ContentEncoding: "uuid"}},
+			})
+			if tc.metaField != "" {
+				collection.Projections = append(collection.Projections, pf.Projection{
+					Field: tc.metaField, Ptr: "/_meta", Inference: pf.Inference{Types: []string{"object"}, Exists: tc.metaExists},
+				})
+			}
+			slices.SortFunc(collection.Projections, func(a, b pf.Projection) int { return strings.Compare(a.Field, b.Field) })
+			client := &validationTestClient{tables: make(map[string][]boilerplate.ExistingField)}
+			if tc.existingType != "" {
+				client.tables["ORDERS"] = []boilerplate.ExistingField{
+					{Name: "ID", Type: "NUMBER"},
+					{Name: locateIdentifier(tc.metaField), Type: tc.existingType, Nullable: true},
+				}
+			}
+			resource, err := json.Marshal(tableConfig{Table: "orders", Delta: tc.delta})
+			require.NoError(t, err)
+			validated, err := testDriver(t, client).Validate(t.Context(), &pm.Request_Validate{
+				Name: spec.Name, ConfigJson: spec.ConfigJson, ConnectorType: spec.ConnectorType,
+				Bindings: []*pm.Request_Validate_Binding{{ResourceConfigJson: resource, Collection: collection}},
+			})
+			require.NoError(t, err)
+			require.NoError(t, validated.Validate())
+			var metaRequired, documentRequired, incompatible bool
+			for _, pc := range validated.Bindings[0].ProjectionConstraints {
+				required := pc.Constraint.Type == pm.Response_Validated_Constraint_LOCATION_REQUIRED || pc.Constraint.Type == pm.Response_Validated_Constraint_FIELD_REQUIRED
+				if pc.Field == tc.metaField {
+					metaRequired = metaRequired || required
+					incompatible = incompatible || pc.Constraint.Type == pm.Response_Validated_Constraint_INCOMPATIBLE
+				} else if pc.Field == "flow_document" {
+					documentRequired = documentRequired || required
+				}
+			}
+			require.Equal(t, tc.wantMeta, metaRequired)
+			require.Equal(t, tc.wantDocument, documentRequired)
+			require.Equal(t, tc.existingType == "NUMBER", incompatible)
+		})
 	}
 }
 
@@ -177,6 +252,9 @@ func TestValidateHardDeleteWithoutFlowDocument(t *testing.T) {
 			cfg.Advanced.NoFlowDocument = !tc.flowDocument
 			spec := testMaterialization(t, cfg)
 			collection := spec.Bindings[0].Collection
+			collection.Projections = append([]pf.Projection{{
+				Field: "_meta", Ptr: "/_meta", Inference: pf.Inference{Types: []string{"object"}},
+			}}, collection.Projections...)
 			if tc.operationField != "" {
 				ptr := tc.operationPtr
 				if ptr == "" {
@@ -357,6 +435,78 @@ func TestValidateIdentifierBytes(t *testing.T) {
 	collection.Projections = slices.DeleteFunc(collection.Projections, func(p pf.Projection) bool { return p.Field == "id" })
 	_, err = validateNewOrders(t, spec, collection)
 	require.ErrorContains(t, err, `location "/id" is required`)
+}
+
+func TestValidateMigrationIdentifierBytes(t *testing.T) {
+	// A VARCHAR2 value must leave room for the temporary column used to migrate it to CLOB.
+	for _, tc := range []struct {
+		name      string
+		field     string
+		maxLength uint32
+		existing  bool
+		forbidden bool
+	}{
+		{name: "fits", field: strings.Repeat("a", 119), maxLength: 1000},
+		{name: "one byte too long", field: strings.Repeat("a", 120), maxLength: 1000, forbidden: true},
+		{name: "maximum identifier", field: strings.Repeat("a", 128), maxLength: 1000, forbidden: true},
+		{name: "multibyte fits", field: strings.Repeat("α", 59) + "a", maxLength: 1000},
+		{name: "multibyte too long", field: strings.Repeat("α", 60), maxLength: 1000, forbidden: true},
+		{name: "new CLOB", field: strings.Repeat("a", 128)},
+		{name: "existing VARCHAR2 to CLOB", field: strings.Repeat("a", 128), existing: true, forbidden: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := testMaterialization(t, testConfig())
+			collection := spec.Bindings[0].Collection
+			collection.Projections = append(collection.Projections, pf.Projection{
+				Field: tc.field, Ptr: "/note",
+				Inference: pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{MaxLength: tc.maxLength}},
+			})
+			slices.SortFunc(collection.Projections, func(a, b pf.Projection) int { return strings.Compare(a.Field, b.Field) })
+			client := &validationTestClient{tables: make(map[string][]boilerplate.ExistingField)}
+			if tc.existing {
+				client.tables["ORDERS"] = []boilerplate.ExistingField{
+					{Name: "ID", Type: "NUMBER"},
+					{Name: locateIdentifier(tc.field), Type: "VARCHAR2", CharacterMaxLength: 4000, Nullable: true},
+				}
+			}
+			validated, err := testDriver(t, client).Validate(t.Context(), &pm.Request_Validate{
+				Name: spec.Name, ConfigJson: spec.ConfigJson, ConnectorType: spec.ConnectorType,
+				Bindings: []*pm.Request_Validate_Binding{{ResourceConfigJson: spec.Bindings[0].ResourceConfigJson, Collection: collection}},
+			})
+			require.NoError(t, err)
+			var found bool
+			for _, pc := range validated.Bindings[0].ProjectionConstraints {
+				if pc.Field == tc.field {
+					found = true
+					require.Equal(t, tc.forbidden, pc.Constraint.Type == pm.Response_Validated_Constraint_FIELD_FORBIDDEN)
+					if tc.forbidden {
+						require.Contains(t, pc.Constraint.Reason, "migration")
+					}
+				}
+			}
+			require.True(t, found)
+		})
+	}
+}
+
+func TestValidateROWID(t *testing.T) {
+	// Quoting uppercase ROWID does not make it a legal Oracle column name.
+	spec := testMaterialization(t, testConfig())
+	collection := spec.Bindings[0].Collection
+	for _, field := range []string{"ROWID", "rowid", "RowId", "source_rowid"} {
+		collection.Projections = append(collection.Projections, pf.Projection{
+			Field: field, Ptr: "/ROWID", Inference: pf.Inference{Types: []string{"string"}},
+		})
+	}
+	slices.SortFunc(collection.Projections, func(a, b pf.Projection) int { return strings.Compare(a.Field, b.Field) })
+	constraints, err := validateNewOrders(t, spec, collection)
+	require.NoError(t, err)
+	require.Equal(t, pm.Response_Validated_Constraint_FIELD_FORBIDDEN, constraints["ROWID"])
+	for _, field := range []string{"rowid", "RowId", "source_rowid"} {
+		require.NotEqual(t, pm.Response_Validated_Constraint_FIELD_FORBIDDEN, constraints[field])
+	}
+	require.Equal(t, `"rowid"`, testDialect.Identifier("rowid"))
+	require.Equal(t, `"RowId"`, testDialect.Identifier("RowId"))
 }
 
 // validateNewOrders validates collection as a new orders table and returns the
