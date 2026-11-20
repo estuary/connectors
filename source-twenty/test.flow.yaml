@@ -1,0 +1,48 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-twenty:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_twenty
+        config: config.yaml
+    bindings:
+    - resource:
+        name: companies
+        interval: PT5M
+      target: acmeCo/companies
+    - resource:
+        name: dashboards
+        interval: PT5M
+      target: acmeCo/dashboards
+    - resource:
+        name: noteTargets
+        interval: PT5M
+      target: acmeCo/noteTargets
+    - resource:
+        name: notes
+        interval: PT5M
+      target: acmeCo/notes
+    - resource:
+        name: opportunities
+        interval: PT5M
+      target: acmeCo/opportunities
+    - resource:
+        name: people
+        interval: PT5M
+      target: acmeCo/people
+    - resource:
+        name: taskTargets
+        interval: PT5M
+      target: acmeCo/taskTargets
+    - resource:
+        name: tasks
+        interval: PT5M
+      target: acmeCo/tasks
+    - resource:
+        name: workflows
+        interval: PT5M
+      target: acmeCo/workflows

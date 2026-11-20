@@ -1,0 +1,31 @@
+info:
+  name: Seeding
+  type: folder
+  seq: 4
+
+docs: |-
+  **WHY:** provide a small company lifecycle for a human to reproduce the
+  soft-delete and restore behavior described in `Records / soft deleted`.
+  Only a human runs these mutations; agents never run this folder.
+
+  Run `Seeding / create company`, `Seeding / soft delete company`, then
+  `Seeding / restore company` in one Bruno session. Creation captures the
+  returned `company_id` in memory for the other requests; each later request
+  stops if that ID has not been captured. To inspect trash before restoration,
+  pause after soft deletion and run `Records / soft deleted`.
+
+  Each mutation has a saved self-hosted v2.52 response projection in its own
+  request file. Before/after list evidence is in `Records / soft deleted`.
+  `Records / incremental window` uses a separate probe company and timestamp;
+  repin its `probe_id` and `cursor` to test a newly created record.
+
+  **LIMITATION (UNOBSERVABLE):** `DELETE /rest/<plural>/<id>` without
+  `soft_delete=true` destroys the record, and so does emptying Twenty's
+  trash. Polling by `updatedAt` cannot see a record that no longer exists.
+  Run history (2026-11-03, self-hosted v2.52, no saved example): destroying
+  a company set its people's `companyId` to null without moving their
+  `updatedAt`, and removed its `noteTargets`; neither change is visible to an
+  `updatedAt` poll. Assumption: destroyed records stay in the collection with
+  their last values. Fallback: a binding `schedule` re-reads the object in
+  full, which refreshes records whose links were cleared. Never run a
+  destroying request from this collection.

@@ -1,0 +1,93 @@
+info:
+  name: bad key
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/rest/metadata/objects?limit=200"
+  params:
+    - name: limit
+      value: "200"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Override the inherited Bearer header with a deliberately invalid value.
+        req.setHeader('Authorization', 'Bearer deliberately-invalid-example-key');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 401 - live self-hosted v2.52, invalid key (projection)
+    request:
+      url: '{{base_url}}/rest/metadata/objects?limit=200'
+      method: GET
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "statusCode": 401,
+            "messages": [
+              "Token invalid."
+            ],
+            "error": "UNAUTHENTICATED"
+          }
+  - name: 401 - live Twenty Cloud, invalid key (projection)
+    request:
+      url: '{{base_url}}/rest/metadata/objects?limit=200'
+      method: GET
+    response:
+      status: 401
+      statusText: Unauthorized
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "statusCode": 401,
+            "messages": [
+              "Token invalid."
+            ],
+            "error": "UNAUTHENTICATED"
+          }
+
+docs: |-
+  **REFERENCE:** https://docs.twenty.com/developers/extend/api
+
+  **WHY:** distinguish an invalid API key from a valid key lacking object
+  permissions. The request script replaces the inherited authorization value
+  with a made-up invalid key; the named User-Agent remains in place.
+
+  **VERIFIED (2026-11-03):** the two saved examples show identical HTTP 401
+  responses on self-hosted v2.52 and Twenty Cloud:
+  `{"statusCode":401,"messages":["Token invalid."],"error":"UNAUTHENTICATED"}`.
+
+  This is the error handled by `validate_credentials` as an invalid API key.
+
+  **VERIFIED (2026-11-03, self-hosted v2.52):** keys tied to test roles,
+  created and deleted for the probe, show how a valid key without access fails.
+  A role without read access to an object gets HTTP 400, not 403 or an empty
+  list, on that object's record list, with or without the capture's filter
+  and sort:
+  `{"statusCode":400,"error":"Error","messages":["Entity performing the request does not have permission"],"code":"PERMISSION_DENIED"}`.
+  A role without the DATA_MODEL permission flag ("Data Model" in Twenty's
+  role settings) gets the same body with HTTP 403 on `/rest/metadata/objects`,
+  even when it can read every record. Metadata lists every object, readable
+  or not, so discovery reads one row of each and marks PERMISSION_DENIED
+  ones disabled (leaving them out would make re-discovery remove a binding).
+  A role reading all records without the WORKFLOWS flag got a 400/403
+  PERMISSION_DENIED on `workflows` (the connector's discovery disabled it,
+  which it does only for that body); a role reading nothing could still read
+  `noteTargets` and `taskTargets`. `validate_bindings` reports an unreadable bound object by name.

@@ -1,0 +1,62 @@
+info:
+  name: soft delete company
+  type: http
+  seq: 2
+
+http:
+  method: DELETE
+  url: "{{base_url}}/rest/companies/{{company_id}}?soft_delete=true"
+  params:
+    - name: soft_delete
+      value: "true"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('company_id')) {
+          throw new Error('Run Seeding / create company first in this session');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - live self-hosted v2.52, delete response identifies the company (projection)
+    request:
+      url: '{{base_url}}/rest/companies/024daa5d-b645-41c5-9ded-3f2dce99b00e?soft_delete=true'
+      method: DELETE
+    response:
+      status: 200
+      statusText: OK
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "deleteCompany": {
+                "id": "024daa5d-b645-41c5-9ded-3f2dce99b00e"
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** https://docs.twenty.com/developers/extend/api
+
+  SEEDING REQUEST — only a human runs this; never an agent. Step 2 of 3.
+
+  **WHY:** put the company from `Seeding / create company` into the trash so
+  `Records / soft deleted` can inspect it. Creation must run first in a fresh
+  session to supply `company_id`. Keep `soft_delete=true` enabled.
+
+  **VERIFIED (2026-11-03):** self-hosted v2.52 returned HTTP 200 with
+  `data.deleteCompany.id: 024daa5d-b645-41c5-9ded-3f2dce99b00e`.
+  Only the ID was supplied in the delete response projection; no name or
+  timestamps are inferred. The read-side timestamp and visibility evidence
+  is saved in `Records / soft deleted`.

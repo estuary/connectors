@@ -1,0 +1,5 @@
+variables:
+  - name: base_url
+    value: http://localhost:3000
+  - name: config_path
+    value: ../config.yaml
