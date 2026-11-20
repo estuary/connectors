@@ -1,0 +1,28 @@
+collections:
+  tests/large:
+    schema:
+      type: object
+      properties:
+        id: {type: integer}
+        small: {type: string}
+        medium: {type: string}
+        large: {type: string}
+        bin: {type: string, contentEncoding: base64}
+      required: [id]
+    key: [/id]
+
+materializations:
+  acmeCo/tests/materialize-oracle-large:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+    - resource:
+        table: large_values
+      source: tests/large
+      fields:
+        recommended: true
+        include:
+          bin: {}
