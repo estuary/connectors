@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-amazon-selling-partner:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_amazon_selling_partner
+        config: config.yaml
+    bindings: []

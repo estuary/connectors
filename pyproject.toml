@@ -23,6 +23,7 @@ members = [
     "source-aircall-native",
     "source-airtable",
     "source-airtable-native",
+    "source-amazon-selling-partner",
     "source-apple-app-store",
     "source-appsflyer",
     "source-asana",

@@ -10,6 +10,7 @@ members = [
     "source-aircall-native",
     "source-airtable",
     "source-airtable-native",
+    "source-amazon-selling-partner",
     "source-apple-app-store",
     "source-appsflyer",
     "source-asana",
@@ -1724,6 +1725,23 @@ dependencies = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.13.4,<4.0.0" },
     { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "pydantic", specifier = ">=2,<3" },
+]
+
+[[package]]
+name = "source-amazon-selling-partner"
+version = "0.1.0"
+source = { editable = "source-amazon-selling-partner" }
+dependencies = [
+    { name = "estuary-cdk" },
+    { name = "ijson" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "estuary-cdk", editable = "estuary-cdk" },
+    { name = "ijson", specifier = ">=3.3.0,<4.0.0" },
     { name = "pydantic", specifier = ">=2,<3" },
 ]
 

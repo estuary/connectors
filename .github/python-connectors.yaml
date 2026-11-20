@@ -295,3 +295,7 @@
   type: capture
   version: v1
   usage_rate: "1.0"
+- name: source-amazon-selling-partner
+  type: capture
+  version: v1
+  usage_rate: "1.0"

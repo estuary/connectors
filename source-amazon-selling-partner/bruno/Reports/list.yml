@@ -1,0 +1,69 @@
+info:
+  name: list
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/reports/2021-06-30/reports?reportTypes=GET_V2_SETTLEMENT_REPORT_DATA_FLAT_FILE_V2&processingStatuses=DONE&createdSince={{created_since}}&pageSize=100"
+  params:
+    - name: reportTypes
+      value: GET_V2_SETTLEMENT_REPORT_DATA_FLAT_FILE_V2
+      type: query
+    - name: processingStatuses
+      value: DONE
+      type: query
+    - name: createdSince
+      value: "{{created_since}}"
+      type: query
+    - name: pageSize
+      value: "100"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // A week back, inside Amazon's 90-day retention whenever this runs.
+        const since = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+        bru.setVar('created_since', since.toISOString().replace(/\.\d{3}Z$/, 'Z'));
+    - type: after-response
+      code: |-
+        // Hand `Reports / report` and `Reports / document` the first report.
+        // Runtime vars live in memory only.
+        const first = res.getBody()?.reports?.[0];
+        if (first) {
+          bru.setVar('report_id', first.reportId);
+          if (first.reportDocumentId) bru.setVar('report_document_id', first.reportDocumentId);
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://developer-docs.amazon.com/sp-api/reference/getreports
+
+    **WHY:** how `settlement_reports` finds the settlement reports Amazon
+    generates (`_done_reports`), and how a requested report is found again
+    after a restart (`_reusable_report`, with IN_QUEUE, IN_PROGRESS and DONE).
+    The connector also sends `createdUntil`.
+
+    **DOCUMENTED (2026-11-10):** `pageSize` is at most 100; a request with
+    `nextToken` must carry no other parameter; `createdSince` defaults to 90
+    days ago.
+
+    **LIMITATION (DOCUMENTED 2026-11-10):** reports are kept for at most 90
+    days; order reports (all_orders) for 30 days, per Amazon's order report
+    catalog page (https://developer-docs.amazon.com/sp-api/docs/report-type-values-order).
+
+    **PENDING:** whether `createdSince` and `createdUntil` are inclusive (the
+    connector filters by both bounds itself); how long after its
+    `createdTime` Amazon lists a settlement report (the connector re-lists 3
+    days); whether settlement reports carry `marketplaceIds`; and whether a
+    `createdSince` just past 90 days is rejected.
+  type: text/markdown
