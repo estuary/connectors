@@ -20,6 +20,7 @@
 - name: source-oracle-batch
 - name: source-postgres
 - name: source-postgres-batch
+- name: source-rabbitmq
 - name: source-redshift-batch
 - name: source-s3
 - name: source-sftp
