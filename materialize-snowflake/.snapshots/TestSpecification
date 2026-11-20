@@ -262,6 +262,42 @@
             "default": false,
             "nonsensitive": true
           },
+          "streaming_warehouse_size": {
+            "type": "string",
+            "enum": [
+              "XSMALL",
+              "SMALL",
+              "MEDIUM",
+              "LARGE",
+              "XLARGE",
+              "XXLARGE",
+              "XXXLARGE",
+              "X4LARGE",
+              "X5LARGE",
+              "X6LARGE"
+            ],
+            "title": "Streaming Warehouse Size",
+            "description": "Size that the warehouse is set to while no binding is being backfilled. Requires Backfill Warehouse Size and the MODIFY privilege on the warehouse.",
+            "nonsensitive": true
+          },
+          "backfill_warehouse_size": {
+            "type": "string",
+            "enum": [
+              "XSMALL",
+              "SMALL",
+              "MEDIUM",
+              "LARGE",
+              "XLARGE",
+              "XXLARGE",
+              "XXXLARGE",
+              "X4LARGE",
+              "X5LARGE",
+              "X6LARGE"
+            ],
+            "title": "Backfill Warehouse Size",
+            "description": "Size that the warehouse is set to from when a capture begins backfilling the collection of a binding until that backfill is materialized. Requires Streaming Warehouse Size and the MODIFY privilege on the warehouse.",
+            "nonsensitive": true
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",

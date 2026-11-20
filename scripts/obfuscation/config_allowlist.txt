@@ -151,6 +151,8 @@ number_of_snapshots_to_retain
 enable_compaction
 enable_retention
 enable_orphan_file_deletion
+streaming_warehouse_size
+backfill_warehouse_size
 
 # --- file format / parser options ---
 format

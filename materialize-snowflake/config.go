@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
@@ -100,9 +101,23 @@ type config struct {
 }
 
 type advancedConfig struct {
-	DisableFieldTruncation bool   `json:"disableFieldTruncation,omitempty" jsonschema:"title=Disable Field Truncation,description=Disables truncation of materialized fields. May result in errors for documents with extremely large values or complex nested structures." jsonschema_extras:"nonsensitive=true"`
-	NoFlowDocument         bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
-	FeatureFlags           string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
+	DisableFieldTruncation bool          `json:"disableFieldTruncation,omitempty" jsonschema:"title=Disable Field Truncation,description=Disables truncation of materialized fields. May result in errors for documents with extremely large values or complex nested structures." jsonschema_extras:"nonsensitive=true"`
+	NoFlowDocument         bool          `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
+	StreamingWarehouseSize warehouseSize `json:"streaming_warehouse_size,omitempty" jsonschema:"title=Streaming Warehouse Size,description=Size that the warehouse is set to while no binding is being backfilled. Requires Backfill Warehouse Size and the MODIFY privilege on the warehouse.,enum=XSMALL,enum=SMALL,enum=MEDIUM,enum=LARGE,enum=XLARGE,enum=XXLARGE,enum=XXXLARGE,enum=X4LARGE,enum=X5LARGE,enum=X6LARGE" jsonschema_extras:"nonsensitive=true"`
+	BackfillWarehouseSize  warehouseSize `json:"backfill_warehouse_size,omitempty" jsonschema:"title=Backfill Warehouse Size,description=Size that the warehouse is set to from when a capture begins backfilling the collection of a binding until that backfill is materialized. Requires Streaming Warehouse Size and the MODIFY privilege on the warehouse.,enum=XSMALL,enum=SMALL,enum=MEDIUM,enum=LARGE,enum=XLARGE,enum=XXLARGE,enum=XXXLARGE,enum=X4LARGE,enum=X5LARGE,enum=X6LARGE" jsonschema_extras:"nonsensitive=true"`
+	FeatureFlags           string        `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
+}
+
+func (c advancedConfig) validateWarehouseSizes() error {
+	if (c.StreamingWarehouseSize == "") != (c.BackfillWarehouseSize == "") {
+		return fmt.Errorf("'streaming_warehouse_size' and 'backfill_warehouse_size' must be set together")
+	}
+	for _, size := range []warehouseSize{c.StreamingWarehouseSize, c.BackfillWarehouseSize} {
+		if size != "" && !slices.Contains(warehouseSizes, size) {
+			return fmt.Errorf("invalid warehouse size %q (must be one of %v)", size, warehouseSizes)
+		}
+	}
+	return nil
 }
 
 // toURI manually builds the DSN connection string. Most uses should set
@@ -239,6 +254,10 @@ func (c config) Validate() error {
 	}
 
 	if err := c.DBTJobTrigger.Validate(); err != nil {
+		return err
+	}
+
+	if err := c.Advanced.validateWarehouseSizes(); err != nil {
 		return err
 	}
 

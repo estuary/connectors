@@ -68,3 +68,26 @@ func TestTimestampTypeHelpers(t *testing.T) {
 		require.False(t, timestampTypeTZ.isCompatibleWith(timestampNTZ))
 	})
 }
+
+func TestValidateWarehouseSizes(t *testing.T) {
+	for name, tc := range map[string]struct {
+		cfg     advancedConfig
+		wantErr string
+	}{
+		"neither":         {cfg: advancedConfig{}},
+		"both":            {cfg: advancedConfig{StreamingWarehouseSize: "XSMALL", BackfillWarehouseSize: "X4LARGE"}},
+		"streaming only":  {cfg: advancedConfig{StreamingWarehouseSize: "XSMALL"}, wantErr: "must be set together"},
+		"backfill only":   {cfg: advancedConfig{BackfillWarehouseSize: "LARGE"}, wantErr: "must be set together"},
+		"unknown size":    {cfg: advancedConfig{StreamingWarehouseSize: "XSMALL", BackfillWarehouseSize: "HUGE"}, wantErr: `invalid warehouse size "HUGE"`},
+		"quoted spelling": {cfg: advancedConfig{StreamingWarehouseSize: "X-SMALL", BackfillWarehouseSize: "LARGE"}, wantErr: `invalid warehouse size "X-SMALL"`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var err = tc.cfg.validateWarehouseSizes()
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tc.wantErr)
+			}
+		})
+	}
+}

@@ -1,5 +1,17 @@
 # materialize-snowflake
 
+## 2026-11-19
+
+### Added
+- New advanced options **Streaming Warehouse Size** and **Backfill Warehouse
+  Size**. When both are set, the connector sets the warehouse to the backfill
+  size when a capture begins backfilling a collection that the task
+  materializes, and back to the streaming size once the task has materialized
+  every such backfill. Bindings that write through Snowpipe or Snowpipe
+  Streaming are ignored, because they don't use the warehouse. Requires a
+  capture that emits backfill signals and the `MODIFY` privilege on the
+  warehouse for the materialization's role.
+
 ## 2026-11-17
 
 ### Changed
