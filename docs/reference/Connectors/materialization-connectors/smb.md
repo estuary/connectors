@@ -59,6 +59,10 @@ slashes, or trailing slash. Date patterns such as `%Y` and SMB-invalid filename
 characters are not supported. Leave `directory` empty to write at the share root.
 Binding paths must differ by more than letter case, such as `Orders` and
 `orders`, because SMB servers usually treat these as the same folder.
+When editing or re-enabling a binding, keep its original path casing or
+increase its backfill counter above its previous value. Validation rejects
+case-only path changes at the same or a lower backfill to prevent overwriting
+existing files.
 
 ### Example
 

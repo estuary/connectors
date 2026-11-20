@@ -160,6 +160,67 @@ func TestPathCase(t *testing.T) {
 	require.ErrorContains(t, err, `resource paths "events/raw" and "Events/Raw"`)
 }
 
+func TestValidatePathCaseEdit(t *testing.T) {
+	// Guard against case-only edits resetting counters and overwriting files,
+	// including when a binding is disabled and then re-enabled.
+	for _, previous := range []string{"active", "inactive"} {
+		t.Run(previous, func(t *testing.T) {
+			for _, tt := range []struct {
+				name     string
+				path     string
+				backfill uint32
+				err      string
+			}{
+				{name: "unchanged", path: "orders", backfill: 1},
+				{name: "case only", path: "Orders", backfill: 1, err: `resource path "Orders" differs from previous path "orders" only by letter case; keep the original casing or increment backfill`},
+				{name: "lower backfill", path: "Orders", err: `resource path "Orders" differs from previous path "orders" only by letter case; keep the original casing or increment backfill`},
+				{name: "nested case only", path: "Events/Raw", backfill: 7, err: `resource path "Events/Raw" differs from previous path "events/raw" only by letter case; keep the original casing or increment backfill`},
+				{name: "nested lower backfill", path: "Events/Raw", backfill: 6, err: `resource path "Events/Raw" differs from previous path "events/raw" only by letter case; keep the original casing or increment backfill`},
+				{name: "backfill", path: "Orders", backfill: 2},
+				{name: "nested backfill", path: "Events/Raw", backfill: 8},
+				{name: "different path", path: "customers"},
+			} {
+				t.Run(tt.name, func(t *testing.T) {
+					store, _ := newTestStore(t)
+					d := driver
+					var connected bool
+					d.NewStore = func(context.Context, filesink.Config, map[string]bool) (filesink.Store[*smbUpload], error) {
+						connected = true
+						return store, nil
+					}
+					encoded, err := json.Marshal(testConfig())
+					require.NoError(t, err)
+					resource, err := json.Marshal(filesink.Resource{Path: tt.path})
+					require.NoError(t, err)
+					last := &pf.MaterializationSpec{Bindings: []*pf.MaterializationSpec_Binding{
+						{ResourcePath: []string{"orders"}, Backfill: 1},
+						{ResourcePath: []string{"events/raw"}, Backfill: 7},
+					}}
+					if previous == "inactive" {
+						last.InactiveBindings, last.Bindings = last.Bindings, nil
+					}
+					resp, err := d.Validate(context.Background(), &pm.Request_Validate{
+						ConfigJson:          encoded,
+						LastMaterialization: last,
+						Bindings: []*pm.Request_Validate_Binding{
+							{ResourceConfigJson: json.RawMessage(`{"path":"other"}`)},
+							{ResourceConfigJson: resource, Backfill: tt.backfill},
+						},
+					})
+					if tt.err != "" {
+						require.EqualError(t, err, tt.err)
+						require.False(t, connected, "invalid edits must fail before connecting")
+						return
+					}
+					require.NoError(t, err)
+					require.True(t, connected)
+					require.Equal(t, []string{tt.path}, resp.Bindings[1].ResourcePath)
+				})
+			}
+		})
+	}
+}
+
 func TestValidate(t *testing.T) {
 	for _, operation := range []string{"success", "mkdir", "open", "write", "remove"} {
 		t.Run(operation, func(t *testing.T) {

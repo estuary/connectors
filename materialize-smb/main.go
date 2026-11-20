@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -164,6 +165,16 @@ func (d smbDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.
 	}
 	if err := checkPathCase(paths); err != nil {
 		return nil, err
+	}
+	// A case-only edit resets the state key but still targets the same SMB files.
+	if last := req.LastMaterialization; last != nil {
+		for _, previous := range slices.Concat(last.Bindings, last.InactiveBindings) {
+			for i, p := range paths {
+				if req.Bindings[i].Backfill <= previous.Backfill && p != previous.ResourcePath[0] && strings.EqualFold(p, previous.ResourcePath[0]) {
+					return nil, fmt.Errorf("resource path %q differs from previous path %q only by letter case; keep the original casing or increment backfill", p, previous.ResourcePath[0])
+				}
+			}
+		}
 	}
 
 	c, err := d.NewConfig(req.ConfigJson)
