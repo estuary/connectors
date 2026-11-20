@@ -1251,6 +1251,7 @@
           "sku": "123456789",
           "taxLines": [],
           "taxable": true,
+          "title": "Oatmeal",
           "totalDiscountSet": {
             "presentmentMoney": {
               "amount": "0.0",
@@ -1287,6 +1288,7 @@
             "legacyResourceId": "43217824284717",
             "sku": "123456789"
           },
+          "variantTitle": null,
           "vendor": "estuary-alex-testing"
         },
         {
@@ -1364,6 +1366,7 @@
           "sku": null,
           "taxLines": [],
           "taxable": true,
+          "title": "The Collection Snowboard: Hydrogen",
           "totalDiscountSet": {
             "presentmentMoney": {
               "amount": "0.0",
@@ -1400,6 +1403,7 @@
             "legacyResourceId": "43217823858733",
             "sku": null
           },
+          "variantTitle": null,
           "vendor": "Hydrogen Vendor"
         },
         {
@@ -1477,6 +1481,7 @@
           "sku": null,
           "taxLines": [],
           "taxable": true,
+          "title": "The Collection Snowboard: Liquid",
           "totalDiscountSet": {
             "presentmentMoney": {
               "amount": "0.0",
@@ -1513,6 +1518,7 @@
             "legacyResourceId": "43217824153645",
             "sku": null
           },
+          "variantTitle": null,
           "vendor": "Hydrogen Vendor"
         },
         {
@@ -1590,6 +1596,7 @@
           "sku": null,
           "taxLines": [],
           "taxable": true,
+          "title": "The Collection Snowboard: Oxygen",
           "totalDiscountSet": {
             "presentmentMoney": {
               "amount": "0.0",
@@ -1626,6 +1633,7 @@
             "legacyResourceId": "43217824022573",
             "sku": null
           },
+          "variantTitle": null,
           "vendor": "Hydrogen Vendor"
         },
         {
@@ -1703,6 +1711,7 @@
           "sku": null,
           "taxLines": [],
           "taxable": true,
+          "title": "The Compare at Price Snowboard",
           "totalDiscountSet": {
             "presentmentMoney": {
               "amount": "0.0",
@@ -1739,6 +1748,7 @@
             "legacyResourceId": "43217823760429",
             "sku": null
           },
+          "variantTitle": null,
           "vendor": "estuary-alex-testing"
         },
         {
@@ -1816,6 +1826,7 @@
           "sku": null,
           "taxLines": [],
           "taxable": true,
+          "title": "The Complete Snowboard",
           "totalDiscountSet": {
             "presentmentMoney": {
               "amount": "0.0",
@@ -1852,6 +1863,7 @@
             "legacyResourceId": "43217823596589",
             "sku": null
           },
+          "variantTitle": "Ice",
           "vendor": "Snowboard Vendor"
         },
         {
@@ -1929,6 +1941,7 @@
           "sku": null,
           "taxLines": [],
           "taxable": true,
+          "title": "The Complete Snowboard",
           "totalDiscountSet": {
             "presentmentMoney": {
               "amount": "0.0",
@@ -1965,6 +1978,7 @@
             "legacyResourceId": "43217823629357",
             "sku": null
           },
+          "variantTitle": "Dawn",
           "vendor": "Snowboard Vendor"
         },
         {
@@ -2042,6 +2056,7 @@
           "sku": null,
           "taxLines": [],
           "taxable": true,
+          "title": "The Complete Snowboard",
           "totalDiscountSet": {
             "presentmentMoney": {
               "amount": "0.0",
@@ -2078,6 +2093,7 @@
             "legacyResourceId": "43217823662125",
             "sku": null
           },
+          "variantTitle": "Powder",
           "vendor": "Snowboard Vendor"
         },
         {
@@ -2155,6 +2171,7 @@
           "sku": null,
           "taxLines": [],
           "taxable": true,
+          "title": "The Complete Snowboard",
           "totalDiscountSet": {
             "presentmentMoney": {
               "amount": "0.0",
@@ -2191,6 +2208,7 @@
             "legacyResourceId": "43217823694893",
             "sku": null
           },
+          "variantTitle": "Electric",
           "vendor": "Snowboard Vendor"
         },
         {
@@ -2268,6 +2286,7 @@
           "sku": null,
           "taxLines": [],
           "taxable": true,
+          "title": "The Complete Snowboard",
           "totalDiscountSet": {
             "presentmentMoney": {
               "amount": "0.0",
@@ -2304,6 +2323,7 @@
             "legacyResourceId": "43217823727661",
             "sku": null
           },
+          "variantTitle": "Sunset",
           "vendor": "Snowboard Vendor"
         },
         {
@@ -2381,6 +2401,7 @@
           "sku": null,
           "taxLines": [],
           "taxable": true,
+          "title": "The Videographer Snowboard",
           "totalDiscountSet": {
             "presentmentMoney": {
               "amount": "0.0",
@@ -2417,6 +2438,7 @@
             "legacyResourceId": "43217823891501",
             "sku": null
           },
+          "variantTitle": null,
           "vendor": "estuary-alex-testing"
         }
       ],
@@ -4890,6 +4912,7 @@
             "id": "gid://shopify/Order/18697849798701",
             "legacyResourceId": "18697849798701"
           },
+          "orderAdjustments": [],
           "refundLineItems": [
             {
               "id": "gid://shopify/RefundLineItem/743490748461",
@@ -5312,6 +5335,7 @@
               }
             }
           ],
+          "refundShippingLines": [],
           "totalRefundedSet": {
             "presentmentMoney": {
               "amount": "670365.0",
@@ -5322,6 +5346,11 @@
               "currencyCode": "USD"
             }
           },
+          "transactions": [
+            {
+              "id": "gid://shopify/OrderTransaction/20456463106093"
+            }
+          ],
           "updatedAt": "2026-06-11T17:35:46Z"
         },
         {
@@ -5334,6 +5363,7 @@
             "id": "gid://shopify/Order/18697849798701",
             "legacyResourceId": "18697849798701"
           },
+          "orderAdjustments": [],
           "refundLineItems": [
             {
               "id": "gid://shopify/RefundLineItem/743491305517",
@@ -5756,6 +5786,7 @@
               }
             }
           ],
+          "refundShippingLines": [],
           "totalRefundedSet": {
             "presentmentMoney": {
               "amount": "33518.25",
@@ -5766,6 +5797,11 @@
               "currencyCode": "USD"
             }
           },
+          "transactions": [
+            {
+              "id": "gid://shopify/OrderTransaction/20456467365933"
+            }
+          ],
           "updatedAt": "2026-06-11T17:37:41Z"
         },
         {
@@ -5778,6 +5814,7 @@
             "id": "gid://shopify/Order/18697849798701",
             "legacyResourceId": "18697849798701"
           },
+          "orderAdjustments": [],
           "refundLineItems": [
             {
               "id": "gid://shopify/RefundLineItem/744073855021",
@@ -6200,6 +6237,7 @@
               }
             }
           ],
+          "refundShippingLines": [],
           "totalRefundedSet": {
             "presentmentMoney": {
               "amount": "32632.3",
@@ -6210,6 +6248,11 @@
               "currencyCode": "USD"
             }
           },
+          "transactions": [
+            {
+              "id": "gid://shopify/OrderTransaction/20497063936045"
+            }
+          ],
           "updatedAt": "2026-06-15T13:21:45Z"
         }
       ],

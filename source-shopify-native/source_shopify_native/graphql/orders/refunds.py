@@ -33,6 +33,30 @@ lineItem {
 }
 """
 
+_ORDER_ADJUSTMENT_SELECTION = """
+id
+reason
+amountSet {
+    ..._MoneyBagFields
+}
+taxAmountSet {
+    ..._MoneyBagFields
+}
+"""
+
+_REFUND_SHIPPING_LINE_SELECTION = """
+id
+shippingLine {
+    id
+}
+subtotalAmountSet {
+    ..._MoneyBagFields
+}
+taxAmountSet {
+    ..._MoneyBagFields
+}
+"""
+
 
 class OrderRefunds(ShopifyGraphQLResource):
     NAME = "order_refunds"
@@ -79,6 +103,9 @@ class OrderRefunds(ShopifyGraphQLResource):
             ..._MoneyBagFields
         }
         # {{ refundLineItems }}
+        # {{ orderAdjustments }}
+        # {{ refundShippingLines }}
+        # {{ transactions }}
     }
     """
 
@@ -93,7 +120,35 @@ class OrderRefunds(ShopifyGraphQLResource):
             overflow_page_size=250,
             fragments=[money_bag_fragment],
         ),
+        NestedConnection(
+            parent_path=["refunds"],
+            parent_typename="Refund",
+            field_name="orderAdjustments",
+            node_selection=_ORDER_ADJUSTMENT_SELECTION,
+            page_size=10,
+            overflow_page_size=250,
+            fragments=[money_bag_fragment],
+        ),
+        NestedConnection(
+            parent_path=["refunds"],
+            parent_typename="Refund",
+            field_name="refundShippingLines",
+            node_selection=_REFUND_SHIPPING_LINE_SELECTION,
+            page_size=10,
+            overflow_page_size=250,
+            fragments=[money_bag_fragment],
+        ),
+        NestedConnection(
+            parent_path=["refunds"],
+            parent_typename="Refund",
+            field_name="transactions",
+            node_selection="id",
+            page_size=10,
+            overflow_page_size=250,
+        ),
     ]
+    # 100 orders with these four inline connections request 380 of the 1,000 points Shopify
+    # allows per query (requestedQueryCost on a development store, API 2026-01).
     OUTER_PAGE_SIZE = 100
 
     @staticmethod

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-19
+
+### Added
+- `order_refunds` refunds now include `orderAdjustments`, `refundShippingLines`
+  with the refunded shipping line's `id`, and `transactions` with each
+  transaction's `id`.
+- `orders` line items now include `title` and `variantTitle`.
+
 ## 2026-11-18
 
 ### Added

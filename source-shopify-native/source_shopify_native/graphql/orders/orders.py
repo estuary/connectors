@@ -235,6 +235,8 @@ class Orders(ShopifyGraphQLResource):
                 # identifiers
                 id
                 name
+                title
+                variantTitle
                 sku
                 vendor
                 image {

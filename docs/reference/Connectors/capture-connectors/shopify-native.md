@@ -66,6 +66,11 @@ Shopify has deprecated the creation of legacy custom apps. Existing access token
 
 For custom apps created through the [Shopify Dev Dashboard](https://help.shopify.com/en/manual/apps/app-types/custom-apps). Uses `client_id` and `client_secret` to obtain short-lived access tokens (~24 hours) that auto-refresh at runtime. This is the recommended authentication method for new integrations.
 
+Before you configure the connector, go to the app's **Settings** page in the Dev Dashboard and, under **Access requests**:
+
+* Click **Enable bulk queries**. The connector captures most streams with bulk queries, which Shopify rejects until this is enabled. Shopify turns it off again if the app runs no bulk queries for 31 days. See [Shopify's bulk query documentation](https://shopify.dev/docs/apps/build/apis/graphql-admin/bulk-operations/queries).
+* If the app is installed on a development store, open **Protected customer data**, select **Customer data** and the **Name**, **Email**, **Phone number** and **Address** fields, and save. Without it, Shopify denies the app access to orders and customer data on the development store. See [Shopify's protected customer data documentation](https://shopify.dev/docs/apps/launch/protected-customer-data).
+
 ### Required Permissions
 
 When authenticating with an access token or client credentials, ensure the following permissions are granted:
@@ -86,9 +91,15 @@ When authenticating with an access token or client credentials, ensure the follo
 * `read_products`
 * `read_publications`
 * `read_returns`
+* `read_shopify_payments_dispute_evidences`
+  * Only needed to capture `disputeEvidence` on `disputes` documents
 * `read_shopify_payments_disputes`
+* `read_third_party_fulfillment_orders`
 * `read_users`
+  * Requires approval from Shopify and is only available on Shopify Plus or Advanced stores or to finance embedded apps. Without it, the `staff_members` stream isn't discovered, and `orders` and `order_returns` documents omit `staffMember`. The `staff_members` stream and the `staffMember` field also require a Shopify Plus or Advanced plan or a development store.
 * `read_own_subscription_contracts`
+
+The `fulfillment_orders` stream is discovered with any one of the four `*_fulfillment_orders` permissions, but it only captures the fulfillment orders that the granted permissions cover. Grant all four to capture every fulfillment order.
 
 ### Bulk Query Operation Limitations
 
