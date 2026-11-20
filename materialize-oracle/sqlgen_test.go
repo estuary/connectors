@@ -23,6 +23,8 @@ func TestSQLGeneration(t *testing.T) {
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
 				testTemplates.createTargetTable,
+				testTemplates.createLoadTable,
+				testTemplates.loadInsert,
 				testTemplates.loadQuery,
 				testTemplates.storeInsert,
 				testTemplates.deleteQuery,

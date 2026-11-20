@@ -199,36 +199,69 @@ func TestIntegration(t *testing.T) {
 		require.NoError(t, rows.Err())
 	})
 
-	// CARDINALITY is an undocumented hint, so the plan it gets Loads is pinned
-	// here: each key looked up in the primary key, never a full scan.
+	// Loads find the rows of keys of every type, and look up each key in the
+	// primary key without scanning the table in full.
 	t.Run("load-plan", func(t *testing.T) {
 		var ctx = context.Background()
 		var db = testConfig().openDB()
 		defer db.Close()
+		// The load table and the plan are private to a session.
+		conn, err := db.Conn(ctx)
+		require.NoError(t, err)
+		defer conn.Close()
 
 		var name = fmt.Sprintf("load_plan_%d", time.Now().UnixNano())
-		_, err := db.ExecContext(ctx, "CREATE TABLE "+name+" (id NUMBER(38,0) NOT NULL, name VARCHAR2(1000 CHAR) NOT NULL, flow_document CLOB, PRIMARY KEY (id, name))")
+		_, err = conn.ExecContext(ctx, "CREATE TABLE "+name+" (id NUMBER(38,0) NOT NULL, flag BOOLEAN NOT NULL, bin RAW(2000) NOT NULL, name VARCHAR2(1000 CHAR) NOT NULL, flow_document CLOB, PRIMARY KEY (id, flag, bin, name))")
 		require.NoError(t, err)
-		defer db.ExecContext(ctx, "DROP TABLE "+name+" PURGE")
-		_, err = db.ExecContext(ctx, "INSERT INTO "+name+" SELECT level, 'name-' || level, '{}' FROM dual CONNECT BY level <= 100000")
+		defer conn.ExecContext(ctx, "DROP TABLE "+name+" PURGE")
+		_, err = conn.ExecContext(ctx, "INSERT INTO "+name+` SELECT level, TO_BOOLEAN(MOD(level, 2)), HEXTORAW(TO_CHAR(level, 'FM0000000X')), 'name-' || level, '{"id":' || level || '}' FROM dual CONNECT BY level <= 100000`)
 		require.NoError(t, err)
-		_, err = db.ExecContext(ctx, "BEGIN DBMS_STATS.GATHER_TABLE_STATS(USER, :1); END;", strings.ToUpper(name))
+		_, err = conn.ExecContext(ctx, "BEGIN DBMS_STATS.GATHER_TABLE_STATS(USER, :1); END;", strings.ToUpper(name))
 		require.NoError(t, err)
 
 		var table = sql.Table{
 			Identifier: name,
 			Keys: []sql.Column{
 				{Identifier: "id", MappedType: sql.MappedType{BareDDL: "NUMBER(38,0)"}},
+				{Identifier: "flag", MappedType: sql.MappedType{BareDDL: "BOOLEAN"}},
+				{Identifier: "bin", MappedType: sql.MappedType{BareDDL: "RAW(2000)"}},
 				{Identifier: "name", MappedType: sql.MappedType{BareDDL: "VARCHAR2(1000 CHAR)"}},
 			},
 			Document: &sql.Column{Identifier: "flow_document"},
 		}
+		createLoadTable, err := sql.RenderTableTemplate(table, testTemplates.createLoadTable)
+		require.NoError(t, err)
+		loadInsert, err := sql.RenderTableTemplate(table, testTemplates.loadInsert)
+		require.NoError(t, err)
 		loadQuery, err := sql.RenderTableTemplate(table, testTemplates.loadQuery)
 		require.NoError(t, err)
-		_, err = db.ExecContext(ctx, "EXPLAIN PLAN SET STATEMENT_ID = '"+name+"' FOR "+loadQuery)
+
+		// The keys of rows 7 and 254, and one that has no row.
+		_, err = conn.ExecContext(ctx, createLoadTable)
+		require.NoError(t, err)
+		_, err = conn.ExecContext(ctx, loadInsert,
+			[]any{"7", "254", "100001"},
+			[]any{true, false, true},
+			[]any{[]byte{0, 0, 0, 7}, []byte{0, 0, 0, 254}, []byte{0, 1, 0x86, 0xA1}},
+			[]any{"name-7", "name-254", "name-100001"},
+		)
 		require.NoError(t, err)
 
-		rows, err := db.QueryContext(ctx, "SELECT operation || ' ' || options || ' ' || object_name FROM plan_table WHERE statement_id = :1 ORDER BY id", name)
+		rows, err := conn.QueryContext(ctx, loadQuery)
+		require.NoError(t, err)
+		var docs []string
+		for rows.Next() {
+			var doc string
+			require.NoError(t, rows.Scan(&doc))
+			docs = append(docs, doc)
+		}
+		require.NoError(t, rows.Err())
+		require.ElementsMatch(t, []string{`{"id":7}`, `{"id":254}`}, docs)
+
+		_, err = conn.ExecContext(ctx, "EXPLAIN PLAN SET STATEMENT_ID = '"+name+"' FOR "+loadQuery)
+		require.NoError(t, err)
+
+		rows, err = conn.QueryContext(ctx, "SELECT operation || ' ' || options || ' ' || object_name FROM plan_table WHERE statement_id = :1 ORDER BY id", name)
 		require.NoError(t, err)
 		var ops []string
 		for rows.Next() {
@@ -242,7 +275,7 @@ func TestIntegration(t *testing.T) {
 		var plan = strings.Join(ops, "\n")
 		require.Contains(t, plan, "NESTED LOOPS", plan)
 		require.Contains(t, plan, "INDEX UNIQUE SCAN", plan)
-		require.NotContains(t, plan, "TABLE ACCESS FULL", plan)
+		require.NotContains(t, plan, "TABLE ACCESS FULL "+strings.ToUpper(name), plan)
 	})
 
 	// The boundary keeps its fraction.

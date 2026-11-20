@@ -13,6 +13,10 @@ To use this connector, you'll need:
 - An Oracle database to which to materialize, and user credentials.
   - Oracle Database 23ai and later are supported, including 26ai.
   - The database character set must be `AL32UTF8`.
+  - The `PRIVATE_TEMP_TABLE_PREFIX` parameter must keep its default, `ORA$PTT_`.
+    Standard updates look up existing documents through private temporary
+    tables named `ORA$PTT_FLOW_LOAD_<n>`, which exist only in the connector's
+    session.
   - The connector creates tables in the schema you configure, so the user needs
     to be able to create tables in it and needs a quota on its tablespace.
 - At least one Estuary collection

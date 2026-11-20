@@ -348,7 +348,11 @@ type binding struct {
 	target    sql.Table
 	insertSQL string
 	deleteSQL string
-	loadSQL   string
+	// loadInsertSQL fills the binding's load table with keys, loadSQL selects
+	// their documents, and loadClearSQL empties the table again.
+	loadInsertSQL string
+	loadSQL       string
+	loadClearSQL  string
 	// order maps each INSERT bind position to its index in
 	// Table.ConvertAll's output, and lobStart is the first position of a LOB
 	// column.
@@ -424,7 +428,7 @@ func newTransactor(
 	}
 
 	for _, target := range bindings {
-		if err := t.addBinding(target, templates); err != nil {
+		if err := t.addBinding(ctx, target, templates); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 		}
 	}
@@ -432,21 +436,31 @@ func newTransactor(
 	return t, nil
 }
 
-func (t *transactor) addBinding(target sql.Table, templates templates) error {
-	var b = &binding{target: target}
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, templates templates) error {
+	var b = &binding{target: target, loadClearSQL: "TRUNCATE TABLE " + loadTableName(target.Binding)}
 	_, b.order, b.lobStart = storeColumns(&target)
 
+	var createLoadTable string
 	for _, m := range []struct {
 		sql *string
 		tpl *template.Template
 	}{
 		{&b.insertSQL, templates.storeInsert},
 		{&b.deleteSQL, templates.deleteQuery},
+		{&createLoadTable, templates.createLoadTable},
+		{&b.loadInsertSQL, templates.loadInsert},
 		{&b.loadSQL, templates.loadQuery},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
 			return err
+		}
+	}
+
+	// Only standard bindings are loaded.
+	if !target.DeltaUpdates {
+		if _, err := t.load.conn.ExecContext(ctx, createLoadTable); err != nil {
+			return fmt.Errorf("creating the temporary load table: %w", err)
 		}
 	}
 
@@ -514,9 +528,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	var ctx = it.Context()
 	var started bool
 
+	// pending holds a binding's keys to load, one array per key column.
 	type pending struct {
-		buf  []byte
-		keys int
+		keys  [][]any
+		bytes int
 	}
 	var batches = make(map[int]*pending)
 
@@ -528,10 +543,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			t.be.StartedEvaluatingLoads()
 			started = true
 		}
-		p.buf = append(p.buf, ']')
 		var b = t.bindings[binding]
 
-		rows, err := t.load.conn.QueryContext(ctx, b.loadSQL, go_ora.Clob{String: string(p.buf), Valid: true})
+		if _, err := t.load.conn.ExecContext(ctx, b.loadInsertSQL, asArgs(p.keys)...); err != nil {
+			return fmt.Errorf("inserting Load keys of %s: %w", b.target.Identifier, err)
+		}
+		rows, err := t.load.conn.QueryContext(ctx, b.loadSQL)
 		if err != nil {
 			return fmt.Errorf("querying Load documents of %s: %w", b.target.Identifier, err)
 		}
@@ -548,7 +565,14 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if err := rows.Err(); err != nil {
 			return fmt.Errorf("reading Load documents of %s: %w", b.target.Identifier, err)
 		}
-		p.buf, p.keys = p.buf[:0], 0
+
+		if _, err := t.load.conn.ExecContext(ctx, b.loadClearSQL); err != nil {
+			return fmt.Errorf("clearing Load keys of %s: %w", b.target.Identifier, err)
+		}
+		for i := range p.keys {
+			p.keys[i] = p.keys[i][:0]
+		}
+		p.bytes = 0
 		return nil
 	}
 
@@ -556,7 +580,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		var b = t.bindings[it.Binding]
 		var p, ok = batches[it.Binding]
 		if !ok {
-			p = &pending{}
+			p = &pending{keys: make([][]any, len(b.target.Keys))}
 			batches[it.Binding] = p
 		}
 
@@ -564,17 +588,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
 		}
-		if p.keys == 0 {
-			p.buf = append(p.buf, '[')
-		} else {
-			p.buf = append(p.buf, ',')
+		for i, v := range converted {
+			p.keys[i] = append(p.keys[i], v)
+			p.bytes += valueSize(v)
 		}
-		if p.buf, err = appendLoadKey(p.buf, &b.target, converted); err != nil {
-			return err
-		}
-		p.keys++
 
-		if p.keys >= loadBatchKeys || len(p.buf) >= loadBatchBytes {
+		if len(p.keys[0]) >= loadBatchKeys || p.bytes >= loadBatchBytes {
 			if err := query(it.Binding, p); err != nil {
 				return err
 			}
@@ -585,7 +604,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	for binding, p := range batches {
-		if p.keys == 0 {
+		if len(p.keys[0]) == 0 {
 			continue
 		} else if err := query(binding, p); err != nil {
 			return err

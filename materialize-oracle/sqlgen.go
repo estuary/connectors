@@ -1,8 +1,6 @@
 package connector
 
 import (
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math"
 	"regexp"
@@ -365,98 +363,19 @@ func storeColumns(t *sql.Table) (cols []*sql.Column, order []int, lobStart int) 
 	return cols, order, lobStart
 }
 
-// keyKind is how a key column is sent to JSON_TABLE and compared to the
-// table's column.
-type keyKind int
-
-const (
-	keyNumber keyKind = iota
-	keyString
-	keyRaw
-	keyBoolean
-)
-
-func keyKindOf(c *sql.Column) keyKind {
-	switch {
-	case strings.HasPrefix(c.BareDDL, "NUMBER"):
-		return keyNumber
-	case strings.HasPrefix(c.BareDDL, "RAW"):
-		return keyRaw
-	case c.BareDDL == "BOOLEAN":
-		return keyBoolean
-	default:
-		return keyString
-	}
-}
-
-// loadKeyColumn is the JSON_TABLE column of the key at index. A key that
-// fails to convert is an error rather than a silent miss.
-func loadKeyColumn(c sql.Column, index int) string {
-	var ddl = "VARCHAR2(4000)"
-	switch keyKindOf(&c) {
-	case keyNumber:
-		ddl = "NUMBER"
-	case keyBoolean:
-		ddl = "VARCHAR2(5)"
-	}
-	return fmt.Sprintf("k%d %s PATH '$[%d]' ERROR ON ERROR", index, ddl, index)
-}
-
-// loadKeyExpr converts the JSON_TABLE column of the key at index to the type
-// of the table's column.
-func loadKeyExpr(c sql.Column, index int) string {
-	var lk = fmt.Sprintf("l.k%d", index)
-	switch keyKindOf(&c) {
-	case keyRaw:
-		return "HEXTORAW(" + lk + ")"
-	case keyBoolean:
-		return "TO_BOOLEAN(" + lk + ")"
-	}
-	return lk
-}
-
-// appendLoadKey appends a converted key as a JSON array to buf.
-func appendLoadKey(buf []byte, t *sql.Table, converted []any) ([]byte, error) {
-	buf = append(buf, '[')
-	for i, v := range converted {
-		if i > 0 {
-			buf = append(buf, ',')
-		}
-		var elem any
-		switch keyKindOf(&t.Keys[i]) {
-		case keyNumber:
-			s, ok := v.(string)
-			if !ok {
-				return nil, fmt.Errorf("key %s: unexpected %T for a number", t.Keys[i].Field, v)
-			}
-			elem = json.Number(s)
-		case keyRaw:
-			b, ok := v.([]byte)
-			if !ok {
-				return nil, fmt.Errorf("key %s: unexpected %T for binary", t.Keys[i].Field, v)
-			}
-			elem = hex.EncodeToString(b)
-		case keyBoolean:
-			b, ok := v.(bool)
-			if !ok {
-				return nil, fmt.Errorf("key %s: unexpected %T for a boolean", t.Keys[i].Field, v)
-			}
-			elem = strconv.FormatBool(b)
-		default:
-			elem = v
-		}
-		enc, err := json.Marshal(elem)
-		if err != nil {
-			return nil, fmt.Errorf("encoding key %s: %w", t.Keys[i].Field, err)
-		}
-		buf = append(buf, enc...)
-	}
-	return append(buf, ']'), nil
+// loadTableName names the private temporary table that holds a binding's Load
+// keys. A private temporary table exists only in its session, and its name
+// must start with the database's PRIVATE_TEMP_TABLE_PREFIX, ORA$PTT_ by
+// default.
+func loadTableName(binding int) string {
+	return fmt.Sprintf("ORA$PTT_FLOW_LOAD_%d", binding)
 }
 
 type templates struct {
 	createTargetTable *template.Template
 	alterTableColumns *template.Template
+	createLoadTable   *template.Template
+	loadInsert        *template.Template
 	loadQuery         *template.Template
 	storeInsert       *template.Template
 	deleteQuery       *template.Template
@@ -500,24 +419,43 @@ ALTER TABLE {{$.Identifier}}
 ){{ end }}
 {{ end }}
 
--- Selects the documents of a JSON array of key tuples, bound as :1.
---
--- The optimizer has no row estimate for JSON_TABLE over a bind, and without
--- one hash-joins it to a full scan of the table, even with join hints. The
--- cardinality hint makes it look up each key in the primary key.
+-- Creates the temporary table of a binding's Load keys, for the session.
+
+{{ define "createLoadTable" }}
+CREATE PRIVATE TEMPORARY TABLE {{ LoadTable $.Binding }} (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }}, {{ end -}}
+		{{$key.Identifier}} {{$key.BareDDL}}
+	{{- end -}}
+) ON COMMIT PRESERVE DEFINITION
+{{ end }}
+
+-- Inserts one Load key per element of the bound arrays.
+
+{{ define "loadInsert" }}
+INSERT INTO {{ LoadTable $.Binding }} (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }}, {{ end -}}
+		{{$key.Identifier}}
+	{{- end -}}
+) VALUES (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }}, {{ end -}}
+		{{ Bind $key $ind }}
+	{{- end -}}
+)
+{{ end }}
+
+-- Selects the documents of the keys in the load table. Without the hints the
+-- optimizer may hash-join them to a full scan of the table.
 
 {{ define "loadQuery" }}
 {{ if $.Document -}}
-SELECT /*+ LEADING(l r) USE_NL(r) INDEX(r) CARDINALITY(l 10) */ r.{{$.Document.Identifier}}
-FROM JSON_TABLE(:1, '$[*]' ERROR ON ERROR COLUMNS (
-	{{- range $ind, $key := $.Keys }}
-		{{- if $ind }}, {{ end -}}
-		{{ LoadKeyColumn $key $ind }}
-	{{- end -}}
-)) l
+SELECT /*+ LEADING(l r) USE_NL(r) INDEX(r) */ r.{{$.Document.Identifier}}
+FROM {{ LoadTable $.Binding }} l
 JOIN {{$.Identifier}} r ON {{ range $ind, $key := $.Keys }}
 	{{- if $ind }} AND {{ end -}}
-	r.{{$key.Identifier}} = {{ LoadKeyExpr $key $ind }}
+	r.{{$key.Identifier}} = l.{{$key.Identifier}}
 {{- end }}
 {{ end -}}
 {{ end }}
@@ -562,14 +500,15 @@ UPDATE {{ Identifier $.TablePath }}
 			var cols, _, _ = storeColumns(&t)
 			return cols
 		},
-		"Bind":          bindExpr,
-		"LoadKeyColumn": loadKeyColumn,
-		"LoadKeyExpr":   loadKeyExpr,
+		"Bind":      bindExpr,
+		"LoadTable": loadTableName,
 	})
 
 	return templates{
 		createTargetTable: tplAll.Lookup("createTargetTable"),
 		alterTableColumns: tplAll.Lookup("alterTableColumns"),
+		createLoadTable:   tplAll.Lookup("createLoadTable"),
+		loadInsert:        tplAll.Lookup("loadInsert"),
 		loadQuery:         tplAll.Lookup("loadQuery"),
 		storeInsert:       tplAll.Lookup("storeInsert"),
 		deleteQuery:       tplAll.Lookup("deleteQuery"),

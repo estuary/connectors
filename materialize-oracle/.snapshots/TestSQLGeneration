@@ -37,11 +37,31 @@ CREATE TABLE IF NOT EXISTS delta_updates (
 	flow_published_at TIMESTAMP(9) WITH TIME ZONE NOT NULL
 )--- End delta_updates createTargetTable ---
 
+--- Begin key_value createLoadTable ---
+
+CREATE PRIVATE TEMPORARY TABLE ORA$PTT_FLOW_LOAD_0 (key1 NUMBER(38,0), key2 BOOLEAN, "key!binary" RAW(2000)) ON COMMIT PRESERVE DEFINITION
+--- End key_value createLoadTable ---
+
+--- Begin delta_updates createLoadTable ---
+
+CREATE PRIVATE TEMPORARY TABLE ORA$PTT_FLOW_LOAD_1 (theKey VARCHAR2(1000 CHAR)) ON COMMIT PRESERVE DEFINITION
+--- End delta_updates createLoadTable ---
+
+--- Begin key_value loadInsert ---
+
+INSERT INTO ORA$PTT_FLOW_LOAD_0 (key1, key2, "key!binary") VALUES (TO_NUMBER(:1), :2, :3)
+--- End key_value loadInsert ---
+
+--- Begin delta_updates loadInsert ---
+
+INSERT INTO ORA$PTT_FLOW_LOAD_1 (theKey) VALUES (:1)
+--- End delta_updates loadInsert ---
+
 --- Begin key_value loadQuery ---
 
-SELECT /*+ LEADING(l r) USE_NL(r) INDEX(r) CARDINALITY(l 10) */ r.flow_document
-FROM JSON_TABLE(:1, '$[*]' ERROR ON ERROR COLUMNS (k0 NUMBER PATH '$[0]' ERROR ON ERROR, k1 VARCHAR2(5) PATH '$[1]' ERROR ON ERROR, k2 VARCHAR2(4000) PATH '$[2]' ERROR ON ERROR)) l
-JOIN key_value r ON r.key1 = l.k0 AND r.key2 = TO_BOOLEAN(l.k1) AND r."key!binary" = HEXTORAW(l.k2)
+SELECT /*+ LEADING(l r) USE_NL(r) INDEX(r) */ r.flow_document
+FROM ORA$PTT_FLOW_LOAD_0 l
+JOIN key_value r ON r.key1 = l.key1 AND r.key2 = l.key2 AND r."key!binary" = l."key!binary"
 --- End key_value loadQuery ---
 
 --- Begin delta_updates loadQuery ---
