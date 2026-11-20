@@ -246,6 +246,22 @@ class TestPythonConnectors(unittest.TestCase):
     def test_connector_docs_build_that_connector(self):
         self.assertEqual(classify("source-sentry/CHANGELOG.md")[2], ["source-sentry"])
 
+    def test_connector_test_fixtures_build_only_that_connector(self):
+        result = verdict("tests/source-iceberg/seed.py", "tests/source-iceberg/snapshot.jsonl")
+        self.assertEqual(result["python_connectors"], '["source-iceberg"]')
+        self.assertEqual(result["go_connectors"], "[]")
+        self.assertEqual(result["rust_connectors"], "[]")
+
+    def test_shared_source_test_tooling_builds_python_integration_tests(self):
+        for path in ["tests/run.sh", "tests/template.flow.yaml"]:
+            with self.subTest(path=path):
+                python, go_rust, connectors = classify(path)
+                self.assertTrue(go_rust)
+                self.assertIn("source-iceberg", connectors)
+
+    def test_other_test_tooling_builds_no_python_connector(self):
+        self.assertEqual(classify("tests/smoke.sh")[2], [])
+
 
 class TestCdk(unittest.TestCase):
     def test_cdk_runs_its_checks(self):

@@ -223,6 +223,21 @@ jobs:
           EOF
           flowctl raw spec --source "${RUNNER_TEMP}/smoke.flow.yaml" > /dev/null
 
+      - name: Source connector ${{ matrix.connector.name }} integration tests
+        if: hashFiles(format('tests/{0}/setup.sh', matrix.connector.name)) != ''
+        run: CONNECTOR=${{ matrix.connector.name }} VERSION=local ./tests/run.sh
+
+      - name: Upload ${{ matrix.connector.name }} capture output
+        if: failure() && hashFiles(format('tests/{0}/setup.sh', matrix.connector.name)) != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: capture-output-${{ matrix.connector.name }}
+          path: |
+            .build/tests/${{ matrix.connector.name }}/actual.jsonl
+            .build/tests/${{ matrix.connector.name }}/raw.jsonl
+          retention-days: 7
+          if-no-files-found: warn
+
       - name: Deployment
         uses: ./.github/actions/deploy
         with:
