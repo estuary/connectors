@@ -1,6 +1,5 @@
 services:
   oracle:
-    # 23c Free, the oldest supported release.
     image: 'gvenzl/oracle-free:23.3-slim-faststart'
     platform: linux/amd64
     environment:

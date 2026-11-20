@@ -126,8 +126,6 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	schemas = slices.Compact(schemas)
 	var owners = strings.Join(schemas, ", ")
 
-	// Tables first, since a table may have no columns that we'd otherwise
-	// learn it from.
 	tables, err := c.db.QueryContext(ctx, fmt.Sprintf(
 		"SELECT owner, table_name FROM all_tables WHERE owner IN (%s) AND dropped = 'NO'", owners))
 	if err != nil {
@@ -171,8 +169,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 			HasDefault: defaultLength.Valid && defaultLength.Int64 > 0,
 		}
 		if dataType == "VARCHAR2" || dataType == "NVARCHAR2" || dataType == "CHAR" {
-			// A BYTE semantics column holds a quarter as many characters of
-			// four bytes.
+			// A BYTE semantics column holds a quarter as many characters
 			field.CharacterMaxLength = int(charLength.Int64)
 			if charUsed.String == "B" {
 				field.CharacterMaxLength = int(dataLength.Int64) / 4

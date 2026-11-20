@@ -199,9 +199,7 @@ func (c config) openDB() *stdsql.DB {
 	return stdsql.OpenDB(sessionConnector{connector})
 }
 
-// tlsConfig is verify-full unless another SSL mode is set. The driver sets
-// ServerName to the address it dials, which is localhost through an SSH
-// tunnel, so there the check against the configured host is our own.
+// tlsConfig is verify-full unless another SSL mode is set.
 func (c config) tlsConfig() *tls.Config {
 	switch c.SSLMode {
 	case sslDisable:
@@ -218,6 +216,9 @@ func (c config) tlsConfig() *tls.Config {
 		host = h
 	}
 	return &tls.Config{
+		// When using NetworkTunnel, because the dialed address is `localhost`
+		// we disable the built-in check and instead do the check ourselves against
+		// the configured hostname instead of the dialed `localhost`
 		InsecureSkipVerify: true,
 		VerifyConnection: func(cs tls.ConnectionState) error {
 			if len(cs.PeerCertificates) == 0 {
@@ -335,8 +336,8 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 }
 
 const (
-	// Bounds of the rows of one array-bound statement, which the driver
-	// buffers in full.
+	// The driver buffers array-bound statements fully, so
+	// we bound the number of rows to avoid RAM overuse.
 	storeBatchRows  = 10_000
 	storeBatchBytes = 32 << 20
 	// Bounds of the keys of one Load query.
@@ -480,8 +481,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, templates
 }
 
 // addTruncation prepares b to delete the rows whose col is earlier than a
-// boundary. It returns why b cannot be truncated, as a clause suited for an
-// operator.
+// boundary.
 func addTruncation(b *binding, col *sql.Column) error {
 	// With castToString the column holds text.
 	if col.BareDDL != timestampDDL {
@@ -654,6 +654,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	if err != nil {
 		return nil, fmt.Errorf("DB.BeginTx: %w", err)
 	}
+	// The defuser rolls the transaction back when Store returns, unless
+	// Defuse was called first.
 	var defuser = sql.NewTxDefuser(txn)
 	defer defuser.MaybeRollback()
 
@@ -707,7 +709,6 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if t.cfg.HardDelete && it.Delete {
-			// Next has skipped the deletions of rows that don't exist.
 			for i := range b.target.Keys {
 				batch.deletes[i] = append(batch.deletes[i], converted[i])
 			}
