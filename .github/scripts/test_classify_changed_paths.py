@@ -159,6 +159,25 @@ class TestLanes(unittest.TestCase):
         # this rule it would fall through to the Go & Rust lane like go.mod.
         self.assertEqual(classify("ruff.toml"), (False, False, []))
 
+    def test_image_scan_verdict_inputs_trigger_neither_connector_lane(self):
+        # They change no image; image-scan.yaml checks a change to them against
+        # the published images instead. The scan's scripts and workflow are
+        # other CI files, which build no connector either.
+        for path in [
+            "trivy.yaml",
+            ".trivyignore.yaml",
+            ".github/actions/scan-images/action.yaml",
+            ".github/CODEOWNERS",
+        ]:
+            with self.subTest(path=path):
+                self.assertEqual(classify(path), (False, False, []))
+
+    def test_connector_exceptions_build_that_connector(self):
+        self.assertEqual(
+            classify("source-sentry/.trivyignore.yaml"), (True, False, ["source-sentry"])
+        )
+        self.assertEqual(rust("source-kafka/.trivyignore.yaml"), ["source-kafka"])
+
     def test_nested_pyproject_does_not_make_a_go_connector_python(self):
         # materialize-iceberg/python/pyproject.toml exists. Classing its parent as
         # Python would stop go.yaml building a Go connector.
@@ -341,6 +360,8 @@ class TestRustConnectors(unittest.TestCase):
             ".github/workflows/go.yaml",
             ".github/workflows/delayed-tag.yaml",
             ".github/scripts/delayed_tag.py",
+            ".github/scripts/trivy-scan.sh",
+            ".github/workflows/image-scan.yaml",
             ".github/go-connectors.yaml",
             "scripts/obfuscation/config_allowlist.txt",
         ]:

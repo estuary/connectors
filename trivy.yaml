@@ -1,0 +1,17 @@
+# The scan policy for connector images. .github/scripts/trivy-scan.sh passes
+# this file to every scan, in CI and locally, so the two agree. It also loads
+# the connector's own .trivyignore.yaml, which a bare `trivy image` from the
+# repo root does not: that reads only the root ignore file named below.
+scan:
+  scanners:
+    - vuln
+severity:
+  - HIGH
+  - CRITICAL
+vulnerability:
+  # A finding with no fixed release would block every connector it reaches
+  # with nothing its author can do. Those go through .trivyignore.yaml review
+  # instead.
+  ignore-unfixed: true
+exit-code: 1
+ignorefile: .trivyignore.yaml
