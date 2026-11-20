@@ -138,7 +138,7 @@ func newOracleDialect(defaultSchema string) sql.Dialect {
 				sql.MapStatic("BLOB", sql.UsingConverter(sql.Base64Decoder)),
 			),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
-				sql.MapStatic("NUMBER(38,0)", sql.UsingConverter(numberConverter)),
+				mapNumber,
 				mapText(sql.ToStr),
 				maxNumberDigits,
 			),
@@ -220,6 +220,10 @@ func isStringDDL(ddl string) bool {
 // maxNumberDigits is the precision of NUMBER(38,0).
 const maxNumberDigits = 38
 
+// mapNumber also accepts NUMBER(*,0), which is how Oracle reports an existing
+// INTEGER column.
+var mapNumber = sql.MapStatic("NUMBER(38,0)", sql.AlsoCompatibleWith("NUMBER(*,0)"), sql.UsingConverter(numberConverter))
+
 // mapInteger maps to NUMBER(38,0) unless the schema's range needs more
 // digits, in which case the integer is stored as text.
 func mapInteger(p *sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
@@ -230,7 +234,7 @@ func mapInteger(p *sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.El
 		}
 	}
 	if digits <= maxNumberDigits {
-		return sql.MapStatic("NUMBER(38,0)", sql.UsingConverter(numberConverter))(p)
+		return mapNumber(p)
 	} else if digits+1 <= maxVarcharChars {
 		return varcharMapping(digits+1, sql.ToStr)
 	}

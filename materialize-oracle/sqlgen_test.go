@@ -6,7 +6,9 @@ import (
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,6 +82,22 @@ func TestConverters(t *testing.T) {
 
 	_, err := floatConverter("abc")
 	require.Error(t, err)
+}
+
+func TestIntegerCompatibility(t *testing.T) {
+	var integer = testDialect.MapType(&sql.Projection{Projection: pf.Projection{
+		Inference: pf.Inference{Types: []string{"integer"}, Exists: pf.Inference_MUST},
+	}}, sql.FieldConfig{})
+	require.Equal(t, "NUMBER(38,0)", integer.BareDDL)
+
+	for existing, want := range map[string]bool{
+		"NUMBER(38,0)": true,
+		"NUMBER(*,0)":  true,
+		"NUMBER(10,0)": false,
+		"NUMBER":       false,
+	} {
+		require.Equal(t, want, integer.Compatible(boilerplate.ExistingField{Type: existing}), existing)
+	}
 }
 
 func TestVarcharLength(t *testing.T) {
