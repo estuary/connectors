@@ -19,14 +19,9 @@ materializations:
           # (objects are FIELD_OPTIONAL and skipped by recommended selection).
           objectToString: {}
         exclude:
-          # These type changes have no migration in Oracle: integers stored as
-          # VARCHAR2 to numbers (int128 and wider, or more than 38 digits), and
-          # BLOB to or from CLOB, which needs base64 conversion that SQL can't do
-          # for LOBs over 32 KB. Validate returns INCOMPATIBLE, which the control
-          # plane would resolve by backfilling the binding. The test harness
-          # doesn't emulate that resolution, so exclude them rather than let
-          # Apply skip the migration and leave a column type the spec doesn't
-          # expect.
+          # int128 and wider integers are stored as VARCHAR2 because they don't
+          # fit in Oracle's NUMBER type, so converting that VARCHAR2 back into a
+          # numeric type is not possible.
           - int128ToNum
           - int128ToNumStr
           - int128ToIntStr128
@@ -42,6 +37,9 @@ materializations:
           - intStr256ToNumStr
           - intStr257ToNum
           - intStr257ToNumStr
+          # Binary fields are BLOB and strings are CLOB. Oracle's base64 encode
+          # and decode functions support up to 32 KB, so not all values can be
+          # converted safely between the two types.
           - binaryToMulti
           - binaryToString
           - stringToBinary
