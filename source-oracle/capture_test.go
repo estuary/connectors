@@ -474,19 +474,32 @@ func TestSchemaChangesSmartMultiple(t *testing.T) {
 	var tableName2 = tb.CreateTable(ctx, t, uniqueID2, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID1), regexp.MustCompile(uniqueID2))
 
+	// Smart mode's switch to extract mode needs a dictionary in the redo logs
+	// from before the changes it decodes, and a fresh database has none. A real
+	// capture on a database without an earlier dictionary build could fail the
+	// same way.
+	tb.Query(ctx, t, true, "BEGIN SYS.DBMS_LOGMNR_D.BUILD(options => DBMS_LOGMNR_D.STORE_IN_REDO_LOGS); END;")
+
 	var captureCtx, cancelCapture = context.WithCancel(ctx)
 
 	tb.Insert(ctx, t, tableName1, [][]any{{1900, "AA", "No Such State", 20000}})
 	tb.Insert(ctx, t, tableName2, [][]any{{1910, "AA", "No Such State", 20000}})
 
 	var step = 0
+	var backfilledYears = make(map[string]bool)
 	cs.Capture(captureCtx, t, func(data json.RawMessage) {
 		if !strings.Contains(string(data), "bindingStateV1") {
 			var d doc
 			err := json.Unmarshal(data, &d)
 			require.NoError(t, err)
 
-			if d.Year == "1910" && step == 0 {
+			// The capture backfills the two tables in random order. Waiting for
+			// both rows keeps the 1920 row out of table 1's backfill.
+			if step == 0 {
+				backfilledYears[d.Year] = true
+			}
+
+			if step == 0 && backfilledYears["1900"] && backfilledYears["1910"] {
 				time.Sleep(1 * time.Second)
 
 				tb.Insert(ctx, t, tableName1, [][]any{{1920, "BB", "No Such State", 10000}})
