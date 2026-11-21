@@ -1,6 +1,6 @@
 services:
   db:
-    image: 'gvenzl/oracle-free:23.2'
+    image: 'gvenzl/oracle-free:23.3'
     platform: 'linux/amd64'
     ports:
       - "1521:1521"
