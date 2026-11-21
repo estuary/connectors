@@ -237,14 +237,23 @@ func getTableObjectMappings(ctx context.Context, watermarksTable string, conn *s
 	defer rows.Close()
 
 	var owner, tableName string
-	var objectID, dataObjectID int
+	var objectID int
+	// A table without a segment of its own, such as a partitioned table, has a
+	// NULL DATA_OBJECT_ID.
+	var nullableDataObjectID sql.NullInt64
 	for rows.Next() {
-		if err := rows.Scan(&owner, &tableName, &objectID, &dataObjectID); err != nil {
+		if err := rows.Scan(&owner, &tableName, &objectID, &nullableDataObjectID); err != nil {
 			return nil, fmt.Errorf("scanning table object identifier row: %w", err)
 		}
 		if !requested[[2]string{owner, tableName}] {
 			continue
 		}
+		// Replication can't capture a table without a DATA_OBJECT_ID, so we fail
+		// here instead of silently skipping it.
+		if !nullableDataObjectID.Valid {
+			return nil, fmt.Errorf("table %s.%s has no DATA_OBJECT_ID", owner, tableName)
+		}
+		var dataObjectID = int(nullableDataObjectID.Int64)
 
 		mapping[joinObjectID(objectID, dataObjectID)] = tableObject{streamID: sqlcapture.JoinStreamID(owner, tableName), objectID: objectID, dataObjectID: dataObjectID}
 	}
