@@ -42,6 +42,18 @@ func TestViewDiscovery(t *testing.T) {
 	}
 }
 
+// A partitioned table stores its rows in one segment per partition, so its
+// own row in ALL_OBJECTS has a NULL DATA_OBJECT_ID. Discovery has to succeed
+// with one in a captured schema.
+func TestPartitionedTableDiscovery(t *testing.T) {
+	var unique = "27450913"
+	var tb, ctx = oracleTestBackend(t), context.Background()
+	tb.CreateTable(ctx, t, unique, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
+	tb.CreateTable(ctx, t, unique+"_partitioned", "(id INTEGER PRIMARY KEY, data VARCHAR(2000)) PARTITION BY HASH (id) PARTITIONS 2")
+
+	tb.CaptureSpec(ctx, t).Discover(ctx, t, regexp.MustCompile(unique))
+}
+
 func TestAllTypes(t *testing.T) {
 	var unique = "18110541"
 	var tb, ctx = oracleTestBackend(t), context.Background()
