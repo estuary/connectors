@@ -761,7 +761,8 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 	return nil
 }
 
-const pollInterval = 10 * time.Second
+// Tests shorten this so each capture doesn't wait 10 seconds for its first poll.
+var pollInterval = 10 * time.Second
 
 // run is the main loop of the replicationStream which loops message
 // receiving and relaying
