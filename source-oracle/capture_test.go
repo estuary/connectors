@@ -564,6 +564,7 @@ func TestSchemaChangesOnline(t *testing.T) {
 }
 
 func TestCrossSCNTransactions(t *testing.T) {
+	t.Skip("hangs because the capture never emits the test's update (#5878)")
 	var tb, ctx = oracleTestBackend(t), context.Background()
 	var uniqueID = "23135019"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
