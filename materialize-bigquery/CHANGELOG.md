@@ -1,5 +1,15 @@
 # materialize-bigquery
 
+## 2026-11-21
+
+### Fixed
+- Changing a `BOOLEAN`, `INTEGER`, `FLOAT`, `BIGNUMERIC`, or `TIMESTAMP` column
+  to `JSON` uses `TO_JSON` instead of `PARSE_JSON`, which only accepts strings.
+  This should stop materializations from failing with `No matching signature
+  for function PARSE_JSON` when a field's new type includes objects or arrays.
+- Changing a `STRING` column to `JSON` keeps text that isn't valid JSON as a
+  JSON string instead of setting it to NULL.
+
 ## 2026-11-11
 
 ### Changed
