@@ -1,0 +1,12 @@
+# ================================
+# Collection "acmeCo/test/c__flow_test_logminer/t66567212": 4 Documents
+# ================================
+{"DATA":"one","ID":"1","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T66567212","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111,"tag":"example_source_tag_1234"}}}
+{"DATA":"three","ID":"3","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T66567212","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111,"tag":"example_source_tag_1234"}}}
+{"DATA":"two","ID":"2","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T66567212","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111,"tag":"example_source_tag_1234"}}}
+{"DATA":"zero","ID":"0","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T66567212","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111,"tag":"example_source_tag_1234"}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT66567212":{"backfilled":2,"key_columns":["ID"],"mode":"Active"}},"cursor":{"PendingTransactions":{},"SCN":111111111"}}
+

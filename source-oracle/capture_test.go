@@ -595,7 +595,7 @@ func TestCrossSCNTransactions(t *testing.T) {
 func TestSourceTag(t *testing.T) {
 	var tb, ctx = oracleTestBackend(t), context.Background()
 	var uniqueID = "66567212"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data VARCHAR2(2000))")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.EndpointSpec.(*Config).Advanced.SourceTag = "example_source_tag_1234"
 	sqlcapture.TestShutdownAfterCaughtUp = true
