@@ -7,6 +7,12 @@ STARTUP MOUNT;
 ALTER DATABASE ARCHIVELOG;
 ALTER DATABASE OPEN;
 
+-- The image's two 20 MB redo log groups are reused so quickly that LogMiner can
+-- still be reading one when it's overwritten (ORA-01368).
+ALTER DATABASE ADD LOGFILE GROUP 3 ('/opt/oracle/oradata/FREE/redo03.log') SIZE 200M;
+ALTER DATABASE ADD LOGFILE GROUP 4 ('/opt/oracle/oradata/FREE/redo04.log') SIZE 200M;
+ALTER DATABASE ADD LOGFILE GROUP 5 ('/opt/oracle/oradata/FREE/redo05.log') SIZE 200M;
+
 -- Enable supplemental logging (required for LogMiner CDC)
 ALTER DATABASE ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS;
 
