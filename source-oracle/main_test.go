@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/go/common"
@@ -39,6 +40,8 @@ func TestMain(m *testing.M) {
 		}
 		log.SetLevel(level)
 	}
+
+	pollInterval = 1 * time.Second
 
 	os.Exit(m.Run())
 }
