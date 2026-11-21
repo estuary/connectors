@@ -9,9 +9,13 @@ services:
         "ORACLE_PASSWORD": "adminpassword",
         "ORACLE_DATABASE": "TEST"
       }
+    # The image's healthcheck.sh passes before docker-initdb.sql runs, so we
+    # check that the test user can log in instead.
     healthcheck:
-      test: "healthcheck.sh"
+      test: ["CMD-SHELL", "printf 'WHENEVER SQLERROR EXIT FAILURE\\nSELECT 1 FROM DUAL;\\n' | sqlplus -s -L 'C##FLOW_TEST_BATCH/FLOW123@localhost/FREE'"]
       interval: 10s
+      start_period: 300s
+      start_interval: 5s
     networks:
       - flow-test
     volumes:
