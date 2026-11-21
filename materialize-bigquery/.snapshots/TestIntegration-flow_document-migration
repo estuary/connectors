@@ -30,7 +30,7 @@ Table Data:
 
 Feature flags: "objects_and_arrays_as_json"
 Resource: estuary-theatre.testing.migration_test
-["applied.actionDescription", "ALTER TABLE `estuary-theatre`.testing.migration_test\n\tADD COLUMN obj_flowtmp1 JSON,\n\tADD COLUMN flow_document_flowtmp1 JSON;\nUPDATE `estuary-theatre`.testing.migration_test SET obj_flowtmp1 = SAFE.PARSE_JSON(obj), flow_document_flowtmp1 = SAFE.PARSE_JSON(flow_document) WHERE true;\nALTER TABLE `estuary-theatre`.testing.migration_test\n\tDROP COLUMN obj,\n\tDROP COLUMN flow_document;\nALTER TABLE `estuary-theatre`.testing.migration_test\n\tRENAME COLUMN obj_flowtmp1 TO obj,\n\tRENAME COLUMN flow_document_flowtmp1 TO flow_document;"]
+["applied.actionDescription", "ALTER TABLE `estuary-theatre`.testing.migration_test\n\tADD COLUMN obj_flowtmp1 JSON,\n\tADD COLUMN flow_document_flowtmp1 JSON;\nUPDATE `estuary-theatre`.testing.migration_test SET obj_flowtmp1 = CASE WHEN obj IS NULL OR obj = '' THEN NULL ELSE COALESCE(SAFE.PARSE_JSON(obj), TO_JSON(obj)) END, flow_document_flowtmp1 = CASE WHEN flow_document IS NULL OR flow_document = '' THEN NULL ELSE COALESCE(SAFE.PARSE_JSON(flow_document), TO_JSON(flow_document)) END WHERE true;\nALTER TABLE `estuary-theatre`.testing.migration_test\n\tDROP COLUMN obj,\n\tDROP COLUMN flow_document;\nALTER TABLE `estuary-theatre`.testing.migration_test\n\tRENAME COLUMN obj_flowtmp1 TO obj,\n\tRENAME COLUMN flow_document_flowtmp1 TO flow_document;"]
 ["applied.actionDescription", ""]
 
 {"Name":"flow_document","Nullable":true,"Type":"JSON"}

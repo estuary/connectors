@@ -133,10 +133,13 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 			"float":      {sql.NewMigrationSpec([]string{"string"})},
 			"date":       {sql.NewMigrationSpec([]string{"string"})},
 			"timestamp":  {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
-			"string":     {sql.NewMigrationSpec([]string{"bytes"}, sql.WithCastSQL(stringToBytesCast))},
-			"bytes":      {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(bytesToStringCast))},
-			"json":       {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(jsonToStringCast))},
-			"*":          {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
+			"string": {
+				sql.NewMigrationSpec([]string{"bytes"}, sql.WithCastSQL(stringToBytesCast)),
+				sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(stringToJsonCast)),
+			},
+			"bytes": {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(bytesToStringCast))},
+			"json":  {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(jsonToStringCast))},
+			"*":     {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
@@ -170,18 +173,24 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 }
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
-	// Object and array fields stored as text hold serialized JSON (e.g. after
-	// objects_and_arrays_as_json was disabled, or the historical string
-	// behavior), so PARSE_JSON restores their structure when migrating back to a
-	// JSON column. SAFE.PARSE_JSON maps the empty-string representation of a null
-	// object/array to NULL rather than erroring. Scalar values widened to JSON
-	// are wrapped as-is with TO_JSON.
-	if slices.ContainsFunc(migration.Inference.Types, func(t string) bool {
+	return fmt.Sprintf(`TO_JSON(%s)`, migration.Identifier)
+}
+
+// stringToJsonCast parses STRING values back into JSON when the field can now be
+// an object or array, because such fields stored as text hold serialized JSON
+// (e.g. after objects_and_arrays_as_json was disabled), with an empty string for
+// null. Text that isn't valid JSON is kept as a JSON string so plain-text values
+// aren't lost.
+func stringToJsonCast(migration sql.ColumnTypeMigration) string {
+	if !slices.ContainsFunc(migration.Inference.Types, func(t string) bool {
 		return t == "object" || t == "array"
 	}) {
-		return fmt.Sprintf(`SAFE.PARSE_JSON(%s)`, migration.Identifier)
+		return toJsonCast(migration)
 	}
-	return fmt.Sprintf(`TO_JSON(%s)`, migration.Identifier)
+	return fmt.Sprintf(
+		`CASE WHEN %[1]s IS NULL OR %[1]s = '' THEN NULL ELSE COALESCE(SAFE.PARSE_JSON(%[1]s), TO_JSON(%[1]s)) END`,
+		migration.Identifier,
+	)
 }
 
 // jsonToStringCast serializes a JSON column to its textual representation. Used

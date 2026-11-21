@@ -11,6 +11,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/go/common"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -275,4 +276,42 @@ func TestLoadQueryLengthLimit(t *testing.T) {
 
 	// The limit leaves the bounds of the subqueries as they were.
 	require.Len(t, subqueries[0].bounds[0].Ranges, 2)
+}
+
+func TestToJsonMigrationCasts(t *testing.T) {
+	var objectOrBool = sql.Projection{Projection: pf.Projection{
+		Field:     "multi",
+		Inference: pf.Inference{Types: []string{"boolean", "object"}, Exists: pf.Inference_MAY},
+	}}
+	var stringOrBool = sql.Projection{Projection: pf.Projection{
+		Field:     "multi",
+		Inference: pf.Inference{Types: []string{"boolean", "string"}, Exists: pf.Inference_MAY, String_: &pf.Inference_String{}},
+	}}
+
+	// Existing types are spelled the way BigQuery's INFORMATION_SCHEMA reports them.
+	for _, tc := range []struct {
+		existingType string
+		projection   sql.Projection
+		want         string
+	}{
+		{"BOOLEAN", objectOrBool, "TO_JSON(multi)"},
+		{"INTEGER", objectOrBool, "TO_JSON(multi)"},
+		{"FLOAT", objectOrBool, "TO_JSON(multi)"},
+		{"BIGNUMERIC", objectOrBool, "TO_JSON(multi)"},
+		{"TIMESTAMP", objectOrBool, "TO_JSON(multi)"},
+		{"STRING", objectOrBool, "CASE WHEN multi IS NULL OR multi = '' THEN NULL ELSE COALESCE(SAFE.PARSE_JSON(multi), TO_JSON(multi)) END"},
+		{"STRING", stringOrBool, "TO_JSON(multi)"},
+	} {
+		var mapped = testDialect.MapType(&tc.projection, sql.FieldConfig{})
+		require.Equal(t, "JSON", mapped.BareDDL)
+
+		var spec = testDialect.MigratableTypes.FindMigrationSpec(
+			boilerplate.ExistingField{Name: "multi", Type: tc.existingType}, mapped)
+		require.NotNil(t, spec, tc.existingType)
+
+		require.Equal(t, tc.want, spec.CastSQL(sql.ColumnTypeMigration{
+			Column:        sql.Column{Projection: tc.projection, MappedType: mapped, Identifier: "multi"},
+			MigrationSpec: *spec,
+		}), tc.existingType)
+	}
 }
