@@ -10,6 +10,9 @@
 ### Fixed
 - Captures and discovery no longer fail with `converting NULL to int is unsupported` when a schema contains a table that discovery skips, such as a partitioned table. The 2026-11-19 release introduced this error.
 
+### Changed
+- Replication closes its database sessions when it stops, instead of leaving them open until the connector exits.
+
 ## 2026-11-19
 
 ### Fixed
