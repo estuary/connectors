@@ -44,7 +44,7 @@ func TestFlushFeatureFlags(t *testing.T) {
 			bindings: []binding{{
 				tableName:      "no_published_at",
 				path:           []string{"no_published_at"},
-				publishedAtErr: errors.New("the binding excludes the flow_published_at field, which must be included to enable deletion after a backfill"),
+				publishedAtErr: errors.New("the binding excludes the flow_published_at field, which must be included to enable truncation after a backfill"),
 			}},
 			truncateAfterBackfill: flags["truncate_after_backfill"],
 		}
@@ -98,17 +98,17 @@ func TestPublishedAtField(t *testing.T) {
 		{
 			name:    "field excluded",
 			values:  []boilerplate.MappedProjection[mappedType]{projection("other", "/other", nil)},
-			wantErr: "the binding excludes the flow_published_at field, which must be included to enable deletion after a backfill",
+			wantErr: "the binding excludes the flow_published_at field, which must be included to enable truncation after a backfill",
 		},
 		{
 			name:    "not a string",
 			values:  []boilerplate.MappedProjection[mappedType]{projection("flow_published_at", "/_meta/uuid", nil)},
-			wantErr: "field flow_published_at projects /_meta/uuid without a string type, where a date-time with uuid encoding is required",
+			wantErr: `field "flow_published_at" projects /_meta/uuid without a string type, where a date-time with uuid encoding is required`,
 		},
 		{
 			name:    "unexpected format",
 			values:  []boilerplate.MappedProjection[mappedType]{projection("flow_published_at", "/_meta/uuid", &pf.Inference_String{Format: "uuid"})},
-			wantErr: `field flow_published_at projects /_meta/uuid with the unexpected format "uuid" and content encoding "", where a date-time with uuid encoding is required`,
+			wantErr: `field "flow_published_at" projects /_meta/uuid with the unexpected format "uuid" and content encoding "", where a date-time with uuid encoding is required`,
 		},
 		{
 			name:   "later qualifying field wins over earlier mismatch",
@@ -116,9 +116,9 @@ func TestPublishedAtField(t *testing.T) {
 			field:  "flow_published_at",
 		},
 		{
-			name:    "first mismatch is reported",
+			name:    "last mismatch is reported",
 			values:  []boilerplate.MappedProjection[mappedType]{projection("custom", "/_meta/uuid", nil), projection("flow_published_at", "/_meta/uuid", &pf.Inference_String{Format: "uuid"})},
-			wantErr: "field custom projects /_meta/uuid without a string type, where a date-time with uuid encoding is required",
+			wantErr: `field "flow_published_at" projects /_meta/uuid with the unexpected format "uuid" and content encoding "", where a date-time with uuid encoding is required`,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

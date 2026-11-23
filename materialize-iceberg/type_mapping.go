@@ -266,20 +266,19 @@ func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.Mapp
 func publishedAtColumn(mb *boilerplate.MappedBinding[config, resource, mapped]) (*boilerplate.MappedProjection[mapped], error) {
 	var reason error
 	for i := range mb.Values {
-		p := &mb.Values[i]
+		var p = &mb.Values[i]
 		if p.Ptr != "/_meta/uuid" {
 			continue
 		}
-		if s := p.Inference.String_; s == nil {
-			reason = fmt.Errorf("field %s projects /_meta/uuid without a string type, where a date-time with uuid encoding is required", p.Field)
-		} else if s.Format != "date-time" || s.ContentEncoding != "uuid" {
-			reason = fmt.Errorf("field %s projects /_meta/uuid with the unexpected format %q and content encoding %q, where a date-time with uuid encoding is required", p.Field, s.Format, s.ContentEncoding)
-		} else {
-			return p, nil
+		var err = boilerplate.PublishedAtMismatch(&p.Projection.Projection)
+		if err != nil {
+			reason = err
+			continue
 		}
+		return p, nil
 	}
 	if reason == nil {
-		reason = fmt.Errorf("the binding excludes the flow_published_at field, which must be included to enable deletion after a backfill")
+		reason = boilerplate.ErrPublishedAtExcluded
 	}
 	return nil, reason
 }
