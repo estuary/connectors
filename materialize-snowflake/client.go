@@ -133,9 +133,9 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		relevantExistingSchemasAndTables[loc.TableSchema] = []string{}
 		tables, err := runShowPaginated(ctx, c.xdb, func(cursor *string) string {
 			if cursor != nil {
-				return fmt.Sprintf("SHOW TERSE TABLES IN %q LIMIT %d FROM '%s';", loc.TableSchema, showQueryLimit, *cursor)
+				return fmt.Sprintf("SHOW TERSE TABLES IN %s LIMIT %d FROM %s;", quoteIdentifier(loc.TableSchema), showQueryLimit, quoteLiteral(*cursor))
 			} else {
-				return fmt.Sprintf("SHOW TERSE TABLES IN %q LIMIT %d;", loc.TableSchema, showQueryLimit)
+				return fmt.Sprintf("SHOW TERSE TABLES IN %s LIMIT %d;", quoteIdentifier(loc.TableSchema), showQueryLimit)
 			}
 		})
 		if err != nil {
@@ -170,7 +170,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 				// are quoted since they are already in exactly the form that
 				// they exist in Snowflake. Quoting allows for special
 				// characters and mixed capitalization to work.
-				if err := c.xdb.SelectContext(groupCtx, &columns, fmt.Sprintf("SHOW COLUMNS IN TABLE %q.%q;", schema, table)); err != nil {
+				if err := c.xdb.SelectContext(groupCtx, &columns, fmt.Sprintf("SHOW COLUMNS IN TABLE %s.%s;", quoteIdentifier(schema), quoteIdentifier(table))); err != nil {
 					return err
 				}
 
@@ -295,7 +295,7 @@ func pipeRefreshStatements(tableIdentifier string) []string {
 func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	return runShowPaginated(ctx, c.xdb, func(cursor *string) string {
 		if cursor != nil {
-			return fmt.Sprintf("SHOW TERSE SCHEMAS LIMIT %d FROM '%s';", showQueryLimit, *cursor)
+			return fmt.Sprintf("SHOW TERSE SCHEMAS LIMIT %d FROM %s;", showQueryLimit, quoteLiteral(*cursor))
 		} else {
 			return fmt.Sprintf("SHOW TERSE SCHEMAS LIMIT %d;", showQueryLimit)
 		}
