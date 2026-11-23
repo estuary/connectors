@@ -124,6 +124,11 @@ func TestEmitter(t *testing.T) {
 	require.ElementsMatch(t, gotDocuments[half:], gotDocs)
 }
 
+func TestMakeDocNullBody(t *testing.T) {
+	_, err := makeDoc(emitMessage{m: &pubsub.Message{Data: []byte("null")}})
+	require.ErrorContains(t, err, "could not unmarshal message data as a JSON object")
+}
+
 var _ pc.Connector_CaptureServer = &TestCaptureServer{}
 
 type TestCaptureServer struct {
