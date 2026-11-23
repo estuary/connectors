@@ -104,6 +104,10 @@ func parseSortingKey(sortingKey string) (plainCols []string, allPlain bool) {
 	for i := 0; i < len(sortingKey); i++ {
 		var c = sortingKey[i]
 		switch {
+		case quoted && c == '\\' && i+1 < len(sortingKey):
+			// A backslash escapes the next character, which may be a backtick.
+			cur.WriteString(sortingKey[i : i+2])
+			i++
 		case c == '`':
 			// Two backticks are an escaped backtick within a quoted name, so
 			// quoting only toggles on a single one.
@@ -138,7 +142,7 @@ func parseSortingKey(sortingKey string) (plainCols []string, allPlain bool) {
 		if strings.HasPrefix(col, "`") && strings.HasSuffix(col, "`") && len(col) > 1 {
 			// Real key columns have names like `Contract Code`, which no
 			// unquoted comparison against a Flow field would match.
-			col = strings.ReplaceAll(col[1:len(col)-1], "``", "`")
+			col = unquoteIdentifier(col[1 : len(col)-1])
 		} else if !plainIdentifier.MatchString(col) {
 			allPlain = false
 			continue
@@ -146,6 +150,28 @@ func parseSortingKey(sortingKey string) (plainCols []string, allPlain bool) {
 		out = append(out, col)
 	}
 	return out, allPlain
+}
+
+var identifierEscapes = map[byte]byte{'b': '\b', 'f': '\f', 'n': '\n', 'r': '\r', 't': '\t', '0': 0}
+
+// unquoteIdentifier decodes the inside of a quoted name as ClickHouse renders
+// it: backticks, backslashes and control characters are backslash-escaped.
+func unquoteIdentifier(s string) string {
+	var out strings.Builder
+	for i := 0; i < len(s); i++ {
+		var c = s[i]
+		if c == '\\' && i+1 < len(s) {
+			i++
+			c = s[i]
+			if decoded, ok := identifierEscapes[c]; ok {
+				c = decoded
+			}
+		} else if c == '`' && i+1 < len(s) && s[i+1] == '`' {
+			i++
+		}
+		out.WriteByte(c)
+	}
+	return out.String()
 }
 
 // sortingKeyContainsAll reports whether the sorting key's plain-column terms
