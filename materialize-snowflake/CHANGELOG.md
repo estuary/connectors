@@ -1,5 +1,11 @@
 # materialize-snowflake
 
+## 2026-11-23
+
+### Fixed
+- A private key that is not an RSA key is now rejected with a clear
+  configuration error instead of crashing the connector.
+
 ## 2026-11-17
 
 ### Changed
