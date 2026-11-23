@@ -29,6 +29,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    PositiveInt,
     PrivateAttr,
     ValidationInfo,
     ValidatorFunctionWrapHandler,
@@ -270,7 +271,7 @@ class GraphQLResponse(BaseModel, Generic[T], extra="allow"):
             class ThrottleStatus(BaseModel, extra="allow"):
                 maximumAvailable: int
                 currentlyAvailable: int
-                restoreRate: int
+                restoreRate: PositiveInt
 
             throttleStatus: ThrottleStatus
 

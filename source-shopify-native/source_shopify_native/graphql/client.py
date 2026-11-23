@@ -20,6 +20,8 @@ DEFAULT_RESTORE_RATE = 100
 INITIAL_RETRY_DELAY = 2
 MAX_RETRY_DELAY = 60
 MAX_RETRY_COUNT = 10
+MIN_THROTTLE_DELAY = 1
+MAX_THROTTLE_DELAY = 300
 
 
 class QueryError(RuntimeError):
@@ -91,7 +93,11 @@ class ShopifyGraphQLClient:
                     raise QueryError(msg, query, fatal_errors)
 
                 if is_throttled:
-                    delay = self.maximum_available / self.restore_rate
+                    # We can't assume `throttleStatus` always gives a reasonable wait.
+                    delay = min(
+                        max(self.maximum_available / self.restore_rate, MIN_THROTTLE_DELAY),
+                        MAX_THROTTLE_DELAY,
+                    )
                     log.info(f"Throttled by API. Sleeping {delay} seconds until cost points have been restored.")
                     await asyncio.sleep(delay)
                     continue
