@@ -30,6 +30,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/time/rate"
 )
 
 // logs catches the connector's log lines, which the tests read the stored counts from.
@@ -979,6 +980,101 @@ func TestStoreRecordsDeletedInTwenty(t *testing.T) {
 	}
 }
 
+func TestStoreUpdateRechecksDeletedRecords(t *testing.T) {
+	for _, restore := range []bool{false, true} {
+		t.Run(fmt.Sprintf("restore_deleted=%t", restore), func(t *testing.T) {
+			h := newHarness(t, companies(fmt.Sprintf(`,"restore_deleted":%t`, restore)))
+			trashed := h.fake.seed("companies", record{"externalId": "a", "name": "Before"})
+			gone := h.fake.seed("companies", record{"externalId": "b"})
+			h.fake.seed("companies", record{"externalId": "c"})
+			var checks int
+			h.fake.hook = func(r *http.Request) {
+				filter := r.URL.Query().Get("filter")
+				check := r.URL.Path == "/rest/companies" && strings.Contains(filter, "id[in]")
+				if check {
+					checks++
+				}
+				if check || (restore && r.URL.Path == "/rest/batch/companies") {
+					h.fake.rows["companies"][trashed["id"].(string)]["deletedAt"] = "2026-11-10"
+					delete(h.fake.rows["companies"], gone["id"].(string))
+				}
+			}
+			require.NoError(t, h.store(h.doc(0, `{"id":"a","name":"After"}`),
+				h.doc(0, `{"id":"b","name":"After"}`), h.doc(0, `{"id":"c","name":"After"}`)))
+			require.Equal(t, []string{"upsert"}, h.fake.writes("companies"))
+			require.Equal(t, "After", h.only("companies", "c")["name"])
+			if restore {
+				require.Zero(t, checks)
+				require.Equal(t, stats{received: 3, updated: 3}, h.stats("companies"))
+				require.Nil(t, h.only("companies", "a")["deletedAt"])
+				require.Equal(t, "After", h.only("companies", "b")["name"])
+			} else {
+				require.Equal(t, 1, checks)
+				require.Equal(t, stats{received: 3, updated: 1, skipped: map[string]int{"deleted_in_twenty": 2}}, h.stats("companies"))
+				require.NotNil(t, h.only("companies", "a")["deletedAt"])
+				require.Equal(t, "Before", h.only("companies", "a")["name"])
+				require.Empty(t, h.fake.byKey("companies", "b"))
+			}
+		})
+	}
+}
+
+func TestUpdateWaitsForBothTurnsBeforeReading(t *testing.T) {
+	h := newHarness(t, companies(""))
+	row := h.fake.seed("companies", record{"externalId": "a"})
+	id := row["id"].(string)
+	h.tx.client.limiter = rate.NewLimiter(rate.Every(time.Hour), 2)
+	h.fake.hook = func(r *http.Request) {
+		if r.URL.Path == "/rest/companies" {
+			if tokens := h.tx.client.limiter.Tokens(); tokens >= 1 {
+				t.Errorf("the upsert's turn was still available during the read: %f tokens", tokens)
+			}
+		}
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	defer cancel()
+	var s stats
+	require.NoError(t, h.tx.writeBatch(ctx, h.tx.bindings[0], []pending{
+		{key: "a", id: id, rec: record{"id": id, "name": "After"}},
+	}, true, &s))
+	require.Equal(t, 1, h.fake.count(http.MethodGet, "/rest/companies"))
+	require.Equal(t, 1, s.updated)
+	require.Equal(t, "After", h.only("companies", "a")["name"])
+}
+
+func TestUpdateSplitsLongIDFilters(t *testing.T) {
+	h := newHarness(t, companies(""))
+	var items []pending
+	for i := range 3 {
+		key := strconv.Itoa(i)
+		id := strings.Repeat("a", maxFilterBytes/3) + key
+		h.fake.seed("companies", record{"id": id, "externalId": key})
+		items = append(items, pending{key: key, id: id, rec: record{"id": id, "name": "After"}})
+	}
+	var s stats
+	require.NoError(t, h.tx.writeBatch(t.Context(), h.tx.bindings[0], items, true, &s))
+	require.Equal(t, 2, h.fake.count(http.MethodGet, "/rest/companies"))
+	require.Equal(t, []int{2, 1}, h.fake.batches)
+	require.Equal(t, 3, s.updated)
+}
+
+func TestUpdateRetryRechecksDeletedRecords(t *testing.T) {
+	h := newHarness(t, companies(""))
+	row := h.fake.seed("companies", record{"externalId": "a", "name": "Before"})
+	id := row["id"].(string)
+	h.fake.failNext("/rest/batch/companies", 503, nil, messagesBody("Unavailable"))
+	h.fake.hook = func(r *http.Request) {
+		if r.URL.Path == "/rest/batch/companies" {
+			h.fake.rows["companies"][id]["deletedAt"] = "2026-11-10"
+		}
+	}
+	require.NoError(t, h.store(h.doc(0, `{"id":"a","name":"After"}`)))
+	require.Equal(t, []string{"upsert"}, h.fake.writes("companies"))
+	require.Equal(t, stats{received: 1, skipped: map[string]int{"deleted_in_twenty": 1}}, h.stats("companies"))
+	require.NotNil(t, h.only("companies", "a")["deletedAt"])
+	require.Equal(t, "Before", h.only("companies", "a")["name"])
+}
+
 func TestStoreUniqueConflicts(t *testing.T) {
 	h := newHarness(t, companies(""))
 	other := h.fake.seed("companies", record{"externalId": "other", "domainName": map[string]any{"primaryLinkUrl": "acme.com"}})
@@ -1375,12 +1471,41 @@ func TestMessages(t *testing.T) {
 	require.Equal(t, []string{"a", "b"}, messages([]byte(`{"messages":["a","b"]}`), false))
 	require.Equal(t, []string{"one"}, messages([]byte(`{"statusCode":400,"message":"one","error":"Bad Request"}`), false))
 	require.Equal(t, []string{"Bad Request"}, messages([]byte(`{"error":"Bad Request"}`), false))
-	require.Equal(t, []string{"<html>oops</html>"}, messages([]byte(`<html>oops</html>`), false))
+	require.Nil(t, messages([]byte(`<html>oops</html>`), false))
 	require.Nil(t, messages(nil, false))
 	// Nested "errors" are read only from the metadata API, so a record error keeps its one message.
 	nested := []byte(`{"message":"top","errors":{"fieldMetadata":[{"errors":[{"message":"inner"}]}]}}`)
 	require.Equal(t, []string{"top"}, messages(nested, false))
 	require.Equal(t, []string{"top", "inner"}, messages(nested, true))
+}
+
+func TestRequestLeavesNonJSONBodiesOutOfErrorsAndLogs(t *testing.T) {
+	for _, status := range []int{200, 400, 503} {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.WriteHeader(status)
+				fmt.Fprintf(w, "<html>Reflected authorization: %s</html>", r.Header.Get("Authorization"))
+			}))
+			defer srv.Close()
+			c := newClient(srv.URL, fakeAPIKey, 60000, 1000)
+			c.sleep = func(context.Context, time.Duration) error { return nil }
+			logs.Reset()
+			_, err := c.objects(t.Context())
+			want := "the answer was not JSON (Content-Type: text/html)"
+			require.ErrorContains(t, err, want)
+			require.NotContains(t, err.Error(), fakeAPIKey)
+			require.NotContains(t, err.Error(), "Reflected authorization")
+			if status == 503 {
+				require.Len(t, logs.AllEntries(), maxAttempts-1)
+			}
+			for _, e := range logs.AllEntries() {
+				require.Contains(t, e.Data["failure"], want)
+				require.NotContains(t, fmt.Sprint(e.Data), fakeAPIKey)
+				require.NotContains(t, fmt.Sprint(e.Data), "Reflected authorization")
+			}
+		})
+	}
 }
 
 func TestMapKind(t *testing.T) {
@@ -1914,7 +2039,8 @@ func TestStoreCreateRefusedByExistingKey(t *testing.T) {
 		if r.Method == http.MethodPost && h.fake.byKeyLocked("companies", "k1") == nil {
 			id := h.fake.newID()
 			row := h.fake.blank("companies")
-			merge(row, record{"id": id, "externalId": "k1", "name": "First try"})
+			merge(row, record{"externalId": "k1", "name": "First try"})
+			row["id"] = id
 			h.fake.rows["companies"][id] = row
 		}
 	}
@@ -1933,7 +2059,8 @@ func TestStoreRetriedCreateRefusedByExistingKey(t *testing.T) {
 			if posts++; posts == 2 {
 				id := h.fake.newID()
 				row := h.fake.blank("people")
-				merge(row, record{"id": id, "externalId": "1"})
+				merge(row, record{"externalId": "1"})
+				row["id"] = id
 				h.fake.rows["people"][id] = row
 			}
 		}
@@ -2694,6 +2821,98 @@ func TestRetryWaitingWithoutDocuments(t *testing.T) {
 	require.Empty(t, h.tx.bindings[0].waiting)
 	// The next transaction saves that.
 	require.JSONEq(t, `{}`, string(h.storeState(h.doc(1, `{"id":"k2"}`))))
+}
+
+func TestRetryWaitingSkipsOnlyTheBindingWithRejectedLinks(t *testing.T) {
+	h := newHarness(t, people(linkCompany), ownedCompanies("userEmail"))
+	h.clock()
+	require.NotNil(t, h.storeState(h.doc(0, `{"id":1,"company":"k1"}`),
+		h.doc(1, `{"id":"k2","owner":"pat@example.com"}`), h.doc(1, `{"id":"k3","owner":"missing@example.com"}`)))
+	h.fake.seed("companies", record{"externalId": "k1"})
+	h.now = h.now.Add(linkRetryEvery)
+	h.fake.failNext("/rest/batch/people", 400, nil, messagesBody("Bad link"))
+	h.tx.retryWaiting(t.Context())
+	require.Contains(t, h.tx.rejected, h.tx.bindings[0])
+
+	h.now = h.now.Add(linkWaitFor)
+	pat := seedMember(h.fake, "pat@example.com", "Pat", "Doe")
+	writes := h.fake.writes("people")
+	h.tx.retryWaiting(t.Context())
+	require.Equal(t, writes, h.fake.writes("people"))
+	require.Len(t, h.tx.bindings[0].waiting, 1)
+	require.Equal(t, pat, h.only("companies", "k2")["accountOwnerId"])
+	require.Empty(t, h.tx.bindings[1].waiting, "the other binding linked k2 and expired k3")
+	require.Equal(t, map[string]int{"link_expired": 1}, h.logged("retried waiting links")["skipped"])
+}
+
+func TestRetryWaitingYieldsToStoreBetweenBindings(t *testing.T) {
+	h := newHarness(t, people(linkCompany), ownedCompanies("userEmail"))
+	h.clock()
+	require.NotNil(t, h.storeState(h.doc(0, `{"id":1,"company":"k1"}`),
+		h.doc(1, `{"id":"k2","owner":"pat@example.com"}`)))
+	h.fake.seed("companies", record{"externalId": "k1"})
+	pat := seedMember(h.fake, "pat@example.com", "Pat", "Doe")
+	h.now = h.now.Add(linkRetryEvery)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	entered, release := make(chan struct{}), make(chan struct{})
+	var order []string
+	h.fake.hook = func(r *http.Request) {
+		switch {
+		case r.URL.Path == "/rest/companies" && strings.Contains(r.URL.Query().Get("filter"), `"k1"`):
+			order = append(order, "first binding")
+			close(entered)
+			select {
+			case <-release:
+			case <-ctx.Done():
+			}
+		case r.URL.Path == "/rest/companies" && strings.Contains(r.URL.Query().Get("filter"), `"k3"`):
+			order = append(order, "Store")
+		case r.URL.Path == "/rest/workspaceMembers":
+			order = append(order, "second binding")
+		}
+	}
+	retried := make(chan struct{})
+	go func() {
+		defer close(retried)
+		h.tx.retryWaiting(ctx)
+	}()
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal("the retry did not start")
+	}
+	item := h.doc(1, `{"id":"k3","name":"New company"}`)
+	it := materialize.NewStoreIterator(ctx, &fakeStream{items: []storeItem{item}}, &pm.Request{Store: &pm.Request_Store{}})
+	stored := make(chan error, 1)
+	go func() {
+		_, err := h.tx.Store(it)
+		stored <- err
+	}()
+	require.Eventually(t, func() bool { return h.tx.storesWaiting.Load() == 1 }, time.Second, time.Millisecond)
+	close(release)
+	<-retried
+	require.NoError(t, <-stored)
+	require.Equal(t, []string{"first binding", "Store", "second binding"}, order)
+	require.Equal(t, pat, h.only("companies", "k2")["accountOwnerId"])
+}
+
+func TestRetryWaitingLeavesTrashedLinkRecordAlone(t *testing.T) {
+	h := waitingJane(t)
+	id := h.only("people", "1")["id"].(string)
+	h.now = h.now.Add(linkRetryEvery)
+	h.fake.hook = func(r *http.Request) {
+		if r.URL.Path == "/rest/people" && strings.Contains(r.URL.Query().Get("filter"), "id[in]") {
+			h.fake.rows["people"][id]["deletedAt"] = "2026-11-10"
+		}
+	}
+	h.tx.retryWaiting(t.Context())
+	require.Equal(t, []string{"create"}, h.fake.writes("people"))
+	require.NotNil(t, h.only("people", "1")["deletedAt"])
+	require.Nil(t, h.only("people", "1")["companyId"])
+	require.Empty(t, h.tx.bindings[0].waiting)
+	require.Equal(t, map[string]int{"link_record_not_in_twenty": 1}, h.logged("retried waiting links")["skipped"])
 }
 
 func TestRetryWaitingFailureKeepsLinks(t *testing.T) {
@@ -3522,6 +3741,25 @@ func TestConnectOldMetadataAPI(t *testing.T) {
 	_, _, err = connect(t.Context(), config{BaseURL: c.baseURL, APIKey: fakeAPIKey})
 	require.ErrorContains(t, err, "something else")
 	require.NotContains(t, err.Error(), "v2.30")
+}
+
+func TestObjectsReadEveryPage(t *testing.T) {
+	f, c := newFakeTwenty(t)
+	for i := range 2*pageSize + 1 {
+		name := fmt.Sprintf("testObjects%03d", i)
+		f.objects[name] = &fakeObject{singular: name, fields: map[string]fakeField{"name": {typ: "TEXT"}}}
+	}
+	objects, err := c.objects(t.Context())
+	require.NoError(t, err)
+	require.Len(t, objects, len(f.objects))
+	require.Equal(t, 3, f.count(http.MethodGet, "/rest/metadata/objects"))
+	want := slices.Sorted(maps.Keys(f.objects))
+	for i, object := range objects {
+		require.Equal(t, want[i], object.NamePlural)
+	}
+	obj, err := findObject(objects, "testObjects400")
+	require.NoError(t, err)
+	require.Len(t, obj.Fields, 2)
 }
 
 func TestValidateRefusesKeyChange(t *testing.T) {

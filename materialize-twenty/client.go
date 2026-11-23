@@ -9,6 +9,7 @@ import (
 	"io"
 	"maps"
 	"math/rand/v2"
+	"mime"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -73,8 +74,8 @@ func inFilterBytes(value string) int {
 
 // sizedBatches splits values into groups of up to maxBatch whose sizes add up to at most
 // maxFilterBytes, so each group's request has a short enough URL.
-func sizedBatches(values []string, size func(string) int) [][]string {
-	var out [][]string
+func sizedBatches[T any](values []T, size func(T) int) [][]T {
+	var out [][]T
 	for len(values) > 0 {
 		n, total := 0, 0
 		for n < min(maxBatch, len(values)) {
@@ -234,17 +235,29 @@ func sleepCtx(ctx context.Context, d time.Duration) error {
 
 // objects lists the workspace's objects with their fields.
 func (c *client) objects(ctx context.Context) ([]objectMeta, error) {
-	var resp struct {
-		Data     []objectMeta `json:"data"`
-		PageInfo pageInfo     `json:"pageInfo"`
+	var objects []objectMeta
+	cursor := ""
+	for {
+		path := fmt.Sprintf("/rest/metadata/objects?limit=%d", pageSize)
+		if cursor != "" {
+			path += "&starting_after=" + escape(cursor)
+		}
+		var resp struct {
+			Data     []objectMeta `json:"data"`
+			PageInfo pageInfo     `json:"pageInfo"`
+		}
+		if err := c.request(ctx, http.MethodGet, path, nil, &resp); err != nil {
+			return nil, err
+		}
+		objects = append(objects, resp.Data...)
+		if !resp.PageInfo.HasNextPage {
+			return objects, nil
+		}
+		if resp.PageInfo.EndCursor == "" || resp.PageInfo.EndCursor == cursor {
+			return nil, errors.New("listing objects: Twenty says there are more pages but gives no new cursor")
+		}
+		cursor = resp.PageInfo.EndCursor
 	}
-	if err := c.request(ctx, http.MethodGet, "/rest/metadata/objects?limit=200", nil, &resp); err != nil {
-		return nil, err
-	}
-	if resp.PageInfo.HasNextPage {
-		return nil, errors.New("the workspace has more than 200 objects, and the connector reads only the first 200")
-	}
-	return resp.Data, nil
 }
 
 // createField adds a field to an object with Twenty's metadata API, labelled with its name.
@@ -386,20 +399,26 @@ func (c *client) findWhere(ctx context.Context, object, filter string) ([]record
 	return rows, err
 }
 
+type recordPage struct {
+	Data     map[string][]record `json:"data"`
+	PageInfo pageInfo            `json:"pageInfo"`
+}
+
+func recordsPath(object, filter string) string {
+	return fmt.Sprintf("/rest/%s?limit=%d&filter=%s", object, pageSize, escape(filter))
+}
+
 // pages calls fn with the records that match a filter, up to 200 at a time. Each page starts
 // after the last record read, so fn may change the records it gets, even so that they stop
 // matching, without the next page skipping any.
 func (c *client) pages(ctx context.Context, object, filter string, fn func([]record) error) error {
 	cursor := ""
 	for {
-		path := fmt.Sprintf("/rest/%s?limit=%d&filter=%s", object, pageSize, escape(filter))
+		path := recordsPath(object, filter)
 		if cursor != "" {
 			path += "&starting_after=" + escape(cursor)
 		}
-		var resp struct {
-			Data     map[string][]record `json:"data"`
-			PageInfo pageInfo            `json:"pageInfo"`
-		}
+		var resp recordPage
 		if err := c.request(ctx, http.MethodGet, path, nil, &resp); err != nil {
 			return err
 		}
@@ -428,6 +447,40 @@ func (c *client) create(ctx context.Context, object string, records []record) ([
 // restores a soft-deleted match, and rejects the whole batch if one record is bad.
 func (c *client) upsert(ctx context.Context, object string, records []record) ([]record, error) {
 	return c.batch(ctx, "/rest/batch/"+object+"?upsert=true", records)
+}
+
+// upsertLive checks which ids are still live, then upserts the records keep returns. The caller
+// keeps the ids short enough for one filter. The read and write wait for their turns up front,
+// leaving a window of one request round trip for a record to be deleted after the read.
+func (c *client) upsertLive(ctx context.Context, object string, ids []string, keep func([]record) []record) error {
+	filter, err := filterIn("id", ids)
+	if err != nil {
+		return err
+	}
+	path := recordsPath(object, "and("+filter+","+anyDeleted+")")
+	var resp struct {
+		Data map[string][]record `json:"data"`
+	}
+	return c.requestWithTurns(ctx, http.MethodPost, "/rest/batch/"+object+"?upsert=true", nil, &resp, 2, func() ([]byte, error) {
+		var page recordPage
+		// An id is unique, so a batch of ids fits in one page.
+		if err := c.requestWithTurns(ctx, http.MethodGet, path, nil, &page, 0, nil); err != nil {
+			var rejected *rejectedError
+			if errors.As(err, &rejected) {
+				// A refused lookup says nothing about whether Twenty would accept the write.
+				return nil, fmt.Errorf("checking records before updating %s: %v", object, err)
+			}
+			return nil, err
+		}
+		if page.PageInfo.HasNextPage {
+			return nil, fmt.Errorf("checking records before updating %s: Twenty returned more than one page of ids", object)
+		}
+		records := keep(page.Data[object])
+		if len(records) == 0 {
+			return nil, nil
+		}
+		return json.Marshal(records)
+	})
 }
 
 func (c *client) batch(ctx context.Context, path string, records []record) ([]record, error) {
@@ -509,6 +562,13 @@ func onlyList(data map[string][]record) []record {
 // to the rate limit, and retries 429, 5xx and network failures with backoff, honoring
 // Retry-After.
 func (c *client) request(ctx context.Context, method, path string, payload, out any) error {
+	return c.requestWithTurns(ctx, method, path, payload, out, 1, nil)
+}
+
+// requestWithTurns waits for turns before each attempt. A read with zero turns uses its paid
+// turn on the first attempt and pays for any retries. A write with prepare rebuilds its body
+// after waiting on every attempt, and skips the request if prepare returns no body.
+func (c *client) requestWithTurns(ctx context.Context, method, path string, payload, out any, turns int, prepare func() ([]byte, error)) error {
 	var body []byte
 	if payload != nil {
 		var err error
@@ -519,8 +579,19 @@ func (c *client) request(ctx context.Context, method, path string, payload, out 
 	name := method + " " + strings.SplitN(path, "?", 2)[0]
 
 	for attempt := 1; ; attempt++ {
-		if err := c.waitTurn(ctx); err != nil {
-			return err
+		for range turns {
+			if err := c.waitTurn(ctx); err != nil {
+				return err
+			}
+		}
+		if turns == 0 {
+			turns = 1
+		}
+		if prepare != nil {
+			var err error
+			if body, err = prepare(); err != nil || body == nil {
+				return err
+			}
 		}
 		status, header, data, err := c.send(ctx, method, path, body)
 		if ctx.Err() != nil {
@@ -530,22 +601,36 @@ func (c *client) request(ctx context.Context, method, path string, payload, out 
 		if err != nil {
 			failure = err.Error()
 		} else {
+			var format string
+			if len(data) > 0 && !json.Valid(data) {
+				contentType, _, _ := mime.ParseMediaType(header.Get("Content-Type"))
+				if contentType == "" {
+					contentType = "unknown"
+				}
+				format = fmt.Sprintf("the answer was not JSON (Content-Type: %s)", contentType)
+			}
+			if status >= 200 && status < 300 {
+				if format != "" {
+					return fmt.Errorf("%s: %s", name, format)
+				}
+				if out != nil && len(data) != 0 && json.Unmarshal(data, out) != nil {
+					return fmt.Errorf("decoding the answer to %s: unexpected JSON structure", name)
+				}
+				return nil
+			}
 			// Twenty's messages can repeat the values sent.
-			raw := messages(data, strings.HasPrefix(path, "/rest/metadata"))
+			var raw []string
+			if format != "" {
+				raw = []string{format}
+			} else {
+				raw = messages(data, strings.HasPrefix(path, "/rest/metadata"))
+			}
 			msgs := make([]string, len(raw))
 			for i, m := range raw {
 				msgs[i] = email.ReplaceAllString(m, "<email>")
 			}
 			failure = fmt.Sprintf("HTTP %d: %s", status, strings.Join(msgs, "; "))
 			switch {
-			case status >= 200 && status < 300:
-				if out == nil || len(data) == 0 {
-					return nil
-				}
-				if err := json.Unmarshal(data, out); err != nil {
-					return fmt.Errorf("decoding the answer to %s: %w", name, err)
-				}
-				return nil
 			case status == 401 || status == 403:
 				return &authError{message: failure}
 			case status == 500 && slices.Contains(raw, "Data validation error."):
@@ -629,7 +714,7 @@ func (c *client) send(ctx context.Context, method, path string, body []byte) (in
 	defer resp.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
-		return 0, nil, nil, err
+		return 0, nil, nil, fmt.Errorf("reading the answer to %s %s failed", method, req.URL.Path)
 	}
 	if len(data) > maxResponseBytes {
 		return 0, nil, nil, fmt.Errorf("the answer to %s %s is over %d bytes", method, req.URL.Path, maxResponseBytes)
@@ -652,10 +737,7 @@ func withoutQuery(err error) error {
 func messages(data []byte, nested bool) []string {
 	var body map[string]json.RawMessage
 	if err := json.Unmarshal(data, &body); err != nil {
-		if len(data) == 0 {
-			return nil
-		}
-		return []string{string(data[:min(len(data), 300)])}
+		return nil
 	}
 	var out []string
 	for _, k := range []string{"messages", "message", "error"} {

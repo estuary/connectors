@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/estuary/connectors/go/materialize"
@@ -43,13 +44,14 @@ const (
 var giveBackTimeout = 30 * time.Second
 
 type transactor struct {
-	mu       sync.Mutex // Store and retryWaiting take turns
-	stop     context.CancelFunc
-	client   *client
-	bindings []*binding
-	be       *materialize.BindingEvents
-	now      func() time.Time
-	changed  bool // a binding's waiting links changed since the last saved state
+	mu            sync.Mutex // Store and retryWaiting take turns
+	storesWaiting atomic.Int32
+	stop          context.CancelFunc
+	client        *client
+	bindings      []*binding
+	be            *materialize.BindingEvents
+	now           func() time.Time
+	changed       bool // a binding's waiting links changed since the last saved state
 	// The found links of a background retry whose write Twenty rejected, under rejected_records
 	// fail. The next transaction tries them again and fails if they're still rejected.
 	rejected map[*binding][]linkSlot
@@ -209,32 +211,43 @@ func (t *transactor) retryLinks(ctx context.Context) {
 }
 
 func (t *transactor) retryWaiting(ctx context.Context) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.members = nil
-	if len(t.rejected) > 0 {
-		return // the next transaction tries them; retrying would only rewrite the same links
+	for i, b := range t.bindings {
+		if ctx.Err() != nil || t.storesWaiting.Load() != 0 {
+			return
+		}
+		t.mu.Lock()
+		if ctx.Err() != nil || t.storesWaiting.Load() != 0 {
+			t.mu.Unlock()
+			return
+		}
+		if i == 0 {
+			t.members = nil
+		}
+		t.retryWaitingBinding(ctx, b)
+		t.mu.Unlock()
 	}
-	for _, b := range t.bindings {
-		if len(b.waiting) == 0 {
-			continue
+}
+
+func (t *transactor) retryWaitingBinding(ctx context.Context, b *binding) {
+	// The next transaction tries this binding's rejected links again.
+	if len(b.waiting) == 0 || len(t.rejected[b]) > 0 {
+		return
+	}
+	var s stats
+	if err := t.linkLater(ctx, b, &s); err != nil {
+		// A link Twenty rejects under rejected_records fail stops the task if the next
+		// transaction's try is rejected too. Other errors leave the links to the next round.
+		if errors.As(err, new(*linkRejectedError)) {
+			t.rejected = put(t.rejected, b, s.unwritten)
 		}
-		var s stats
-		if err := t.linkLater(ctx, b, &s); err != nil {
-			// A link Twenty rejects under rejected_records fail stops the task if the next
-			// transaction's try is rejected too. Other errors leave the links to the next round.
-			if errors.As(err, new(*linkRejectedError)) {
-				t.rejected = put(t.rejected, b, s.unwritten)
-			}
-			if ctx.Err() == nil {
-				log.WithError(err).WithField("object", b.object).Warn("retrying waiting links failed; the next try is in a few minutes")
-			}
-			continue
+		if ctx.Err() == nil {
+			log.WithError(err).WithField("object", b.object).Warn("retrying waiting links failed; the next try is in a few minutes")
 		}
-		if s.linkedLater > 0 || len(s.skipped) > 0 {
-			log.WithFields(log.Fields{"object": b.object, "linkedLater": s.linkedLater, "skipped": s.skipped,
-				"stillWaiting": len(b.waiting)}).Info("retried waiting links")
-		}
+		return
+	}
+	if s.linkedLater > 0 || len(s.skipped) > 0 {
+		log.WithFields(log.Fields{"object": b.object, "linkedLater": s.linkedLater, "skipped": s.skipped,
+			"stillWaiting": len(b.waiting)}).Info("retried waiting links")
 	}
 }
 
@@ -294,7 +307,9 @@ func (s *stats) skip(reason string) {
 // Store writes each binding's documents to Twenty, up to maxBatch documents at a time. Stores
 // arrive grouped by binding and ordered by key, so the documents of a key are adjacent.
 func (t *transactor) Store(it *materialize.StoreIterator) (materialize.StartCommitFunc, error) {
+	t.storesWaiting.Add(1)
 	t.mu.Lock()
+	t.storesWaiting.Add(-1)
 	defer t.mu.Unlock()
 	t.members = nil
 	ctx := it.Context()
@@ -1268,6 +1283,9 @@ func (t *transactor) linkLater(ctx context.Context, b *binding, s *stats) error 
 		return err
 	}
 	s.linkedLater += later.updated
+	for reason, count := range later.skipped {
+		s.skipped = addCount(s.skipped, reason, count)
+	}
 	for range later.rejected {
 		s.skip("link_rejected")
 	}
@@ -1872,7 +1890,7 @@ func (t *transactor) takeBack(ctx context.Context, b *binding, f fieldMeta, item
 	}
 	var empty []pending
 	for _, p := range items {
-		if back.rejectedKeys[p.key] {
+		if back.refusals[p.key] != "" {
 			// The links found by the value are found again (see relink).
 			t.moved = put(t.moved, movedValue{b.object, f.Name, uniqueValue(p.rec, f)}, true)
 			p.rec[f.Name] = emptyUnique(f)
@@ -2002,23 +2020,21 @@ func (t *transactor) recheck(ctx context.Context, b *binding, items []pending, s
 // writeBatch writes records in batches. Twenty rejects a whole batch for one bad record, so a
 // rejected batch is split until each bad record is alone.
 func (t *transactor) writeBatch(ctx context.Context, b *binding, items []pending, update bool, s *stats) error {
-	if len(items) > maxBatch {
-		for start := 0; start < len(items); start += maxBatch {
-			if err := t.writeBatch(ctx, b, items[start:min(start+maxBatch, len(items))], update, s); err != nil {
-				return err
-			}
+	for _, batch := range sizedBatches(items, func(p pending) int {
+		if update && !b.res.RestoreDeleted {
+			return inFilterBytes(p.id)
 		}
-		return nil
+		return 0
+	}) {
+		if err := t.writeOneBatch(ctx, b, batch, update, s); err != nil {
+			return err
+		}
 	}
-	if len(items) == 0 {
-		return nil
-	}
+	return nil
+}
 
-	recs := make([]record, len(items))
-	for i, p := range items {
-		recs[i] = p.rec
-	}
-	err := t.send(ctx, b, recs, update, s)
+func (t *transactor) writeOneBatch(ctx context.Context, b *binding, items []pending, update bool, s *stats) error {
+	items, err := t.send(ctx, b, items, update, s)
 	var rej *rejectedError
 	switch {
 	case err == nil:
@@ -2144,19 +2160,59 @@ func mentions(v any, text string) bool {
 	return true
 }
 
-func (t *transactor) send(ctx context.Context, b *binding, recs []record, update bool, s *stats) error {
-	if update {
-		if _, err := t.client.upsert(ctx, b.object, recs); err != nil {
-			return err
+func (t *transactor) send(ctx context.Context, b *binding, items []pending, update bool, s *stats) ([]pending, error) {
+	records := func(items []pending) []record {
+		recs := make([]record, len(items))
+		for i, p := range items {
+			recs[i] = p.rec
 		}
-		s.updated += len(recs)
-		return nil
+		return recs
 	}
-	if _, err := t.client.create(ctx, b.object, recs); err != nil {
-		return err
+	switch {
+	case !update:
+		if _, err := t.client.create(ctx, b.object, records(items)); err != nil {
+			return items, err
+		}
+		s.created += len(items)
+	case b.res.RestoreDeleted:
+		if _, err := t.client.upsert(ctx, b.object, records(items)); err != nil {
+			return items, err
+		}
+		s.updated += len(items)
+	default:
+		ids := make([]string, len(items))
+		for i, p := range items {
+			ids[i] = p.id
+		}
+		reason := "deleted_in_twenty"
+		if s.linking {
+			reason = "link_record_not_in_twenty"
+		}
+		items = slices.Clone(items)
+		err := t.client.upsertLive(ctx, b.object, ids, func(rows []record) []record {
+			live := make(map[string]bool, len(rows))
+			for _, row := range rows {
+				id, _ := row["id"].(string)
+				live[id] = row["deletedAt"] == nil
+			}
+			items = slices.DeleteFunc(items, func(p pending) bool {
+				if live[p.id] {
+					return false
+				}
+				s.skip(reason)
+				if !s.linking {
+					s.rejectedKeys = put(s.rejectedKeys, p.key, true)
+				}
+				return true
+			})
+			return records(items)
+		})
+		if err != nil {
+			return items, err
+		}
+		s.updated += len(items)
 	}
-	s.created += len(recs)
-	return nil
+	return items, nil
 }
 
 // linkRejectedError is a link Twenty rejected under rejected_records fail.

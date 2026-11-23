@@ -374,7 +374,20 @@ func (f *fakeTwenty) handle(r *http.Request) (int, http.Header, any) {
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	switch {
 	case r.Method == http.MethodGet && path == "/rest/metadata/objects":
-		return 200, nil, map[string]any{"data": f.metadata(), "pageInfo": map[string]any{"hasNextPage": false}}
+		objects := f.metadata()
+		if after := query.Get("starting_after"); after != "" {
+			objects = slices.DeleteFunc(objects, func(o map[string]any) bool { return o["id"].(string) <= after })
+		}
+		limit := pageSize
+		if n, err := strconv.Atoi(query.Get("limit")); err == nil {
+			limit = n
+		}
+		page := objects[:min(limit, len(objects))]
+		info := pageInfo{HasNextPage: len(objects) > limit}
+		if len(page) > 0 {
+			info.EndCursor = page[len(page)-1]["id"].(string)
+		}
+		return 200, nil, map[string]any{"data": page, "pageInfo": info}
 	case r.Method == http.MethodPost && path == "/metadata":
 		return f.graphql(payload)
 	case r.Method == http.MethodPost && path == "/rest/metadata/fields":
