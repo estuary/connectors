@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -102,6 +103,11 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 				constraint = pm.Response_Validated_Constraint{
 					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
 					Reason: "The Slack materialization requires 'text'",
+				}
+			case projection.Field == "blocks" && !slices.Contains(projection.Inference.Types, "array"):
+				constraint = pm.Response_Validated_Constraint{
+					Type:   pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
+					Reason: "The Slack materialization requires 'blocks' to be an array",
 				}
 			case projection.Field == "blocks":
 				constraint = pm.Response_Validated_Constraint{
@@ -276,7 +282,12 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		var blockSet []slack.Block
 
 		if parsed["blocks"] != nil {
-			var blocks = parsed["blocks"].(json.RawMessage)
+			// Only objects and arrays are packed as JSON; scalars arrive as
+			// their native Go type.
+			var blocks, ok = parsed["blocks"].(json.RawMessage)
+			if !ok {
+				return nil, fmt.Errorf("invalid blocks value of type %T: 'blocks' must be an array", parsed["blocks"])
+			}
 			var blocksParsed slack.Blocks
 
 			// Is this jank? This should really be taken care of by the
