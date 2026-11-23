@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"strings"
 	"testing"
 	"text/template"
 
@@ -106,4 +107,36 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	cupaloy.SnapshotT(t, snap.String())
+}
+
+func TestCopyIntoQuotesLiterals(t *testing.T) {
+	_, tables := sql.RunSqlGenTests(
+		t,
+		testDialect,
+		func(table string) []string {
+			return []string{"a-warehouse", "a-schema", table}
+		},
+		sql.TestTemplates{
+			TplAddColumns:  testTemplates.alterTableColumns,
+			TplUpdateFence: testTemplates.updateFence,
+		},
+	)
+
+	for _, tpl := range []*template.Template{
+		testTemplates.createLoadTable,
+		testTemplates.createStoreTable,
+		testTemplates.storeCopyIntoDirectQuery,
+	} {
+		t.Run(tpl.Name(), func(t *testing.T) {
+			var out strings.Builder
+			require.NoError(t, tpl.Execute(&out, &queryParams{
+				Table:             tables[0],
+				URIs:              []string{"https://some/dir'name/file1", "https://some/dir'name/file2"},
+				StorageAccountKey: "some'key",
+			}))
+
+			require.Contains(t, out.String(), "FROM 'https://some/dir''name/file1', 'https://some/dir''name/file2'\n")
+			require.Contains(t, out.String(), "SECRET='some''key')")
+		})
+	}
 }
