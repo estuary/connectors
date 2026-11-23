@@ -239,3 +239,44 @@ func TestIdentifierer(t *testing.T) {
 		})
 	}
 }
+
+// literalRoundTripValues must come back unchanged when rendered as a literal.
+var literalRoundTripValues = []string{
+	`plain`,
+	`it's`,
+	`back\slash`,
+	`trailing\`,
+	`a\'b`,
+	`a\\'b`,
+	`a\nb`,
+	`100\%`,
+}
+
+func TestLiteral(t *testing.T) {
+	for in, want := range map[string]string{
+		`plain`:      `'plain'`,
+		`it's`:       `'it''s'`,
+		`back\slash`: `'back\\slash'`,
+		`trailing\`:  `'trailing\\'`,
+		`a\'b`:       `'a\\''b'`,
+	} {
+		require.Equal(t, want, testDialect.Literal(in))
+	}
+}
+
+func TestCommentLiterals(t *testing.T) {
+	var table = sql.Table{
+		TableShape: sql.TableShape{Comment: `table\`},
+		Identifier: "t",
+		Keys: []sql.Column{{
+			Projection: sql.Projection{Comment: `key\'`},
+			MappedType: sql.MappedType{DDL: "BIGINT"},
+			Identifier: "k",
+		}},
+	}
+
+	var out strings.Builder
+	require.NoError(t, testTemplates.createTargetTable.Execute(&out, &table))
+	require.Contains(t, out.String(), `COMMENT ON TABLE t IS 'table\\';`)
+	require.Contains(t, out.String(), `COMMENT ON COLUMN t.k IS 'key\\''';`)
+}
