@@ -173,7 +173,8 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 				},
 				sql.QuoteTransform(`"`, `""`),
 			))),
-		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
+		// Backslash is an escape character in Redshift string literals.
+		Literaler: sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			// parameterIndex starts at 0, but postgres (and redshift, which is based on postgres)
 			// parameters start at $1

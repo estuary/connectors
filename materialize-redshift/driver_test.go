@@ -442,6 +442,21 @@ func TestPrereqs(t *testing.T) {
 	}
 }
 
+func TestLiteralRoundTrip(t *testing.T) {
+	cfg := mustGetCfg(t)
+	ctx := context.Background()
+
+	conn, err := pgx.Connect(ctx, cfg.toURI())
+	require.NoError(t, err)
+	defer conn.Close(ctx)
+
+	for _, want := range literalRoundTripValues {
+		var got string
+		require.NoError(t, conn.QueryRow(ctx, "SELECT "+testDialect.Literal(want)).Scan(&got), want)
+		require.Equal(t, want, got)
+	}
+}
+
 // NewEndpoint runs before the prerequisite checks, so a login failure must be
 // reported as a connection failure rather than as the first query it runs.
 func TestNewEndpointConnectError(t *testing.T) {
