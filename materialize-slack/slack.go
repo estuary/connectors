@@ -31,16 +31,16 @@ func (api *SlackAPI) AuthTest() error {
 
 // PostMessage sends a simple message to the specified channel name or ID.
 // If the channel is specified by ID it should be prefixed like `id:C1234`.
-func (api *SlackAPI) PostMessage(channel, text string, blocks []slack.Block, config SlackSenderConfig) error {
+// Unless raw is set the text is escaped, so that Slack shows it as written
+// instead of reading mentions and links out of it.
+func (api *SlackAPI) PostMessage(channel, text string, blocks []slack.Block, config SlackSenderConfig, raw bool) error {
 	var channelID, err = api.GetChannelID(channel)
 	if err != nil {
 		return fmt.Errorf("error getting channel id: %w", err)
 	}
 
 	var options = []slack.MsgOption{
-		// Escaped so that Slack shows the text as written instead of reading
-		// mentions and links out of it.
-		slack.MsgOptionText(text, true),
+		slack.MsgOptionText(text, !raw),
 		slack.MsgOptionUsername(config.DisplayName),
 		slack.MsgOptionIconEmoji(config.LogoEmoji),
 		slack.MsgOptionIconURL(config.LogoPicture),

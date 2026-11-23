@@ -24,6 +24,11 @@ type driver struct{}
 
 type config struct {
 	Credentials CredentialConfig `json:"credentials" jsonschema:"required,title=Authentication" jsonschema_extras:"x-oauth2-provider=slack"`
+	Advanced    advancedConfig   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+}
+
+type advancedConfig struct {
+	RawMessages bool `json:"raw_messages,omitempty" jsonschema:"title=Raw Messages,description=Send the text and blocks of each document to Slack as written instead of escaping them. Slack then turns sequences such as <!channel> and <url|label> into mentions and links. Enable this only if everything written to the source collections is trusted.,default=false" jsonschema_extras:"nonsensitive=true"`
 }
 
 // Validate returns an error if the config is not well-formed.
@@ -210,16 +215,18 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.Bi
 	}
 
 	var transactor = &transactor{
-		api:      api,
-		bindings: bindings,
+		api:         api,
+		bindings:    bindings,
+		rawMessages: cfg.Advanced.RawMessages,
 	}
 
 	return transactor, &pm.Response_Opened{}, nil, nil
 }
 
 type transactor struct {
-	api      *SlackAPI
-	bindings []*binding
+	api         *SlackAPI
+	bindings    []*binding
+	rawMessages bool // Send text and blocks without escaping them
 }
 
 type binding struct {
@@ -295,9 +302,11 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			// bad to do it here... right? see below:
 			// https://api.slack.com/reference/surfaces/formatting#escaping
 			var escaped_blocks = string(blocks)
-			escaped_blocks = strings.ReplaceAll(escaped_blocks, "&", "&amp;")
-			escaped_blocks = strings.ReplaceAll(escaped_blocks, "<", "&lt;")
-			escaped_blocks = strings.ReplaceAll(escaped_blocks, ">", "&gt;")
+			if !t.rawMessages {
+				escaped_blocks = strings.ReplaceAll(escaped_blocks, "&", "&amp;")
+				escaped_blocks = strings.ReplaceAll(escaped_blocks, "<", "&lt;")
+				escaped_blocks = strings.ReplaceAll(escaped_blocks, ">", "&gt;")
+			}
 
 			if err := json.Unmarshal([]byte(escaped_blocks), &blocksParsed); err != nil {
 				return nil, fmt.Errorf("invalid blocks value %q, %q: %w", reflect.TypeOf(blocks), string(blocks), err)
@@ -308,7 +317,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		// Accept messages from at most 10 minutes in the past
 		if time.Since(ts).Minutes() < 10 {
-			if err := t.api.PostMessage(b.resource.Channel, text, blockSet, b.resource.SenderConfig); err != nil {
+			if err := t.api.PostMessage(b.resource.Channel, text, blockSet, b.resource.SenderConfig, t.rawMessages); err != nil {
 				return nil, fmt.Errorf("error sending message (%q): %w", ts, err)
 			}
 			time.Sleep(time.Second * 10)
