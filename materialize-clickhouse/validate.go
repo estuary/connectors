@@ -40,6 +40,10 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	}
 
 	for i, rb := range req.Bindings {
+		if resp.Bindings[i].ProjectionConstraints, err = forbidUnwritableFields(&rb.Collection, resp.Bindings[i].ProjectionConstraints); err != nil {
+			return nil, err
+		}
+
 		var rc tableConfig
 		if err := json.Unmarshal(rb.ResourceConfigJson, &rc); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
@@ -113,6 +117,52 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	}
 
 	return resp, nil
+}
+
+// forbidUnwritableFields forbids fields whose column name would need an escape
+// inside its quotes. The ClickHouse client reads the column names out of the
+// INSERT text without decoding them, so it cannot write to such a column.
+func forbidUnwritableFields(collection *pf.CollectionSpec, constraints []*pm.Response_Validated_ProjectionConstraint) ([]*pm.Response_Validated_ProjectionConstraint, error) {
+	var out = make([]*pm.Response_Validated_ProjectionConstraint, 0, len(constraints))
+	var forbidden = make(map[string]bool)
+	// Whether each required location has a projection that can be written.
+	var requiredLocations = make(map[string]bool)
+
+	for _, pc := range constraints {
+		var unwritable = strings.ContainsAny(pc.Field, "\\`")
+
+		switch pc.Constraint.Type {
+		case pm.Response_Validated_Constraint_FIELD_REQUIRED:
+			if unwritable {
+				return nil, fmt.Errorf("field '%s' is required to be materialized but its name contains a backslash or backtick, which this connector cannot write", pc.Field)
+			}
+		case pm.Response_Validated_Constraint_LOCATION_REQUIRED:
+			var ptr = collection.GetProjection(pc.Field).Ptr
+			requiredLocations[ptr] = requiredLocations[ptr] || !unwritable
+		}
+
+		if !unwritable {
+			out = append(out, pc)
+		} else if !forbidden[pc.Field] {
+			forbidden[pc.Field] = true
+			out = append(out, &pm.Response_Validated_ProjectionConstraint{
+				Field: pc.Field,
+				Constraint: &pm.Response_Validated_Constraint{
+					Type:        pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
+					Reason:      fmt.Sprintf("Field '%s' contains a backslash or backtick, which this connector cannot write. Use an alternate projection without these characters to materialize this location", pc.Field),
+					FoldedField: pc.Constraint.FoldedField,
+				},
+			})
+		}
+	}
+
+	for ptr, writable := range requiredLocations {
+		if !writable {
+			return nil, fmt.Errorf("at least one field from location '%s' is required to be materialized, but the names of all its projections contain a backslash or backtick: must provide an alternate projection without these characters", ptr)
+		}
+	}
+
+	return out, nil
 }
 
 // dryRunPartitionBy creates and immediately drops a scratch table having the
