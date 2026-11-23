@@ -5,6 +5,7 @@
 ### Changed
 - Bulk query results are downloaded without the store's access token.
 - Waits at most 5 minutes at a time for Shopify's API rate limit to recover.
+- `store` only accepts letters, digits, dots, and hyphens.
 
 ## 2026-11-18
 

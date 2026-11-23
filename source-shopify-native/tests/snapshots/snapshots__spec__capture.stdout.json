@@ -96,6 +96,7 @@
             "store": {
               "description": "Shopify store name (the prefix of your admin URL, e.g., 'mystore' for mystore.myshopify.com)",
               "minLength": 1,
+              "pattern": "^[A-Za-z0-9.-]+$",
               "title": "Store Name",
               "type": "string"
             },

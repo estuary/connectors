@@ -71,6 +71,11 @@ MAX_CONCURRENT_BULK_OPS = 5
 # most that fits (Bruno `Pricing / cost over ceiling`); 50 leaves headroom.
 MAX_CONTEXTUAL_PRICING_COUNTRIES = 50
 
+# `store` starts the API's hostname. Allowing only hostname characters keeps
+# requests on myshopify.com, because a character such as "/" or ":" would end
+# the hostname before ".myshopify.com".
+HOST_LABEL_PATTERN = r"^[A-Za-z0-9.-]+$"
+
 # TODO(justin): OAuth support is temporarily removed for multi-store. Will revisit once the
 # OAuth app is approved and UI/runtime is ready to support OAuth inside array items with credentials.
 # See git history for the previous OAUTH2_SPEC implementation.
@@ -114,6 +119,7 @@ class StoreConfig(BaseModel):
         title="Store Name",
         description="Shopify store name (the prefix of your admin URL, e.g., 'mystore' for mystore.myshopify.com)",
         min_length=1,
+        pattern=HOST_LABEL_PATTERN,
     )
     credentials: ShopifyClientCredentials | AccessToken = Field(
         discriminator="credentials_title",
