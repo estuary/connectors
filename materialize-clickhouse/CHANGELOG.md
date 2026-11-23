@@ -8,9 +8,12 @@
   sequence, which changed the name or made the statement fail.
 
 ### Changed
-- Writes to a column whose name contains a backslash now fail with an error
-  naming the column. Such a column was previously written only when its
-  backslash did not form an escape sequence.
+- A field whose name contains a backslash or backtick is no longer
+  materialized, because its column cannot be written. Publishing leaves such
+  a field out, or fails when the field is a key that has no other projection.
+  To materialize it, add a projection with a name that has neither character.
+  A task that already has such a field selected fails when writing to it until
+  it is published again.
 
 ## 2026-11-03
 
