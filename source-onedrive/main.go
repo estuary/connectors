@@ -17,6 +17,7 @@ import (
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	msgraphcore "github.com/microsoftgraph/msgraph-sdk-go-core"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
 
@@ -331,6 +332,19 @@ func (listing *oneDriveListing) Next() (filesource.ObjectInfo, error) {
 		if itemSize := firstUnprocessedItem.GetSize(); itemSize != nil {
 			size = *itemSize
 		}
+
+		var fsCreated, fsLastModified *time.Time
+		if fsInfo := firstUnprocessedItem.GetFileSystemInfo(); fsInfo != nil {
+			fsCreated, fsLastModified = fsInfo.GetCreatedDateTime(), fsInfo.GetLastModifiedDateTime()
+		}
+		log.WithFields(log.Fields{
+			"path":                      fullItemPath,
+			"size":                      size,
+			"created":                   firstUnprocessedItem.GetCreatedDateTime(),
+			"last_modified":             firstUnprocessedItem.GetLastModifiedDateTime(),
+			"file_system_created":       fsCreated,
+			"file_system_last_modified": fsLastModified,
+		}).Debug("listed file")
 
 		var contentSum string
 		if file := firstUnprocessedItem.GetFile(); file != nil {
