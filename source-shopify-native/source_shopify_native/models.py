@@ -12,6 +12,7 @@ from typing import (
     ClassVar,
     Generic,
     Literal,
+    Protocol,
     TypeVar,
 )
 
@@ -63,6 +64,11 @@ scopes = [
 # Shopify API 2026-01+ allows each app to run up to 5 bulk query operations per store at once.
 # See: https://shopify.dev/docs/api/usage/bulk-operations/queries#limitations
 MAX_CONCURRENT_BULK_OPS = 5
+
+# Each country adds a 1-point field to every variant in a 250-variant page, which Shopify prices
+# at (2 + countries) x 11 + 2 points against its 1,000-point query ceiling. 88 countries is the
+# most that fits (Bruno `Pricing / cost over ceiling`); 50 leaves headroom.
+MAX_CONTEXTUAL_PRICING_COUNTRIES = 50
 
 # TODO(justin): OAuth support is temporarily removed for multi-store. Will revisit once the
 # OAuth app is approved and UI/runtime is ready to support OAuth inside array items with credentials.
@@ -160,6 +166,20 @@ class EndpointConfig(BaseModel):
                 "other systems that submit bulk queries through the same app."
             ),
             json_schema_extra={"nonsensitive": True},
+        )
+        contextual_pricing_countries: list[
+            Annotated[str, Field(pattern="^[A-Z]{2}$")]
+        ] = Field(
+            default_factory=list,
+            max_length=MAX_CONTEXTUAL_PRICING_COUNTRIES,
+            title="Contextual Pricing Countries",
+            description=(
+                "Two-letter country codes, such as GB, to capture each product variant's "
+                "price and compare-at price in. Listing a country adds the "
+                f"product_variant_contextual_pricing stream. Up to "
+                f"{MAX_CONTEXTUAL_PRICING_COUNTRIES} countries."
+            ),
+            json_schema_extra={"uniqueItems": True},
         )
 
     advanced: Advanced = Field(
@@ -427,6 +447,36 @@ class AccessScopes(BaseModel, extra="allow"):
         return {s.handle for s in self.data.currentAppInstallation.accessScopes}
 
 
+class CountryCodes(BaseModel, extra="allow"):
+    """Model for introspecting the `CountryCode` enum: the country codes the API version accepts."""
+
+    class Data(BaseModel, extra="forbid"):
+        class Type(BaseModel, extra="forbid"):
+            class EnumValue(BaseModel, extra="forbid"):
+                name: str
+
+            enumValues: list[EnumValue]
+
+        type_: Type = Field(alias="__type")
+
+    data: Data
+
+    @staticmethod
+    def query() -> str:
+        return """
+        {
+            __type(name: "CountryCode") {
+                enumValues(includeDeprecated: true) {
+                    name
+                }
+            }
+        }
+        """
+
+    def get_names(self) -> set[str]:
+        return {v.name for v in self.data.type_.enumValues}
+
+
 class SortKey(StrEnum):
     CREATED_AT = "CREATED_AT"
     UPDATED_AT = "UPDATED_AT"
@@ -450,6 +500,20 @@ class StoreCapabilities:
     # Whether the store is on a Shopify Plus or Advanced plan or a partner dev store.
     # Some fields are only queryable on these tiers regardless of granted scopes.
     is_plus_or_advanced: bool = False
+
+
+class QueryBuilder(Protocol):
+    """Builds the query for one page of a paged stream, with the signature of
+    `ShopifyGraphQLResource.build_query`."""
+
+    def __call__(
+        self,
+        start: datetime,
+        end: datetime,
+        first: int | None = None,
+        after: str | None = None,
+        capabilities: "StoreCapabilities | None" = None,
+    ) -> str: ...
 
 
 @dataclass(slots=True)
@@ -593,6 +657,10 @@ class ShopifyDocument(BaseDocument):
 class ShopifyGraphQLResource(ShopifyDocument):
     QUERY: ClassVar[str] = ""
     QUERY_ROOT: ClassVar[str] = ""
+    # The fields from QUERY_ROOT down to the connection that's paged through, for a
+    # connection that isn't a top-level query field. For example, payouts sit under
+    # `shopifyPaymentsAccount`, so their path is `["payouts"]`.
+    CONNECTION_PATH: ClassVar[list[str]] = []
     FRAGMENTS: ClassVar[list[str]] = []
     NAME: ClassVar[str] = ""
     SORT_KEY: ClassVar[SortKey | None] = None
@@ -600,6 +668,8 @@ class ShopifyGraphQLResource(ShopifyDocument):
     QUALIFYING_SCOPES: ClassVar[set[str]] = set()
     # Cron expression driving a periodic re-initialization of this stream's binding.
     BACKFILL_SCHEDULE: ClassVar[str] = ""
+    # Default interval between snapshots of a full-refresh stream.
+    SNAPSHOT_INTERVAL: ClassVar[timedelta] = timedelta(minutes=15)
     # Some resources are only queryable on Shopify Plus / Advanced plans or
     # partner dev stores regardless of granted scopes.
     REQUIRES_PLUS_OR_ADVANCED_PLAN: ClassVar[bool] = False
@@ -739,6 +809,10 @@ class ShopifyGraphQLResource(ShopifyDocument):
         # that only one connection accepts (ex: `includeInactive` on `locations`).
         extra_root_args: str = "",
     ) -> str:
+        if cls.CONNECTION_PATH:
+            raise NotImplementedError(
+                f"{cls.__name__} sets CONNECTION_PATH, so it must build its own query."
+            )
         lower_bound = dt_to_str(start)
         upper_bound = dt_to_str(end)
         query_body = cls._resolve_nested_connections(
@@ -850,15 +924,38 @@ def create_response_data_model(
 ) -> type[BaseResponseData[TShopifyGraphQLResource]]:
     """Factory function to create typed GraphQL data field models."""
     query_root = resource_type.QUERY_ROOT
+    path = [query_root, *resource_type.CONNECTION_PATH]
+
+    # Every object above the connection, starting at QUERY_ROOT, can be null, like
+    # shopifyPaymentsAccount for a store without Shopify Payments. A null one reads as an
+    # empty page.
+    field_type: Any = EdgesData[resource_type]
+    for parent, child in reversed(list(zip(path, path[1:]))):
+        parent_model = type(
+            f"{parent[0].upper()}{parent[1:]}Data",
+            (BaseModel,),
+            {"__annotations__": {child: field_type}},
+        )
+        field_type = parent_model | None
+
+    def get_connection(data: Any) -> EdgesData[TShopifyGraphQLResource] | None:
+        value = data
+        for name in path:
+            value = getattr(value, name)
+            if value is None:
+                return None
+        return value
 
     def get_edges(self) -> list[Edge[TShopifyGraphQLResource]]:
-        return getattr(self, query_root).edges
+        connection = get_connection(self)
+        return connection.edges if connection is not None else []
 
     def get_page_info(self) -> PageInfo:
-        return getattr(self, query_root).pageInfo
+        connection = get_connection(self)
+        return connection.pageInfo if connection is not None else PageInfo()
 
     class_dict = {
-        "__annotations__": {query_root: EdgesData[resource_type]},
+        "__annotations__": {query_root: field_type},
         "edges": property(get_edges),
         "page_info": property(get_page_info),
     }

@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +15,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
 	m "github.com/estuary/connectors/go/materialize"
+	"github.com/estuary/connectors/go/retry"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -57,24 +60,58 @@ type binding struct {
 	// Index within the collection key to use for the routing parameter. nil if no routing field
 	// is configured.
 	routingField *int
+
+	// publishedAtField is the translated field name of the selected
+	// projection of /_meta/uuid as a date-time, used to find and delete
+	// documents published before a completed backfill. It's empty for
+	// delta-updates bindings, and for standard bindings without a qualifying
+	// field, in which case publishedAtFieldErr explains why.
+	publishedAtField    string
+	publishedAtFieldErr error
 }
 
 type transactor struct {
-	cfg          config
-	client       *client
-	bindings     []binding
-	isServerless bool
-	be           *m.BindingEvents
+	cfg                 config
+	client              *client
+	materializationName string
+	bindings            []binding
+	isServerless        bool
+	be                  *m.BindingEvents
 
 	// Used to correlate the binding number for loaded documents from Elasticsearch.
 	indexToBinding map[string]int
+
+	// truncateAfterBackfill permits deleting the documents published before a
+	// completed backfill.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for deletion after this transaction's stores.
+	truncations map[int]time.Time
 }
 
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, range_ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return nil, nil
 }
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
-func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for idx, boundary := range completes {
+		b := t.bindings[idx]
+		if b.deltaUpdates {
+			continue
+		} else if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"index":    b.index,
+				"boundary": boundary,
+			}).Info("documents published before the backfill were not deleted because feature flags disable it")
+			continue
+		} else if b.publishedAtField == "" {
+			t.be.Warn(b.index, fmt.Sprintf("Documents published before the backfill of index %q were not deleted because %s.", b.index, b.publishedAtFieldErr))
+			continue
+		}
+		t.truncations[idx] = boundary
+	}
 	return nil
 }
 
@@ -289,10 +326,96 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	close(batchCh)
-	return nil, group.Wait()
+	err := group.Wait()
+	if err != nil {
+		return nil, err
+	}
+
+	// Truncations run after the stores, so deleteBefore's query sees each
+	// document's post-store publication time and doesn't delete one this
+	// transaction just refreshed.
+	for idx, boundary := range t.truncations {
+		b := t.bindings[idx]
+		deleted, err := t.client.deleteBefore(ctx, b.index, b.publishedAtField, boundary, truncationTagPrefix(t.materializationName, b.index), t.isServerless)
+		if isForbidden(err) {
+			t.be.Warn(b.index, fmt.Sprintf("Documents published before the backfill of index %q were not deleted because the credentials lack the privileges to do so: %s.", b.index, err))
+			continue
+		} else if err != nil {
+			return nil, fmt.Errorf("truncating index %q after backfill: %w", b.index, err)
+		}
+		log.WithFields(log.Fields{
+			"index":    b.index,
+			"boundary": boundary,
+			"deleted":  deleted,
+		}).Info("truncated documents published before the backfill")
+		t.be.ReportRowStats(it.Round, b.path, m.ExactRowStats(0, 0, 0).WithTruncated(deleted))
+	}
+	clear(t.truncations)
+
+	return nil, nil
 }
 
 func (t *transactor) Destroy() {}
+
+// truncationTagPrefix is the prefix of the X-Opaque-Id that tags the delete by
+// query tasks of materializationName truncating index. Elasticsearch copies
+// the header onto the task, where listing tasks reports it. Neither name can
+// contain a colon, so the prefix of one materialization and index is never a
+// prefix of another's.
+func truncationTagPrefix(materializationName string, index string) string {
+	return fmt.Sprintf("estuary-truncate:%s:%s:", materializationName, index)
+}
+
+// cancelTruncations cancels this materialization's deletes of documents
+// published before a completed backfill that may still be running from an
+// earlier transaction attempt. It returns an error if they can't be listed.
+// Failing to cancel one is reported as a warning.
+func (t *transactor) cancelTruncations(ctx context.Context) error {
+	prefixes := make([]string, 0, len(t.bindings))
+	for _, b := range t.bindings {
+		prefixes = append(prefixes, truncationTagPrefix(t.materializationName, b.index))
+	}
+
+	var running map[string]string
+	err := requestRetry.Do(ctx, "listing running truncations", func(ctx context.Context) error {
+		var err error
+		running, err = t.client.listDeleteByQueryTasks(ctx, prefixes)
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("listing running truncations: %w", err)
+	}
+
+	for taskID, tag := range running {
+		var index string
+		for _, b := range t.bindings {
+			if strings.HasPrefix(tag, truncationTagPrefix(t.materializationName, b.index)) {
+				index = b.index
+				break
+			}
+		}
+		err := t.client.cancelTask(ctx, taskID)
+		if isForbidden(err) {
+			t.be.Warn("cancel truncation "+index, fmt.Sprintf("A truncation of index %q from an earlier run is still running and was not cancelled because the credentials lack the privileges to do so: %s.", index, err))
+			continue
+		} else if err != nil {
+			t.be.Warn("cancel truncation "+index, fmt.Sprintf("A truncation of index %q from an earlier run is still running and could not be cancelled: %s.", index, err))
+			continue
+		}
+		log.WithFields(log.Fields{
+			"index": index,
+			"task":  taskID,
+		}).Info("cancelled truncation from an earlier run")
+	}
+	return nil
+}
+
+// isForbidden reports whether err is Elasticsearch rejecting a request because
+// the credentials lack the privilege for it.
+func isForbidden(err error) bool {
+	e, ok := errors.AsType[*responseError](err)
+	return ok && e.status == http.StatusForbidden
+}
 
 // storeAction returns the Elasticsearch _bulk action metadata line for storing
 // (not deleting) a single document.
@@ -339,27 +462,31 @@ type gotDoc struct {
 	Index   string                     `json:"_index"`
 	Found   bool                       `json:"found"`
 	Source  map[string]json.RawMessage `json:"_source"`
-	Error   *docError                  `json:"error"`
+	Error   *esError                   `json:"error"`
 	Timeout bool                       `json:"timed_out"`
 }
 
-type docError struct {
-	Type   string `json:"type"`
-	Reason string `json:"reason"`
-}
-
 func (t *transactor) loadDocs(ctx context.Context, getDocs []getDoc, loaded func(int, json.RawMessage) error) error {
-	res, err := t.client.es.Mget(
-		esutil.NewJSONReader(map[string][]getDoc{"docs": getDocs}),
-		t.client.es.Mget.WithContext(ctx),
-	)
-	if err != nil {
+	// Only the request is retried: once results stream into loaded, a repeat
+	// would load documents twice.
+	var res *esapi.Response
+	if err := requestRetry.Do(ctx, "loading documents", func(ctx context.Context) error {
+		r, err := t.client.es.Mget(
+			esutil.NewJSONReader(map[string][]getDoc{"docs": getDocs}),
+			t.client.es.Mget.WithContext(ctx),
+		)
+		if err != nil {
+			return &transportError{err}
+		} else if r.IsError() {
+			defer r.Body.Close()
+			return newResponseError(r)
+		}
+		res = r
+		return nil
+	}); err != nil {
 		return fmt.Errorf("loadDocs mGet: %w", err)
 	}
 	defer res.Body.Close()
-	if res.IsError() {
-		return fmt.Errorf("loadDocs mGet error response [%s] %s", res.Status(), res.String())
-	}
 
 	// Stream the results of the request directly into the loaded callback from the response body.
 	dec := json.NewDecoder(res.Body)
@@ -430,8 +557,6 @@ func (t *transactor) loadDocs(ctx context.Context, getDocs []getDoc, loaded func
 	return nil
 }
 
-const maxStoreRetries = 5
-
 // retryableBulkErrorTypes are Elasticsearch per-item error types that are
 // transient and safe to retry by re-sending only the affected items. They show
 // up inside an HTTP 200 bulk response (the request as a whole succeeded), most
@@ -497,7 +622,7 @@ func (b bulkResponse) rowCounts() (inserted, updated, deleted int64) {
 }
 
 // itemError returns the formatted error for the first errored item at one of
-// the given indices, for use when retries are exhausted.
+// the given indices.
 func (b bulkResponse) itemError(idx []int) error {
 	for _, i := range idx {
 		for action, res := range b.Items[i] {
@@ -510,9 +635,8 @@ func (b bulkResponse) itemError(idx []int) error {
 }
 
 // sendBulk submits a single bulk request and returns the parsed per-item
-// response. A non-nil error indicates a transport- or HTTP-level failure (the
-// go-elasticsearch client has already retried those per its RetryOnStatus
-// config); per-item errors are carried in the returned bulkResponse.
+// response. A non-nil error indicates a transport- or HTTP-level failure;
+// per-item errors are carried in the returned bulkResponse.
 func (t *transactor) sendBulk(ctx context.Context, body []byte, index string) (*bulkResponse, error) {
 	opts := []func(*esapi.BulkRequest){
 		t.client.es.Bulk.WithContext(ctx),
@@ -541,12 +665,12 @@ func (t *transactor) sendBulk(ctx context.Context, body []byte, index string) (*
 
 	res, err := t.client.es.Bulk(bytes.NewReader(body), opts...)
 	if err != nil {
-		return nil, fmt.Errorf("bulk request submission failed: %w", err)
+		return nil, fmt.Errorf("bulk request submission failed: %w", &transportError{err})
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
-		return nil, fmt.Errorf("bulk request to index %q failed with status %d: %s", index, res.StatusCode, res.String())
+		return nil, newResponseError(res)
 	}
 
 	var parsed bulkResponse
@@ -558,9 +682,8 @@ func (t *transactor) sendBulk(ctx context.Context, body []byte, index string) (*
 
 func (t *transactor) doStore(ctx context.Context, items [][]byte, binding int, round int) error {
 	b := t.bindings[binding]
-	stats, err := retryBulkStore(ctx, items, maxStoreRetries,
-		func(body []byte) (*bulkResponse, error) { return t.sendBulk(ctx, body, b.index) },
-		storeRetryDelay,
+	stats, err := storeBulk(ctx, requestRetry, items,
+		func(ctx context.Context, body []byte) (*bulkResponse, error) { return t.sendBulk(ctx, body, b.index) },
 	)
 	if err != nil {
 		return fmt.Errorf("bulk request to index %q failed: %w", b.index, err)
@@ -569,40 +692,31 @@ func (t *transactor) doStore(ctx context.Context, items [][]byte, binding int, r
 	return nil
 }
 
-// retryBulkStore sends items as a single bulk request and, if any items fail
-// with a retryable per-item error, re-sends only those items after a delay,
-// up to maxAttempts times. Re-sending only the failed items is safe for both
-// standard and delta-updates bindings: a failed item did not land, so it is
-// never duplicated, and items that succeeded are never re-sent. The returned
-// stats tally the items that succeeded across all attempts.
-func retryBulkStore(
+// storeBulk sends items as a single bulk request and, if any items fail with a
+// retryable per-item error, re-sends only those items. A failed item did not
+// land, so re-sending it never duplicates it. The returned stats tally the
+// items that succeeded across all attempts.
+func storeBulk(
 	ctx context.Context,
+	policy retry.Policy,
 	items [][]byte,
-	maxAttempts int,
-	send func(body []byte) (*bulkResponse, error),
-	delay func(ctx context.Context, attempt int) error,
+	send func(ctx context.Context, body []byte) (*bulkResponse, error),
 ) (m.RowStats, error) {
 	pending := items
 	var inserted, updated, deleted int64
-	stats := func() m.RowStats { return m.ExactRowStats(inserted, updated, deleted) }
-	for attempt := 0; ; attempt++ {
-		resp, err := send(bytes.Join(pending, nil))
+	err := policy.Do(ctx, "storing documents", func(ctx context.Context) error {
+		resp, err := send(ctx, bytes.Join(pending, nil))
 		if err != nil {
-			return stats(), err
+			return err
 		}
 		i, u, d := resp.rowCounts()
 		inserted, updated, deleted = inserted+i, updated+u, deleted+d
 
 		terminal, retryableIdx := resp.classify()
 		if terminal != nil {
-			return stats(), terminal
-		}
-		if len(retryableIdx) == 0 {
-			return stats(), nil
-		}
-		if attempt+1 >= maxAttempts {
-			return stats(), fmt.Errorf("%d items still failing after %d attempts: %w",
-				len(retryableIdx), attempt+1, resp.itemError(retryableIdx))
+			return terminal
+		} else if len(retryableIdx) == 0 {
+			return nil
 		}
 
 		next := make([][]byte, len(retryableIdx))
@@ -610,23 +724,7 @@ func retryBulkStore(
 			next[i] = pending[idx]
 		}
 		pending = next
-
-		if err := delay(ctx, attempt); err != nil {
-			return stats(), err
-		}
-	}
-}
-
-// storeRetryDelay waits before re-sending failed bulk items, with exponential
-// backoff capped at 5s, mirroring the go-elasticsearch client's RetryBackoff.
-func storeRetryDelay(ctx context.Context, attempt int) error {
-	d := min(time.Duration(1<<attempt)*time.Second, 5*time.Second)
-	log.WithFields(log.Fields{"attempt": attempt, "delay": d.String()}).
-		Info("waiting to retry bulk items on retryable error")
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-time.After(d):
-		return nil
-	}
+		return &bulkItemsError{count: len(retryableIdx), err: resp.itemError(retryableIdx)}
+	})
+	return m.ExactRowStats(inserted, updated, deleted), err
 }

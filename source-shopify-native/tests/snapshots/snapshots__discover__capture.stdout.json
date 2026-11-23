@@ -704,6 +704,101 @@
     ]
   },
   {
+    "recommendedName": "product_variant_contextual_pricing",
+    "resourceConfig": {
+      "name": "product_variant_contextual_pricing",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "store": {
+              "default": "",
+              "description": "The Shopify store this document belongs to",
+              "title": "Store",
+              "type": "string"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "A product variant's final price and compare-at price in one configured country, after its\nmarket's price adjustment, fixed prices, currency conversion and rounding.\n\nThere is one document per variant per country: `country` is the country the variant was\npriced in, and `contextualPricing` is Shopify's pricing for it.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "country": {
+          "title": "Country",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "country"
+      ],
+      "title": "ProductVariantContextualPricing",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/store",
+      "/id",
+      "/country"
+    ],
+    "resourcePath": [
+      "product_variant_contextual_pricing"
+    ]
+  },
+  {
     "recommendedName": "fulfillment_orders",
     "resourceConfig": {
       "name": "fulfillment_orders",
@@ -2453,6 +2548,166 @@
     ],
     "resourcePath": [
       "markets"
+    ]
+  },
+  {
+    "recommendedName": "price_lists",
+    "resourceConfig": {
+      "name": "price_lists",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "store": {
+              "default": "",
+              "description": "The Shopify store this document belongs to",
+              "title": "Store",
+              "type": "string"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "ShopifyDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/store",
+      "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "price_lists"
+    ]
+  },
+  {
+    "recommendedName": "price_list_prices",
+    "resourceConfig": {
+      "name": "price_list_prices",
+      "interval": "P1D"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "store": {
+              "default": "",
+              "description": "The Shopify store this document belongs to",
+              "title": "Store",
+              "type": "string"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "ShopifyDocument",
+      "type": "object",
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/_meta/store",
+      "/_meta/row_id"
+    ],
+    "resourcePath": [
+      "price_list_prices"
     ]
   }
 ]

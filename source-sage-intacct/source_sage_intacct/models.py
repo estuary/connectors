@@ -1,17 +1,20 @@
+from datetime import date
 from typing import (
     Any,
+    ClassVar,
     Literal,
     Optional,
 )
 
+from estuary_cdk.capture.backfill_signals import backfill_signal_flag_defaults
 from estuary_cdk.capture.common import (
     BaseDocument,
-    ResourceConfig,
     ResourceState,
 )
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
+from estuary_cdk.feature_flags import FeatureFlagsConfig, FlagDefault
 from estuary_cdk.flow import ValidationError
 from pydantic import (
     AwareDatetime,
@@ -46,7 +49,17 @@ class EndpointConfig(BaseModel):
         json_schema_extra={"secret": True},
     )
 
-    class Advanced(BaseModel):
+    class Advanced(FeatureFlagsConfig):
+        FEATURE_FLAG_DEFAULTS: ClassVar[dict[str, FlagDefault]] = {
+            # emit_backfill_signals sends backfill signals, which make
+            # destinations delete the rows that a backfill does not capture
+            # again. ignore_config_for_backfill_signals also sends them when a
+            # setting limits what a backfill reads.
+            **backfill_signal_flag_defaults(
+                enabled_for_tasks_created_after=date(2026, 12, 1)
+            ),
+        }
+
         include_company_id_in_documents: bool = Field(
             description=f"Include the configured Sage Intacct Company ID in captured documents, with the field name '{COMPANY_ID_FIELD}'. Every captured document will have the same value for this field, equal to the configured Sage Intacct Company ID.",
             title="Include Company ID in Documents",
@@ -54,7 +67,7 @@ class EndpointConfig(BaseModel):
         )
 
     advanced: Advanced = Field(
-        default_factory=Advanced,
+        default_factory=Advanced,  # type: ignore
         title="Advanced Config",
         description="Advanced settings for the connector.",
         json_schema_extra={"advanced": True},
@@ -88,7 +101,11 @@ class ApiResponse(BaseModel):
                     return True
                 # AUDITHISTORY denials arrive without an `errorno`, so fall
                 # back to matching the literal description Sage emits.
-                if self.description2 and "do not have permission to view audit history" in self.description2.lower():
+                if (
+                    self.description2
+                    and "do not have permission to view audit history"
+                    in self.description2.lower()
+                ):
                     return True
                 return False
 
@@ -224,6 +241,27 @@ class CreationRecord(Document):
 
     def cursor_value(self) -> AwareDatetime:
         return self.WHENCREATED
+
+
+# GLDETAIL is a view that joins journal entry lines with their AR and AP
+# documents. Its RECORDNO is text, composed of the keys of the rows it joins,
+# so it has its own document models.
+class GLDetailDocument(BaseDocument, extra="allow"):
+    RECORDNO: str
+
+
+class GLDetailRecord(GLDetailDocument):
+    WHENMODIFIED: AwareDatetime
+
+    def cursor_value(self) -> AwareDatetime:
+        return self.WHENMODIFIED
+
+
+class GLDetailBackfillRecord(GLDetailDocument):
+    BATCHKEY: int
+    # Optional because the backfill is the only reader of a row that has no
+    # WHENMODIFIED.
+    WHENMODIFIED: AwareDatetime | None = None
 
 
 def parse_backfill_record(raw: dict) -> "IncrementalResource | CreationRecord":

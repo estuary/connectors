@@ -108,3 +108,25 @@ func TestLockstepTransactions(t *testing.T) {
 		})
 	}
 }
+
+func TestFailureMessage(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		logs []string
+		want string
+	}{
+		{name: "no errors", logs: nil, want: ""},
+		{name: "latest error wins", logs: []string{"first", "second"}, want: "second"},
+		{name: "exit status keeps the cause", logs: []string{"cannot read table", connectorExitMessage}, want: "cannot read table"},
+		{name: "exit status alone", logs: []string{connectorExitMessage}, want: connectorExitMessage},
+		{name: "error after exit status", logs: []string{"first", connectorExitMessage, "second"}, want: "second"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var got string
+			for _, message := range tc.logs {
+				got = failureMessage(got, message)
+			}
+			require.Equal(t, tc.want, got)
+		})
+	}
+}

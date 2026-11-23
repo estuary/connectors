@@ -1,5 +1,20 @@
 # Changelog
 
+
+## 2026-11-09
+
+### Fixed
+- Merges failed or silently skipped rows when the first line break in a
+  transaction's staged data was a `\r\n` inside a string value. Affected
+  merges also rewrote `\r\n` in string values to `\n`.
+### Added
+- A completed backfill now deletes a table's rows published before the
+  backfill began, instead of leaving them in place until the next store
+  overwrites or removes them. The deletion runs as part of the same Spark
+  job that merges the transaction's own stores. Controlled by the
+  `truncate_after_backfill` feature flag, enabled by default; a binding
+  without a `flow_published_at` column is unaffected.
+
 ## 2026-11-03
 
 ### Changed

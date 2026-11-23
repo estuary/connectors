@@ -1,0 +1,268 @@
+info:
+  name: price list prices
+  type: graphql
+  seq: 14
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  headers:
+    - name: Shopify-GraphQL-Cost-Debug
+      value: "1"
+  body:
+    query: |-
+      query PriceListPrices {
+        mexico: priceList(id: "gid://shopify/PriceList/27592228909") { ...ListPrices }
+        b2b: priceList(id: "gid://shopify/PriceList/28232679469") { ...ListPrices }
+        noCatalog: priceList(id: "gid://shopify/PriceList/27592196141") { ...ListPrices }
+      }
+
+      fragment ListPrices on PriceList {
+        id
+        currency
+        createdAt
+        prices(first: 60) {
+          nodes {
+            originType
+            price { amount currencyCode }
+            compareAtPrice { amount currencyCode }
+            variant { id updatedAt price compareAtPrice }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [PriceList](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/PriceList) and [PriceListPrice](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/PriceListPrice)
+
+  **WHY:** sizes and shapes `price_list_prices`. The three price lists from
+  `Pricing / price lists`: Mexico (MXN, market catalog, 1 fixed price), the
+  B2B catalog's (USD, 1 fixed price) and one with no catalog. Answers:
+  - does `prices` return a row for every variant, or only fixed ones;
+  - are RELATIVE prices in another currency converted at an exchange rate;
+  - did setting a fixed price move the variant's `updatedAt`;
+  - what a page of prices costs, for paged vs bulk.
+
+  **VERIFIED (2026-11-13):**
+  - Each list returns a row for all 27 variants: FIXED rows for its fixed
+    prices, RELATIVE rows for the rest. That includes the list with no
+    catalog, so rows = price lists x variants.
+  - RELATIVE rows are in the shop currency, not the list's. `Mexico Buyers`
+    is MXN, but 10.00 USD becomes 9.5 USD (-5%). Only FIXED rows are in MXN
+    (11000.0 / 15000.0).
+  - So RELATIVE rows don't move with exchange rates, and they aren't the
+    converted price a buyer sees: `Pricing / by country` gives that variant
+    a converted MXN price in MX (177.66 MXN on 2026-11-17).
+  - The B2B list was created 2026-10-27. Its fixed-price variant
+    43217823891501 was last updated 2026-06-15, so setting a fixed price
+    didn't move the variant's `updatedAt`.
+  - Paging is cheap: a row costs 2 (itself and its variant), and
+    `prices(first: 60)` requests 18 points per list.
+
+examples:
+  - name: "200 - the Mexico list's FIXED row as returned (other rows and lists dropped, cost totals only)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "mexico": {
+                "id": "gid://shopify/PriceList/27592228909",
+                "currency": "MXN",
+                "createdAt": "2025-01-14T15:10:14Z",
+                "prices": {
+                  "nodes": [
+                    {
+                      "originType": "FIXED",
+                      "price": {
+                        "amount": "11000.0",
+                        "currencyCode": "MXN"
+                      },
+                      "compareAtPrice": {
+                        "amount": "15000.0",
+                        "currencyCode": "MXN"
+                      },
+                      "variant": {
+                        "id": "gid://shopify/ProductVariant/43217823760429",
+                        "updatedAt": "2026-06-15T13:22:29Z",
+                        "price": "785.95",
+                        "compareAtPrice": "885.95"
+                      }
+                    }
+                  ],
+                  "pageInfo": {
+                    "hasNextPage": false,
+                    "endCursor": "eyJsYXN0X2lkIjo0MzIyMTcxNTMyMDg3NywibGFzdF92YWx1ZSI6IjQzMjIxNzE1MzIwODc3In0="
+                  }
+                }
+              }
+            },
+            "extensions": {
+              "cost": {
+                "requestedQueryCost": 57,
+                "actualQueryCost": 30,
+                "throttleStatus": {
+                  "maximumAvailable": 2000,
+                  "currentlyAvailable": 1970,
+                  "restoreRate": 100
+                }
+              }
+            }
+          }
+  - name: "200 - a row per variant per list (projection)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "mexico": {
+              "currency": "MXN",
+              "createdAt": "2025-01-14T15:10:14Z",
+              "rowCount": 27,
+              "originTypes": {
+                "FIXED": 1,
+                "RELATIVE": 26
+              },
+              "sampleRows": [
+                {
+                  "originType": "FIXED",
+                  "price": "11000.0 MXN",
+                  "compareAtPrice": "15000.0 MXN",
+                  "variant": {
+                    "id": "gid://shopify/ProductVariant/43217823760429",
+                    "updatedAt": "2026-06-15T13:22:29Z",
+                    "price": "785.95",
+                    "compareAtPrice": "885.95"
+                  }
+                },
+                {
+                  "originType": "RELATIVE",
+                  "price": "9.5 USD",
+                  "compareAtPrice": null,
+                  "variant": {
+                    "id": "gid://shopify/ProductVariant/43217823334445",
+                    "updatedAt": "2025-08-29T12:12:00Z",
+                    "price": "10.00",
+                    "compareAtPrice": null
+                  }
+                },
+                {
+                  "originType": "RELATIVE",
+                  "price": "664.95 USD",
+                  "compareAtPrice": "759.95 USD",
+                  "variant": {
+                    "id": "gid://shopify/ProductVariant/43217823596589",
+                    "updatedAt": "2026-09-02T09:40:53Z",
+                    "price": "699.95",
+                    "compareAtPrice": "799.95"
+                  }
+                }
+              ]
+            },
+            "b2b": {
+              "currency": "USD",
+              "createdAt": "2026-10-27T10:35:11Z",
+              "rowCount": 27,
+              "originTypes": {
+                "FIXED": 1,
+                "RELATIVE": 26
+              },
+              "sampleRows": [
+                {
+                  "originType": "FIXED",
+                  "price": "700.0 USD",
+                  "compareAtPrice": "850.0 USD",
+                  "variant": {
+                    "id": "gid://shopify/ProductVariant/43217823891501",
+                    "updatedAt": "2026-06-15T13:22:30Z",
+                    "price": "885.95",
+                    "compareAtPrice": null
+                  }
+                },
+                {
+                  "originType": "RELATIVE",
+                  "price": "9.0 USD",
+                  "compareAtPrice": null,
+                  "variant": {
+                    "id": "gid://shopify/ProductVariant/43217823334445",
+                    "updatedAt": "2025-08-29T12:12:00Z",
+                    "price": "10.00",
+                    "compareAtPrice": null
+                  }
+                },
+                {
+                  "originType": "RELATIVE",
+                  "price": "629.96 USD",
+                  "compareAtPrice": "719.96 USD",
+                  "variant": {
+                    "id": "gid://shopify/ProductVariant/43217823596589",
+                    "updatedAt": "2026-09-02T09:40:53Z",
+                    "price": "699.95",
+                    "compareAtPrice": "799.95"
+                  }
+                }
+              ]
+            },
+            "noCatalog": {
+              "currency": "USD",
+              "createdAt": "2025-01-14T15:10:02Z",
+              "rowCount": 27,
+              "originTypes": {
+                "FIXED": 0,
+                "RELATIVE": 27
+              },
+              "sampleRows": [
+                {
+                  "originType": "RELATIVE",
+                  "price": "9.5 USD",
+                  "compareAtPrice": null,
+                  "variant": {
+                    "id": "gid://shopify/ProductVariant/43217823334445",
+                    "updatedAt": "2025-08-29T12:12:00Z",
+                    "price": "10.00",
+                    "compareAtPrice": null
+                  }
+                },
+                {
+                  "originType": "RELATIVE",
+                  "price": "664.95 USD",
+                  "compareAtPrice": "759.95 USD",
+                  "variant": {
+                    "id": "gid://shopify/ProductVariant/43217823596589",
+                    "updatedAt": "2026-09-02T09:40:53Z",
+                    "price": "699.95",
+                    "compareAtPrice": "799.95"
+                  }
+                }
+              ]
+            },
+            "cost": {
+              "requestedQueryCost": 57,
+              "actualQueryCost": 30
+            }
+          }

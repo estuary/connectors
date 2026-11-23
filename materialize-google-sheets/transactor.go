@@ -263,8 +263,11 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		batchRequests = append(batchRequests, updateCells...)
 	}
 
-	if err := batchRequestWithRetry(
+	// InsertDimension shifts rows down, so repeating a batch that may have been
+	// applied would insert its rows twice.
+	if err := batchUpdate(
 		it.Context(),
+		requestRetry,
 		d.client,
 		d.spreadsheetId,
 		batchRequests,

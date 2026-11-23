@@ -1,5 +1,18 @@
 # source-sqlserver
 
+## 2026-11-19
+
+### Fixed
+- Backfill queries now escape `]` in schema and table names, so a table whose name contains `]` can be backfilled.
+- Queries that read change data from capture instances now quote the instance name, so a space or `]` in it no longer breaks the query.
+- Statements that create and write to the watermarks table now quote its schema and table names, so a watermarks table name containing a space works.
+
+## 2026-11-17
+
+### Changed
+- FEATURE FLAG SWITCH: Starting 2026-11-18 the feature flag partition_aware_backfill will be on by default for new tasks, while existing tasks created at or before 2026-11-17 will keep their existing behaviour. Backfills of tables partitioned on a column other than the first primary key column no longer sort the whole table for every chunk, so they progress on very large tables.
+- With `partition_aware_backfill` on, bindings on such tables in the automatic backfill mode use the normal backfill mode.
+
 ## 2026-10-30
 
 ### Changed

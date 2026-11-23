@@ -48,6 +48,25 @@ func TestS3ConfigWithEndpoint(t *testing.T) {
 	})
 }
 
+// The driver's error for these quotes the token, so they must not reach it.
+// It can't parse the first four, and the last two make the token part of
+// another option's value.
+func TestValidateRejectsMalformedDatabase(t *testing.T) {
+	const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+	for _, database := range []string{"test_db\n", "test\tdb", "//test:db", "//[test_db", "test_db?threads=abc", "test_db?memory_limit=abc"} {
+		var cfg = config{
+			Token:    token,
+			Database: database,
+			Schema:   "main",
+		}
+		_, openErr := cfg.bareOpen()
+		for _, err := range []error{openErr, cfg.Validate()} {
+			require.ErrorContains(t, err, "invalid 'database'", database)
+			require.NotContains(t, err.Error(), token, database)
+		}
+	}
+}
+
 func TestBucketPathValidation(t *testing.T) {
 	// Validate() only checks that each dot-separated part is valid base64url,
 	// so this doesn't need to look like a real JWT.

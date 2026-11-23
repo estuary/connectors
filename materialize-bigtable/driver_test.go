@@ -59,6 +59,6 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, applySpec, makeResourceFn)
+		boilerplate.RunApplyTest(t, &driver{}, NewMaterializer, applySpec, makeResourceFn, boilerplate.RuntimeConfig{})
 	})
 }

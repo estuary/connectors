@@ -25,9 +25,20 @@ operations {
 }
 """
 
+# Selection for each region of a Market. Every region is a country: MarketRegionCountry is
+# MarketRegion's only type (Bruno `Pricing / market regions`).
+_MARKET_REGION_SELECTION = """
+id
+name
+... on MarketRegionCountry {
+    code
+}
+"""
+
 
 class Markets(ShopifyGraphQLResource):
-    """Markets of a Shopify store, each carrying its market catalogs inline.
+    """Markets of a Shopify store, each carrying its market catalogs and the countries it covers
+    inline.
 
     Market has no `createdAt`/`updatedAt` and the `markets` connection cannot filter or
     sort by date, so there is no usable incremental cursor and the full set is re-fetched
@@ -36,12 +47,9 @@ class Markets(ShopifyGraphQLResource):
     MarketCatalog has no query root of its own that the connector captures, so catalogs are
     embedded in their Market rather than referenced by id.
 
-    Two connections are deliberately left out of the field set for now:
-    - `webPresences`, which would need a second inline connection and force `OUTER_PAGE_SIZE`
-      down to stay under Shopify's per-query cost ceiling.
-    - `conditions.regionsCondition.regions`, because `RegionsCondition` is not a `Node`. The
-      nested resolver drains overflow with `node(id:)` re-queries, so a market with more regions
-      than the inline page would have no id to page from.
+    `webPresences` is deliberately left out of the field set for now: it would need another
+    inline connection and force `OUTER_PAGE_SIZE` down to stay under Shopify's per-query cost
+    ceiling.
     """
 
     NAME = "markets"
@@ -75,6 +83,9 @@ class Markets(ShopifyGraphQLResource):
     }
     conditions {
         conditionTypes
+        regionsCondition {
+            # {{ regions }}
+        }
     }
     # {{ catalogs }}
     """
@@ -87,10 +98,21 @@ class Markets(ShopifyGraphQLResource):
             page_size=5,
             overflow_page_size=100,
         ),
+        NestedConnection(
+            parent_path=["conditions", "regionsCondition"],
+            parent_typename="RegionsCondition",
+            field_name="regions",
+            node_selection=_MARKET_REGION_SELECTION,
+            # Every region is a country and Shopify has 245 country codes (Bruno `Pricing /
+            # country codes`), so one page holds all of a market's regions. That matters because
+            # RegionsCondition is not a Node: an overflow would have no id to page from, and the
+            # resolver raises instead.
+            page_size=250,
+        ),
     ]
-    # 25 markets x (~5 object points + 5 catalogs x ~4) lands near 625, leaving headroom under
-    # Shopify's 1000 point per-query ceiling. MAX_COST_EXCEEDED is fatal, so the margin is
-    # deliberate.
+    # Shopify requests 260 points for a page of 25 markets with both connections inline (Bruno
+    # `Pricing / markets query cost`), leaving headroom under its 1000 point per-query ceiling.
+    # MAX_COST_EXCEEDED is fatal, so the margin is deliberate.
     OUTER_PAGE_SIZE = 25
 
     @staticmethod

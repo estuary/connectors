@@ -144,7 +144,7 @@ func (db *mysqlDatabase) SetupTablePrerequisites(ctx context.Context, tables []s
 func (db *mysqlDatabase) setupTablePrerequisite(_ context.Context, schema, table string) error {
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 
-	results, err := db.conn.Execute(fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 0;", schema, table))
+	results, err := db.conn.Execute(fmt.Sprintf("SELECT * FROM %s.%s LIMIT 0;", quoteIdentifier(schema), quoteIdentifier(table)))
 	if err != nil {
 		return fmt.Errorf("user %q cannot read from table %q", db.config.User, streamID)
 	}
@@ -154,11 +154,11 @@ func (db *mysqlDatabase) setupTablePrerequisite(_ context.Context, schema, table
 	// couldn't be determined.
 	// Requirement: (*db).connect has already been called to initialize the datetimeLocation field.
 	if db.datetimeLocation == nil {
-		results, err := db.conn.Execute(fmt.Sprintf(`
+		results, err := db.conn.Execute(`
 			SELECT column_name
 			FROM information_schema.columns
-			WHERE data_type='datetime' AND table_schema='%s' AND table_name='%s';
-		`, schema, table))
+			WHERE data_type='datetime' AND table_schema=? AND table_name=?;
+		`, schema, table)
 		if err != nil {
 			return fmt.Errorf("db.datetimeLocation not set and could not validate that table %q does not contain DATETIME columns: %w", streamID, err)
 		}

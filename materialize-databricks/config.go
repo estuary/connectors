@@ -166,6 +166,10 @@ func (c config) Validate() error {
 		}
 	}
 
+	if _, err := c.ToURI(""); err != nil {
+		return err
+	}
+
 	if err := c.Schedule.Validate(); err != nil {
 		return err
 	}
@@ -192,8 +196,10 @@ func (c config) warehouseID() string {
 	return parts[len(parts)-1]
 }
 
-// ToURI puts together address and http_path to form the full workspace URL
-func (c config) ToURI(materializationName string) string {
+// ToURI puts together address and http_path to form the full workspace URL.
+// It fails for an address the driver can't parse, because the driver's own
+// parse error quotes the connection string, credentials included.
+func (c config) ToURI(materializationName string) (string, error) {
 	var address = c.Address
 	if !strings.Contains(address, ":") {
 		address = address + ":" + defaultPort
@@ -235,7 +241,18 @@ func (c config) ToURI(materializationName string) string {
 		}
 	}
 
-	return strings.TrimLeft(uri.String(), "/")
+	var dsn = strings.TrimLeft(uri.String(), "/")
+
+	// Like the driver, add the scheme only to a string that doesn't start with one.
+	var parsed = dsn
+	if !strings.HasPrefix(dsn, "https://") && !strings.HasPrefix(dsn, "http://") {
+		parsed = "https://" + dsn
+	}
+	if _, err := url.Parse(parsed); err != nil {
+		return "", fmt.Errorf("invalid 'address' %q: expected host or host:port", c.Address)
+	}
+
+	return dsn, nil
 }
 
 // workspaceConfig is the Databricks SDK configuration for this endpoint,

@@ -303,6 +303,9 @@ impl EndpointConfig {
 
         config.set("bootstrap.servers", self.bootstrap_servers.clone());
         config.set("security.protocol", self.security_protocol());
+        // A broker closing a connection is routine, because the client
+        // reconnects on its own.
+        config.set("log.connection.close", "false");
 
         match &self.credentials {
             Some(Credentials::UserPassword {
@@ -428,6 +431,10 @@ impl ProducerContext for AckTrackingContext {
 
                 // Only notify when all messages are acknowledged
                 if completed == pending {
+                    // A waiter holds the lock from reading the counters
+                    // until it begins waiting, so notifying under the lock
+                    // cannot fall between those two steps.
+                    let _guard = self.state.lock().unwrap();
                     self.notify.notify_all();
                 }
             }

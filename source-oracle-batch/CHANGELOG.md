@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-19
+
+### Fixed
+- Table discovery now passes `discover_schemas` entries as bound parameters, so a schema name containing `'` can be selected.
+
 ## 2026-11-02
 
 ### Changed

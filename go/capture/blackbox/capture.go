@@ -39,6 +39,11 @@ type Capture struct {
 	// mutated os.Environ() would alter the behavior of every other test running at the
 	// same time.
 	Env map[string]string
+
+	// BeforeRun, if set, is called before each capture run and fails the run if it
+	// returns an error. It lets a test wait for the source to settle, such as for a
+	// change it just wrote to become visible to the connector.
+	BeforeRun func() error
 }
 
 func New(baseYAML string) (*Capture, error) {
@@ -88,7 +93,22 @@ type flowctlCmd struct {
 	cmd        *exec.Cmd
 	Stdout     io.ReadCloser
 	stderrDone <-chan struct{}
-	lastError  string // Last error-level log message, populated by stderr goroutine
+	lastError  string // Explanation of a failed run, folded from error-level logs by the stderr goroutine
+}
+
+// connectorExitMessage is the message of the error log with which flowctl
+// reports a connector's non-zero exit status.
+const connectorExitMessage = "connector failed"
+
+// failureMessage folds the next error-level log message into the one held as
+// the explanation of a failed run. The latest message wins, except that
+// connectorExitMessage never replaces a held message, because it says only
+// that the connector failed and the held message says why.
+func failureMessage(held, next string) string {
+	if next == connectorExitMessage && held != "" {
+		return held
+	}
+	return next
 }
 
 // Wait waits for stderr streaming to complete and then waits for the command to exit.
@@ -148,9 +168,8 @@ func (c *Capture) startFlowctl(ctx context.Context, args ...string) (*flowctlCmd
 				continue
 			}
 
-			// Track the last error-level message
 			if logEntry.Level == "error" {
-				fc.lastError = logEntry.Message
+				fc.lastError = failureMessage(fc.lastError, logEntry.Message)
 			}
 
 			// Format: "LEVEL  message  {fields}" or "LEVEL  message" if no fields
@@ -395,6 +414,12 @@ func (c *Capture) Run(sessions int) ([]byte, error) {
 // the capture process will be killed. This is useful for tests that need to run a
 // capture indefinitely and then stop it programmatically.
 func (c *Capture) RunWithContext(ctx context.Context, sessions int) ([]byte, error) {
+	if c.BeforeRun != nil {
+		if err := c.BeforeRun(); err != nil {
+			return nil, fmt.Errorf("before run: %w", err)
+		}
+	}
+
 	path, tempdir, err := c.writeCatalog()
 	if err != nil {
 		return nil, err

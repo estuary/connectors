@@ -28,7 +28,6 @@ ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector /connector/materialize-pinecone
-COPY --from=builder /lib/x86_64-linux-gnu/libgcc_s.so.1 /lib/x86_64-linux-gnu/
 
 # Avoid running the connector as root.
 USER nonroot:nonroot

@@ -41,7 +41,7 @@ type healthLine struct {
 	}
 	Actual struct {
 		Inserted, Updated, Deleted, Total int64
-		Staged, Loaded, Truncated         *int64
+		Staged, Truncated                 *int64
 	}
 	Pending    int
 	Recovery   bool
@@ -586,22 +586,12 @@ func TestHealthChecks(t *testing.T) {
 		},
 		{
 			name:  "staged equals stores",
-			stats: TotalRowStats(3).WithStaged(3).WithLoaded(3),
+			stats: TotalRowStats(3).WithStaged(3),
 		},
 		{
 			name:  "staged lost a row",
-			stats: TotalRowStats(3).WithStaged(2).WithLoaded(2),
+			stats: TotalRowStats(3).WithStaged(2),
 			want:  []healthMismatch{{Check: "staged", ResourcePath: []string{"schema", "alpha"}, Expected: 3, Actual: 2}},
-		},
-		{
-			name:  "load lost a row",
-			stats: TotalRowStats(3).WithStaged(3).WithLoaded(2),
-			want:  []healthMismatch{{Check: "loadedRows", ResourcePath: []string{"schema", "alpha"}, Expected: 3, Actual: 2}},
-		},
-		{
-			name:  "loaded without staged compares to stores",
-			stats: RowStats{}.WithLoaded(2),
-			want:  []healthMismatch{{Check: "loadedRows", ResourcePath: []string{"schema", "alpha"}, Expected: 3, Actual: 2}},
 		},
 		{
 			name:     "delta binding that merged",

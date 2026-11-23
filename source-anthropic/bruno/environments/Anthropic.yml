@@ -1,0 +1,11 @@
+name: Anthropic
+variables:
+  - name: base_url
+    value: https://api.anthropic.com/v1/organizations/analytics
+  - name: config_path
+    value: ../config.yaml
+  # A window holding the dev org's seeded Playground traffic (2026-11-12).
+  - name: seed_start
+    value: "2026-11-12T00:00:00Z"
+  - name: seed_end
+    value: "2026-11-13T00:00:00Z"

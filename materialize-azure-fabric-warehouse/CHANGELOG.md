@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-11
+### Fixed
+- Retry installing the fence and committing a transaction when Fabric
+  Warehouse rolls it back on a deadlock or snapshot-isolation conflict,
+  which can happen when multiple tasks write to the same schema.
+
 ## 2026-11-06
 ### Fixed
 - Only populate the info schema from the tables that are referenced by this

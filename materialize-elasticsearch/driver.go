@@ -27,6 +27,7 @@ import (
 
 var featureFlagDefaults = map[string]common.FlagDefault{
 	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"truncate_after_backfill":          common.FlagEnabled,
 
 	// Enable this flag to avoid a one time backfill due to change in date
 	// format in the mapping (a581ab1b761816b2b93b525c63153aac3493d49a).  This
@@ -248,7 +249,7 @@ func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 
 // toClient initializes a client for connecting to Elasticsearch, starting the network tunnel if
 // configured.
-func (c config) toClient(disableRetry bool) (*client, error) {
+func (c config) toClient() (*client, error) {
 	endpoint := c.Endpoint
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
@@ -290,18 +291,9 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 			// header when it is absent so the product check passes. Genuine
 			// Elasticsearch always sends this header, so its responses are never
 			// modified and the check still validates against it.
-			Transport:     productHeaderInjector{inner: http.DefaultTransport},
-			RetryOnStatus: []int{429, 502, 503, 504},
-			RetryBackoff: func(i int) time.Duration {
-				d := min(time.Duration(1<<i)*time.Second, 5*time.Second)
-				log.WithFields(log.Fields{
-					"attempt": i,
-					"delay":   d.String(),
-				}).Info("waiting to retry request on retryable error")
-				return d
-			},
-			MaxRetries:   10,
-			DisableRetry: disableRetry,
+			Transport: productHeaderInjector{inner: http.DefaultTransport},
+			// Requests that are safe to repeat are retried by the caller.
+			DisableRetry: true,
 		},
 	)
 	if err != nil {
@@ -473,10 +465,11 @@ func (driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.Bind
 }
 
 type materialization struct {
-	cfg          config
-	metaClient   *client
-	dataClient   *client
-	featureFlags map[string]bool
+	materializationName string
+	cfg                 config
+	metaClient          *client
+	dataClient          *client
+	featureFlags        map[string]bool
 
 	// isOpenSearch is true when connected to an OpenSearch cluster rather than
 	// Elasticsearch. OpenSearch is API-compatible except for a handful of field
@@ -487,12 +480,12 @@ type materialization struct {
 var _ boilerplate.Materializer[config, fieldConfig, resource, property] = &materialization{}
 
 func NewMaterializer(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, property], error) {
-	metaClient, err := cfg.toClient(true)
+	metaClient, err := cfg.toClient()
 	if err != nil {
 		return nil, fmt.Errorf("creating metadata client: %w", err)
 	}
 
-	dataClient, err := cfg.toClient(false)
+	dataClient, err := cfg.toClient()
 	if err != nil {
 		return nil, fmt.Errorf("creating data client: %w", err)
 	}
@@ -509,11 +502,12 @@ func NewMaterializer(ctx context.Context, materializationName string, cfg config
 	}
 
 	return &materialization{
-		cfg:          cfg,
-		metaClient:   metaClient,
-		dataClient:   dataClient,
-		featureFlags: featureFlags,
-		isOpenSearch: isOpenSearch,
+		materializationName: materializationName,
+		cfg:                 cfg,
+		metaClient:          metaClient,
+		dataClient:          dataClient,
+		featureFlags:        featureFlags,
+		isOpenSearch:        isOpenSearch,
 	}, nil
 }
 
@@ -727,30 +721,86 @@ func (d *materialization) NewTransactor(
 
 		}
 
+		var publishedAtField string
+		var publishedAtFieldErr error
+		if !b.DeltaUpdates {
+			publishedAtField, publishedAtFieldErr = findPublishedAtField(ps)
+		}
+
 		indexToBinding[b.ResourcePath[0]] = idx
 		bindings = append(bindings, binding{
-			index:          b.ResourcePath[0],
-			path:           b.ResourcePath,
-			deltaUpdates:   b.DeltaUpdates,
-			fields:         fields,
-			floatFields:    floatFields,
-			dateTimeFields: dateTimeFields,
-			wrapFields:     wrapFields,
-			docField:       b.FieldSelection.Document,
-			routingField:   routingField,
+			index:               b.ResourcePath[0],
+			path:                b.ResourcePath,
+			deltaUpdates:        b.DeltaUpdates,
+			fields:              fields,
+			floatFields:         floatFields,
+			dateTimeFields:      dateTimeFields,
+			wrapFields:          wrapFields,
+			docField:            b.FieldSelection.Document,
+			routingField:        routingField,
+			publishedAtField:    publishedAtField,
+			publishedAtFieldErr: publishedAtFieldErr,
 		})
 	}
 
 	var transactor = &transactor{
-		cfg:            d.cfg,
-		client:         d.dataClient,
-		bindings:       bindings,
-		isServerless:   isServerless,
-		be:             be,
-		indexToBinding: indexToBinding,
+		cfg:                 d.cfg,
+		client:              d.dataClient,
+		materializationName: d.materializationName,
+		bindings:            bindings,
+		isServerless:        isServerless,
+		be:                  be,
+		indexToBinding:      indexToBinding,
+		// Retaining existing data on backfill forbids deleting the documents
+		// published before a completed backfill, since those documents are
+		// exactly the data being retained.
+		truncateAfterBackfill: d.featureFlags["truncate_after_backfill"] && !d.featureFlags["retain_existing_data_on_backfill"],
+	}
+
+	// Serverless clusters don't support listing or cancelling tasks.
+	if transactor.truncateAfterBackfill && !isServerless {
+		err = transactor.cancelTruncations(ctx)
+		if err != nil {
+			log.WithError(err).Warn("unable to cancel pre-existing truncations")
+		}
 	}
 	return transactor, nil
 
+}
+
+// findPublishedAtField returns the translated field name of the selected
+// projection of /_meta/uuid as a date-time, which holds each document's
+// publication time and is used to delete documents published before a
+// completed backfill. The field must also be mapped as a date. The returned
+// error explains why no field qualifies.
+func findPublishedAtField(ps []boilerplate.MappedProjection[property]) (string, error) {
+	var reason error
+	for _, p := range ps {
+		if p.Ptr != "/_meta/uuid" {
+			continue
+		}
+
+		s := p.Inference.String_
+		if s == nil {
+			if reason == nil {
+				reason = fmt.Errorf("field %q projects /_meta/uuid without a string type, where a date-time with uuid encoding is required", p.Field)
+			}
+		} else if s.Format != "date-time" || s.ContentEncoding != "uuid" {
+			if reason == nil {
+				reason = fmt.Errorf("field %q projects /_meta/uuid with the unexpected format %q and content encoding %q, where a date-time with uuid encoding is required", p.Field, s.Format, s.ContentEncoding)
+			}
+		} else if p.Mapped.Type != elasticTypeDate {
+			if reason == nil {
+				reason = fmt.Errorf("field %q is mapped as type %q, where a %q mapping is required", p.Field, p.Mapped.Type, elasticTypeDate)
+			}
+		} else {
+			return translateField(p.Field), nil
+		}
+	}
+	if reason == nil {
+		reason = fmt.Errorf("the binding excludes the flow_published_at field, which must be included to enable deletion after a backfill")
+	}
+	return "", reason
 }
 
 func (d *materialization) ListTestTasks(ctx context.Context) ([]string, error) {

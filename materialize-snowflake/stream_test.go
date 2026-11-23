@@ -8,11 +8,18 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
+
+// streamTestSuffix keeps concurrent CI runs, which share the test schema, off
+// each other's tables. It ends in the harness's _flow_test_<unix> form so the
+// test resource sweeper drops tables a killed run leaves behind.
+var streamTestSuffix = strings.ToUpper(fmt.Sprintf("_%s_flow_test_%d", uuid.NewString()[:8], time.Now().Unix()))
 
 func TestStreamManager(t *testing.T) {
 	t.Parallel()
@@ -64,7 +71,7 @@ func TestStreamManager(t *testing.T) {
 			TableShape: sql.TableShape{
 				Binding: 0,
 			},
-			Identifier: `STREAM_TEST`,
+			Identifier: "STREAM_TEST" + streamTestSuffix,
 			Keys:       []sql.Column{{Identifier: `key`}},
 			Values:     []sql.Column{{Identifier: `firstcol`}, {Identifier: `secondcol`}},
 			Document:   nil,
@@ -72,12 +79,12 @@ func TestStreamManager(t *testing.T) {
 
 		cleanup := func(t *testing.T) {
 			t.Helper()
-			_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS STREAM_TEST;")
+			_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", table.Identifier))
 		}
 		defer cleanup(t)
 
 		cleanup(t)
-		_, err = db.ExecContext(ctx, `CREATE TABLE STREAM_TEST (key TEXT, firstcol TEXT, secondcol TEXT);`)
+		_, err = db.ExecContext(ctx, fmt.Sprintf(`CREATE TABLE %s (key TEXT, firstcol TEXT, secondcol TEXT);`, table.Identifier))
 		require.NoError(t, err)
 
 		sm, err := newStreamManager(&cfg, "testing", accountName, 0)
@@ -95,7 +102,7 @@ func TestStreamManager(t *testing.T) {
 
 		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
-		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
+		verify(t, fmt.Sprintf("SELECT * FROM %s ORDER BY key", table.Identifier), [][]any{
 			{"key1", "hello1", "world1"},
 			{"key2", "hello2", "world2"},
 			{"key3", "hello3", "world3"},
@@ -104,7 +111,7 @@ func TestStreamManager(t *testing.T) {
 		// Write the same token again, it is not added to the table.
 		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
-		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
+		verify(t, fmt.Sprintf("SELECT * FROM %s ORDER BY key", table.Identifier), [][]any{
 			{"key1", "hello1", "world1"},
 			{"key2", "hello2", "world2"},
 			{"key3", "hello3", "world3"},
@@ -125,7 +132,7 @@ func TestStreamManager(t *testing.T) {
 
 		// The original invocation will error and not write any data.
 		require.Error(t, sm.write(ctx, blobs[0], encKeys[0], false))
-		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
+		verify(t, fmt.Sprintf("SELECT * FROM %s ORDER BY key", table.Identifier), [][]any{
 			{"key1", "hello1", "world1"},
 			{"key2", "hello2", "world2"},
 			{"key3", "hello3", "world3"},
@@ -142,7 +149,7 @@ func TestStreamManager(t *testing.T) {
 
 		require.NoError(t, ssm.write(ctx, blobs[0], encKeys[0], false))
 
-		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
+		verify(t, fmt.Sprintf("SELECT * FROM %s ORDER BY key", table.Identifier), [][]any{
 			{"key1", "hello1", "world1"},
 			{"key2", "hello2", "world2"},
 			{"key3", "hello3", "world3"},
@@ -157,7 +164,7 @@ func TestStreamManager(t *testing.T) {
 			TableShape: sql.TableShape{
 				Binding: 0,
 			},
-			Identifier: `STREAM_TEST`,
+			Identifier: "STREAM_TEST" + streamTestSuffix,
 			Keys:       []sql.Column{{Identifier: `key`}},
 			Values:     []sql.Column{{Identifier: `firstcol`}, {Identifier: `secondcol`}},
 			Document:   nil,
@@ -165,12 +172,12 @@ func TestStreamManager(t *testing.T) {
 
 		cleanup := func(t *testing.T) {
 			t.Helper()
-			_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS STREAM_TEST;")
+			_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", table.Identifier))
 		}
 		defer cleanup(t)
 
 		cleanup(t)
-		_, err = db.ExecContext(ctx, `CREATE TABLE STREAM_TEST (key TEXT, firstcol TEXT, secondcol TEXT);`)
+		_, err = db.ExecContext(ctx, fmt.Sprintf(`CREATE TABLE %s (key TEXT, firstcol TEXT, secondcol TEXT);`, table.Identifier))
 		require.NoError(t, err)
 
 		sm, err := newStreamManager(&cfg, "testing", accountName, 0)
@@ -189,7 +196,7 @@ func TestStreamManager(t *testing.T) {
 		// Write blob normally.
 		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
-		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
+		verify(t, fmt.Sprintf("SELECT * FROM %s ORDER BY key", table.Identifier), [][]any{
 			{"key1", "hello1", "world1"},
 			{"key2", "hello2", "world2"},
 			{"key3", "hello3", "world3"},
@@ -204,7 +211,7 @@ func TestStreamManager(t *testing.T) {
 		blobs[0][0].Chunks[0].Channels[0].OffsetToken = "a-new-token:0"
 		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], true))
 
-		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
+		verify(t, fmt.Sprintf("SELECT * FROM %s ORDER BY key", table.Identifier), [][]any{
 			{"key1", "hello1", "world1"},
 			{"key1", "hello1", "world1"},
 			{"key2", "hello2", "world2"},
@@ -219,7 +226,7 @@ func TestStreamManager(t *testing.T) {
 			TableShape: sql.TableShape{
 				Binding: 0,
 			},
-			Identifier: `STREAM_TEST`,
+			Identifier: "STREAM_TEST" + streamTestSuffix,
 			Keys:       []sql.Column{{Identifier: `key`}},
 			Values:     []sql.Column{{Identifier: `firstcol`}, {Identifier: `secondcol`}},
 			Document:   nil,
@@ -227,12 +234,12 @@ func TestStreamManager(t *testing.T) {
 
 		cleanup := func(t *testing.T) {
 			t.Helper()
-			_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS STREAM_TEST;")
+			_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", table.Identifier))
 		}
 		defer cleanup(t)
 
 		cleanup(t)
-		_, err = db.ExecContext(ctx, `CREATE TABLE STREAM_TEST (key TEXT, firstcol TEXT, secondcol TEXT);`)
+		_, err = db.ExecContext(ctx, fmt.Sprintf(`CREATE TABLE %s (key TEXT, firstcol TEXT, secondcol TEXT);`, table.Identifier))
 		require.NoError(t, err)
 
 		sm, err := newStreamManager(&cfg, "testing", accountName, 0)
@@ -254,7 +261,7 @@ func TestStreamManager(t *testing.T) {
 
 		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
-		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
+		verify(t, fmt.Sprintf("SELECT * FROM %s ORDER BY key", table.Identifier), [][]any{
 			{"key1", "hello1", "world1"},
 			{"key2", "hello2", "world2"},
 			{"key3", "hello3", "world3"},
@@ -270,21 +277,21 @@ func TestStreamManager(t *testing.T) {
 		tables := []sql.Table{
 			{
 				TableShape: sql.TableShape{Binding: 0},
-				Identifier: `STREAM_TEST_1`,
+				Identifier: "STREAM_TEST_1" + streamTestSuffix,
 				Keys:       keys,
 				Values:     values,
 				Document:   nil,
 			},
 			{
 				TableShape: sql.TableShape{Binding: 1},
-				Identifier: `STREAM_TEST_2`,
+				Identifier: "STREAM_TEST_2" + streamTestSuffix,
 				Keys:       keys,
 				Values:     values,
 				Document:   nil,
 			},
 			{
 				TableShape: sql.TableShape{Binding: 2},
-				Identifier: `STREAM_TEST_3`,
+				Identifier: "STREAM_TEST_3" + streamTestSuffix,
 				Keys:       keys,
 				Values:     values,
 				Document:   nil,
@@ -294,7 +301,7 @@ func TestStreamManager(t *testing.T) {
 		cleanup := func(t *testing.T) {
 			t.Helper()
 			for _, tbl := range tables {
-				_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS "+tbl.Identifier+";")
+				_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tbl.Identifier))
 				require.NoError(t, err)
 			}
 		}
@@ -302,7 +309,7 @@ func TestStreamManager(t *testing.T) {
 
 		cleanup(t)
 		for _, tbl := range tables {
-			_, err = db.ExecContext(ctx, `CREATE TABLE `+tbl.Identifier+` (key TEXT, firstcol TEXT, secondcol TEXT);`)
+			_, err = db.ExecContext(ctx, fmt.Sprintf(`CREATE TABLE %s (key TEXT, firstcol TEXT, secondcol TEXT);`, tbl.Identifier))
 			require.NoError(t, err)
 		}
 
@@ -358,7 +365,7 @@ func TestStreamManager(t *testing.T) {
 			require.NoError(t, sm.write(ctx, blob, encKeys[idx], false))
 		}
 
-		verify(t, "SELECT * FROM "+tables[0].Identifier+" ORDER BY key", [][]any{
+		verify(t, fmt.Sprintf("SELECT * FROM %s ORDER BY key", tables[0].Identifier), [][]any{
 			{"key1", "hello1", "world1"},
 			{"key2", "hello2", "world2"},
 			{"key3", "hello3", "world3"},
@@ -370,13 +377,13 @@ func TestStreamManager(t *testing.T) {
 			{"key9", "hello9", "world9"},
 		})
 
-		verify(t, "SELECT * FROM "+tables[1].Identifier+" ORDER BY key", [][]any{
+		verify(t, fmt.Sprintf("SELECT * FROM %s ORDER BY key", tables[1].Identifier), [][]any{
 			{"key4", "hello4", "world4"},
 			{"key5", "hello5", "world5"},
 			{"key6", "hello6", "world6"},
 		})
 
-		verify(t, "SELECT * FROM "+tables[2].Identifier+" ORDER BY key", [][]any{
+		verify(t, fmt.Sprintf("SELECT * FROM %s ORDER BY key", tables[2].Identifier), [][]any{
 			{"key4", "hello4", "world4"},
 			{"key5", "hello5", "world5"},
 			{"key6", "hello6", "world6"},
@@ -395,7 +402,7 @@ func TestStreamManager(t *testing.T) {
 		}
 		tbl := sql.Table{
 			TableShape: sql.TableShape{Binding: 0},
-			Identifier: `STREAM_TEST_QUOTED_COLUMNS`,
+			Identifier: "STREAM_TEST_QUOTED_COLUMNS" + streamTestSuffix,
 			Keys:       keys,
 			Values:     values,
 			Document:   nil,
@@ -403,15 +410,15 @@ func TestStreamManager(t *testing.T) {
 
 		cleanup := func(t *testing.T) {
 			t.Helper()
-			_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS "+tbl.Identifier+";")
+			_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", tbl.Identifier))
 			require.NoError(t, err)
 		}
 		defer cleanup(t)
 
 		cleanup(t)
 
-		createQuery := `
-		CREATE TABLE STREAM_TEST_QUOTED_COLUMNS(
+		createQuery := fmt.Sprintf(`
+		CREATE TABLE %s(
 			someothercolumn TEXT,
 			key TEXT NOT NULL,
 			" Column WiTh ""quotes"" and ""\""spaces"""" ,;{}().-� 𐀀 嶲 " TEXT NOT NULL,
@@ -420,7 +427,7 @@ func TestStreamManager(t *testing.T) {
 			"$dollar$signs.here#andotherstuff" TEXT NOT NULL,
 			"finalColumn" TEXT
 		);
-		`
+		`, tbl.Identifier)
 
 		_, err = db.ExecContext(ctx, createQuery)
 		require.NoError(t, err)
@@ -438,7 +445,7 @@ func TestStreamManager(t *testing.T) {
 		require.Equal(t, 1, len(blobs[0]))
 		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
-		verify(t, "SELECT * FROM "+tbl.Identifier+" ORDER BY key", [][]any{
+		verify(t, fmt.Sprintf("SELECT * FROM %s ORDER BY key", tbl.Identifier), [][]any{
 			{nil, "key1", "hello1", nil, "goodbye1", "aloha1", nil},
 			{nil, "key2", "hello2", nil, "goodbye2", "aloha2", nil},
 			{nil, "key3", "hello3", nil, "goodbye3", "aloha3", nil},
@@ -459,7 +466,7 @@ func TestStreamManager(t *testing.T) {
 			TableShape: sql.TableShape{
 				Binding: 0,
 			},
-			Identifier: `STREAM_TEST`,
+			Identifier: "STREAM_TEST" + streamTestSuffix,
 			Keys:       []sql.Column{{Identifier: `key`}},
 			Values:     []sql.Column{{Identifier: `firstcol`}},
 			Document:   nil,
@@ -467,12 +474,12 @@ func TestStreamManager(t *testing.T) {
 
 		cleanup := func(t *testing.T) {
 			t.Helper()
-			_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS STREAM_TEST;")
+			_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", table.Identifier))
 		}
 		defer cleanup(t)
 
 		cleanup(t)
-		_, err = db.ExecContext(ctx, `CREATE TABLE STREAM_TEST (key TEXT, firstcol VARIANT);`)
+		_, err = db.ExecContext(ctx, fmt.Sprintf(`CREATE TABLE %s (key TEXT, firstcol VARIANT);`, table.Identifier))
 		require.NoError(t, err)
 
 		sm, err := newStreamManager(&cfg, "testing", accountName, 0)
@@ -487,7 +494,7 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
 		var gotData string
-		require.NoError(t, db.QueryRowContext(ctx, "SELECT firstcol FROM STREAM_TEST").Scan(&gotData))
+		require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf("SELECT firstcol FROM %s", table.Identifier)).Scan(&gotData))
 
 		var got hugeThing
 		require.NoError(t, json.Unmarshal([]byte(gotData), &got))
@@ -578,7 +585,7 @@ func TestStreamDatatypes(t *testing.T) {
 		t.Run(tt.ddl, func(t *testing.T) {
 			tbl := sql.Table{
 				TableShape: sql.TableShape{Binding: 0, DeltaUpdates: true},
-				Identifier: testTableBaseName + "_" + tt.ddl,
+				Identifier: testTableBaseName + "_" + tt.ddl + streamTestSuffix,
 				Keys:       []sql.Column{{Identifier: `key`, MappedType: sql.MappedType{DDL: "INTEGER"}}},
 				Values:     []sql.Column{{Identifier: `val`, MappedType: sql.MappedType{DDL: tt.ddl}}},
 				Document:   nil,

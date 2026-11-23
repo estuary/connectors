@@ -25,15 +25,22 @@ func TestProfileBounds(t *testing.T) {
 			},
 		},
 		"day": map[string]any{"lower": "'2026-02-28'", "upper": "'2026-03-02'", "span": "48h0m0s"},
-		"id":  map[string]any{"lower": "'018f'", "upper": "'01a1'"},
-		"ok":  nil,
+		"id": map[string]any{
+			"lower":  "'018f'",
+			"upper":  "'01a1'",
+			"ranges": [][2]string{{"'018f'", "'018f'"}, {"'01a0'", "'01a1'"}},
+		},
+		"ok": nil,
 	}, MergeBounds{
 		bound("created_at", "'2025-12-16T12:00:00Z'", "'2026-10-27T13:30:00.5Z'",
 			MergeRange{LiteralLower: "'2025-12-16T12:00:00Z'", LiteralUpper: "'2025-12-16T12:00:00Z'"},
 			MergeRange{LiteralLower: "'2026-10-27T13:15:00Z'", LiteralUpper: "'2026-10-27T13:30:00.5Z'"},
 		),
 		bound("day", "'2026-02-28'", "'2026-03-02'"),
-		bound("id", "'018f'", "'01a1'"),
+		bound("id", "'018f'", "'01a1'",
+			MergeRange{LiteralLower: "'018f'", LiteralUpper: "'018f'"},
+			MergeRange{LiteralLower: "'01a0'", LiteralUpper: "'01a1'"},
+		),
 		bound("ok", "", ""),
 	}.ProfileFields())
 }

@@ -1,0 +1,189 @@
+info:
+  name: markets
+  type: graphql
+  seq: 1
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query MarketsAndCountries {
+        shop { currencyCode }
+        markets(first: 10) {
+          nodes {
+            id
+            name
+            status
+            type
+            currencySettings {
+              baseCurrency { currencyCode manualRate rateUpdatedAt }
+              localCurrencies
+              roundingEnabled
+            }
+            conditions {
+              conditionTypes
+              regionsCondition {
+                regions(first: 250) {
+                  nodes {
+                    name
+                    ... on MarketRegionCountry { code currency { currencyCode } }
+                  }
+                  pageInfo { hasNextPage }
+                }
+              }
+            }
+            catalogs(first: 5) {
+              nodes { id title status priceList { id name currency } }
+            }
+          }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [markets](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/markets) and [MarketRegionCountry](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/MarketRegionCountry)
+
+  **WHY:** the other `Pricing` requests need to know which countries sit in
+  which market, in which currency, and whether a market converts and rounds
+  prices. This picks the countries they query.
+
+  **VERIFIED (2026-11-17):** the store's currency is USD. It has three active
+  markets:
+  - United States: US, USD.
+  - International: 27 countries, including GB, DE, CH, CA and JP, all priced
+    in USD. No catalog. All 27 fit one `regions(first: 250)` page.
+  - Mexico: MX, converted to MXN, with rounding on.
+
+  Only the Mexico market's catalog has a price list (`Mexico Buyers`, MXN).
+  The other `Pricing` requests query US, MX, GB, DE and CH from here.
+
+examples:
+  - name: "200 - three markets (projection: region counts and first 6 countries)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "shop": {
+              "currencyCode": "USD"
+            },
+            "markets": [
+              {
+                "name": "International",
+                "status": "ACTIVE",
+                "currencySettings": {
+                  "baseCurrency": {
+                    "currencyCode": "USD",
+                    "manualRate": null,
+                    "rateUpdatedAt": null
+                  },
+                  "localCurrencies": false,
+                  "roundingEnabled": true
+                },
+                "countryCount": 27,
+                "regionsHasNextPage": false,
+                "someCountries": [
+                  [
+                    "AE",
+                    "USD"
+                  ],
+                  [
+                    "AT",
+                    "USD"
+                  ],
+                  [
+                    "AU",
+                    "USD"
+                  ],
+                  [
+                    "BE",
+                    "USD"
+                  ],
+                  [
+                    "CA",
+                    "USD"
+                  ],
+                  [
+                    "CH",
+                    "USD"
+                  ]
+                ],
+                "catalogs": []
+              },
+              {
+                "name": "Mexico",
+                "status": "ACTIVE",
+                "currencySettings": {
+                  "baseCurrency": {
+                    "currencyCode": "MXN",
+                    "manualRate": null,
+                    "rateUpdatedAt": "2026-11-17T23:05:40Z"
+                  },
+                  "localCurrencies": false,
+                  "roundingEnabled": true
+                },
+                "countryCount": 1,
+                "regionsHasNextPage": false,
+                "someCountries": [
+                  [
+                    "MX",
+                    "MXN"
+                  ]
+                ],
+                "catalogs": [
+                  {
+                    "id": "gid://shopify/MarketCatalog/63489638445",
+                    "title": "Mexico",
+                    "status": "ACTIVE",
+                    "priceList": {
+                      "id": "gid://shopify/PriceList/27592228909",
+                      "name": "Mexico Buyers",
+                      "currency": "MXN"
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "United States",
+                "status": "ACTIVE",
+                "currencySettings": {
+                  "baseCurrency": {
+                    "currencyCode": "USD",
+                    "manualRate": null,
+                    "rateUpdatedAt": null
+                  },
+                  "localCurrencies": false,
+                  "roundingEnabled": true
+                },
+                "countryCount": 1,
+                "regionsHasNextPage": false,
+                "someCountries": [
+                  [
+                    "US",
+                    "USD"
+                  ]
+                ],
+                "catalogs": []
+              }
+            ],
+            "cost": {
+              "requestedQueryCost": 151,
+              "actualQueryCost": 15
+            }
+          }

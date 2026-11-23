@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-11
+
+### Changed
+- Every binding emits a sourced schema, which raises its inferred schema's complexity limit from 1,000 to 10,000 locations. This may let materializations give more nested fields, such as `event_properties` keys, their own columns. Fields directly under `attributes` and `relationships` are no longer marked required, except `event_properties` and its `$event_id` key, so their columns may become nullable. A field that comes back on a collection that already reached the old limit may have its existing column converted to a JSON type.
+
 ## 2026-08-31
 
 ### Fixed

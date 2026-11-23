@@ -13,14 +13,21 @@ from estuary_cdk.http import HTTPMixin
 from source_shopify_native.graphql.bulk_job_manager import BulkJobManager
 from source_shopify_native.models import (
     BaseResponseData,
+    QueryBuilder,
     ShopifyGraphQLResource,
     StoreCapabilities,
     StoreValidationContext,
     TShopifyGraphQLResource,
+    create_response_data_model,
 )
 
 from .graphql.client import ShopifyGraphQLClient
 from .graphql.nested_resolver import NESTED_CONNECTION_CONCURRENCY, resolve_document
+from .graphql.price_lists import (
+    PriceListPrices,
+    PriceLists,
+    PriceListValidationContext,
+)
 from .utils import dt_to_str, str_to_dt
 
 CHECKPOINT_INTERVAL = 1_000
@@ -96,7 +103,12 @@ async def _paginate_through_resources(
     store: str,
     capabilities: StoreCapabilities,
     log: Logger,
+    build_query: QueryBuilder | None = None,
 ) -> AsyncGenerator[TShopifyGraphQLResource, None]:
+    # A stream whose query depends on the config passes a `build_query` with those
+    # arguments bound; every other stream builds its query with the model's own.
+    if build_query is None:
+        build_query = model.build_query
     after: str | None = None
     ctx = StoreValidationContext(store=store)
     # Shared across all pages of this fetch so total concurrent nested re-queries stay bounded.
@@ -105,7 +117,7 @@ async def _paginate_through_resources(
     page_size = model.OUTER_PAGE_SIZE or PAGE_SIZE
 
     while True:
-        query = model.build_query(
+        query = build_query(
             start=start,
             end=end,
             first=page_size,
@@ -147,7 +159,10 @@ async def _stitch_nested_connections(
         document: dict[str, Any] = {"id": getattr(node, "id", None)}
         for connection in model.NESTED_CONNECTIONS:
             key = connection.parent_path[0] if connection.parent_path else connection.field_name
-            document[key] = getattr(node, key, None)
+            # A field the node lacks stays out of `document`, so the resolver raises on it
+            # instead of reading it as null.
+            if hasattr(node, key):
+                document[key] = getattr(node, key)
 
         await resolve_document(client, document, model.NESTED_CONNECTIONS, log, sem)
 
@@ -191,6 +206,8 @@ async def fetch_incremental_unsorted(
     capabilities: StoreCapabilities,
     log: Logger,
     log_cursor: LogCursor,
+    *,
+    build_query: QueryBuilder | None = None,
 ) -> AsyncGenerator[TShopifyGraphQLResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     end = datetime.now(tz=UTC)
@@ -206,6 +223,7 @@ async def fetch_incremental_unsorted(
         store=store,
         capabilities=capabilities,
         log=log,
+        build_query=build_query,
     ):
         cursor_value = doc.get_cursor_value()
         if cursor_value > log_cursor:
@@ -323,13 +341,36 @@ async def backfill_incremental_unsorted(
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
+    *,
+    build_query: QueryBuilder | None = None,
 ) -> AsyncGenerator[TShopifyGraphQLResource | PageCursor, None]:
+    """Reads the resources last updated between `start_date` and `cutoff`, one page per call.
+    The page cursor is Shopify's `endCursor` for the page.
+
+               start_date                      cutoff
+    ────────────────┼─────────────────────────────┼───────▶ updated_at
+                    │                             │
+    updated_at:>= ──[═════════════════════════════╪═══════▶
+    updated_at:<= ══╪═════════════════════════════]
+    emitted ────────[═════════════════════════════]
+                    │                             └─ later edits are the
+                    │                                incremental task's
+                    └─ a resource last updated before this is
+                       never read
+
+    The incremental task emits resources updated after `cutoff`, so the two meet without a gap.
+    A stream whose query depends on the config passes a `build_query` with those arguments bound.
+    It's keyword-only because the CDK treats a `fetch_page` that accepts a fourth positional
+    argument as a recurring backfill and passes it a bool.
+    """
     assert isinstance(cutoff, datetime)
 
     if page is not None:
         assert isinstance(page, str)
 
-    query = model.build_query(
+    if build_query is None:
+        build_query = model.build_query
+    query = build_query(
         start_date,
         cutoff,
         first=PAGE_SIZE,
@@ -346,3 +387,44 @@ async def backfill_incremental_unsorted(
     page_info = data.page_info
     if page_info.hasNextPage:
         yield page_info.endCursor
+
+
+async def snapshot_price_list_prices(
+    client: ShopifyGraphQLClient,
+    data_model: type[BaseResponseData[PriceListPrices]],
+    store: str,
+    capabilities: StoreCapabilities,
+    log: Logger,
+) -> AsyncGenerator[PriceListPrices, None]:
+    """Every price on every price list, one price list at a time in id order. Each price
+    carries its price list's id. A price list deleted after it was listed reads as an empty
+    page, so it is skipped."""
+    price_list_ids = [
+        price_list.id
+        async for price_list in fetch_snapshot(
+            client,
+            PriceLists,
+            create_response_data_model(PriceLists),
+            store,
+            capabilities,
+            log,
+        )
+    ]
+
+    for price_list_id in price_list_ids:
+        ctx = PriceListValidationContext(store=store, price_list_id=price_list_id)
+        after: str | None = None
+        while True:
+            data = await client.request(
+                PriceListPrices.build_query_for_price_list(price_list_id, PAGE_SIZE, after),
+                data_model,
+                log,
+                context=ctx,
+            )
+            for doc in data.nodes:
+                yield doc
+
+            page_info = data.page_info
+            if not page_info.hasNextPage:
+                break
+            after = page_info.endCursor

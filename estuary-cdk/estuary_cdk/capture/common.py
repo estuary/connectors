@@ -42,6 +42,7 @@ from ..flow import (
 )
 from ..utils import json_merge_patch
 from . import Task, request, response
+from ._discovered_schema_checks import check_schema_regexes
 from .backfill_signals import (
     EMIT_BACKFILL_SIGNALS,
     IGNORE_CONFIG_FOR_BACKFILL_SIGNALS,
@@ -596,6 +597,13 @@ def discovered(
                 resourcePath=resource.initial_config.path(),
             )
         )
+
+    # Flow doesn't support certain regex features, and will reject a publication attempting
+    # to use them. The CDK checks for those incompatibilities so connector developers
+    # get that feedback a little sooner.
+    check_schema_regexes(
+        (binding.recommendedName, binding.documentSchema) for binding in bindings
+    )
 
     return response.Discovered(bindings=bindings)
 

@@ -1,5 +1,10 @@
 # materialize-elasticsearch
 
+## 2026-11-17
+
+### Added
+- A completed backfill now deletes an index's documents published before the backfill began.
+
 ## 2026-11-03
 
 ### Changed

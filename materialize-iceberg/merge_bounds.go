@@ -37,7 +37,15 @@ func newMergeBoundsBuilder(keys []boilerplate.MappedProjection[mapped]) *mergeBo
 	}
 }
 
-func (b *mergeBoundsBuilder) nextKey(key []any) {
+// nextKey updates the observed minimum and maximum key for a transaction. A
+// null key field is an error, because a null has no order among the other
+// values.
+func (b *mergeBoundsBuilder) nextKey(key []any) error {
+	for idx, k := range key {
+		if k == nil {
+			return fmt.Errorf("key field %q is null", b.keys[idx].Field)
+		}
+	}
 	if b.lower == nil {
 		b.lower = append([]any(nil), key...)
 		b.upper = append([]any(nil), key...)
@@ -58,6 +66,8 @@ func (b *mergeBoundsBuilder) nextKey(key []any) {
 		b.lower[idx] = minKey(b.lower[idx], k)
 		b.upper[idx] = maxKey(b.upper[idx], k)
 	}
+
+	return nil
 }
 
 func minKey(k1 any, k2 any) any {
@@ -102,6 +112,10 @@ func maxKey(k1 any, k2 any) any {
 func timestamptzLiteral(t time.Time) string {
 	return t.UTC().Truncate(time.Microsecond).Format("2006-01-02T15:04:05.000000Z07:00")
 }
+
+// quoteLiteral renders a transformed value as a single-quoted SQL string
+// literal, matching every other literal this package emits.
+var quoteLiteral = sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "\\'"))
 
 func (b *mergeBoundsBuilder) build() []mergeBound {
 	conditions := make([]mergeBound, len(b.lower))

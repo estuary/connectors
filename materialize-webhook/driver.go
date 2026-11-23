@@ -425,15 +425,8 @@ func (d *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error
 }
 
 func (d *transactor) sendWebhook(ctx context.Context, address string, body bytes.Buffer) error {
-	for attempt := 0; true; attempt++ {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(backoff(attempt)):
-			// Fallthrough
-		}
-
-		request, err := http.NewRequest("POST", address, bytes.NewReader((body.Bytes())))
+	return sendRetry.Do(ctx, "sending webhook", func(ctx context.Context) error {
+		request, err := http.NewRequestWithContext(ctx, "POST", address, bytes.NewReader(body.Bytes()))
 		if err != nil {
 			return fmt.Errorf("http.NewRequest(%s): %w", address, err)
 		}
@@ -446,21 +439,15 @@ func (d *transactor) sendWebhook(ctx context.Context, address string, body bytes
 		}
 
 		response, err := http.DefaultClient.Do(request)
-		if err == nil {
-			err = response.Body.Close()
+		if err != nil {
+			return err
+		} else if err := response.Body.Close(); err != nil {
+			return err
+		} else if response.StatusCode < 200 || response.StatusCode >= 300 {
+			return &statusError{code: response.StatusCode, address: address}
 		}
-		if err == nil && (response.StatusCode < 200 || response.StatusCode >= 300) {
-			err = fmt.Errorf("unexpected webhook response code %d from %s", response.StatusCode, address)
-		}
-
-		if err == nil {
-			break
-		} else if attempt == 10 {
-			return fmt.Errorf("webhook failed after many attempts: %w", err)
-		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
 // Store streams StoreIterator documents directly into the webhook body.
@@ -534,17 +521,4 @@ func (d *transactor) Destroy() {}
 
 func (d *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return nil, nil
-}
-
-func backoff(attempt int) time.Duration {
-	switch attempt {
-	case 0:
-		return 0
-	case 1:
-		return time.Millisecond * 100
-	case 2, 3, 4, 5, 6, 7, 8, 9, 10:
-		return time.Second * time.Duration(attempt-1)
-	default:
-		return 10 * time.Second
-	}
 }

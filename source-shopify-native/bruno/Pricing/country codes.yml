@@ -1,0 +1,89 @@
+info:
+  name: country codes
+  type: graphql
+  seq: 2
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query CountryCodes {
+        __type(name: "CountryCode") {
+          enumValues(includeDeprecated: true) { name isDeprecated }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [CountryCode](https://shopify.dev/docs/api/admin-graphql/2026-01/enums/CountryCode)
+
+  **WHY:** the connector should reject a configured country Shopify doesn't
+  accept (`UK` instead of `GB`) when the capture is published, not on every
+  poll. Answers: can the connector read the accepted codes from the API
+  version it queries, through introspection?
+
+  **VERIFIED (2026-11-13):** introspection works with the app's token. It
+  returns 245 `CountryCode` values. `GB` is one; `UK` and `AQ` aren't (a query
+  with `AQ` fails the way `Pricing / invalid country` does). AC, TA, XK, ZZ
+  and AN are also values. The connector can check configured countries
+  against this list, read from the API version its queries use.
+
+  **VERIFIED (2026-11-20):** with `includeDeprecated: true` the list is still
+  245 values, none deprecated. The connector asks for deprecated values
+  because GraphQL leaves them out by default while Shopify still accepts
+  them: a code Shopify deprecates would otherwise fail validation on the
+  capture's next start. Shopify does deprecate enum values in place: the same
+  day, `CurrencyCode` listed ANG, BYR, STD and VEF as deprecated ("Use `XCG`
+  instead." etc.). AN, retired from ISO 3166-1 in 2010, is not deprecated.
+  Shopify allows `enumValues` under only one name per query
+  (`INTROSPECTION_LIMIT_EXCEEDED`), so one query can't fetch the lists with
+  and without deprecated values side by side.
+
+examples:
+  - name: "200 - 245 values, none deprecated (projection)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "count": 245,
+            "deprecated": [],
+            "GB": true,
+            "UK": false,
+            "AQ": false,
+            "nonIso": [
+              "AC",
+              "XK",
+              "AN",
+              "TA",
+              "ZZ"
+            ],
+            "first10": [
+              "AF",
+              "AX",
+              "AL",
+              "DZ",
+              "AD",
+              "AO",
+              "AI",
+              "AG",
+              "AR",
+              "AM"
+            ]
+          }

@@ -4,9 +4,9 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import Any, AsyncGenerator, ClassVar, Optional, TypeVar
+from xml.sax.saxutils import escape
 
 import xmltodict
-from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import AwareDatetime, BaseModel, create_model, model_validator
@@ -25,10 +25,30 @@ PAGE_SIZE = 2000
 
 endpoint_url = "https://api.intacct.com/ia/xml/xmlgw.phtml"
 
+# Objects whose queries set `showprivate`. Without it, a query from the top
+# level of a multi-entity company skips the records made inside an entity.
+SHOW_PRIVATE_OBJECTS: frozenset[str] = frozenset({"GLBATCH", "GLENTRY", "GLDETAIL"})
+
+# Sage warns that General Ledger queries without a filter can time out, so
+# their backfills filter on the posting date, from GL_START_DATE on.
+# GL_START_DATE is earlier than any Sage Intacct entry, so the filter
+# excludes nothing.
+GL_START_DATE = "01/01/1900"
+
+# The posting date field of each General Ledger object. Sage requires a
+# posting date on each entry. WHENCREATED is not used because Sage leaves it
+# empty on some rows, and a date filter drops rows with an empty value.
+BACKFILL_DATE_FIELDS: dict[str, str] = {
+    "GLBATCH": "BATCH_DATE",
+    "GLENTRY": "ENTRY_DATE",
+    "GLDETAIL": "ENTRY_DATE",
+}
+
 
 DATATYPE_MAP: dict[str, Any] = {
     "TEXT": str,
-    "INTEGER": int | float, # We have seen instances of string-encoded floats in "INTEGER" fields.
+    # We have seen instances of string-encoded floats in "INTEGER" fields.
+    "INTEGER": int | float,
     "BOOLEAN": bool,
     "DATE": str,
     "TIMESTAMP": AwareDatetime,
@@ -75,7 +95,7 @@ class SageRecord(BaseModel):
     field_datatypes: ClassVar[list[str]]
     company_id: ClassVar[str | None] = None
 
-    def model_dump(self, **kwargs):
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         kwargs.setdefault("exclude_none", True)
         res = super().model_dump(**kwargs)
         if self.company_id:
@@ -95,22 +115,18 @@ class SageRecord(BaseModel):
             match datatype:
                 case "TIMESTAMP":
                     assert isinstance(val, str)
-                    parsed = False
                     for fmt in ("%m/%d/%Y %H:%M:%S", "%m/%d/%Y"):
                         try:
-                            dt_naive = datetime.strptime(val, fmt)
-                            parsed = True
+                            val = datetime.strptime(val, fmt).replace(
+                                tzinfo=cls.tz_dt.tzinfo
+                            )
                             break
                         except ValueError:
                             continue
-
-                    if not parsed:
+                    else:
                         raise ValueError(
                             f"Invalid TIMESTAMP format for {field_name}: {val}"
                         )
-
-                    dt_aware = dt_naive.replace(tzinfo=cls.tz_dt.tzinfo)
-                    val = dt_aware
                 case "BOOLEAN":
                     assert isinstance(val, str)
                     if val == "":
@@ -259,7 +275,7 @@ class Sage:
         self,
         obj: str,
         at: AwareDatetime,
-        after: int | None,
+        after: int | str | None,
     ) -> AsyncGenerator[SageRecord, None]:
         model = await self.get_model(obj)
         formatted_at = at.astimezone(model.tz_dt.tzinfo).strftime("%m/%d/%Y %H:%M:%S")
@@ -273,8 +289,48 @@ class Sage:
         self, obj: str, after: int | None
     ) -> AsyncGenerator[SageRecord, None]:
         model = await self.get_model(obj)
-        data = get_all_records_request(
-            self.config, self.session_id, obj, model.field_names, after
+        if date_field := BACKFILL_DATE_FIELDS.get(obj):
+            data = get_all_records_from_date_request(
+                self.config,
+                self.session_id,
+                obj,
+                model.field_names,
+                date_field,
+                GL_START_DATE,
+                after,
+            )
+        else:
+            data = get_all_records_request(
+                self.config, self.session_id, obj, model.field_names, after
+            )
+        async for rec in self._req_json(model, data):
+            yield rec
+
+    async def fetch_gldetail_page(
+        self, from_batch_key: int | None
+    ) -> AsyncGenerator[SageRecord, None]:
+        model = await self.get_model("GLDETAIL")
+        data = get_gldetail_page_request(
+            self.config,
+            self.session_id,
+            model.field_names,
+            GL_START_DATE,
+            from_batch_key,
+        )
+        async for rec in self._req_json(model, data):
+            yield rec
+
+    async def fetch_gldetail_batch(
+        self, batch_key: int, after: str | None
+    ) -> AsyncGenerator[SageRecord, None]:
+        model = await self.get_model("GLDETAIL")
+        data = get_gldetail_batch_request(
+            self.config,
+            self.session_id,
+            model.field_names,
+            GL_START_DATE,
+            batch_key,
+            after,
         )
         async for rec in self._req_json(model, data):
             yield rec
@@ -296,7 +352,7 @@ class Sage:
         self,
         obj: str,
         at: AwareDatetime,
-        after: int | None,
+        after: int | str | None,
     ) -> AsyncGenerator[SageRecord, None]:
         model = await self.get_model(obj)
         formatted_at = at.astimezone(model.tz_dt.tzinfo).strftime("%m/%d/%Y %H:%M:%S")
@@ -371,7 +427,9 @@ class Sage:
         the Sage error message attached on a PL04000005 denial."""
         await self._maybe_refresh_session()
 
-        data = permission_probe_request(self.config, self.session_id, obj)
+        # The request body is XML. The CDK sends `form` as the body as it is,
+        # and its type hint only names the form-encoded use.
+        data: Any = permission_probe_request(self.config, self.session_id, obj)
         bs = await self.http.request(
             self.log,
             endpoint_url,
@@ -384,7 +442,7 @@ class Sage:
         parsed.raise_for_error()
 
     async def _req_xml(
-        self, cls: type[XMLRecord], data: Any, skip_refresh=False
+        self, cls: type[XMLRecord], data: Any, skip_refresh: bool = False
     ) -> XMLRecord:
         if not skip_refresh:
             await self._maybe_refresh_session()
@@ -486,6 +544,17 @@ class Sage:
         return m
 
 
+def query_options(object: str) -> str:
+    show_private = (
+        "\n            <showprivate>true</showprivate>"
+        if object in SHOW_PRIVATE_OBJECTS
+        else ""
+    )
+    return f"""<options>{show_private}
+            <returnformat>json</returnformat>
+          </options>"""
+
+
 def xml_query(cfg: EndpointConfig, operation: str) -> str:
     return f"""
 <?xml version="1.0" encoding="UTF-8"?>
@@ -565,9 +634,7 @@ def get_user_by_id_request(cfg: EndpointConfig, session_id: str, user_id: str) -
     return function_with_session_id_xml(cfg, session_id, exec)
 
 
-def permission_probe_request(
-    cfg: EndpointConfig, session_id: str, object: str
-) -> str:
+def permission_probe_request(cfg: EndpointConfig, session_id: str, object: str) -> str:
     # A `pagesize=1` query is the cheapest way to surface a PL04000005
     # permission denial: Sage checks permissions before retrieval, so the
     # error fires regardless of whether the query would match any rows.
@@ -621,9 +688,7 @@ def get_records_since_request(
                 <ascending/>
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options(object)}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()
@@ -637,16 +702,26 @@ def get_records_at_request(
     object: str,
     fields: list[str],
     at: str,  # ex: 12/08/202 10:46:26
-    after: int | None,
+    after: int | str | None,
 ) -> str:
     def filter() -> str:
         if after is None:
-            return ""
+            return f"""
+              <equalto>
+                  <field>WHENMODIFIED</field>
+                  <value>{at}</value>
+              </equalto>"""
         return f"""
+            <and>
+              <equalto>
+                <field>WHENMODIFIED</field>
+                <value>{at}</value>
+              </equalto>
               <greaterthan>
-                  <field>RECORDNO</field>
-                  <value>{after}</value>
-              </greaterthan>"""
+                <field>RECORDNO</field>
+                <value>{escape(str(after))}</value>
+              </greaterthan>
+            </and>"""
 
     exec = f"""
         <query>
@@ -654,11 +729,7 @@ def get_records_at_request(
           <select>
 {"\n".join(f"            <field>{field}</field>" for field in fields)}
           </select>
-          <filter>
-              <equalto>
-                  <field>WHENMODIFIED</field>
-                  <value>{at}</value>
-              </equalto>{filter()}
+          <filter>{filter()}
           </filter>
           <orderby>
             <order>
@@ -666,9 +737,7 @@ def get_records_at_request(
                 <ascending/>
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options(object)}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()
@@ -681,7 +750,7 @@ def get_all_records_request(
     session_id: str,
     object: str,
     fields: list[str],
-    after: int | None,
+    after: int | str | None,
 ) -> str:
     def filter() -> str:
         if after is None:
@@ -690,7 +759,7 @@ def get_all_records_request(
           <filter>
               <greaterthan>
                   <field>RECORDNO</field>
-                  <value>{after}</value>
+                  <value>{escape(str(after))}</value>
               </greaterthan>
           </filter>"""
 
@@ -706,14 +775,119 @@ def get_all_records_request(
                 <ascending/>
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options(object)}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()
 
     return function_with_session_id_xml(cfg, session_id, exec)
+
+
+def condition(operator: str, field: str, value: Any) -> str:
+    return f"""<{operator}>
+                <field>{field}</field>
+                <value>{escape(str(value))}</value>
+              </{operator}>"""
+
+
+def filtered_query_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    object: str,
+    fields: list[str],
+    conditions: list[str],
+    order_field: str,
+) -> str:
+    """`conditions` needs at least one entry."""
+    # Sage allows one element under <filter>, so two or more conditions need
+    # <and>. A request without it is not valid.
+    if len(conditions) == 1:
+        filter = f"""
+              {conditions[0]}"""
+    else:
+        filter = f"""
+            <and>
+              {"\n              ".join(conditions)}
+            </and>"""
+
+    exec = f"""
+        <query>
+          <object>{object}</object>
+          <select>
+{"\n".join(f"            <field>{field}</field>" for field in fields)}
+          </select>
+          <filter>{filter}
+          </filter>
+          <orderby>
+            <order>
+                <field>{order_field}</field>
+                <ascending/>
+            </order>
+          </orderby>
+          {query_options(object)}
+          <pagesize>{PAGE_SIZE}</pagesize>
+        </query>
+""".strip()
+
+    return function_with_session_id_xml(cfg, session_id, exec)
+
+
+def get_all_records_from_date_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    object: str,
+    fields: list[str],
+    date_field: str,
+    start_date: str,  # ex: 12/08/2024
+    after: int | None,
+) -> str:
+    conditions = [condition("greaterthanorequalto", date_field, start_date)]
+    if after is not None:
+        conditions.append(condition("greaterthan", "RECORDNO", after))
+
+    return filtered_query_request(
+        cfg, session_id, object, fields, conditions, "RECORDNO"
+    )
+
+
+def get_gldetail_page_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    fields: list[str],
+    start_date: str,  # ex: 12/08/2024
+    from_batch_key: int | None,
+) -> str:
+    date_field = BACKFILL_DATE_FIELDS["GLDETAIL"]
+    conditions = [
+        condition("greaterthanorequalto", date_field, start_date),
+    ]
+    if from_batch_key is not None:
+        conditions.append(condition("greaterthanorequalto", "BATCHKEY", from_batch_key))
+
+    return filtered_query_request(
+        cfg, session_id, "GLDETAIL", fields, conditions, "BATCHKEY"
+    )
+
+
+def get_gldetail_batch_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    fields: list[str],
+    start_date: str,  # ex: 12/08/2024
+    batch_key: int,
+    after: str | None,
+) -> str:
+    date_field = BACKFILL_DATE_FIELDS["GLDETAIL"]
+    conditions = [
+        condition("greaterthanorequalto", date_field, start_date),
+        condition("equalto", "BATCHKEY", batch_key),
+    ]
+    if after is not None:
+        conditions.append(condition("greaterthan", "RECORDNO", after))
+
+    return filtered_query_request(
+        cfg, session_id, "GLDETAIL", fields, conditions, "RECORDNO"
+    )
 
 
 def get_creations_since_request(
@@ -746,9 +920,7 @@ def get_creations_since_request(
                 <ascending/>
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options(object)}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()
@@ -762,7 +934,7 @@ def get_creations_at_request(
     object: str,
     fields: list[str],
     at: str,  # ex: 12/08/2024 10:46:26
-    after: int | None,
+    after: int | str | None,
 ) -> str:
     def filter() -> str:
         if after is None:
@@ -770,7 +942,7 @@ def get_creations_at_request(
         return f"""
               <greaterthan>
                 <field>RECORDNO</field>
-                <value>{after}</value>
+                <value>{escape(str(after))}</value>
               </greaterthan>"""
 
     exec = f"""
@@ -796,9 +968,7 @@ def get_creations_at_request(
                 <ascending/>
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options(object)}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()
@@ -842,9 +1012,7 @@ def get_deletions_since_request(
               <ascending />
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options("AUDITHISTORY")}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()
@@ -865,7 +1033,7 @@ def get_deletions_at_request(
         return f"""
               <greaterthan>
                 <field>ID</field>
-                <value>{after}</value>
+                <value>{escape(str(after))}</value>
               </greaterthan>"""
 
     exec = f"""
@@ -898,9 +1066,7 @@ def get_deletions_at_request(
               <ascending />
             </order>
           </orderby>
-          <options>
-            <returnformat>json</returnformat>
-          </options>
+          {query_options("AUDITHISTORY")}
           <pagesize>{PAGE_SIZE}</pagesize>
         </query>
 """.strip()

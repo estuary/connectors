@@ -331,6 +331,29 @@
     }
   ],
   [
+    "acmeCo/product_variant_contextual_pricing",
+    {
+      "_meta": {
+        "store": "estuary-alex-testing",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "contextualPricing": {
+        "compareAtPrice": null,
+        "price": {
+          "amount": "10.0",
+          "currencyCode": "USD"
+        }
+      },
+      "country": "DE",
+      "id": "gid://shopify/ProductVariant/43217823334445",
+      "legacyResourceId": "43217823334445",
+      "product": {
+        "id": "gid://shopify/Product/8086707830829"
+      },
+      "updatedAt": "redacted"
+    }
+  ],
+  [
     "acmeCo/fulfillment_orders",
     {
       "_meta": {
@@ -6878,7 +6901,146 @@
       "conditions": {
         "conditionTypes": [
           "REGION"
-        ]
+        ],
+        "regionsCondition": {
+          "regions": [
+            {
+              "code": "AE",
+              "id": "gid://shopify/MarketRegionCountry/2739687292973",
+              "name": "United Arab Emirates"
+            },
+            {
+              "code": "AT",
+              "id": "gid://shopify/MarketRegionCountry/2739687325741",
+              "name": "Austria"
+            },
+            {
+              "code": "AU",
+              "id": "gid://shopify/MarketRegionCountry/2739687358509",
+              "name": "Australia"
+            },
+            {
+              "code": "BE",
+              "id": "gid://shopify/MarketRegionCountry/2739687391277",
+              "name": "Belgium"
+            },
+            {
+              "code": "CA",
+              "id": "gid://shopify/MarketRegionCountry/2739687424045",
+              "name": "Canada"
+            },
+            {
+              "code": "CH",
+              "id": "gid://shopify/MarketRegionCountry/2739687456813",
+              "name": "Switzerland"
+            },
+            {
+              "code": "CZ",
+              "id": "gid://shopify/MarketRegionCountry/2739687489581",
+              "name": "Czechia"
+            },
+            {
+              "code": "DE",
+              "id": "gid://shopify/MarketRegionCountry/2739687522349",
+              "name": "Germany"
+            },
+            {
+              "code": "DK",
+              "id": "gid://shopify/MarketRegionCountry/2739687555117",
+              "name": "Denmark"
+            },
+            {
+              "code": "ES",
+              "id": "gid://shopify/MarketRegionCountry/2739687587885",
+              "name": "Spain"
+            },
+            {
+              "code": "FI",
+              "id": "gid://shopify/MarketRegionCountry/2739687620653",
+              "name": "Finland"
+            },
+            {
+              "code": "FR",
+              "id": "gid://shopify/MarketRegionCountry/2739687653421",
+              "name": "France"
+            },
+            {
+              "code": "GB",
+              "id": "gid://shopify/MarketRegionCountry/2739687686189",
+              "name": "United Kingdom"
+            },
+            {
+              "code": "HK",
+              "id": "gid://shopify/MarketRegionCountry/2739687718957",
+              "name": "Hong Kong SAR"
+            },
+            {
+              "code": "IE",
+              "id": "gid://shopify/MarketRegionCountry/2739687751725",
+              "name": "Ireland"
+            },
+            {
+              "code": "IL",
+              "id": "gid://shopify/MarketRegionCountry/2739687784493",
+              "name": "Israel"
+            },
+            {
+              "code": "IT",
+              "id": "gid://shopify/MarketRegionCountry/2739687817261",
+              "name": "Italy"
+            },
+            {
+              "code": "JP",
+              "id": "gid://shopify/MarketRegionCountry/2739687850029",
+              "name": "Japan"
+            },
+            {
+              "code": "KR",
+              "id": "gid://shopify/MarketRegionCountry/2739687882797",
+              "name": "South Korea"
+            },
+            {
+              "code": "MY",
+              "id": "gid://shopify/MarketRegionCountry/2739687915565",
+              "name": "Malaysia"
+            },
+            {
+              "code": "NL",
+              "id": "gid://shopify/MarketRegionCountry/2739687948333",
+              "name": "Netherlands"
+            },
+            {
+              "code": "NO",
+              "id": "gid://shopify/MarketRegionCountry/2739687981101",
+              "name": "Norway"
+            },
+            {
+              "code": "NZ",
+              "id": "gid://shopify/MarketRegionCountry/2739688013869",
+              "name": "New Zealand"
+            },
+            {
+              "code": "PL",
+              "id": "gid://shopify/MarketRegionCountry/2739688046637",
+              "name": "Poland"
+            },
+            {
+              "code": "PT",
+              "id": "gid://shopify/MarketRegionCountry/2739688079405",
+              "name": "Portugal"
+            },
+            {
+              "code": "SE",
+              "id": "gid://shopify/MarketRegionCountry/2739688112173",
+              "name": "Sweden"
+            },
+            {
+              "code": "SG",
+              "id": "gid://shopify/MarketRegionCountry/2739688144941",
+              "name": "Singapore"
+            }
+          ]
+        }
       },
       "currencySettings": {
         "baseCurrency": {
@@ -6897,6 +7059,54 @@
       "priceInclusions": null,
       "status": "ACTIVE",
       "type": "REGION"
+    }
+  ],
+  [
+    "acmeCo/price_lists",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "store": "estuary-alex-testing",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "catalog": null,
+      "currency": "USD",
+      "fixedPricesCount": 0,
+      "id": "gid://shopify/PriceList/27592196141",
+      "name": "Price List example Buyers",
+      "parent": {
+        "adjustment": {
+          "type": "PERCENTAGE_DECREASE",
+          "value": 5.0
+        },
+        "settings": {
+          "compareAtMode": "ADJUSTED"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/price_list_prices",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "store": "estuary-alex-testing",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "compareAtPrice": null,
+      "originType": "RELATIVE",
+      "price": {
+        "amount": "9.5",
+        "currencyCode": "USD"
+      },
+      "priceList": {
+        "id": "gid://shopify/PriceList/27592196141"
+      },
+      "variant": {
+        "id": "gid://shopify/ProductVariant/43217823334445"
+      }
     }
   ]
 ]

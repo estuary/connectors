@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-11-19
+
+### Added
+
+- New General Ledger bindings `GLBATCH` (journal entries), `GLENTRY` (journal
+  entry lines) and `GLDETAIL` (lines joined with their AR and AP documents).
+  They include the records made inside an entity of a multi-entity company.
+- Backfills: each binding has a new optional `schedule` setting, to backfill
+  it on a cron schedule. Backfills of the General Ledger bindings read all
+  entries. They also remove the rows that no longer exist in Sage from the
+  destination, for captures created on or after 2026-12-01.
+
+### Fixed
+
+- Bindings with more than 2,000 records modified in the same second now send
+  a valid request for the records after the first 2,000. Its two filter
+  conditions are combined with `<and>`, as Sage requires.
+
 ## 2026-09-10
 
 ### Fixed

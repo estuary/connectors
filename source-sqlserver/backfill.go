@@ -52,12 +52,73 @@ func (db *sqlserverDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool {
 	return true
 }
 
-// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
+// ScanTableChunk fetches a chunk of rows from the specified table, resuming after the row key in `state.Scanned` if non-nil.
 func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, backfillFilter string, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
-	var keyColumns = state.KeyColumns
-	var schema, table = info.Schema, info.Name
-	var streamID = sqlcapture.JoinStreamID(schema, table)
+	var scan = db.newChunkScan(info, state, callback)
 
+	// A backfill never switches from key order to partition order. A fresh one goes by
+	// partition when the table can be backfilled that way, and one already underway goes
+	// by partition only if its state holds a partition. So a key-ordered backfill stays
+	// key-ordered even if partition-aware backfills are enabled while it is in progress,
+	// since its cursor has passed rows in every partition.
+	if state.Mode != sqlcapture.TableStateKeylessBackfill {
+		var metadata, err = decodeBackfillMetadata(state.Metadata)
+		if err != nil {
+			return false, nil, err
+		}
+
+		var partitionIndex, unusedReason = partitionedBackfillIndex(info, state)
+		var partitionOrdered = state.Scanned != nil && metadata.Partition != nil
+
+		// Warn once, on the first chunk of a backfill, when the table could have been
+		// backfilled by partition but its binding rules that out.
+		if unusedReason != "" && state.Scanned == nil {
+			log.WithFields(log.Fields{
+				"stream": scan.streamID,
+				"reason": unusedReason,
+			}).Warn("table could be backfilled one partition at a time but will be backfilled in key order, which sorts the whole table for every chunk")
+		}
+
+		switch {
+		case partitionIndex != nil && (state.Scanned == nil || partitionOrdered):
+			return db.scanPartitioned(ctx, scan, partitionIndex, metadata.Partition, backfillFilter)
+		case partitionOrdered:
+			// The resume key is a position within one partition, and in key order it
+			// would skip the rows of later partitions which sort below it. So the only
+			// safe way to continue in key order is from the beginning.
+			log.WithField("stream", scan.streamID).Warn("partition-ordered backfill can no longer continue by partition" +
+				" (partition-aware backfills disabled, or the table's key index is no longer partitioned on a non-leading key column)," +
+				" restarting its backfill in key order")
+			state.Scanned, state.Metadata = nil, clearedMetadata
+		}
+	}
+
+	query, args, err := backfill.BuildBackfillQuery(state, scan.schema, scan.table, scan.columnTypes, scan.chunkSize, backfillFilter)
+	if err != nil {
+		return false, nil, err
+	}
+	rows, rowKey, err := scan.run(ctx, query, args)
+	if err != nil {
+		return false, nil, err
+	}
+	return rows < scan.chunkSize, rowKey, nil
+}
+
+// chunkScan runs the backfill queries of one chunk, that is one ScanTableChunk call,
+// against a table and emits their result rows as change events.
+type chunkScan struct {
+	db             *sqlserverDatabase
+	state          *sqlcapture.TableState
+	callback       func(event sqlcapture.ChangeEvent) error
+	streamID       sqlcapture.StreamID
+	schema, table  string
+	chunkSize      int
+	columnTypes    map[string]any
+	excludeColumns []string
+	emitted        int // Rows emitted by this scan so far, across all of its queries.
+}
+
+func (db *sqlserverDatabase) newChunkScan(info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event sqlcapture.ChangeEvent) error) *chunkScan {
 	var columnTypes = make(map[string]any)
 	for name, column := range info.Columns {
 		columnTypes[name] = column.DataType
@@ -71,11 +132,25 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		excludeColumns = details.ComputedColumns
 	}
 
-	// Compute backfill query and arguments list
-	query, args, err := backfill.BuildBackfillQuery(state, schema, table, columnTypes, db.config.Advanced.BackfillChunkSize, backfillFilter)
-	if err != nil {
-		return false, nil, err
+	return &chunkScan{
+		db:             db,
+		state:          state,
+		callback:       callback,
+		streamID:       sqlcapture.JoinStreamID(info.Schema, info.Name),
+		schema:         info.Schema,
+		table:          info.Name,
+		chunkSize:      db.config.Advanced.BackfillChunkSize,
+		columnTypes:    columnTypes,
+		excludeColumns: excludeColumns,
 	}
+}
+
+// run executes one backfill query and emits its rows, returning the number of rows and
+// the row key of the last one.
+func (scan *chunkScan) run(ctx context.Context, query string, args []any) (int, []byte, error) {
+	var db, state, streamID = scan.db, scan.state, scan.streamID
+	var keyColumns = state.KeyColumns
+	var columnTypes = scan.columnTypes
 
 	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
 
@@ -93,14 +168,14 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 
 	rows, err := db.conn.QueryContext(watchdogCtx, query, args...)
 	if err != nil {
-		return false, nil, fmt.Errorf("unable to execute query %q: %w", query, err)
+		return 0, nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
 	defer rows.Close()
 
 	// Set up the necessary slices for generic scanning over query rows
 	cnames, err := rows.Columns()
 	if err != nil {
-		return false, nil, err
+		return 0, nil, err
 	}
 
 	// Preprocess result metadata for efficient row handling.
@@ -108,7 +183,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	var outputTranscoders = make([]datatypes.JSONTranscoder, len(cnames)) // Transcoders for all columns, with omitted columns set to nil
 	var rowKeyTranscoders = make([]datatypes.FDBTranscoder, len(cnames))  // Transcoders for all columns, with omitted columns set to nil
 	for idx, name := range cnames {
-		if slices.Contains(excludeColumns, name) {
+		if slices.Contains(scan.excludeColumns, name) {
 			continue // Leave outputColumnNames[idx] unset for this column
 		}
 
@@ -132,7 +207,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		for idx, colName := range keyColumns {
 			var resultIndex = slices.Index(cnames, colName)
 			if resultIndex < 0 {
-				return false, nil, fmt.Errorf("key column %q not found in result columns for %q", colName, streamID)
+				return 0, nil, fmt.Errorf("key column %q not found in result columns for %q", colName, streamID)
 			}
 			keyIndices[idx] = resultIndex
 		}
@@ -154,16 +229,16 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	}
 
 	// Iterate over the result set yielding each row as a change event.
-	var resultRows int               // Count of rows received within the current backfill chunk
+	var resultRows int               // Count of rows received within the current backfill query
 	var rowKey = make([]byte, 0, 64) // The row key of the most recent row processed
-	var rowOffset = state.BackfilledCount
 	for rows.Next() {
 		watchdogTimer.Reset(backfillQueryTimeout) // Reset on data movement
 
 		if err := rows.Scan(vptrs...); err != nil {
-			return false, nil, fmt.Errorf("error scanning result row: %w", err)
+			return 0, nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 
+		var rowOffset = state.BackfilledCount + scan.emitted
 		rowKey = rowKey[:0]
 		if state.Mode == sqlcapture.TableStateKeylessBackfill {
 			rowKey = fmt.Appendf(rowKey, "B%019d", rowOffset) // A 19 digit decimal number is sufficient to hold any 63-bit integer
@@ -171,7 +246,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 			for _, n := range keyIndices {
 				rowKey, err = rowKeyTranscoders[n].TranscodeFDB(rowKey, vals[n])
 				if err != nil {
-					return false, nil, fmt.Errorf("error encoding column %q at index %d: %w", cnames[n], n, err)
+					return 0, nil, fmt.Errorf("error encoding column %q at index %d: %w", cnames[n], n, err)
 				}
 			}
 		}
@@ -183,9 +258,9 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 				Operation: sqlcapture.InsertOp,
 				Source: sqlserverSourceInfoCDC{
 					SourceCommon: sqlcapture.SourceCommon{
-						Schema:   schema,
+						Schema:   scan.schema,
 						Snapshot: true,
-						Table:    table,
+						Table:    scan.table,
 					},
 					LSN:    reused.lsn,
 					SeqVal: reused.seqval,
@@ -195,18 +270,17 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 			RowKey: rowKey,
 			Values: vals,
 		}
-		if err := callback(&reused.event); err != nil {
-			return false, nil, fmt.Errorf("error processing change event: %w", err)
+		if err := scan.callback(&reused.event); err != nil {
+			return 0, nil, fmt.Errorf("error processing change event: %w", err)
 		}
 		resultRows++
-		rowOffset++
+		scan.emitted++
 	}
-	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
 	err = rows.Err()
 	if err != nil && watchdogCtx.Err() == context.Canceled {
 		err = fmt.Errorf("backfill query canceled after %s due to lack of progress for table %q", backfillQueryTimeout.String(), streamID)
 	}
-	return backfillComplete, rowKey, err
+	return resultRows, rowKey, err
 }
 
 type sqlserverTableStatistics struct {

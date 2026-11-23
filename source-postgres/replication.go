@@ -10,12 +10,14 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/encrow"
+	pgtls "github.com/estuary/connectors/go/postgres/tls"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/google/uuid"
 	"github.com/jackc/pgio"
@@ -152,6 +154,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 	if err != nil {
 		return nil, err
 	}
+	pgtls.Configure(connConfig, db.config.Advanced.SSLMode, db.config.tlsServerHost())
 	if connConfig.ConnectTimeout == 0 {
 		connConfig.ConnectTimeout = 30 * time.Second
 	}
@@ -432,7 +435,7 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 	}).Info("starting replication")
 
 	// Construct and send the START_REPLICATION command to the database.
-	var sql = fmt.Sprintf(`START_REPLICATION SLOT %s LOGICAL %s ("proto_version" '1', "publication_names" '%s')`, s.replSlot, startLSN, s.pubName)
+	var sql = fmt.Sprintf(`START_REPLICATION SLOT %s LOGICAL %s ("proto_version" '1', "publication_names" '%s')`, s.replSlot, startLSN, strings.ReplaceAll(s.pubName, `'`, `''`))
 	if bs, err := (&pgproto3.Query{String: sql}).Encode(nil); err != nil {
 		return fmt.Errorf("error encoding START_REPLICATION query: %w", err)
 	} else if _, err := s.conn.Conn.Write(bs); err != nil {

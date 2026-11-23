@@ -23,13 +23,15 @@ func TestDatabricksConfig(t *testing.T) {
 		SchemaName: "default",
 	}
 	require.NoError(t, validConfig.Validate())
-	var uri = validConfig.ToURI("my-materialization")
+	uri, err := validConfig.ToURI("my-materialization")
+	require.NoError(t, err)
 	require.Equal(t, "token:secret@db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?catalog=mycatalog&maxDownloadThreads=2&query_tags=materialization_name%3Amy-materialization&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", uri)
 
 	var noPort = validConfig
 	noPort.Address = "db-something.cloud.databricks.com"
 	require.NoError(t, noPort.Validate())
-	uri = noPort.ToURI("")
+	uri, err = noPort.ToURI("")
+	require.NoError(t, err)
 	require.Equal(t, "token:secret@db-something.cloud.databricks.com:443/sql/1.0/warehouses/someid?catalog=mycatalog&maxDownloadThreads=2&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", uri)
 
 	var noAddress = validConfig
@@ -65,7 +67,8 @@ func TestDatabricksConfig(t *testing.T) {
 		SchemaName: "default",
 	}
 	require.NoError(t, validOAuthConfig.Validate())
-	var oauthUri = validOAuthConfig.ToURI("")
+	oauthUri, err := validOAuthConfig.ToURI("")
+	require.NoError(t, err)
 	require.Equal(t, "db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?authType=OauthM2M&catalog=mycatalog&clientID=my-client-id&clientSecret=my-client-secret&maxDownloadThreads=2&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", oauthUri)
 
 	var noClientID = validOAuthConfig
@@ -89,6 +92,45 @@ func TestDatabricksConfig(t *testing.T) {
 	require.Equal(t, "my-client-secret", oauthWs.ClientSecret)
 	require.Empty(t, oauthWs.Token)
 	require.Nil(t, oauthWs.Credentials)
+}
+
+// The driver fails to parse these with an error that quotes the whole
+// connection string, so they must not reach it.
+func TestValidateRejectsUnparseableAddress(t *testing.T) {
+	var pat = credentialConfig{AuthType: PAT_AUTH_TYPE, PersonalAccessToken: "secret1234"}
+	var oauth = credentialConfig{AuthType: OAUTH_M2M_AUTH_TYPE, ClientID: "my-client-id", ClientSecret: "secret1234"}
+
+	type testCase struct {
+		creds    credentialConfig
+		address  string
+		httpPath string
+	}
+	var cases []testCase
+	for _, creds := range []credentialConfig{pat, oauth} {
+		for _, address := range []string{"example.com:prod", "will@example.com", "example.com/db", "example .com:443"} {
+			cases = append(cases, testCase{creds, address, "/sql/1.0/warehouses/someid"})
+		}
+	}
+	// These connection strings start with a scheme, so the driver doesn't add one.
+	cases = append(cases,
+		testCase{oauth, "https:", "//example.com:prod/sql"},
+		testCase{oauth, "http:", "//example.com:prod/sql"},
+	)
+
+	for _, tc := range cases {
+		var cfg = config{
+			Address:     tc.address,
+			CatalogName: "mycatalog",
+			HTTPPath:    tc.httpPath,
+			Credentials: tc.creds,
+			SchemaName:  "default",
+		}
+		_, uriErr := cfg.ToURI("")
+		for _, err := range []error{uriErr, cfg.Validate()} {
+			require.ErrorContains(t, err, "invalid 'address'", tc.address)
+			require.NotContains(t, err.Error(), "secret1234", tc.address)
+		}
+	}
 }
 
 func TestSpecification(t *testing.T) {

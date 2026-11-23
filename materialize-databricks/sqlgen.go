@@ -235,18 +235,6 @@ FROM {{ $.Table.Identifier }}{{ if $.Version }} VERSION AS OF {{ $.Version }} AS
 	{{- end }}
 {{- end }}
 
--- The range condition of a key column's merge bound: one range of its lower
--- and upper literals, or the union of its ranges when it has them.
-
-{{ define "boundCondition" -}}
-{{- if $.Bound.Ranges }} AND (
-	{{- range $i, $r := $.Bound.Ranges }}{{ if $i }} OR {{ end -}}
-	({{ $.Alias }}.{{ $.Bound.Identifier }} >= {{ $r.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} <= {{ $r.LiteralUpper }})
-	{{- end }})
-{{- else if $.Bound.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} >= {{ $.Bound.LiteralLower }} AND {{ $.Alias }}.{{ $.Bound.Identifier }} <= {{ $.Bound.LiteralUpper }}
-{{- end }}
-{{- end }}
-
 -- The staged files of a transaction: one relation per staging directory, and
 -- one scan per file for files staged at the root by earlier versions.
 -- TODO: remove the per-file scans in about January 2027, with the root-level
@@ -425,7 +413,6 @@ CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
 	);
 {{ end }}
   `, template.FuncMap{
-		"BoundOn":    func(alias string, bound sql.MergeBound) boundOn { return boundOn{Alias: alias, Bound: bound} },
 		"QuoteAlias": sql.QuoteTransform("`", "``"),
 	})
 
@@ -467,12 +454,6 @@ func (t *tableWithFiles) LoadAlias() string {
 		return "l"
 	}
 	return t.Table.Identifier
-}
-
-// boundOn is a merge bound on the key column of the table aliased Alias.
-type boundOn struct {
-	Alias string
-	Bound sql.MergeBound
 }
 
 // stagingCopy renders the creation of a staging table and the copy of a

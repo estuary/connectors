@@ -1,5 +1,11 @@
 # source-mysql
 
+## 2026-11-19
+
+### Fixed
+- Backfill queries and table prerequisite checks now escape backticks in schema and table names, so a table whose name contains a backtick can be captured.
+- The prerequisite check for `DATETIME` columns now passes schema and table names as bound parameters, so it works for a table whose name contains `'`. That check only runs when the database time zone is unknown.
+
 ## 2026-10-30
 
 ### Changed

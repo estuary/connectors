@@ -1,0 +1,72 @@
+info:
+  name: product statuses
+  type: graphql
+  seq: 11
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query ProductStatuses {
+        products(first: 50) {
+          nodes {
+            status
+            variantsCount { count }
+            variants(first: 1) { nodes { legacyResourceId } }
+          }
+        }
+        productVariants(first: 250) { nodes { legacyResourceId } }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [productVariants](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/productVariants) (filters `product_status` and `published_status` exist; no default value is documented)
+
+  **WHY:** silent-data-loss check. A list with an unstated default filter
+  can skip a partition. Answers: does `productVariants` with no `query`
+  return the variants of draft and archived products?
+
+  **VERIFIED (2026-11-13):** with no `query`, `productVariants` returns all
+  27 variants. That includes the variants of the store's one DRAFT and one
+  ARCHIVED product; 16 active products hold the other 25. The default
+  filters out nothing.
+
+examples:
+  - name: "200 - draft and archived variants included (projection)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "productsByStatus": {
+              "ACTIVE": 16,
+              "DRAFT": 1,
+              "ARCHIVED": 1
+            },
+            "variantsByProductStatus": {
+              "ACTIVE": 25,
+              "DRAFT": 1,
+              "ARCHIVED": 1
+            },
+            "productVariantsReturned": 27,
+            "nonActiveVariantsReturned": [
+              "43217823563821",
+              "43217823531053"
+            ]
+          }

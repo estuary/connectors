@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +19,7 @@ import (
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	pgtls "github.com/estuary/connectors/go/postgres/tls"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
@@ -52,7 +55,7 @@ func main() {
 	boilerplate.RunMain(postgresDriver)
 }
 
-func connectPostgres(ctx context.Context, name string, cfg json.RawMessage) (sqlcapture.Database, error) {
+func connectPostgres(ctx context.Context, name string, cfg json.RawMessage, _ common.CreatedAt) (sqlcapture.Database, error) {
 	var config Config
 	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
 		return nil, fmt.Errorf("error parsing config json: %w", err)
@@ -165,7 +168,7 @@ type advancedConfig struct {
 	WatermarksTable           string   `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 	SkipBackfills             string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	BackfillChunkSize         int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query." jsonschema_extras:"nonsensitive=true"`
-	SSLMode                   string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
+	SSLMode                   string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter. 'verify-ca' and 'verify-full' trust public certificate authorities and the CAs of Amazon RDS and Google Cloud SQL (shared CA).,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
 	DiscoverSchemas           []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas." jsonschema_extras:"nonsensitive=true"`
 	MinimumBackfillXID        string   `json:"min_backfill_xid,omitempty" jsonschema:"title=Minimum Backfill XID,description=Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases." jsonschema_extras:"pattern=^[0-9]+$"`
 	ReadOnlyCapture           bool     `json:"read_only_capture,omitempty" jsonschema:"title=Read-Only Capture,description=When set the capture will operate in read-only mode and avoid operations such as watermark writes. This comes with some tradeoffs; consult the connector documentation for more information." jsonschema_extras:"nonsensitive=true"`
@@ -248,6 +251,15 @@ var featureFlagDefaults = map[string]bool{
 	"activate_streams_before_catchup": false,
 }
 
+// slotNameRegex and watermarksTableRegex match valid unquoted identifiers. The
+// names have to stay unquoted because quoting would stop Postgres from
+// lowercasing them, so a name like `public.Flow_Watermarks` would refer to a
+// different table.
+var (
+	slotNameRegex        = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	watermarksTableRegex = regexp.MustCompile(`^[\p{L}_][\p{L}\p{N}_$]*\.[\p{L}_][\p{L}\p{N}_$]*$`)
+)
+
 // Validate checks that the configuration possesses all required properties.
 func (c *Config) Validate() error {
 	if c.Address == "" {
@@ -286,6 +298,17 @@ func (c *Config) Validate() error {
 
 	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
 		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
+	}
+	if c.Advanced.WatermarksTable != "" && !c.Advanced.ReadOnlyCapture && !watermarksTableRegex.MatchString(c.Advanced.WatermarksTable) {
+		return fmt.Errorf("invalid 'watermarksTable' configuration: in %q, the schema and table names must each start with a letter or '_' and contain only letters, digits, '_', and '$'", c.Advanced.WatermarksTable)
+	}
+	if c.Advanced.SlotName != "" && !slotNameRegex.MatchString(c.Advanced.SlotName) {
+		return fmt.Errorf("invalid 'slotName' configuration: %q must start with a letter or '_' and contain only letters, digits, and '_'", c.Advanced.SlotName)
+	}
+	if c.Advanced.MinimumBackfillXID != "" {
+		if _, err := strconv.ParseUint(c.Advanced.MinimumBackfillXID, 10, 64); err != nil {
+			return fmt.Errorf("invalid 'min_backfill_xid' configuration: %q must be a non-negative integer", c.Advanced.MinimumBackfillXID)
+		}
 	}
 	if c.Advanced.SkipBackfills != "" {
 		for _, skipStreamID := range strings.Split(c.Advanced.SkipBackfills, ",") {
@@ -342,6 +365,21 @@ func (c *Config) SetDefaults() {
 	if !strings.Contains(c.Address, ":") {
 		c.Address += ":5432"
 	}
+}
+
+// tlsServerHost returns the name that 'verify-full' checks the server
+// certificate against, when pgx would check the wrong one. Through an SSH
+// tunnel pgx dials localhost, so the configured host is returned instead.
+// Without a tunnel it returns "", and pgx checks each host it parsed from the
+// address against that host's own name.
+func (c *Config) tlsServerHost() string {
+	if !(c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "") {
+		return ""
+	}
+	if host, _, err := net.SplitHostPort(c.Address); err == nil {
+		return host
+	}
+	return c.Address
 }
 
 // ToURI converts the Config to a DSN string.
@@ -468,6 +506,7 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error parsing database uri: %w", err)
 	}
+	pgtls.Configure(&config.ConnConfig.Config, db.config.Advanced.SSLMode, db.config.tlsServerHost())
 	if config.ConnConfig.ConnectTimeout == 0 {
 		config.ConnConfig.ConnectTimeout = 20 * time.Second
 	}

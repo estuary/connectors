@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-11-19
+
+### Fixed
+- Backfill queries and table prerequisite checks now escape `"` in schema and table names, so a table whose name contains `"` can be captured.
+- Prerequisite checks now pass `user`, `slotName`, and `publicationName` as bound parameters, and `START_REPLICATION` escapes `'` in the publication name, so a `'` in those values no longer breaks those queries.
+
+### Changed
+- The connector now rejects a `slotName` or `watermarksTable` that isn't made of valid unquoted identifiers, and a `min_backfill_xid` that isn't an integer. Read-only captures skip the `watermarksTable` check.
+
+## 2026-11-09
+
+### Fixed
+- The `verify-ca` and `verify-full` SSL modes now work with Amazon RDS, Aurora, and Google Cloud SQL instances that use the shared CA.
+- The `verify-full` SSL mode now works through an SSH tunnel.
+
 ## 2026-11-04
 
 ### Added

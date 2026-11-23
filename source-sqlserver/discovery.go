@@ -334,6 +334,10 @@ func (db *sqlserverDatabase) extendTableDetails(ctx context.Context, dst map[sql
 		}
 	}
 
+	if err := db.discoverPartitionedIndexes(ctx, dst, requested); err != nil {
+		return fmt.Errorf("unable to list database partitioned indexes: %w", err)
+	}
+
 	// Determine whether the database sorts the keys of each table in a
 	// predictable order or not. The term "predictable" here specifically
 	// means "able to be reproduced using bytewise lexicographic ordering of
@@ -354,6 +358,12 @@ func (db *sqlserverDatabase) extendTableDetails(ctx context.Context, dst map[sql
 				info.UnpredictableKeyOrdering = true
 			}
 		}
+
+		// A table backfilled one partition at a time doesn't emit its rows in key order
+		// at all, so the backfilled region is not a prefix of the key space.
+		if details, ok := info.ExtraDetails.(*sqlserverTableDiscoveryDetails); ok && details.PartitionedKey != nil {
+			info.UnpredictableKeyOrdering = true
+		}
 	}
 
 	return nil
@@ -370,6 +380,10 @@ func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnName
 
 type sqlserverTableDiscoveryDetails struct {
 	ComputedColumns []string // List of the names of computed columns in this table, in no particular order.
+
+	// PartitionedKey is the index by which the connector can backfill the table's
+	// discovered key one partition at a time, or nil when there is none.
+	PartitionedKey *partitionedIndex
 }
 
 // listTables returns the identifiers of all tables visible for capture,

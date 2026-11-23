@@ -118,7 +118,7 @@ class Connection(EdgeList):
 
 class AuthorizedPrefix(BaseModel, extra="allow"):
     prefix: str
-    capabilities: list[str]
+    capabilityBits: list[str]
 
 
 class AuthorizedPrefixEdge(BaseModel, extra="allow"):

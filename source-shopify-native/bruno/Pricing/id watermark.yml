@@ -1,0 +1,119 @@
+info:
+  name: id watermark
+  type: graphql
+  seq: 10
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query IdWatermark {
+        after: productVariants(first: 3, sortKey: ID, query: "id:>43217823399981") {
+          nodes { legacyResourceId }
+        }
+        atOrAfter: productVariants(first: 3, sortKey: ID, query: "id:>=43217823399981") {
+          nodes { legacyResourceId }
+        }
+        withUpdatedAt: productVariants(
+          first: 3
+          sortKey: ID
+          query: "id:>43217823399981 AND updated_at:<='2026-06-11T17:29:57Z'"
+        ) {
+          nodes { legacyResourceId updatedAt }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [productVariants](https://shopify.dev/docs/api/admin-graphql/2026-01/queries/productVariants) (`id` filter supports ranges; `sortKey: ID` is the default)
+
+  **WHY:** checks whether a backfill that reads every variant should resume
+  from the last id it wrote (`id:>last`, sorted by id) instead of Shopify's
+  opaque page cursor. Answers: is `>` exclusive and `>=` inclusive, are
+  results in id order, and does the id range combine with another filter.
+  The pinned id,
+  43217823399981, is the store's third variant. `withUpdatedAt` bounds
+  `updated_at` one second before variant 43217823531053's `updatedAt`
+  (2026-06-11T17:29:58Z), so that variant must drop out if both filters
+  apply.
+
+  **VERIFIED (2026-11-13):** `id:>N` excludes N and `id:>=N` includes it.
+  Results come back in ascending id order. A backfill can resume from the
+  last id it wrote.
+
+  **VERIFIED (2026-11-17):** the id range and the `updated_at` bound both
+  apply. `withUpdatedAt` skips 43217823531053, which `after` returns third,
+  and takes the next variant updated before the bound (43217823563821).
+
+  **VERIFIED (2026-11-17):** Shopify's page cursor is already an id
+  watermark. The `endCursor` in `Pricing / by country`'s full example
+  decodes from base64 to `{"last_id":43217823989805,"last_value":"43217823989805"}`,
+  the last variant on that page. So the connector's backfill resumes from
+  that cursor, like every other paged stream, rather than from `id:>last`.
+
+examples:
+  - name: "200 - exclusive and inclusive bounds, updated_at bound applied (data only)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "after": {
+              "nodes": [
+                {
+                  "legacyResourceId": "43217823432749"
+                },
+                {
+                  "legacyResourceId": "43217823498285"
+                },
+                {
+                  "legacyResourceId": "43217823531053"
+                }
+              ]
+            },
+            "atOrAfter": {
+              "nodes": [
+                {
+                  "legacyResourceId": "43217823399981"
+                },
+                {
+                  "legacyResourceId": "43217823432749"
+                },
+                {
+                  "legacyResourceId": "43217823498285"
+                }
+              ]
+            },
+            "withUpdatedAt": {
+              "nodes": [
+                {
+                  "legacyResourceId": "43217823432749",
+                  "updatedAt": "2025-01-14T15:10:14Z"
+                },
+                {
+                  "legacyResourceId": "43217823498285",
+                  "updatedAt": "2025-01-14T15:10:14Z"
+                },
+                {
+                  "legacyResourceId": "43217823563821",
+                  "updatedAt": "2026-06-11T17:29:45Z"
+                }
+              ]
+            }
+          }

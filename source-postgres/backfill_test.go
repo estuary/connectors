@@ -60,6 +60,14 @@ func TestBackfillQueryGeneration(t *testing.T) {
 			tableName:   "special_users",
 		},
 		{
+			name:        "quoted_table_name",
+			isPrecise:   true,
+			keyColumns:  []string{"id"},
+			columnTypes: map[string]interface{}{"id": "integer"},
+			schemaName:  `my"schema`,
+			tableName:   `special"users`,
+		},
+		{
 			name:           "integer_key_with_backfill_filter",
 			isPrecise:      true,
 			keyColumns:     []string{"id"},

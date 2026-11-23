@@ -1,0 +1,178 @@
+info:
+  name: variant updatedAt vs inventory
+  type: graphql
+  seq: 18
+
+graphql:
+  method: POST
+  url: "{{base_url}}/graphql.json"
+  body:
+    query: |-
+      query VariantUpdatedAtVsInventory {
+        productVariants(first: 50, sortKey: ID) {
+          nodes {
+            id
+            updatedAt
+            inventoryQuantity
+            product { updatedAt }
+            inventoryItem {
+              tracked
+              updatedAt
+              inventoryLevels(first: 5) {
+                nodes {
+                  updatedAt
+                  quantities(names: ["available", "committed", "on_hand"]) {
+                    name
+                    quantity
+                    updatedAt
+                  }
+                }
+              }
+            }
+          }
+        }
+        orders(first: 25, sortKey: CREATED_AT, reverse: true) {
+          nodes {
+            name
+            createdAt
+            cancelledAt
+            fulfillments { createdAt }
+            lineItems(first: 10) {
+              nodes {
+                quantity
+                variant { id updatedAt }
+              }
+            }
+          }
+        }
+      }
+    variables: |-
+      {}
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [ProductVariant](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/ProductVariant) and [InventoryLevel](https://shopify.dev/docs/api/admin-graphql/2026-01/objects/InventoryLevel)
+
+  **WHY:** `product_variant_contextual_pricing` re-reads a variant whenever
+  its `updatedAt` moves. This checks whether a sale or an inventory change
+  moves it, since that decides how often unchanged prices are re-emitted.
+
+  **VERIFIED (2026-11-17):**
+  - None of the 27 variants has an inventory quantity newer than its own
+    `updatedAt`.
+  - Three variants were updated 2 to 4 seconds after an order that sold
+    them, in the same second as their inventory quantity. Order #1004 was
+    created at 2025-04-10T17:55:42Z; variant 43217824088109 and its
+    quantity are both stamped 17:55:46Z. Order #1001 (17:42:58Z) and
+    variants 43217823367213 and 43217823399981 (17:43:00Z) do the same.
+  - 12 tracked variants were last updated 16 to 59 seconds after their last
+    inventory change (2026-06-11 and 2026-06-15), and one 7 minutes after.
+    That fits the same pattern, but separate edits made right after the
+    stock was set would look the same.
+
+  **UNOBSERVABLE:** whether a sale or a stock adjustment made now moves
+  `updatedAt`. Making one would change records the capture snapshot reads,
+  so this rests on past orders, not a controlled test.
+
+examples:
+  - name: "200 - 27 variants vs their inventory, and two orders (projection)"
+    request:
+      url: "{{base_url}}/graphql.json"
+      method: POST
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "variantCount": 27,
+            "variantsWithNewerInventory": 0,
+            "trackedSecondsFromInventoryToVariantUpdate": {
+              "43217823531053": 59,
+              "43217823563821": 46,
+              "43217823662125": 53,
+              "43217823694893": 53,
+              "43217823727661": 53,
+              "43217823760429": 43,
+              "43217823825965": 53,
+              "43217823858733": 432,
+              "43217823891501": 34,
+              "43217824022573": 47,
+              "43217824055341": 48,
+              "43217824120877": 16,
+              "43217824153645": 45
+            },
+            "variantsSoldByTheseOrders": [
+              {
+                "id": "gid://shopify/ProductVariant/43217823367213",
+                "updatedAt": "2025-04-10T17:43:00Z",
+                "tracked": false,
+                "newestQuantityUpdatedAt": "2025-04-10T17:43:00Z"
+              },
+              {
+                "id": "gid://shopify/ProductVariant/43217823399981",
+                "updatedAt": "2025-04-10T17:43:00Z",
+                "tracked": false,
+                "newestQuantityUpdatedAt": "2025-04-10T17:43:00Z"
+              },
+              {
+                "id": "gid://shopify/ProductVariant/43217824088109",
+                "updatedAt": "2025-04-10T17:55:46Z",
+                "tracked": true,
+                "newestQuantityUpdatedAt": "2025-04-10T17:55:46Z"
+              }
+            ],
+            "orders": [
+              {
+                "name": "#1004",
+                "createdAt": "2025-04-10T17:55:42Z",
+                "cancelledAt": null,
+                "lineItems": [
+                  {
+                    "quantity": 1,
+                    "variant": {
+                      "id": "gid://shopify/ProductVariant/43217823727661",
+                      "updatedAt": "2026-06-15T13:22:39Z"
+                    }
+                  },
+                  {
+                    "quantity": 1,
+                    "variant": {
+                      "id": "gid://shopify/ProductVariant/43217824088109",
+                      "updatedAt": "2025-04-10T17:55:46Z"
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "#1001",
+                "createdAt": "2025-04-10T17:42:58Z",
+                "cancelledAt": null,
+                "lineItems": [
+                  {
+                    "quantity": 1,
+                    "variant": {
+                      "id": "gid://shopify/ProductVariant/43217823367213",
+                      "updatedAt": "2025-04-10T17:43:00Z"
+                    }
+                  },
+                  {
+                    "quantity": 1,
+                    "variant": {
+                      "id": "gid://shopify/ProductVariant/43217823399981",
+                      "updatedAt": "2025-04-10T17:43:00Z"
+                    }
+                  }
+                ]
+              }
+            ]
+          }

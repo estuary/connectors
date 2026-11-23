@@ -2,15 +2,20 @@ import asyncio
 import functools
 from datetime import UTC, datetime, timedelta
 from logging import Logger
+from typing import Any
 
 from estuary_cdk.capture import Task, common
+from estuary_cdk.capture.common import ResourceConfigWithSchedule
+from estuary_cdk.capture.backfill_signals import BackfillCoverage
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPMixin
 
 from .api import (
+    backfill_gldetail,
     fetch_changes,
     fetch_creations,
     fetch_deletions,
+    fetch_gldetail,
     fetch_page,
     snapshot,
 )
@@ -18,12 +23,20 @@ from .models import (
     ConnectorState,
     Document,
     EndpointConfig,
-    ResourceConfig,
+    GLDetailDocument,
     ResourceState,
     SagePermissionError,
     SnapshotResource,
 )
 from .sage import PAGE_SIZE, Sage
+
+# The other bindings of the task, as the CDK passes them to `open`.
+AllBindings = list[
+    tuple[
+        CaptureBinding[ResourceConfigWithSchedule],
+        common.Resource[Any, ResourceConfigWithSchedule, ResourceState],
+    ]
+]
 
 # REALTIME_LAG defers the "realtime" modified sub-task by this much so that
 # a near-simultaneous create-then-modify can't race the "realtime_creations"
@@ -32,6 +45,14 @@ from .sage import PAGE_SIZE, Sage
 REALTIME_LAG = timedelta(minutes=2)
 LOOKBACK_LAG = timedelta(hours=2)
 LOOKBACK_LAG_DELETIONS = timedelta(hours=2, minutes=30)
+# Longer than each delay Sage documents: 2 hours for changes and 2.5 hours for
+# deletions. GLDETAIL has no deletion subtasks, so its lookback subtask is the
+# only reader of late changes between backfills.
+LOOKBACK_LAG_GLDETAIL = timedelta(hours=3)
+
+# The polling interval of a new binding. It is long because Sage bills each
+# API call.
+DEFAULT_INTERVAL = timedelta(hours=6)
 
 REALTIME = "realtime"
 LOOKBACK = "lookback"
@@ -58,6 +79,15 @@ INCREMENTAL_OBJECTS = {
     "TASK",
 }
 
+# GL_OBJECTS are General Ledger objects that are captured like the
+# INCREMENTAL_OBJECTS. Sage does not record all of their deletions in the audit
+# trail, so their backfills also declare a coverage: a backfill that sends
+# backfill signals removes the rows that Sage no longer has.
+GL_OBJECTS = {
+    "GLBATCH",
+    "GLENTRY",
+}
+
 SNAPSHOT_OBJECTS = {
     "COMPANYPREF",
     "PROJECT",
@@ -68,16 +98,20 @@ SNAPSHOT_OBJECTS = {
 
 
 async def incremental_resource(
-    sage: Sage, obj: str, started_at: datetime, can_read_audit_history: bool
+    sage: Sage,
+    obj: str,
+    started_at: datetime,
+    can_read_audit_history: bool,
+    backfill_coverage: BackfillCoverage | None = None,
 ) -> common.Resource:
     model = await sage.get_model(obj)
 
     async def open(
-        binding: CaptureBinding[ResourceConfig],
+        binding: CaptureBinding[ResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings,
+        all_bindings: AllBindings,
     ):
         task.sourced_schema(binding_index, model.sourced_schema())
 
@@ -86,13 +120,17 @@ async def incremental_resource(
         if (
             isinstance(state.inc, dict)
             and REALTIME_CREATIONS not in state.inc
-            and isinstance(existing := state.inc.get(REALTIME), ResourceState.Incremental)
+            and isinstance(
+                existing := state.inc.get(REALTIME), ResourceState.Incremental
+            )
             and isinstance(existing.cursor, datetime)
         ):
             current_cursor = existing.cursor
-            creation_state: dict[str, ResourceState.Incremental] = {
+            creation_state: dict[str, ResourceState.Incremental | None] = {
                 REALTIME_CREATIONS: ResourceState.Incremental(cursor=current_cursor),
-                LOOKBACK_CREATIONS: ResourceState.Incremental(cursor=current_cursor - LOOKBACK_LAG),
+                LOOKBACK_CREATIONS: ResourceState.Incremental(
+                    cursor=current_cursor - LOOKBACK_LAG
+                ),
             }
             state.inc = {**state.inc, **creation_state}
 
@@ -101,7 +139,9 @@ async def incremental_resource(
                 {"state.inc": state.inc},
             )
             await task.checkpoint(
-                ConnectorState(bindingStateV1={binding.stateKey: ResourceState(inc=creation_state)}),
+                ConnectorState(
+                    bindingStateV1={binding.stateKey: ResourceState(inc=creation_state)}
+                ),
             )
         else:
             await task.checkpoint(state=ConnectorState())
@@ -184,8 +224,68 @@ async def incremental_resource(
             },
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=obj, interval=timedelta(hours=6)),
+        initial_config=ResourceConfigWithSchedule(name=obj, interval=DEFAULT_INTERVAL),
         schema_inference=True,
+        backfill_coverage=backfill_coverage,
+    )
+
+
+async def gldetail_resource(
+    sage: Sage,
+    started_at: datetime,
+    backfill_coverage: BackfillCoverage,
+) -> common.Resource:
+    obj = "GLDETAIL"
+    model = await sage.get_model(obj)
+
+    async def open(
+        binding: CaptureBinding[ResourceConfigWithSchedule],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings: AllBindings,
+    ):
+        task.sourced_schema(binding_index, model.sourced_schema())
+        await task.checkpoint(state=ConnectorState())
+
+        # No deletion subtasks: Sage does not audit the rows of this view.
+        # A deleted or replaced row leaves the destination only at a backfill
+        # that sends backfill signals.
+        #
+        # No creation subtasks either. No GLDETAIL row seen so far lacks a
+        # WHENMODIFIED, and each query is billed. A backfill reads a row that
+        # lacks one.
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes={
+                REALTIME: functools.partial(
+                    fetch_gldetail, sage, REALTIME_LAG, PAGE_SIZE
+                ),
+                LOOKBACK: functools.partial(
+                    fetch_gldetail, sage, LOOKBACK_LAG_GLDETAIL, PAGE_SIZE
+                ),
+            },
+            fetch_page=functools.partial(backfill_gldetail, sage, PAGE_SIZE),
+        )
+
+    return common.Resource(
+        name=obj,
+        key=["/RECORDNO"],
+        model=GLDetailDocument,
+        open=open,
+        initial_state=ResourceState(
+            inc={
+                REALTIME: ResourceState.Incremental(cursor=started_at),
+                LOOKBACK: ResourceState.Incremental(cursor=started_at),
+            },
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+        ),
+        initial_config=ResourceConfigWithSchedule(name=obj, interval=DEFAULT_INTERVAL),
+        schema_inference=True,
+        backfill_coverage=backfill_coverage,
     )
 
 
@@ -194,11 +294,11 @@ async def snapshot_resource(sage: Sage, obj: str) -> common.Resource:
 
     async def open(
         obj: str,
-        binding: CaptureBinding[ResourceConfig],
+        binding: CaptureBinding[ResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings,
+        all_bindings: AllBindings,
     ):
         task.sourced_schema(binding_index, model.sourced_schema())
         await task.checkpoint(state=ConnectorState())
@@ -218,7 +318,7 @@ async def snapshot_resource(sage: Sage, obj: str) -> common.Resource:
         model=SnapshotResource,
         open=functools.partial(open, obj),
         initial_state=ResourceState(),
-        initial_config=ResourceConfig(name=obj, interval=timedelta(hours=6)),
+        initial_config=ResourceConfigWithSchedule(name=obj, interval=DEFAULT_INTERVAL),
         schema_inference=True,
     )
 
@@ -242,7 +342,9 @@ async def all_resources(
         except SagePermissionError as e:
             return obj, str(e)
 
-    object_names = sorted(INCREMENTAL_OBJECTS | SNAPSHOT_OBJECTS)
+    object_names = sorted(
+        INCREMENTAL_OBJECTS | GL_OBJECTS | {"GLDETAIL"} | SNAPSHOT_OBJECTS
+    )
     probes = await asyncio.gather(*(_probe(obj) for obj in object_names))
     accessible_objects = {obj for obj, denial in probes if denial is None}
     for obj, denial in probes:
@@ -255,7 +357,10 @@ async def all_resources(
     except SagePermissionError as e:
         can_read_audit_history = False
         log.warning(
-            f"omitting deletion sub-tasks since AUDITHISTORY cannot be read: {e}. "
+            f"AUDITHISTORY cannot be read: {e}. No binding captures deletions "
+            "until the user's role can read the audit trail. For the General "
+            "Ledger bindings, deleted rows stay in the destination until the "
+            "next backfill of the binding."
         )
 
     started_at = datetime.now(tz=UTC)
@@ -264,6 +369,16 @@ async def all_resources(
         for obj in INCREMENTAL_OBJECTS
         if obj in accessible_objects
     ]
+    # Every General Ledger backfill reads all entries, so it covers the whole
+    # object.
+    gl_coverage = BackfillCoverage.FULL
+    gl = [
+        incremental_resource(sage, obj, started_at, can_read_audit_history, gl_coverage)
+        for obj in GL_OBJECTS
+        if obj in accessible_objects
+    ]
+    if "GLDETAIL" in accessible_objects:
+        gl.append(gldetail_resource(sage, started_at, gl_coverage))
     snap = [
         snapshot_resource(sage, obj)
         for obj in SNAPSHOT_OBJECTS
@@ -273,4 +388,4 @@ async def all_resources(
     # TODO(whb): Add a binding for AUDITHISTORY to capture deletes once we have
     # access to this object type.
 
-    return sorted(await asyncio.gather(*inc, *snap), key=lambda r: r.name)
+    return sorted(await asyncio.gather(*inc, *gl, *snap), key=lambda r: r.name)

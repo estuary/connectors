@@ -1,0 +1,99 @@
+import json
+import subprocess
+
+from pydantic import JsonValue
+
+# Actor identity from the test organization. Keys and user ids stay, since
+# group_key is built from them.
+FIELDS_TO_REDACT = ["email_address", "name"]
+
+
+def redact_nested_fields(
+    input: list[JsonValue] | dict[str, JsonValue], fields: list[str]
+):
+    if isinstance(input, list):
+        for element in input:
+            if isinstance(element, (list, dict)):
+                redact_nested_fields(element, fields)
+    elif isinstance(input, dict):
+        for key in list(input.keys()):
+            if key in fields:
+                input[key] = "redacted"
+            elif isinstance(input[key], (list, dict)):
+                redact_nested_fields(input[key], fields)
+
+
+def test_capture(request, snapshot):
+    result = subprocess.run(
+        [
+            "flowctl",
+            "raw",
+            "preview-next",
+            "--source",
+            request.fspath.dirname + "/../test.flow.yaml",
+            "--sessions",
+            "1",
+            "--delay",
+            "10s",
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    assert result.returncode == 0
+    lines = [json.loads(l) for l in result.stdout.splitlines()]
+
+    unique_stream_lines = []
+    seen = set()
+
+    for line in lines:
+        stream = line[0]
+        # Minutely streams re-read the lookback, so their documents depend on
+        # the dev org's recent usage. The offline tests cover them.
+        if stream.endswith("_minutely"):
+            continue
+        if stream not in seen:
+            unique_stream_lines.append(line)
+            seen.add(stream)
+
+    redact_nested_fields(unique_stream_lines, FIELDS_TO_REDACT)
+
+    assert snapshot("capture.stdout.json") == unique_stream_lines
+
+
+def test_discover(request, snapshot):
+    result = subprocess.run(
+        [
+            "flowctl",
+            "raw",
+            "discover",
+            "--source",
+            request.fspath.dirname + "/../test.flow.yaml",
+            "-o",
+            "json",
+            "--emit-raw",
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    assert result.returncode == 0
+    lines = [json.loads(l) for l in result.stdout.splitlines()]
+
+    assert snapshot("capture.stdout.json") == lines
+
+
+def test_spec(request, snapshot):
+    result = subprocess.run(
+        [
+            "flowctl",
+            "raw",
+            "spec",
+            "--source",
+            request.fspath.dirname + "/../test.flow.yaml",
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    assert result.returncode == 0
+    lines = [json.loads(l) for l in result.stdout.splitlines()]
+
+    assert snapshot("capture.stdout.json") == lines

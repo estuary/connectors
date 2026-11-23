@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	stdsql "database/sql"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	m "github.com/estuary/connectors/go/materialize"
 	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/duckdb/duckdb-go/v2"
@@ -70,6 +72,7 @@ func TestIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
+	createRunCheckpointsTable(t)
 
 	for _, variant := range []integrationVariant{motherduckVariant, ducklakeVariant} {
 		t.Run(variant.name, func(t *testing.T) {
@@ -343,4 +346,44 @@ func runFenceSuite(t *testing.T, variant integrationVariant) {
 			return client.ExecStatements(ctx, []string{fenceUpdate.String()})
 		},
 	)
+}
+
+// createRunCheckpointsTable creates, in each test database, a checkpoints table
+// for this run alone and points the connector at it, both in this process and in
+// those flowctl starts, until the test ends. Overlapping runs sharing
+// flow_checkpoints_v1 abort each other's commits on it. Creating it up front
+// keeps it out of every test's Apply, so snapshots are unchanged.
+func createRunCheckpointsTable(t *testing.T) {
+	t.Helper()
+	var ctx = context.Background()
+	var dialect = createDuckDialect(nil, true)
+	var name = fmt.Sprintf("%s_%s_flow_test_%d", sql.DefaultFlowCheckpoints, uuid.NewString()[:8], time.Now().Unix())
+	var prev = sql.DefaultFlowCheckpoints
+	sql.DefaultFlowCheckpoints = name
+	t.Cleanup(func() { sql.DefaultFlowCheckpoints = prev })
+	t.Setenv("TEST_FLOW_CHECKPOINTS_TABLE", name)
+
+	// config.gcs.yaml names the same database as config.s3.yaml.
+	for _, path := range []string{"testdata/config.s3.yaml", "testdata/config.ducklake.s3.yaml"} {
+		raw, err := testutil.ReadConfigFile(path)
+		require.NoError(t, err)
+		var cfg config
+		require.NoError(t, json.Unmarshal(raw, &cfg))
+		db, err := cfg.bareOpen()
+		require.NoError(t, err)
+
+		checkpoints, err := sql.ResolveTable(*sql.FlowCheckpointsTable([]string{cfg.Database, cfg.Schema}), dialect)
+		require.NoError(t, err)
+		createCheckpoints, err := sql.RenderTableTemplate(checkpoints, renderTemplates(dialect).createTargetTable)
+		require.NoError(t, err)
+		_, err = db.ExecContext(ctx, createCheckpoints)
+		require.NoError(t, err)
+
+		t.Cleanup(func() {
+			defer db.Close()
+			if _, err := db.ExecContext(ctx, "DROP TABLE IF EXISTS "+checkpoints.Identifier); err != nil {
+				t.Logf("dropping %s: %s", checkpoints.Identifier, err)
+			}
+		})
+	}
 }
