@@ -267,6 +267,12 @@ jobs:
             ]'), matrix.connector.name)
         run: |
           set +e # Show logs even if startup fails
+          # GHCR, which serves source-sftp's image, rate-limits pulls, and
+          # `up` fails on the first rejected pull.
+          for DELAY in 15 30 60; do
+            docker compose --file "$CONNECTOR/docker-compose.yaml" pull --quiet && break
+            sleep "$DELAY"
+          done
           # --wait blocks until every service's healthcheck passes. Bound it:
           # without a timeout a healthcheck which never goes green hangs the
           # job until the workflow-level limit rather than failing here.
