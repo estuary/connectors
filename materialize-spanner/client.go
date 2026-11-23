@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -249,30 +250,24 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		return nil
 	}
 
-	// Build list of schemas to query
+	// Schema names come from the resource configs, so they are bound as a
+	// query parameter rather than written into the statement.
 	schemas := make([]string, 0, len(resourcePaths))
 	for _, p := range resourcePaths {
-		loc := c.ep.Dialect.TableLocator(p)
-		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
-	}
-
-	// Deduplicate schemas
-	schemaSet := make(map[string]bool)
-	uniqueSchemas := make([]string, 0, len(schemas))
-	for _, s := range schemas {
-		if !schemaSet[s] {
-			schemaSet[s] = true
-			uniqueSchemas = append(uniqueSchemas, s)
+		if s := c.ep.Dialect.TableLocator(p).TableSchema; !slices.Contains(schemas, s) {
+			schemas = append(schemas, s)
 		}
 	}
+	params := map[string]any{"schemas": schemas}
 
 	// Query for tables first
 	tablesStmt := spanner.Statement{
-		SQL: fmt.Sprintf(`
+		SQL: `
 			SELECT table_schema, table_name
 			FROM information_schema.tables
-			WHERE table_schema IN (%s)
-		`, strings.Join(uniqueSchemas, ",")),
+			WHERE table_schema IN UNNEST(@schemas)
+		`,
+		Params: params,
 	}
 
 	tablesIter := c.dataClient.Single().Query(ctx, tablesStmt)
@@ -297,11 +292,12 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 
 	// Query for columns
 	columnsStmt := spanner.Statement{
-		SQL: fmt.Sprintf(`
+		SQL: `
 			SELECT table_schema, table_name, column_name, is_nullable, spanner_type
 			FROM information_schema.columns
-			WHERE table_schema IN (%s)
-		`, strings.Join(uniqueSchemas, ",")),
+			WHERE table_schema IN UNNEST(@schemas)
+		`,
+		Params: params,
 	}
 
 	columnsIter := c.dataClient.Single().Query(ctx, columnsStmt)

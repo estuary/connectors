@@ -9,6 +9,7 @@ import (
 	"cloud.google.com/go/spanner"
 	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-boilerplate/testutil"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
@@ -103,4 +104,26 @@ func TestIntegration(t *testing.T) {
 			},
 		)
 	})
+}
+
+// A schema name is matched as a value, whatever characters it contains.
+func TestPopulateInfoSchemaSchemaNames(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+
+	var ctx = context.Background()
+	var cfg = config{ProjectID: testProjectID, InstanceID: testInstanceID, Database: testDatabase}
+
+	ep, err := sqlDriver.NewEndpoint(ctx, cfg, nil)
+	require.NoError(t, err)
+	c, err := newClient(ctx, "", ep)
+	require.NoError(t, err)
+	defer c.Close()
+
+	for _, schema := range []string{`it's`, `back\slash`, `a\'b`, `a\`} {
+		var is = boilerplate.InitInfoSchema(boilerplate.MaterializeCfg{})
+		require.NoError(t, c.PopulateInfoSchema(ctx, is, [][]string{{schema, "some_table"}}), schema)
+		require.Empty(t, is.Resources(), schema)
+	}
 }
