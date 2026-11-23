@@ -139,6 +139,9 @@ func makeDoc(m emitMessage) (json.RawMessage, error) {
 	// support for other formats could be considered.
 	if err := json.Unmarshal(msg.Data, &doc); err != nil {
 		return nil, fmt.Errorf("could not unmarshal message data as a JSON object: %w", err)
+	} else if doc == nil {
+		// Unmarshal decodes a JSON null into a nil map without an error.
+		return nil, fmt.Errorf("could not unmarshal message data as a JSON object: message data is null")
 	}
 	doc["_meta"] = meta
 
