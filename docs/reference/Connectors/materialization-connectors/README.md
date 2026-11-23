@@ -30,6 +30,7 @@ In the future, other open-source materialization connectors from third parties c
 * [Amazon MySQL](./MySQL/amazon-rds-mysql.md)
 * [Amazon PostgreSQL](./PostgreSQL/amazon-rds-postgres.md)
 * [Amazon SQL Server](./SQLServer/amazon-rds-sqlserver.md)
+* [Azure Cosmos DB for NoSQL](./azure-cosmosdb-nosql.md)
 * [Azure SQL Server](./SQLServer/)
 * [Google Cloud Bigtable](./google-bigtable.md)
 * [Google Cloud MySQL](./MySQL/google-cloud-sql-mysql.md)

@@ -1,0 +1,8 @@
+materializations:
+  acmeCo/tests/materialize-cosmosdb-nosql:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings: []
