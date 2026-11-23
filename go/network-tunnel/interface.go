@@ -12,9 +12,10 @@ import (
 )
 
 type SSHForwardingConfig struct {
-	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint" jsonschema_extras:"pattern=^ssh://.+@.+$"`
-	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key" jsonschema_extras:"secret=true,multiline=true"`
-	KnownHosts  string `json:"knownHosts,omitempty" jsonschema:"title=SSH Known Hosts" jsonschema_extras:"multiline=true"`
+	SSHEndpoint             string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint" jsonschema_extras:"pattern=^ssh://.+@.+$"`
+	PrivateKey              string `json:"privateKey" jsonschema:"title=SSH Private Key" jsonschema_extras:"secret=true,multiline=true"`
+	KnownHosts              string `json:"knownHosts,omitempty" jsonschema:"title=SSH Known Hosts" jsonschema_extras:"multiline=true"`
+	SkipHostKeyVerification bool   `json:"skipHostKeyVerification,omitempty" jsonschema:"title=Skip Host Key Verification" jsonschema_extras:"nonsensitive=true,x-hidden-field=true"`
 }
 
 func (SSHForwardingConfig) GetFieldDocString(fieldName string) string {
@@ -25,9 +26,21 @@ func (SSHForwardingConfig) GetFieldDocString(fieldName string) string {
 		return "Private key to connect to the remote SSH server."
 	case "KnownHosts":
 		return "Host keys of the SSH server in OpenSSH known_hosts format, one per line: the output of `ssh-keyscan -p 2222 bastion.example.com`, for example `[bastion.example.com]:2222 ssh-ed25519 AAAA...`."
+	case "SkipHostKeyVerification":
+		return "Connect without verifying the SSH server's host key."
 	default:
 		return ""
 	}
+}
+
+func (cfg *SSHForwardingConfig) validate() error {
+	if err := validateKnownHosts(cfg.KnownHosts); err != nil {
+		return err
+	}
+	if strings.TrimSpace(cfg.KnownHosts) != "" && cfg.SkipHostKeyVerification {
+		return errors.New("both Skip Host Key Verification and SSH Known Hosts are set. Keep SSH Known Hosts to verify the SSH server, or clear it and keep Skip Host Key Verification to connect without verification, but not both")
+	}
+	return nil
 }
 
 // validateKnownHosts checks that every line of the SSH Known Hosts field is a
@@ -80,13 +93,18 @@ func (cfg *TunnelConfig) InUse() bool {
 func (cfg *TunnelConfig) Start(ctx context.Context, address string, localPort string) (*SshTunnel, error) {
 	// Connectors start the tunnel while validating a publication, so checking
 	// the fields here makes an invalid tunnel config fail the publication.
-	if err := validateKnownHosts(cfg.SSHForwarding.KnownHosts); err != nil {
+	if err := cfg.SSHForwarding.validate(); err != nil {
 		return nil, err
 	}
 	var knownHosts = cfg.SSHForwarding.KnownHosts
 	if strings.TrimSpace(knownHosts) == "" {
 		knownHosts = ""
-		log.WithField("ssh-endpoint", cfg.SSHForwarding.SSHEndpoint).Warn("SSH Known Hosts isn't set, so the SSH server's host key isn't verified. A future version will require it.")
+		var logEntry = log.WithField("ssh-endpoint", cfg.SSHForwarding.SSHEndpoint)
+		if cfg.SSHForwarding.SkipHostKeyVerification {
+			logEntry.Warn("Skip Host Key Verification is enabled, so the SSH server's host key isn't verified.")
+		} else {
+			logEntry.Warn("SSH Known Hosts isn't set, so the SSH server's host key isn't verified. A future version will require it.")
+		}
 	}
 
 	host, port, err := net.SplitHostPort(address)

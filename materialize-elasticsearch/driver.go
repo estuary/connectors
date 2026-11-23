@@ -65,6 +65,7 @@ type advancedConfig struct {
 // instead of being generated from the structs.
 func configSchema() json.RawMessage {
 	knownHostsDescription, _ := json.Marshal(networkTunnel.SSHForwardingConfig{}.GetFieldDocString("KnownHosts"))
+	skipHostKeyVerificationDescription, _ := json.Marshal(networkTunnel.SSHForwardingConfig{}.GetFieldDocString("SkipHostKeyVerification"))
 
 	var schemaStr = `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -169,6 +170,13 @@ func configSchema() json.RawMessage {
 					"title": "SSH Known Hosts",
 					"description": ` + string(knownHostsDescription) + `,
 					"multiline": true
+				  },
+				  "skipHostKeyVerification": {
+					"type": "boolean",
+					"title": "Skip Host Key Verification",
+					"description": ` + string(skipHostKeyVerificationDescription) + `,
+					"nonsensitive": true,
+					"x-hidden-field": true
 				  }
 				},
 				"additionalProperties": false,
