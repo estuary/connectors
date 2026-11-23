@@ -448,8 +448,13 @@ async fn parse_datum(
     schema_cache: &mut HashMap<u32, RegisteredSchema>,
     schema_client: Option<&SchemaRegistryClient>,
 ) -> Result<Parsed> {
-    match (schema_client, datum[0]) {
-        (Some(schema_client), 0) => {
+    // Data encoded with a registered schema starts with a 0 byte and a 4-byte
+    // schema ID. Data shorter than 5 bytes, such as an empty key, can't have
+    // that header.
+    let has_schema_header = datum.len() >= 5 && datum[0] == 0;
+
+    match (schema_client, has_schema_header) {
+        (Some(schema_client), true) => {
             // Schema registry is available, and this message was encoded with a
             // schema.
             let schema_id = u32::from_be_bytes(datum[1..5].try_into()?);
@@ -515,7 +520,7 @@ async fn parse_datum(
                 }
             }
         }
-        (None, 0) => {
+        (None, true) => {
             // Schema registry is not available, but the data was encoded with a
             // schema. We might as well try to see if the data is a valid JSON
             // document.
@@ -523,7 +528,7 @@ async fn parse_datum(
                 "received a message with a schema magic byte, but schema registry is not configured and the message is not valid JSON"
             )?))
         }
-        (_, _) => {
+        (_, false) => {
             // If there is no schema information available for how to parse the
             // document, we make our best guess at parsing into something that
             // would be useful. A present key will always be able to be captured
@@ -1122,5 +1127,24 @@ mod tests {
         assert!(owns(key, key));
         assert!(!owns(0, key - 1));
         assert!(!owns(key + 1, u32::MAX));
+    }
+
+    #[tokio::test]
+    async fn short_keys_are_captured_as_base64() {
+        let client = SchemaRegistryClient::new(String::new(), String::new(), String::new());
+
+        for schema_client in [None, Some(&client)] {
+            // An empty key and the integer 1000 as a 4-byte big-endian key.
+            for (key, want) in [(&[][..], ""), (&[0, 0, 3, 232][..], "AAAD6A==")] {
+                let Parsed::Value(parsed) =
+                    parse_datum(key, true, &mut HashMap::new(), schema_client)
+                        .await
+                        .unwrap()
+                else {
+                    panic!("keys are parsed to a Value");
+                };
+                assert_eq!(parsed, json!({ "_key": want }));
+            }
+        }
     }
 }
