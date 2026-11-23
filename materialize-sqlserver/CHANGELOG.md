@@ -2,6 +2,9 @@
 
 ## 2026-11-23
 
+### Added
+- New `knownHosts` network tunnel option makes the connector verify the SSH server's host key.
+
 ### Fixed
 - Tables with an apostrophe in their name or schema can now be created.
 - With Exclude Flow Document enabled, binary fields with an apostrophe in

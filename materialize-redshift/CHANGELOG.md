@@ -2,6 +2,9 @@
 
 ## 2026-11-23
 
+### Added
+- New `knownHosts` network tunnel option makes the connector verify the SSH server's host key.
+
 ### Changed
 - A Bucket Path with a `.` or `..` path segment is now rejected.
 

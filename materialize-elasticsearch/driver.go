@@ -64,6 +64,8 @@ type advancedConfig struct {
 // to output a schema that works with Flow's UI. So the endpoint config schema is written out manually
 // instead of being generated from the structs.
 func configSchema() json.RawMessage {
+	knownHostsDescription, _ := json.Marshal(networkTunnel.SSHForwardingConfig{}.GetFieldDocString("KnownHosts"))
+
 	var schemaStr = `{
 		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"$id": "https://github.com/estuary/connectors/materialize-elasticsearch/config",
@@ -161,6 +163,12 @@ func configSchema() json.RawMessage {
 					"description": "Private key to connect to the remote SSH server.",
 					"multiline": true,
 					"secret": true
+				  },
+				  "knownHosts": {
+					"type": "string",
+					"title": "SSH Known Hosts",
+					"description": ` + string(knownHostsDescription) + `,
+					"multiline": true
 				  }
 				},
 				"additionalProperties": false,

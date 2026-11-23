@@ -54,6 +54,7 @@ See the table below and the [sample config](#sample).
 | `/networkTunnel/sshForwarding` | SSH Forwarding | | Object | |
 | `/networkTunnel/sshForwarding/sshEndpoint` | SSH Endpoint | Endpoint of the remote SSH server (in this case, your Google Cloud VM) that supports tunneling (in the form of ssh://user@address. | String | |
 | `/networkTunnel/sshForwarding/privateKey` | SSH Private Key | Private key to connect to the remote SSH server. | String | |
+| `/networkTunnel/sshForwarding/knownHosts` | SSH Known Hosts | Host keys of the SSH server in OpenSSH known_hosts format, one per line, as printed by `ssh-keyscan -p <port> <host>`. When set, the connector only connects to an SSH server that presents one of these keys. | String | |
 
 ##### Credentials
 
