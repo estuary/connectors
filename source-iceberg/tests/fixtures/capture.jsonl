@@ -1,0 +1,5 @@
+["acmeCo/orders",{"_meta":{"file":"s3://warehouse/test/orders/data/orders-1.parquet","row":0,"snapshot_id":102,"uuid":"DocUUIDPlaceholder-329Bb50aa48EAa9ef"},"amount":"12.34","at":"2026-01-02T03:04:05Z","canary":"o1","id":1,"payload":"AP8="}]
+["acmeCo/orders",{"_meta":{"file":"s3://warehouse/test/orders/data/orders-1.parquet","row":1,"snapshot_id":102,"uuid":"DocUUIDPlaceholder-329Bb50aa48EAa9ef"},"amount":"-0.10","at":"2026-01-02T03:04:05.123456Z","canary":"o2","id":2,"payload":"aWNlYmVyZw=="}]
+["acmeCo/orders",{"_meta":{"file":"s3://warehouse/test/orders/data/orders-1.parquet","row":2,"snapshot_id":102,"uuid":"DocUUIDPlaceholder-329Bb50aa48EAa9ef"},"amount":null,"at":null,"canary":"o3","id":3,"payload":null}]
+["acmeCo/orders",{"_meta":{"file":"s3://warehouse/test/orders/data/orders-2.parquet","row":0,"snapshot_id":102,"uuid":"DocUUIDPlaceholder-329Bb50aa48EAa9ef"},"amount":"0.00","at":null,"canary":"o4","id":4,"payload":""}]
+["acmeCo/orders",{"_meta":{"file":"s3://warehouse/test/orders/data/orders-2.parquet","row":1,"snapshot_id":102,"uuid":"DocUUIDPlaceholder-329Bb50aa48EAa9ef"},"amount":"1234567890.12","at":null,"canary":"o5","id":5,"payload":null}]
