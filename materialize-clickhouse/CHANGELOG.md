@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-11-23
+
+### Fixed
+- Table and column names containing a backslash are now created with exactly
+  that name. Previously the backslash was read as the start of an escape
+  sequence, which changed the name or made the statement fail.
+
+### Changed
+- Writes to a column whose name contains a backslash now fail with an error
+  naming the column. Such a column was previously written only when its
+  backslash did not form an escape sequence.
+
 ## 2026-11-03
 
 ### Changed
