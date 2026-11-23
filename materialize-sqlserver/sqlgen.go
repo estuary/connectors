@@ -268,7 +268,9 @@ func renderTemplates(dialect sql.Dialect) templates {
 -- Templated creation of a materialized table definition and comments:
 
 {{ define "createTargetTable" }}
-IF OBJECT_ID(N'{{Join $.Path "."}}', 'U') IS NULL BEGIN
+{{- /* OBJECT_ID parses its argument as a multi-part identifier, so it takes
+       the quoted identifier, escaped as a string literal. */}}
+IF OBJECT_ID(N{{Literal $.Identifier}}, 'U') IS NULL BEGIN
 CREATE TABLE {{$.Identifier}} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
