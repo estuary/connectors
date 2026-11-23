@@ -1,0 +1,49 @@
+--- Begin "a'schema"."key_value'name" createTargetTable ---
+
+IF OBJECT_ID(N'"a''schema"."key_value''name"', 'U') IS NULL BEGIN
+CREATE TABLE "a'schema"."key_value'name" (
+		key1 BIGINT NOT NULL,
+		key2 BIT NOT NULL,
+		"key!binary" VARBINARY(900) NOT NULL,
+		"array" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"binary" VARBINARY(MAX),
+		"boolean" BIT,
+		field_with_projection varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		flow_published_at DATETIME2 NOT NULL,
+		"integer" BIGINT,
+		"integerGt128Bit" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"integerGt256Bit" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"integerGt64Bit" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"integerWithUserDDL" DECIMAL(20),
+		multiple varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"nonAsciiκόσμε" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		number DOUBLE PRECISION,
+		"numberCastToString" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"object" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		string varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"stringInteger" BIGINT,
+		"stringInteger18Chars" BIGINT,
+		"stringInteger38Chars" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"stringInteger39Chars" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"stringInteger66Chars" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"stringInteger77Chars" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"stringNumber" DOUBLE PRECISION,
+		flow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
+
+		PRIMARY KEY (key1, key2, "key!binary")
+);
+END;
+--- End "a'schema"."key_value'name" createTargetTable ---
+
+--- Begin "a'schema"."delta_updates'name" createTargetTable ---
+
+IF OBJECT_ID(N'"a''schema"."delta_updates''name"', 'U') IS NULL BEGIN
+CREATE TABLE "a'schema"."delta_updates'name" (
+		"theKey" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
+		"aValue" BIGINT,
+		flow_published_at DATETIME2 NOT NULL
+);
+END;
+--- End "a'schema"."delta_updates'name" createTargetTable ---
+
+

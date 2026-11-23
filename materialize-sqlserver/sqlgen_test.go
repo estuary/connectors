@@ -45,6 +45,23 @@ func TestSQLGeneration(t *testing.T) {
 	cupaloy.SnapshotT(t, snap.String())
 }
 
+func TestSQLGenerationQuotedTableNames(t *testing.T) {
+	snap, _ := sql.RunSqlGenTests(
+		t,
+		testDialect,
+		func(table string) []string {
+			return []string{"a'schema", table + "'name"}
+		},
+		sql.TestTemplates{
+			TableTemplates: []*template.Template{
+				testTemplates.createTargetTable,
+			},
+		},
+	)
+
+	cupaloy.SnapshotT(t, snap.String())
+}
+
 func TestXQueryColumnRef(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
