@@ -203,6 +203,11 @@ func TestAzureBucketWrapperURI(t *testing.T) {
 			key:      "staging/data/file.json.gz",
 			expected: "az://mycontainer/staging/data/file.json.gz",
 		},
+		{
+			name:     "key above the container root",
+			key:      "../staging/file.json",
+			expected: "az://mycontainer/staging/file.json",
+		},
 	}
 
 	for _, tt := range tests {
