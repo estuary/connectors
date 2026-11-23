@@ -7,7 +7,6 @@ import (
 	"io"
 	"iter"
 	"net/http"
-	"path"
 	"strings"
 
 	"cloud.google.com/go/storage"
@@ -88,7 +87,7 @@ func (b *GCSBucket) Upload(ctx context.Context, key string, r io.Reader, opts ..
 }
 
 func (b *GCSBucket) URI(key string) string {
-	return "gs://" + path.Join(b.bucket, key)
+	return "gs://" + JoinKey(b.bucket, key)
 }
 
 func (b *GCSBucket) Delete(ctx context.Context, uris []string) error {

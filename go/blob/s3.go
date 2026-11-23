@@ -7,7 +7,6 @@ import (
 	"io"
 	"iter"
 	"net/http"
-	"path"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -140,7 +139,7 @@ func (b *S3Bucket) Upload(ctx context.Context, key string, r io.Reader, opts ...
 }
 
 func (b *S3Bucket) URI(key string) string {
-	return "s3://" + path.Join(b.bucket, key)
+	return "s3://" + JoinKey(b.bucket, key)
 }
 
 func (b *S3Bucket) Delete(ctx context.Context, uris []string) error {

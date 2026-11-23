@@ -8,7 +8,6 @@ import (
 	"io"
 	"iter"
 	"net/url"
-	"path"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/streaming"
@@ -162,7 +161,7 @@ func (b *AzureBlobBucket) URI(key string) string {
 	// This is not a scheme-specific URI like S3 and GCS use, where they start
 	// with `s3://` or `gs://`, but rather a full HTTPS URL, since that is all
 	// Azure officially supports.
-	return strings.TrimSuffix(b.client.URL(), "/") + "/" + path.Join(b.container, key)
+	return strings.TrimSuffix(b.client.URL(), "/") + "/" + JoinKey(b.container, key)
 }
 
 func (b *AzureBlobBucket) Delete(ctx context.Context, uris []string) error {
