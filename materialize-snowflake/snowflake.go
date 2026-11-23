@@ -751,7 +751,7 @@ func (d *transactor) loadDocuments(ctx context.Context, ch chan *loadDoc, loaded
 func (d *transactor) pipeExists(ctx context.Context, pipeName string) (bool, error) {
 	// We use SHOW PIPES to avoid waking up the warehouse. SELECT from INFORMATION_SCHEMA.PIPES wakes up the warehouse.
 	var parts = pipeNameToParts(pipeName)
-	var query = fmt.Sprintf("SHOW PIPES LIKE '%s';", strings.ReplaceAll(parts.toPipeName(), "_", "\\\\_"))
+	var query = fmt.Sprintf("SHOW PIPES LIKE %s;", showLikeLiteral(parts.toPipeName()))
 	rows, err := d.db.QueryContext(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("finding pipe %q: %w", pipeName, err)
@@ -1614,7 +1614,7 @@ func (d *transactor) deleteFiles(ctx context.Context, files []string) error {
 }
 
 func (d *transactor) dropPipe(ctx context.Context, pipeName string) error {
-	if _, err := d.db.ExecContext(ctx, fmt.Sprintf("DROP PIPE IF EXISTS %s", pipeName)); err != nil {
+	if _, err := d.db.ExecContext(ctx, fmt.Sprintf("DROP PIPE IF EXISTS %s", pipeIdentifier(pipeName))); err != nil {
 		return fmt.Errorf("dropping pipe %q: %w", pipeName, err)
 	}
 	return nil
@@ -1689,7 +1689,7 @@ func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr
 	}
 
 	var result stdsql.NullString
-	query := fmt.Sprintf("SELECT SYSTEM$CLUSTERING_INFORMATION('%s', '%s')", table, keyExpr)
+	query := fmt.Sprintf("SELECT SYSTEM$CLUSTERING_INFORMATION(%s, %s)", quoteLiteral(table), quoteLiteral(keyExpr))
 	if err := db.QueryRowContext(ctx, query).Scan(&result); err != nil {
 		log.WithFields(log.Fields{
 			"table":          table,
@@ -1751,7 +1751,7 @@ func queryCurrentClusterBy(ctx context.Context, db *stdsql.DB, schema, table str
 	// The pattern is escaped so that `_` and `%` in the table name match
 	// literally, and the returned name is still compared exactly because
 	// LIKE matches case-insensitively.
-	var query = fmt.Sprintf("SHOW TABLES LIKE '%s' IN SCHEMA %q;", escapeShowLikePattern(table), schema)
+	var query = fmt.Sprintf("SHOW TABLES LIKE %s IN SCHEMA %s;", showLikeLiteral(table), quoteIdentifier(schema))
 
 	type tableRow struct {
 		Name      string            `db:"name"`
@@ -1772,17 +1772,15 @@ func queryCurrentClusterBy(ctx context.Context, db *stdsql.DB, schema, table str
 	return "", nil
 }
 
-// escapeShowLikePattern quotes an identifier for literal use inside a SHOW
-// ... LIKE '<pattern>' string. Snowflake unescapes the string literal before
-// LIKE sees it, so each wildcard needs a doubled backslash to survive as an
-// escaped wildcard.
-func escapeShowLikePattern(name string) string {
-	return strings.NewReplacer(
-		`\\`, `\\\\`,
-		`_`, `\\_`,
-		`%`, `\\%`,
-		`'`, `''`,
-	).Replace(name)
+// showLikeLiteral renders a name as the string literal of a SHOW ... LIKE
+// pattern that matches only that name. Snowflake unescapes the literal before
+// LIKE sees it, so the backslash that escapes a wildcard is itself escaped.
+func showLikeLiteral(name string) string {
+	return quoteLiteral(strings.NewReplacer(
+		`\`, `\\`,
+		`_`, `\_`,
+		`%`, `\%`,
+	).Replace(name))
 }
 
 func (d *transactor) syncClustering(ctx context.Context, bindings []sql.Table, open pm.Request_Open) error {

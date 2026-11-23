@@ -23,6 +23,13 @@ func isSimpleIdentifier(s string) bool {
 	return simpleIdentifierRegexp.MatchString(s) && !slices.Contains(SF_RESERVED_WORDS, strings.ToLower(s))
 }
 
+// quoteIdentifier quotes a name as an identifier, which Snowflake then
+// resolves exactly as written.
+var quoteIdentifier = sql.QuoteTransform(`"`, `""`)
+
+// quoteLiteral renders a string as a string literal.
+var quoteLiteral = sql.QuoteTransformEscapedBackslash("'", "''")
+
 // unquotedIdentifier removes SQL identifier quotes, yielding the exact name that
 // Snowflake stores.
 func unquotedIdentifier(ident string) string {
@@ -172,9 +179,9 @@ var snowflakeDialect = func(configSchema string, timestampType snowflakeTimestam
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				isSimpleIdentifier,
-				sql.QuoteTransform(`"`, `""`),
+				quoteIdentifier,
 			))),
-		Literaler: sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "''")),
+		Literaler: sql.ToLiteralFn(quoteLiteral),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
@@ -353,7 +360,7 @@ JOIN (
 
 {{ define "createPipe" }}
 CREATE PIPE {{ $.PipeName }}
-  COMMENT = 'Pipe for table {{ $.Table.Path }}'
+  COMMENT = {{ Literal (printf "Pipe for table %v" $.Table.Path) }}
   AS COPY INTO {{ $.Table.Identifier }} (
 	{{ range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
@@ -426,7 +433,7 @@ WHEN NOT MATCHED AND r._flow_delete=false THEN
 
 {{ define "copyHistory" }}
 SELECT FILE_NAME, STATUS, FIRST_ERROR_MESSAGE, ROW_COUNT FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
-  TABLE_NAME=>'{{ $.TableName }}',
+  TABLE_NAME=>{{ Literal $.TableName }},
   START_TIME=>DATEADD(DAY, -14, CURRENT_TIMESTAMP())
 )) WHERE
 FILE_NAME IN ('{{ Join $.Files "','" }}')
@@ -462,7 +469,7 @@ type tablePipe struct {
 
 func renderTablePipeTemplate(table sql.Table, pipeName string, tpl *template.Template) (string, error) {
 	var w strings.Builder
-	if err := tpl.Execute(&w, &tablePipe{Table: table, PipeName: pipeName}); err != nil {
+	if err := tpl.Execute(&w, &tablePipe{Table: table, PipeName: pipeIdentifier(pipeName)}); err != nil {
 		return "", err
 	}
 	var s = w.String()
