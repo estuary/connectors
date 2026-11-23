@@ -1,0 +1,10 @@
+info:
+  name: _auth
+  type: folder
+  seq: 2
+
+docs: |-
+  **WHY:** keep authentication failure evidence beside the metadata probe.
+
+  See `_auth / bad key` for the saved 401 responses from self-hosted v2.52
+  and Twenty Cloud.

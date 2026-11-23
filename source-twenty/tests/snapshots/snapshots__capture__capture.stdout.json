@@ -1,0 +1,286 @@
+[
+  [
+    "acmeCo/companies",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "accountOwnerId": null,
+      "address": {
+        "addressCity": "Testville",
+        "addressCountry": "United States",
+        "addressLat": null,
+        "addressLng": null,
+        "addressPostcode": "00000",
+        "addressState": "CA",
+        "addressStreet1": "100 Test Ave",
+        "addressStreet2": ""
+      },
+      "annualRevenue": {
+        "amountMicros": null,
+        "currencyCode": null
+      },
+      "createdAt": "2026-11-10T23:27:07.615Z",
+      "createdBy": {
+        "context": null,
+        "name": "System",
+        "source": "SYSTEM",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "domainName": {
+        "primaryLinkLabel": "",
+        "primaryLinkUrl": "examplewidgets.example",
+        "secondaryLinks": []
+      },
+      "id": "06290608-8bf0-4806-99ae-a715a6a93fad",
+      "linkedinLink": {
+        "primaryLinkLabel": "",
+        "primaryLinkUrl": "",
+        "secondaryLinks": []
+      },
+      "name": "Example Widgets",
+      "position": 5,
+      "updatedAt": "2026-11-10T23:39:43.386000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/dashboards",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2026-11-10T23:27:07.615Z",
+      "createdBy": {
+        "context": {},
+        "name": "System",
+        "source": "SYSTEM",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "id": "f31ecf3b-87d3-4e8a-a84b-b6f0f3f8c7e2",
+      "pageLayoutId": "dabe3862-6d49-434c-9e6b-87985e2dcc9a",
+      "position": 0,
+      "title": "My First Dashboard",
+      "updatedAt": "2026-11-10T23:27:07.615000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "System",
+        "source": "SYSTEM",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/noteTargets",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2026-11-10T23:40:09.917Z",
+      "createdBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "id": "2b8b8fb4-5719-42a3-8440-5e08d6962466",
+      "noteId": "9a16d41d-ca41-4fb6-a007-dbf5021d9107",
+      "position": 0,
+      "targetCompanyId": null,
+      "targetOpportunityId": null,
+      "targetPersonId": "7a93d1e5-3f74-4945-8a65-d7f996083f72",
+      "updatedAt": "2026-11-10T23:40:09.917000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/notes",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "bodyV2": {
+        "blocknote": null,
+        "markdown": "",
+        "tiptap": null
+      },
+      "createdAt": "2026-11-10T23:39:55.057Z",
+      "createdBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "id": "9a16d41d-ca41-4fb6-a007-dbf5021d9107",
+      "position": 0,
+      "title": "Made-up kickoff note",
+      "updatedAt": "2026-11-10T23:39:55.057000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/opportunities",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "amount": {
+        "amountMicros": 75000000000,
+        "currencyCode": "USD"
+      },
+      "closeDate": "2026-01-25T16:26:00.000Z",
+      "companyId": "1f70157c-4ea5-4d81-bc49-e1401abfbb94",
+      "createdAt": "2026-11-10T23:27:07.615Z",
+      "createdBy": {
+        "context": null,
+        "name": "System",
+        "source": "SYSTEM",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "id": "2beb07b0-340c-41d7-be33-5aa91757f329",
+      "name": "API Integration Deal",
+      "ownerId": "57455b8d-68df-4844-b49f-2243ea351d46",
+      "pointOfContactId": "edf6d445-13a7-4373-9a47-8f89e8c0a877",
+      "position": 4,
+      "stage": "SCREENING",
+      "updatedAt": "2026-11-10T23:27:07.615000Z",
+      "updatedBy": {
+        "context": null,
+        "name": "System",
+        "source": "SYSTEM",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/people",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "avatarFile": null,
+      "avatarUrl": "",
+      "companyId": "06290608-8bf0-4806-99ae-a715a6a93fad",
+      "createdAt": "2026-11-10T23:27:07.615Z",
+      "createdBy": {
+        "context": null,
+        "name": "System",
+        "source": "SYSTEM",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "emails": {
+        "additionalEmails": [],
+        "primaryEmail": "ada@example.com"
+      },
+      "id": "7a93d1e5-3f74-4945-8a65-d7f996083f72",
+      "jobTitle": "",
+      "linkedinLink": {
+        "primaryLinkLabel": "",
+        "primaryLinkUrl": "",
+        "secondaryLinks": []
+      },
+      "name": {
+        "firstName": "Ada",
+        "lastName": "Tester"
+      },
+      "phones": {
+        "additionalPhones": [],
+        "primaryPhoneCallingCode": "+1",
+        "primaryPhoneCountryCode": "US",
+        "primaryPhoneNumber": "2025550100"
+      },
+      "position": 5,
+      "updatedAt": "2026-11-10T23:39:53.525000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/taskTargets",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2026-11-10T23:40:10.197Z",
+      "createdBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "id": "d1287015-1ffc-41ca-9da2-459bc89371fd",
+      "position": 0,
+      "targetCompanyId": "06290608-8bf0-4806-99ae-a715a6a93fad",
+      "targetOpportunityId": null,
+      "targetPersonId": null,
+      "taskId": "4c532b2f-247a-4982-8b1b-0be9069d77dd",
+      "updatedAt": "2026-11-10T23:40:10.197000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      }
+    }
+  ],
+  [
+    "acmeCo/tasks",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "assigneeId": null,
+      "bodyV2": {
+        "blocknote": null,
+        "markdown": "",
+        "tiptap": null
+      },
+      "createdAt": "2026-11-10T23:39:55.282Z",
+      "createdBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      },
+      "deletedAt": null,
+      "dueAt": null,
+      "id": "4c532b2f-247a-4982-8b1b-0be9069d77dd",
+      "position": 0,
+      "status": "TODO",
+      "title": "Made-up follow-up task",
+      "updatedAt": "2026-11-10T23:39:55.282000Z",
+      "updatedBy": {
+        "context": {},
+        "name": "Dev tests",
+        "source": "API",
+        "workspaceMemberId": null
+      }
+    }
+  ]
+]

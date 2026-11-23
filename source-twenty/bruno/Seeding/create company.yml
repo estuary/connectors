@@ -1,0 +1,73 @@
+info:
+  name: create company
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{base_url}}/rest/companies"
+  body:
+    type: json
+    data: |-
+      {"name": "Example Co (source-twenty probe)"}
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain the created resource ID in memory, never the API credential.
+        const data = res.getBody()?.data;
+        const company = data && Object.values(data).find(value =>
+          value && typeof value === 'object' && typeof value.id === 'string',
+        );
+        if (res.getStatus() >= 300 || !company?.id) {
+          throw new Error('Company creation did not return an ID; stop the seed sequence');
+        }
+        bru.setVar('company_id', company.id);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 201 - live self-hosted v2.52, created company and initial timestamps (projection)
+    request:
+      url: '{{base_url}}/rest/companies'
+      method: POST
+    response:
+      status: 201
+      statusText: Created
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "createCompany": {
+                "id": "024daa5d-b645-41c5-9ded-3f2dce99b00e",
+                "name": "Example Co (source-twenty probe)",
+                "createdAt": "2026-11-03T19:00:54.731Z",
+                "updatedAt": "2026-11-03T19:00:54.731Z",
+                "deletedAt": null
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** https://docs.twenty.com/developers/extend/api
+
+  SEEDING REQUEST — only a human runs this; never an agent. Step 1 of 3.
+
+  **WHY:** create the test company consumed by `Seeding / soft delete company`
+  and `Seeding / restore company`. Use `Records / soft deleted` to inspect
+  it between mutations. The response script captures `company_id` for the
+  remaining steps; no manual ID copy is needed.
+
+  **VERIFIED (2026-11-03):** self-hosted v2.52 returned HTTP 201 with
+  `data.createCompany.id: 024daa5d-b645-41c5-9ded-3f2dce99b00e`, the name
+  `Example Co (source-twenty probe)`, `deletedAt: null`, and equal
+  `createdAt` / `updatedAt` values of `2026-11-03T19:00:54.731Z`.
+  The saved body projects only those supplied fields.

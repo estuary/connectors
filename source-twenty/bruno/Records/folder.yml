@@ -1,0 +1,14 @@
+info:
+  name: Records
+  type: folder
+  seq: 3
+
+docs: |-
+  **WHY:** exercise the shared `/rest/<plural>` record-list contract with
+  `people` for backfill and `companies` for timestamp boundaries and soft
+  deletes.
+
+  See `Records / backfill page` for pagination and the `(updatedAt, id)`
+  keyset cursor, `Records / incremental window` for RFC3339 `updatedAt`
+  boundary comparisons, and `Records / soft deleted` for default-list
+  visibility and deletion/restoration timestamps.

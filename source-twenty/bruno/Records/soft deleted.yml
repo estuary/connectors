@@ -1,0 +1,128 @@
+info:
+  name: soft deleted
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: '{{base_url}}/rest/companies?limit=200&depth=0&filter=and(id[eq]:"{{company_id}}",deletedAt[is]:NOT_NULL)'
+  params:
+    - name: limit
+      value: "200"
+      type: query
+    - name: depth
+      value: "0"
+      type: query
+    - name: filter
+      value: 'and(id[eq]:"{{company_id}}",deletedAt[is]:NOT_NULL)'
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('company_id')) {
+          bru.setVar('company_id', '024daa5d-b645-41c5-9ded-3f2dce99b00e');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - live self-hosted v2.52, soft-deleted company has matching deletion and update times (projection)
+    request:
+      url: '{{base_url}}/rest/companies?limit=200&depth=0&filter=and(id[eq]:"024daa5d-b645-41c5-9ded-3f2dce99b00e",deletedAt[is]:NOT_NULL)'
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "companies": [
+                {
+                  "id": "024daa5d-b645-41c5-9ded-3f2dce99b00e",
+                  "updatedAt": "2026-11-03T19:00:55.884Z",
+                  "deletedAt": "2026-11-03T19:00:55.884Z"
+                }
+              ]
+            },
+            "totalCount": 1
+          }
+  - name: 200 - live self-hosted v2.52, default list hides the same soft-deleted company (projection)
+    request:
+      url: '{{base_url}}/rest/companies?limit=200&depth=0&filter=id[eq]:"024daa5d-b645-41c5-9ded-3f2dce99b00e"'
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "companies": []
+            },
+            "totalCount": 0
+          }
+  - name: 200 - live self-hosted v2.52, default list includes the company after restore (projection)
+    request:
+      url: '{{base_url}}/rest/companies?limit=200&depth=0&filter=id[eq]:"024daa5d-b645-41c5-9ded-3f2dce99b00e"'
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "companies": [
+                {
+                  "id": "024daa5d-b645-41c5-9ded-3f2dce99b00e",
+                  "updatedAt": "2026-11-03T19:00:57.007Z",
+                  "deletedAt": null
+                }
+              ]
+            }
+          }
+
+docs: |-
+  **REFERENCE:** https://docs.twenty.com/developers/extend/api
+
+  **WHY:** test default-list visibility of trash and the timestamp changes
+  needed to observe soft deletion and restoration through incremental reads.
+
+  **VERIFIED (2026-11-03):** the self-hosted v2.52 examples follow company
+  `024daa5d-b645-41c5-9ded-3f2dce99b00e`. The deleted-only query returns it
+  with `deletedAt == updatedAt == 2026-11-03T19:00:55.884Z`. After the restore
+  call saved in `Seeding / restore company`, the default list returns it with
+  `deletedAt: null` and `updatedAt: 2026-11-03T19:00:57.007Z`, a later time.
+  The after-restore projection has no supplied `totalCount` or `pageInfo`.
+
+  **LIMITATION (VERIFIED 2026-11-03):** before restoration, filtering only on
+  that same ID returns an empty default list with `totalCount: 0`, whereas
+  explicit `deletedAt[is]:NOT_NULL` returns the deleted row with
+  `totalCount: 1`.
+
+  The connector includes `or(deletedAt[is]:NULL,deletedAt[is]:NOT_NULL)` in
+  both read paths to cover live and trashed records together; this request
+  isolates the trash. It emits `_meta/op: d` for a non-null `deletedAt` and
+  captures a restored record as an update. `_meta` is connector output,
+  not an API field.
+
+  For a human-run lifecycle, run `Seeding / create company`, then
+  `Seeding / soft delete company`, and inspect this request before running
+  `Seeding / restore company`. It uses the captured `company_id`; standalone
+  runs fall back to the historical ID above. For a fresh session, create a
+  new test company first. To inspect it after restore, use only `id[eq]` in
+  the filter, as in the saved default-list examples.

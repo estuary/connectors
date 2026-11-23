@@ -1,0 +1,64 @@
+info:
+  name: restore company
+  type: http
+  seq: 3
+
+http:
+  method: PATCH
+  url: "{{base_url}}/rest/companies/{{company_id}}/restore"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('company_id')) {
+          throw new Error('Run Seeding / create company first in this session');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 - live self-hosted v2.52, restored company with null deletedAt (projection)
+    request:
+      url: '{{base_url}}/rest/companies/024daa5d-b645-41c5-9ded-3f2dce99b00e/restore'
+      method: PATCH
+    response:
+      status: 200
+      statusText: OK
+      headers: []
+      body:
+        type: json
+        data: |-
+          {
+            "data": {
+              "restoreCompany": {
+                "id": "024daa5d-b645-41c5-9ded-3f2dce99b00e",
+                "name": "Example Co (source-twenty probe)",
+                "createdAt": "2026-11-03T19:00:54.731Z",
+                "updatedAt": "2026-11-03T19:00:57.007Z",
+                "deletedAt": null
+              }
+            }
+          }
+
+docs: |-
+  **REFERENCE:** https://docs.twenty.com/developers/extend/api
+
+  SEEDING REQUEST — only a human runs this; never an agent. Step 3 of 3.
+
+  **WHY:** restore the company after `Seeding / soft delete company` so its
+  return can be inspected in `Records / soft deleted`. Run
+  `Seeding / create company` first in a fresh session to supply `company_id`,
+  then soft-delete it before this step.
+
+  **VERIFIED (2026-11-03):** self-hosted v2.52 returned HTTP 200 with
+  `data.restoreCompany.id: 024daa5d-b645-41c5-9ded-3f2dce99b00e`,
+  `createdAt: 2026-11-03T19:00:54.731Z`,
+  `updatedAt: 2026-11-03T19:00:57.007Z`, and `deletedAt: null`.
+  Compare the before/after list responses in `Records / soft deleted` for
+  the timestamp advance and restored default-list visibility.
