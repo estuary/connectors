@@ -247,11 +247,12 @@ var clickHouseDialect = func(database string) sql.Dialect {
 			sql.PassThroughTransform(
 				func(s string) bool {
 					// Identifiers can contain any special characters, wrapping with backticks
-					// is required in those cases. Backtick is the only escaped character.
+					// is required in those cases. A backslash starts an escape sequence inside
+					// the backticks, so it is escaped along with the backtick.
 					// https://clickhouse.com/docs/sql-reference/syntax#identifiers
 					return simpleIdentifier.MatchString(s) && !slices.Contains(CLICKHOUSE_RESERVED_WORDS, strings.ToLower(s))
 				},
-				sql.QuoteTransform("`", "``"),
+				sql.QuoteTransformEscapedBackslash("`", "``"),
 			))),
 		// String literals can be much more complicated, but
 		// backslashes and single-quotes cover our needs.

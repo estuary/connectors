@@ -160,6 +160,19 @@ func TestSQLGenerationQuotedTableNames(t *testing.T) {
 	cupaloy.SnapshotT(t, snap.String())
 }
 
+func TestIdentifierQuoting(t *testing.T) {
+	for _, tt := range []struct{ name, want string }{
+		{"plain", "plain"},
+		{"with space", "`with space`"},
+		{"back`tick", "`back``tick`"},
+		{`path\to`, "`path\\\\to`"},
+		{"slash\\`tick", "`slash\\\\``tick`"},
+		{`trailing\`, "`trailing\\\\`"},
+	} {
+		require.Equal(t, tt.want, testDialect.Identifier(tt.name))
+	}
+}
+
 func TestClickHouseClampDatetime(t *testing.T) {
 	for _, tt := range []struct {
 		input   string

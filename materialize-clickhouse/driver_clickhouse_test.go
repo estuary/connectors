@@ -6,7 +6,9 @@ import (
 	"io"
 	"math"
 	"sort"
+	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	chproto "github.com/ClickHouse/ch-go/proto"
@@ -1952,4 +1954,98 @@ func TestAcknowledgeRidesOutConnectionDrops(t *testing.T) {
 		require.EqualValues(t, 1, countTable(t, ctx, tr, tr.dialect.Identifier("test_ack_drop_recover")))
 		require.Empty(t, tr.state)
 	})
+}
+
+// TestIdentifiersRoundTrip creates the target and staging tables of a binding
+// whose table and field names contain backticks and backslashes, and checks
+// that the server holds those names verbatim.
+func TestIdentifiersRoundTrip(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
+	var cfg = testConfig()
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+
+	var stringField = func(field string, exists pf.Inference_Exists) sql.Projection {
+		return sql.Projection{Projection: pf.Projection{
+			Field:     field,
+			Inference: pf.Inference{Types: []string{"string"}, Exists: exists, String_: &pf.Inference_String{}},
+		}}
+	}
+
+	for _, name := range []string{`path\to`, "back`tick", "slash\\`tick", `trailing\`} {
+		t.Run(name, func(t *testing.T) {
+			var key, value, added = "key " + name, "value " + name, "added " + name
+			table, err := sql.ResolveTable(sql.TableShape{
+				Path:         sql.TablePath{"test_ident " + name},
+				DeltaUpdates: true,
+				Keys:         []sql.Projection{stringField(key, pf.Inference_MUST)},
+				Values:       []sql.Projection{stringField(value, pf.Inference_MAY), stringField(added, pf.Inference_MAY)},
+			}, dialect)
+			require.NoError(t, err)
+
+			var addedColumn = table.Values[1]
+			table.Values = table.Values[:1]
+
+			var statements []string
+			var render = func(tpl *template.Template, data any) {
+				var w strings.Builder
+				require.NoError(t, tpl.Execute(&w, data))
+				statements = append(statements, w.String())
+			}
+			var rangeKeyed = func(tpl *template.Template) {
+				rendered, err := renderTableAndRangeKey(table, 0, tpl)
+				require.NoError(t, err)
+				statements = append(statements, rendered)
+			}
+			var drop = fmt.Sprintf("DROP TABLE IF EXISTS %s SYNC", table.Identifier)
+			statements = append(statements, drop)
+			rangeKeyed(tpls.dropLoadTable)
+			rangeKeyed(tpls.dropStoreTable)
+			render(tpls.createTargetTable, &table)
+			render(tpls.alterTargetColumns, sql.TableAlter{Table: table, AddColumns: []sql.Column{addedColumn}})
+			rangeKeyed(tpls.createLoadTable)
+			rangeKeyed(tpls.createStoreTable)
+
+			t.Cleanup(func() {
+				for _, stmt := range statements[:3] {
+					_, _ = db.ExecContext(context.Background(), stmt)
+				}
+			})
+			for _, stmt := range statements {
+				_, err := db.ExecContext(ctx, stmt)
+				require.NoError(t, err, stmt)
+			}
+
+			var query = func(q string, args ...any) (out []string) {
+				rows, err := db.QueryContext(ctx, q, args...)
+				require.NoError(t, err)
+				defer rows.Close()
+				for rows.Next() {
+					var s string
+					require.NoError(t, rows.Scan(&s))
+					out = append(out, s)
+				}
+				require.NoError(t, rows.Err())
+				return out
+			}
+			const columnsSQL = "SELECT name FROM system.columns WHERE database = currentDatabase() AND table = ? ORDER BY position"
+			require.Equal(t, []string{key, value, added}, query(columnsSQL, table.Path[0]))
+			require.Equal(t, []string{key}, query(columnsSQL, loadTableName(table, 0)))
+			require.Equal(t, []string{key, value, added}, query(columnsSQL, storeTableName(table, 0)))
+
+			var sortingKey = query("SELECT sorting_key FROM system.tables WHERE database = currentDatabase() AND name = ?", table.Path[0])
+			require.Len(t, sortingKey, 1)
+			cols, allPlain := parseSortingKey(sortingKey[0])
+			require.True(t, allPlain)
+			require.Equal(t, []string{key}, cols)
+		})
+	}
 }
