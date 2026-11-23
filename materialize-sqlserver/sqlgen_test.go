@@ -62,6 +62,32 @@ func TestSQLGenerationQuotedTableNames(t *testing.T) {
 	cupaloy.SnapshotT(t, snap.String())
 }
 
+func TestSQLGenerationQuotedBinaryField(t *testing.T) {
+	table, err := sql.ResolveTable(sql.TableShape{
+		Path: []string{"quoted_binary"},
+		Keys: []sql.Projection{{Projection: pf.Projection{
+			Field:     "id",
+			Ptr:       "/id",
+			Inference: pf.Inference{Types: []string{"integer"}, Exists: pf.Inference_MUST},
+		}}},
+		Values: []sql.Projection{{Projection: pf.Projection{
+			Field: "bin'ary",
+			Ptr:   "/bin'ary",
+			Inference: pf.Inference{
+				Types:   []string{"string"},
+				String_: &pf.Inference_String{ContentEncoding: "base64"},
+				Exists:  pf.Inference_MUST,
+			},
+		}}},
+	}, testDialect)
+	require.NoError(t, err)
+
+	snap, err := sql.RenderTableTemplate(table, testTemplates.loadQueryNoFlowDocument)
+	require.NoError(t, err)
+
+	cupaloy.SnapshotT(t, snap)
+}
+
 func TestXQueryColumnRef(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -74,7 +100,7 @@ func TestXQueryColumnRef(t *testing.T) {
 		{"field with double quote", "", `a"b`, `[a""b]`},
 		{"field with bracket", "", "a]b", "[a]]b]"},
 		{"field with bracket and quote", "r", `a"b]c`, `r.[a""b]]c]`},
-		{"field with apostrophe is left to caller", "", "a'b", "[a'b]"},
+		{"field with apostrophe", "", "a'b", "[a''b]"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			require.Equal(t, tc.want, xqueryColumnRef(tc.alias, tc.field))
