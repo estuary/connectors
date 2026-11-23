@@ -58,9 +58,11 @@ jobs:
         # .github/, and expands variants. Reads the version from the connector's
         # VERSION file (Go, Rust) or python-connectors.yaml (Python).
         # Writes: /tmp/forward_plan.tsv  (image, version)
+        env:
+          CONNECTOR: ${{ inputs.connector }}
         run: |
           python3 .github/scripts/delayed_tag.py forward \
-            --connector "${{ inputs.connector }}" \
+            --connector "$CONNECTOR" \
             --output /tmp/forward_plan.tsv
 
       - name: Fast-forward ':delayed' to the version tag
@@ -125,10 +127,12 @@ jobs:
 
       - name: Write job summary
         if: always()
+        env:
+          CONNECTOR: ${{ inputs.connector }}
         run: |
           set -uo pipefail
           {
-            echo "## Forward Delayed Tag — \`${{ inputs.connector }}\`"
+            echo "## Forward Delayed Tag — \`${CONNECTOR}\`"
             echo ""
             if [ -s /tmp/forwarded.tsv ]; then
               echo "Fast-forwarded \`:delayed\` to the latest version tag:"

@@ -24,9 +24,11 @@ runs:
 
     - name: Login to GitHub package docker registry
       shell: bash
+      env:
+        TOKEN: ${{ inputs.github_token }}
       run: |
-        echo "${{ inputs.github_token }}" | \
-          docker login --username ${{ github.actor }} --password-stdin ghcr.io
+        echo "$TOKEN" | \
+          docker login --username "$GITHUB_ACTOR" --password-stdin ghcr.io
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v4
