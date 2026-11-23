@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"regexp"
 	"strconv"
 	"unicode"
 	"unicode/utf8"
@@ -18,8 +19,9 @@ import (
 const csvCompressionlevel = flate.BestSpeed
 
 type csvConfig struct {
-	skipHeaders bool
-	quoteChar   rune
+	skipHeaders    bool
+	quoteChar      rune
+	escapeFormulas bool
 }
 
 type CsvWriter struct {
@@ -44,6 +46,15 @@ func WithCsvQuoteChar(char rune) CsvOption {
 	}
 }
 
+// WithCsvEscapeFormulas prefixes string values and headers that a spreadsheet
+// application would evaluate as a formula with a single quote. This changes
+// the written values, so it is not suitable for files read back as data.
+func WithCsvEscapeFormulas() CsvOption {
+	return func(cfg *csvConfig) {
+		cfg.escapeFormulas = true
+	}
+}
+
 func NewCsvWriter(w io.WriteCloser, fields []string, opts ...CsvOption) *CsvWriter {
 	var cfg csvConfig
 	for _, o := range opts {
@@ -64,7 +75,7 @@ func NewCsvWriter(w io.WriteCloser, fields []string, opts ...CsvOption) *CsvWrit
 
 	return &CsvWriter{
 		cfg:    cfg,
-		csv:    newCsvWriter(gz, byte(quoteChar)),
+		csv:    newCsvWriter(gz, byte(quoteChar), cfg.escapeFormulas),
 		cwc:    cwc,
 		gz:     gz,
 		fields: fields,
@@ -101,15 +112,18 @@ func (w *CsvWriter) Close() error {
 }
 
 type csvWriter struct {
-	w         io.Writer
-	buf       []byte
-	quoteChar byte
+	w              io.Writer
+	buf            []byte
+	escaped        []byte
+	quoteChar      byte
+	escapeFormulas bool
 }
 
-func newCsvWriter(w io.Writer, quoteChar byte) *csvWriter {
+func newCsvWriter(w io.Writer, quoteChar byte, escapeFormulas bool) *csvWriter {
 	return &csvWriter{
-		w:         w,
-		quoteChar: quoteChar,
+		w:              w,
+		quoteChar:      quoteChar,
+		escapeFormulas: escapeFormulas,
 	}
 }
 
@@ -160,6 +174,11 @@ func (w *csvWriter) writeRow(row []any) error {
 }
 
 func (w *csvWriter) appendString(buf []byte, field []byte) []byte {
+	if w.escapeFormulas && startsFormula(field) {
+		w.escaped = append(append(w.escaped[:0], '\''), field...)
+		field = w.escaped
+	}
+
 	if !w.stringNeedsQuotes(field) {
 		buf = append(buf, field...)
 	} else {
@@ -183,6 +202,25 @@ func (w *csvWriter) appendString(buf []byte, field []byte) []byte {
 	}
 
 	return buf
+}
+
+var csvSignedNumber = regexp.MustCompile(`^[+-][0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$`)
+
+// startsFormula reports whether a spreadsheet application would evaluate the
+// field as a formula. Signed numbers are only ever read as numbers.
+func startsFormula(field []byte) bool {
+	if len(field) == 0 {
+		return false
+	}
+
+	switch field[0] {
+	case '=', '@', '\t', '\r', '\n':
+		return true
+	case '+', '-':
+		return !csvSignedNumber.Match(field)
+	}
+
+	return false
 }
 
 func (w *csvWriter) stringNeedsQuotes(field []byte) bool {
