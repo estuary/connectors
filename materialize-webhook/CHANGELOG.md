@@ -1,5 +1,14 @@
 # materialize-webhook
 
+## 2026-11-23
+
+### Fixed
+- Custom header values are now marked as secret, so the dashboard masks them
+  and encrypts them when the configuration is saved. Previously a header value,
+  such as an authorization token, was stored as plain text. Existing
+  materializations will have their header values encrypted the next time their
+  configuration is saved.
+
 ## 2026-11-03
 
 ### Changed

@@ -30,7 +30,7 @@ func NewDriver() boilerplate.Connector { return driver{} }
 
 type customHeader struct {
 	Name  string `json:"name,omitempty" jsonschema:"title=Name"`
-	Value string `json:"value,omitempty" jsonschema:"title=Value"`
+	Value string `json:"value,omitempty" jsonschema:"title=Value" jsonschema_extras:"secret=true"`
 }
 
 func (h customHeader) Validate() error {
