@@ -32,6 +32,11 @@ UtcDatetime = Annotated[AwareDatetime, BeforeValidator(_assume_utc)]
 
 EXPORT_RETENTION_LIMIT = timedelta(days=365) # 12 months
 
+# `bot_handle` starts the API's hostname. Allowing only hostname characters
+# keeps requests on ada.support, because a character such as "/" or ":"
+# would end the hostname before ".ada.support".
+HOST_LABEL_PATTERN = r"^[A-Za-z0-9.-]+$"
+
 
 def default_start_date():
     dt = datetime.now(timezone.utc) - EXPORT_RETENTION_LIMIT
@@ -49,6 +54,7 @@ class EndpointConfig(BaseModel):
     bot_handle: str = Field(
         description="Your Ada bot handle. This can be found in the URL of your bot's dashboard. ex: {BOT_HANDLE}.ada.support",
         title="Bot Handle",
+        pattern=HOST_LABEL_PATTERN,
     )
     start_date: AwareDatetime = Field(
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 12 months before the present date. Note: due to Ada's data retention limits, only the past 12 months of data can be captured.",

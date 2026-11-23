@@ -27,6 +27,7 @@
       "properties": {
         "bot_handle": {
           "description": "Your Ada bot handle. This can be found in the URL of your bot's dashboard. ex: {BOT_HANDLE}.ada.support",
+          "pattern": "^[A-Za-z0-9.-]+$",
           "title": "Bot Handle",
           "type": "string"
         },
