@@ -27,10 +27,7 @@ func TestURI(t *testing.T) {
 		{"trailing slash", "estuary/staging/", "bucket/estuary/staging"},
 		{"leading slash", "/estuary/file", "bucket/estuary/file"},
 		{"repeated slash", "estuary//file", "bucket/estuary/file"},
-		{"current directory segment", "./estuary/file", "bucket/estuary/file"},
-		{"parent segment within the bucket", "estuary/../staging/file", "bucket/staging/file"},
-		{"parent segment above the bucket root", "../staging/file", "bucket/staging/file"},
-		{"resolving above the bucket root", "estuary/../../staging/file", "bucket/staging/file"},
+		{"parent segments do not replace the bucket", "../staging/file", "bucket/staging/file"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, "s3://"+tt.want, s3Bucket.URI(tt.key))

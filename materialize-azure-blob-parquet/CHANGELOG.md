@@ -3,7 +3,7 @@
 ## 2026-11-23
 
 ### Changed
-- A Prefix that uses `..` to reach above the top of the container is now rejected.
+- A Prefix with a `.` or `..` path segment is now rejected.
 
 ## 2026-11-03
 

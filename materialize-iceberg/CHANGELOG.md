@@ -3,7 +3,7 @@
 ## 2026-11-23
 
 ### Changed
-- A Bucket Path that uses `..` to reach above the top of the bucket is now rejected.
+- A Bucket Path with a `.` or `..` path segment is now rejected.
 
 ## 2026-11-09
 
