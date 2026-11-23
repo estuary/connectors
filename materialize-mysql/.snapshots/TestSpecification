@@ -179,6 +179,13 @@
                 "title": "SSH Known Hosts",
                 "description": "Host keys of the SSH server in OpenSSH known_hosts format, one per line: the output of `ssh-keyscan -p 2222 bastion.example.com`, for example `[bastion.example.com]:2222 ssh-ed25519 AAAA...`.",
                 "multiline": true
+              },
+              "skipHostKeyVerification": {
+                "type": "boolean",
+                "title": "Skip Host Key Verification",
+                "description": "Connect without verifying the SSH server's host key.",
+                "nonsensitive": true,
+                "x-hidden-field": true
               }
             },
             "additionalProperties": false,

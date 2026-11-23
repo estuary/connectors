@@ -42,6 +42,28 @@ func TestValidateKnownHosts(t *testing.T) {
 	}
 }
 
+func TestSkipHostKeyVerification(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		knownHosts string
+		wantErr    string
+	}{
+		{name: "alone", knownHosts: ""},
+		{name: "with whitespace known hosts", knownHosts: " \n"},
+		{name: "with known hosts", knownHosts: testKnownHostsEntry, wantErr: "both Skip Host Key Verification and SSH Known Hosts are set"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var cfg = SSHForwardingConfig{KnownHosts: tc.knownHosts, SkipHostKeyVerification: true}
+			var err = cfg.validate()
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestTunnelConfigStartKnownHosts(t *testing.T) {
 	var tunnelConfig = func(knownHosts string) *TunnelConfig {
 		return &TunnelConfig{SSHForwarding: &SSHForwardingConfig{
