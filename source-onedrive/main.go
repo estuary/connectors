@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 	msgraphcore "github.com/microsoftgraph/msgraph-sdk-go-core"
-	"github.com/microsoftgraph/msgraph-sdk-go/drives"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	"golang.org/x/oauth2"
 )
@@ -147,13 +147,6 @@ func (odStore *oneDriveStore) check(ctx context.Context) error {
 func (odStore *oneDriveStore) listFolderDirectChildren(
 	ctx context.Context, folderPath string,
 ) ([]models.DriveItemable, error) {
-	requestConfig := &drives.
-		ItemItemsItemChildrenRequestBuilderGetRequestConfiguration{
-		QueryParameters: &drives.ItemItemsItemChildrenRequestBuilderGetQueryParameters{
-			Orderby: []string{"name"},
-		},
-	}
-
 	items, err := odStore.
 		graphClient.
 		Drives().
@@ -161,7 +154,7 @@ func (odStore *oneDriveStore) listFolderDirectChildren(
 		Items().
 		ByDriveItemId("root:"+folderPath+":").
 		Children().
-		Get(ctx, requestConfig)
+		Get(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("listing folder %s: %w", folderPath, err)
 	}
@@ -186,7 +179,27 @@ func (odStore *oneDriveStore) listFolderDirectChildren(
 		return nil, err
 	}
 
+	sortByPath(allItems)
 	return allItems, nil
+}
+
+// sortByPath sorts a folder's children so their full paths are in byte order, as
+// filesource requires. Graph's `$orderby=name` lists "19-SEPT" before "1-OCT".
+func sortByPath(items []models.DriveItemable) {
+	// A folder sorts as name + "/", where its children's paths fall: after "a-b.csv".
+	var sortName = func(item models.DriveItemable) string {
+		var name string
+		if n := item.GetName(); n != nil {
+			name = *n
+		}
+		if item.GetFolder() != nil {
+			name += "/"
+		}
+		return name
+	}
+	slices.SortStableFunc(items, func(a, b models.DriveItemable) int {
+		return strings.Compare(sortName(a), sortName(b))
+	})
 }
 
 func (odStore *oneDriveStore) List(
