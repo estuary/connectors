@@ -14,7 +14,8 @@ func TestQuoting(t *testing.T) {
 
 	for _, tc := range []struct{ name, want string }{
 		{`DB.MY_SCHEMA.FLOW_PIPE_0`, `DB.MY_SCHEMA.FLOW_PIPE_0`},
-		{`DB.MY$SCHEMA.FLOW_PIPE_0`, `DB.MY$SCHEMA.FLOW_PIPE_0`},
+		{`DB.MY$SCHEMA.FLOW_PIPE_0`, `DB."MY$SCHEMA".FLOW_PIPE_0`},
+		{`DB.ORDER.FLOW_PIPE_0`, `DB."ORDER".FLOW_PIPE_0`},
 		{`"MY-DB".S.FLOW_PIPE_0`, `"MY-DB".S.FLOW_PIPE_0`},
 		{`"A""B".S.FLOW_PIPE_0`, `"A""B".S.FLOW_PIPE_0`},
 		{`"A"B".S.FLOW_PIPE_0`, `"""A""B""".S.FLOW_PIPE_0`},
