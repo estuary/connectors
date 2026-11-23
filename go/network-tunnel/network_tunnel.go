@@ -20,14 +20,18 @@ type SshConfig struct {
 	ForwardHost string
 	ForwardPort string
 	LocalPort   string
+	// KnownHosts holds the SSH server's host keys in OpenSSH known_hosts format.
+	// When it's empty, the tunnel doesn't verify the server's host key.
+	KnownHosts string
 }
 
 type SshTunnel struct {
-	Config      *SshConfig
-	ctx         context.Context
-	Cmd         *exec.Cmd
-	tmpFileName string
-	cancel      context.CancelFunc
+	Config             *SshConfig
+	ctx                context.Context
+	Cmd                *exec.Cmd
+	tmpFileName        string
+	knownHostsFileName string
+	cancel             context.CancelFunc
 }
 
 func (c *SshConfig) CreateTunnel() *SshTunnel {
@@ -57,6 +61,22 @@ func (t *SshTunnel) Start() error {
 		return fmt.Errorf("writing key to temporary file: %w", err)
 	}
 
+	if t.Config.KnownHosts != "" {
+		knownHostsFile, err := os.CreateTemp("", "flow-network-tunnel-known-hosts")
+		if err != nil {
+			return fmt.Errorf("creating temporary file for known hosts: %w", err)
+		}
+		t.knownHostsFileName = knownHostsFile.Name()
+
+		_, err = knownHostsFile.WriteString(t.Config.KnownHosts)
+		if closeErr := knownHostsFile.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			return fmt.Errorf("writing known hosts to temporary file: %w", err)
+		}
+	}
+
 	log.WithFields(log.Fields{
 		"ssh-endpoint": t.Config.SshEndpoint,
 		"forward-host": t.Config.ForwardHost,
@@ -71,9 +91,7 @@ func (t *SshTunnel) Start() error {
 		logLevel = "warn"
 	}
 
-	t.Cmd = exec.CommandContext(
-		t.ctx,
-		"flow-network-tunnel",
+	var args = []string{
 		"ssh",
 		"--ssh-endpoint", t.Config.SshEndpoint,
 		"--private-key", tmpKeyFile.Name(),
@@ -81,7 +99,12 @@ func (t *SshTunnel) Start() error {
 		"--forward-port", t.Config.ForwardPort,
 		"--local-port", t.Config.LocalPort,
 		"--log.level", logLevel,
-	)
+	}
+	if t.knownHostsFileName != "" {
+		args = append(args, "--known-hosts", t.knownHostsFileName)
+	}
+
+	t.Cmd = exec.CommandContext(t.ctx, "flow-network-tunnel", args...)
 	// Assign process gid to this process and its children
 	// so we can kill them together in the end
 	t.Cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -153,5 +176,8 @@ func (t *SshTunnel) Stop() {
 	// cleanup key file
 	if t.tmpFileName != "" {
 		os.Remove(t.tmpFileName)
+	}
+	if t.knownHostsFileName != "" {
+		os.Remove(t.knownHostsFileName)
 	}
 }
