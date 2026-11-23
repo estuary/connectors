@@ -22,6 +22,11 @@ from pydantic import (
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
+# `region` starts the API's hostname. Allowing only hostname characters
+# keeps requests on gong.io, because a character such as "/" or ":" would
+# end the hostname before ".api.gong.io".
+HOST_LABEL_PATTERN = r"^[A-Za-z0-9.-]+$"
+
 
 def default_start_date() -> datetime:
     return datetime.now(tz=UTC) - timedelta(days=30)
@@ -55,6 +60,7 @@ class EndpointConfig(BaseModel):
         default="us-55616",
         description="The API region for your Gong account. Check your Gong API settings for the correct region.",
         title="API Region",
+        pattern=HOST_LABEL_PATTERN,
     )
     start_date: AwareDatetime = Field(
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data before this date will not be replicated. If left blank, defaults to 30 days before current time.",

@@ -50,6 +50,7 @@
         "region": {
           "default": "us-55616",
           "description": "The API region for your Gong account. Check your Gong API settings for the correct region.",
+          "pattern": "^[A-Za-z0-9.-]+$",
           "title": "API Region",
           "type": "string"
         },
