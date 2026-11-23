@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"sort"
 	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
-	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -34,7 +34,7 @@ func NewDriver() boilerplate.Connector { return driver{} }
 
 func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections.
-	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SSHForwarding != nil && cfg.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+	if cfg.NetworkTunnel.InUse() {
 		uri, err := url.Parse(cfg.Address)
 		if err != nil {
 			// A *url.Error repeats its input, which may contain a password, so unwrap it
@@ -42,16 +42,7 @@ func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 			return nil, fmt.Errorf("parsing address for network tunnel: %w", errors.Unwrap(err))
 		}
 
-		var sshConfig = &networkTunnel.SshConfig{
-			SshEndpoint: cfg.NetworkTunnel.SSHForwarding.SSHEndpoint,
-			PrivateKey:  []byte(cfg.NetworkTunnel.SSHForwarding.PrivateKey),
-			ForwardHost: uri.Hostname(),
-			ForwardPort: uri.Port(),
-			LocalPort:   "27017",
-		}
-		var tunnel = sshConfig.CreateTunnel()
-
-		if err := tunnel.Start(); err != nil {
+		if _, err := cfg.NetworkTunnel.Start(ctx, net.JoinHostPort(uri.Hostname(), uri.Port()), "27017"); err != nil {
 			return nil, err
 		}
 	}
