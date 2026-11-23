@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-23
+
+### Changed
+- The connector refuses to download an export file unless its URL uses HTTPS.
+
 ## 2026-09-21
 
 ### Fixed
