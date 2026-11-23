@@ -9,7 +9,7 @@ import urllib
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Callable, Iterable, List, Mapping, MutableMapping, Optional, Tuple, Union
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import requests
 import requests_cache
@@ -320,7 +320,13 @@ class HttpStream(Stream, ABC):
 
     @classmethod
     def _join_url(cls, url_base: str, path: str) -> str:
-        return urljoin(url_base, path)
+        url = urljoin(url_base, path)
+        # urljoin lets a path replace url_base's scheme or host, so we fail
+        # here instead of sending the request to a different host.
+        base, joined = urlparse(url_base), urlparse(url)
+        if (joined.scheme, joined.netloc) != (base.scheme, base.netloc):
+            raise ValueError(f"path {path!r} resolves to {url!r}, which has a different scheme or host than url_base {url_base!r}")
+        return url
 
     def _send(self, request: requests.PreparedRequest, request_kwargs: Mapping[str, Any]) -> requests.Response:
         """
