@@ -2,6 +2,9 @@
 
 ## 2026-11-23
 
+### Changed
+- `account_name` only accepts letters, digits, dots, and hyphens.
+
 ### Fixed
 - Logs and error messages from failed storage requests no longer include the SAS token.
 

@@ -12,6 +12,11 @@ from estuary_cdk.incremental_csv_processor import BaseCSVRow
 
 from pydantic import BaseModel, Field, BeforeValidator
 
+# `account_name` starts the storage account's hostname. Allowing only
+# hostname characters keeps requests on windows.net, because a character such
+# as "/" or ":" would end the hostname before ".dfs.core.windows.net".
+HOST_LABEL_PATTERN = r"^[A-Za-z0-9.-]+$"
+
 
 class AzureSASToken(BaseModel):
     credentials_title: Literal["SAS Token"] = Field(
@@ -28,6 +33,7 @@ class EndpointConfig(BaseModel):
     account_name: str = Field(
         description="The Azure account name.",
         title="Account name",
+        pattern=HOST_LABEL_PATTERN,
         json_schema_extra={"order": 0},
     )
     filesystem: str = Field(
