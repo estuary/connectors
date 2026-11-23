@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -35,15 +36,6 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	"ignore_mapping_format_changes": common.FlagDisabled,
 }
 
-type sshForwarding struct {
-	SshEndpoint string `json:"sshEndpoint"`
-	PrivateKey  string `json:"privateKey"`
-}
-
-type tunnelConfig struct {
-	SshForwarding *sshForwarding `json:"sshForwarding,omitempty"`
-}
-
 // credentials is a union representing either an api key or a username/password.
 // It's allowed for all credentials to be missing, which is used for connecting to servers
 // without authentication enabled.
@@ -60,7 +52,7 @@ type config struct {
 
 	Advanced advancedConfig `json:"advanced,omitempty"`
 
-	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty"`
+	NetworkTunnel *networkTunnel.TunnelConfig `json:"networkTunnel,omitempty"`
 }
 
 type advancedConfig struct {
@@ -253,22 +245,13 @@ func (c config) toClient() (*client, error) {
 	endpoint := c.Endpoint
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
-	if c.NetworkTunnel != nil && c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != "" {
+	if c.NetworkTunnel.InUse() {
 		u, err := url.Parse(c.Endpoint)
 		if err != nil {
 			return nil, fmt.Errorf("parsing endpoint URL: %w", err)
 		}
 
-		var sshConfig = &networkTunnel.SshConfig{
-			SshEndpoint: c.NetworkTunnel.SshForwarding.SshEndpoint,
-			PrivateKey:  []byte(c.NetworkTunnel.SshForwarding.PrivateKey),
-			ForwardHost: u.Hostname(),
-			ForwardPort: u.Port(),
-			LocalPort:   "9200",
-		}
-		var tunnel = sshConfig.CreateTunnel()
-
-		if err := tunnel.Start(); err != nil {
+		if _, err := c.NetworkTunnel.Start(context.Background(), net.JoinHostPort(u.Hostname(), u.Port()), "9200"); err != nil {
 			return nil, err
 		}
 
