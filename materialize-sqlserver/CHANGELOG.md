@@ -4,6 +4,8 @@
 
 ### Fixed
 - Tables with an apostrophe in their name or schema can now be created.
+- With Exclude Flow Document enabled, binary fields with an apostrophe in
+  their name now load correctly.
 
 ## 2026-11-13
 
