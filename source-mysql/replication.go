@@ -64,7 +64,7 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 	var address = db.config.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
 	// to address through the bastion server, so we use the tunnel's address
-	if db.config.NetworkTunnel != nil && db.config.NetworkTunnel.SSHForwarding != nil && db.config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+	if db.config.NetworkTunnel.InUse() {
 		address = "localhost:3306"
 	}
 	var host, port, err = splitHostPort(address)

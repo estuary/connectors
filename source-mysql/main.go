@@ -71,15 +71,6 @@ var featureFlagDefaults = map[string]bool{
 	"activate_streams_before_catchup": false,
 }
 
-type sshForwarding struct {
-	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
-	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
-}
-
-type tunnelConfig struct {
-	SSHForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
-}
-
 const minimumExpiryTime = 7 * 24 * time.Hour
 
 var mysqlDriver = &sqlcapture.Driver{
@@ -101,24 +92,10 @@ func connectMySQL(ctx context.Context, name string, cfg json.RawMessage, _ commo
 	config.normalizeCredentials()
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
-	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		host, port, err := net.SplitHostPort(config.Address)
-		if err != nil {
-			return nil, fmt.Errorf("splitting address to host and port: %w", err)
-		}
-
-		var sshConfig = &networkTunnel.SshConfig{
-			SshEndpoint: config.NetworkTunnel.SSHForwarding.SSHEndpoint,
-			PrivateKey:  []byte(config.NetworkTunnel.SSHForwarding.PrivateKey),
-			ForwardHost: host,
-			ForwardPort: port,
-			LocalPort:   "3306",
-		}
-		var tunnel = sshConfig.CreateTunnel()
-
+	if config.NetworkTunnel.InUse() {
 		// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
 		// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
-		if err := tunnel.Start(); err != nil {
+		if _, err := config.NetworkTunnel.Start(ctx, config.Address, "3306"); err != nil {
 			return nil, err
 		}
 	}
@@ -220,7 +197,7 @@ type Config struct {
 	DiscoveryFilters discoveryFilters `json:"discoveryFilters,omitempty" jsonschema:"title=Discovery Filters,description=Options that restrict which tables are visible to discovery."`
 	Advanced         advancedConfig   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
-	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+	NetworkTunnel *networkTunnel.TunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
@@ -532,7 +509,7 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 	var address = db.config.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
 	// to address through the bastion server, so we use the tunnel's address
-	if db.config.NetworkTunnel != nil && db.config.NetworkTunnel.SSHForwarding != nil && db.config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+	if db.config.NetworkTunnel.InUse() {
 		address = "localhost:3306"
 	}
 
