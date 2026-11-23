@@ -181,10 +181,9 @@ const maxOpenConns = 10
 type tableConfig struct {
 	Table string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true,nonsensitive=true"`
-	// PartitionBy is spliced verbatim into the table's PARTITION BY clause.
-	// It runs as DDL with the user's own credentials against their own
-	// database, so it is the same trust plane as the rest of the endpoint
-	// config; malformed input fails the dry-run CREATE TABLE at Validate time.
+	// PartitionBy must pass validatePartitionBy to be rendered into the table's
+	// PARTITION BY clause. The dry-run CREATE TABLE at Validate time checks
+	// that it is a usable partition key.
 	PartitionBy string `json:"partition_by,omitempty" jsonschema:"title=Partition By,description=Optional expression to use as the table's PARTITION BY clause\\, for example toYYYYMM(flow_published_at). Leave blank for ClickHouse's default single partition. Use a low-cardinality expression: ClickHouse recommends well under 1000 total partitions\\, and inserts spanning more than 100 partitions are rejected by default. Changing this value requires backfilling the binding\\, which drops and re-creates the table." jsonschema_extras:"advanced=true,nonsensitive=true"`
 }
 

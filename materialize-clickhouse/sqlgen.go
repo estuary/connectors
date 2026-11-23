@@ -681,7 +681,7 @@ TRUNCATE TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }} SYNC;
 {{ define "dropStoreTable" }}
 DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }} SYNC;
 {{ end }}
-`, template.FuncMap{"PartitionExpr": partitionExpr})
+`, template.FuncMap{"PartitionExpr": partitionClauseExpr})
 
 	return templates{
 		createTargetTable:                tplAll.Lookup("createTargetTable"),

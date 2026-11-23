@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-23
+
+### Changed
+- Publishing a materialization now fails when a table's `partition_by` is
+  more than an expression: unbalanced parentheses, comments, queries,
+  aliases (`AS`, except in `CAST(x AS T)`), and characters such as `;` or
+  `$` outside of quoted names and strings are rejected. Tables that already
+  exist are not affected.
+
 ## 2026-11-03
 
 ### Changed

@@ -74,6 +74,15 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 			lastExpr = strings.TrimSpace(lastRC.PartitionBy)
 		}
 
+		// Existing tables work as-is. Otherwise the table may be created with
+		// this expression, so it must be one.
+		var unchanged = last != nil && newExpr == lastExpr
+		if newExpr != "" && !(unchanged && rb.Backfill == last.Backfill) {
+			if err := validatePartitionBy(newExpr); err != nil {
+				return nil, cerrors.NewUserError(err, fmt.Sprintf("'partition_by' expression %q is not valid for table %q: it %s", rc.PartitionBy, rc.Table, err))
+			}
+		}
+
 		// ClickHouse only accepts PARTITION BY at CREATE TABLE time, so a
 		// changed expression requires re-creating the table. Absent a
 		// backfill counter bump, block the publication with INCOMPATIBLE
@@ -104,7 +113,7 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		// evolution removes a projection it references -- the existing table
 		// keeps its column and keeps working, and the failure would block
 		// every publication touching this materialization.
-		if newExpr == "" || (last != nil && newExpr == lastExpr) {
+		if newExpr == "" || unchanged {
 			continue
 		}
 		if err := dryRunPartitionBy(ctx, db, dialect, tpls, cfg, req.Name.String(), i, rb, resp.Bindings[i], rc); err != nil {

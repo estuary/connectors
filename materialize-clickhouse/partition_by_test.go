@@ -43,6 +43,66 @@ func TestPartitionExpr(t *testing.T) {
 	}
 }
 
+func TestValidatePartitionByGrammar(t *testing.T) {
+	for _, expr := range []string{
+		"toYYYYMM(flow_published_at)",
+		"toYYYYMMDD(flow_published_at)",
+		"value, toYYYYMM(flow_published_at)",
+		"(id, toStartOfMonth(flow_published_at))",
+		"toYYYYMM(\n\tflow_published_at\n)",
+		"toDate(flow_published_at, 'UTC')",
+		"tuple()",
+		"`_meta/op`, \"id\"",
+		"`select`, selected",
+		"`a``)b`",
+		"length(id) % 4 - 1",
+		"length(id) > 3 ? 1 : 0",
+		"id IN ('a', 'b')",
+		"CAST(length(id) AS UInt8)",
+		"cast (id AS Nullable(String))",
+		"length(id)::UInt8",
+		"arrayExists(x -> x = 'a', [id])",
+		"id = 'a;b' || '--' || '/*'",
+		"id = 'it''s)'",
+		`id = 'it\'s)'`,
+		`id = 'a\\'`,
+	} {
+		require.NoError(t, validatePartitionBy(expr), expr)
+	}
+
+	for _, expr := range []string{
+		"toYYYYMM(flow_published_at);",
+		"toYYYYMM(flow_published_at); SELECT 1",
+		"toYYYYMM(flow_published_at))",
+		"toYYYYMM(flow_published_at)) ORDER BY (id",
+		"(toYYYYMM(flow_published_at)",
+		")(",
+		"toYYYYMM(flow_published_at) -- note",
+		"toYYYYMM(flow_published_at) /* note */",
+		"toYYYYMM(flow_published_at) # note",
+		"id IN (SELECT 1)",
+		"id = (select 1)",
+		"EXISTS (SeLeCt 1)",
+		"toYYYYMM(flow_published_at) AS m",
+		"(toYYYYMM(flow_published_at) as m), id",
+		"tuple(id AS k)",
+		"CAST((id AS k) AS String)",
+		"id = 'a",
+		`id = 'a\'`,
+		"id = 'a''",
+		"`id",
+		"\"id",
+		"id = $$)$$",
+		"id = ‘a’",
+		"{p:String}",
+		`a\b`,
+		"@@x",
+		"id\x00",
+	} {
+		require.Error(t, validatePartitionBy(expr), expr)
+	}
+}
+
 func TestMustRecreateResourcePartitionBy(t *testing.T) {
 	var c = &client{}
 	var binding = func(raw string) *pf.MaterializationSpec_Binding {
@@ -119,6 +179,15 @@ func TestSQLGenerationPartitionBy(t *testing.T) {
 	snap.WriteString("--- End composite expression createTargetTable ---\n\n")
 
 	cupaloy.SnapshotT(t, snap.String())
+}
+
+// A partition_by that is more than an expression never renders into DDL.
+func TestSQLGenerationPartitionByRejected(t *testing.T) {
+	var table = buildTestTable(t, testDialect, "target_table")
+	table.ResourceConfigJson = json.RawMessage(`{"table":"target_table","partition_by":"toYYYYMM(flow_published_at)) ORDER BY (flow_published_at"}`)
+	rendered, err := sql.RenderTableTemplate(table, renderTemplates(testDialect, true).createTargetTable)
+	require.ErrorContains(t, err, "partition_by")
+	require.Empty(t, rendered)
 }
 
 // loadBaseSpec returns the shared boilerplate test spec, whose single binding
@@ -206,6 +275,28 @@ func TestValidatePartitionBy(t *testing.T) {
 		_, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(no_such_column)", 0, nil))
 		require.ErrorContains(t, err, "no_such_column")
 		require.Zero(t, countDryRunTables(t, ctx, cfg), "dry-run scratch tables must be dropped even on failure")
+	})
+
+	t.Run("rejects anything but an expression", func(t *testing.T) {
+		for _, expr := range []string{"toYYYYMM(flow_published_at)) ORDER BY (flow_published_at", "key IN (SELECT 1)"} {
+			_, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, expr, 0, nil))
+			require.ErrorContains(t, err, "'partition_by' expression", expr)
+			require.ErrorContains(t, err, "is not valid for table", expr)
+
+			// A table that already has the expression works as-is.
+			var lastSpec = specWithPartitionBy(t, cfg, tableName, expr, 0)
+			_, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, expr, 0, lastSpec))
+			require.NoError(t, err, expr)
+
+			// A backfill of an unchanged expression re-creates the table.
+			_, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, expr, 1, lastSpec))
+			require.ErrorContains(t, err, "is not valid for table", expr)
+
+			// A backfill can move the table off the expression.
+			_, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "toYYYYMM(flow_published_at)", 1, lastSpec))
+			require.NoError(t, err, expr)
+		}
+		require.Zero(t, countDryRunTables(t, ctx, cfg))
 	})
 
 	t.Run("change without backfill is INCOMPATIBLE", func(t *testing.T) {
