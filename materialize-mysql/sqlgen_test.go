@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"strings"
 	"testing"
 	"text/template"
 	"time"
@@ -211,4 +212,45 @@ func TestBinaryPKColumn(t *testing.T) {
 		Type: "VARBINARY",
 	}
 	require.True(t, mapped.Compatible(existing))
+}
+
+// literalRoundTripValues must come back unchanged when rendered as a literal.
+var literalRoundTripValues = []string{
+	`plain`,
+	`it's`,
+	`back\slash`,
+	`trailing\`,
+	`a\'b`,
+	`a\\'b`,
+	`a\nb`,
+	`100\%`,
+}
+
+func TestLiteral(t *testing.T) {
+	for in, want := range map[string]string{
+		`plain`:      `'plain'`,
+		`it's`:       `'it''s'`,
+		`back\slash`: `'back\\slash'`,
+		`trailing\`:  `'trailing\\'`,
+		`a\'b`:       `'a\\''b'`,
+	} {
+		require.Equal(t, want, testDialect.Literal(in))
+	}
+}
+
+func TestCommentLiterals(t *testing.T) {
+	var table = sql.Table{
+		TableShape: sql.TableShape{Comment: `table\`},
+		Identifier: "t",
+		Keys: []sql.Column{{
+			Projection: sql.Projection{Comment: `key\'`},
+			MappedType: sql.MappedType{DDL: "BIGINT NOT NULL"},
+			Identifier: "k",
+		}},
+	}
+
+	var out strings.Builder
+	require.NoError(t, testTemplates.createTargetTable.Execute(&out, &table))
+	require.Contains(t, out.String(), `COMMENT 'key\\'''`)
+	require.Contains(t, out.String(), `COMMENT='table\\'`)
 }
