@@ -1,5 +1,11 @@
 # materialize-sqlserver
 
+## 2026-11-23
+
+### Changed
+- Materializing a field whose name contains `]` now fails with an error that
+  names the field.
+
 ## 2026-11-13
 
 ### Fixed

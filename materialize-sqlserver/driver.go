@@ -567,6 +567,18 @@ func (t *transactor) tempTables(stmt func(*binding) string) []string {
 	return out
 }
 
+// bulkCopyIn returns the statement that begins a bulk insert of columns into
+// table. The driver brackets each column name without escaping it, so a name
+// containing "]" is refused.
+func bulkCopyIn(table string, columns []string) (string, error) {
+	for _, col := range columns {
+		if strings.Contains(col, "]") {
+			return "", fmt.Errorf("field %q cannot be materialized because its name contains ']': remove it from the field selection, or project its location under another name", col)
+		}
+	}
+	return mssqldb.CopyIn(table, mssqldb.BulkOptions{}, columns...), nil
+}
+
 // addTruncation prepares b to delete the rows whose col is earlier than a
 // boundary, compared in the type that col has in the table. It returns why b
 // cannot be truncated, as a clause suited for an operator.
@@ -659,8 +671,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				colNames = append(colNames, col.Field)
 			}
 
-			var err error
-			batch, err = txn.PrepareContext(ctx, mssqldb.CopyIn(b.tempLoadTableName, mssqldb.BulkOptions{}, colNames...))
+			copyIn, err := bulkCopyIn(b.tempLoadTableName, colNames)
+			if err != nil {
+				return err
+			}
+			batch, err = txn.PrepareContext(ctx, copyIn)
 			if err != nil {
 				return fmt.Errorf("load: preparing bulk insert statement on %q: %w", b.tempLoadTableName, err)
 			}
@@ -803,8 +818,11 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 			colNames = append(colNames, "_flow_delete")
 
-			var err error
-			batches[it.Binding], err = txn.PrepareContext(ctx, mssqldb.CopyIn(b.tempStoreTableName, mssqldb.BulkOptions{}, colNames...))
+			copyIn, err := bulkCopyIn(b.tempStoreTableName, colNames)
+			if err != nil {
+				return nil, err
+			}
+			batches[it.Binding], err = txn.PrepareContext(ctx, copyIn)
 			if err != nil {
 				return nil, fmt.Errorf("load: preparing bulk insert statement on %q: %w", b.tempStoreTableName, err)
 			}
