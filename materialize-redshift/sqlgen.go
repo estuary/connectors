@@ -438,10 +438,10 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 
 {{ define "copyFromS3" }}
 COPY {{ $.Target }}
-FROM '{{ $.ManifestURL }}'
+FROM {{ Literal $.ManifestURL }}
 MANIFEST
-CREDENTIALS 'aws_access_key_id={{ $.Config.AWSAccessKeyID }};aws_secret_access_key={{ $.Config.AWSSecretAccessKey }}'
-REGION '{{ $.Config.Region }}'
+CREDENTIALS {{ Literal (printf "aws_access_key_id=%s;aws_secret_access_key=%s" $.Config.AWSAccessKeyID $.Config.AWSSecretAccessKey) }}
+REGION {{ Literal $.Config.Region }}
 {{ if $.CaseSensitiveIdentifierEnabled -}}
 JSON 'auto'
 {{- else -}}
