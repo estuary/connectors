@@ -15,7 +15,7 @@ type SSHForwardingConfig struct {
 	SSHEndpoint             string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint" jsonschema_extras:"pattern=^ssh://.+@.+$"`
 	PrivateKey              string `json:"privateKey" jsonschema:"title=SSH Private Key" jsonschema_extras:"secret=true,multiline=true"`
 	KnownHosts              string `json:"knownHosts,omitempty" jsonschema:"title=SSH Known Hosts" jsonschema_extras:"multiline=true"`
-	SkipHostKeyVerification bool   `json:"skipHostKeyVerification,omitempty" jsonschema:"title=Skip Host Key Verification" jsonschema_extras:"nonsensitive=true,x-hidden-field=true"`
+	SkipHostKeyVerification bool   `json:"skipHostKeyVerification,omitempty" jsonschema:"title=Skip Host Key Verification" jsonschema_extras:"nonsensitive=true"`
 }
 
 func (SSHForwardingConfig) GetFieldDocString(fieldName string) string {
@@ -27,13 +27,13 @@ func (SSHForwardingConfig) GetFieldDocString(fieldName string) string {
 	case "KnownHosts":
 		return "Host keys of the SSH server in OpenSSH known_hosts format, one per line: the output of `ssh-keyscan -p 2222 bastion.example.com`, for example `[bastion.example.com]:2222 ssh-ed25519 AAAA...`."
 	case "SkipHostKeyVerification":
-		return "Connect without verifying the SSH server's host key."
+		return "Connect without verifying the SSH server's host key. This leaves the task open to man-in-the-middle attacks."
 	default:
 		return ""
 	}
 }
 
-var errMissingKnownHosts = errors.New("missing SSH Known Hosts: paste the host keys of the SSH server, as printed by `ssh-keyscan -p <port> <host>`")
+var errMissingKnownHosts = errors.New("missing SSH Known Hosts: paste the host keys of the SSH server, as printed by `ssh-keyscan -p <port> <host>`, or set Skip Host Key Verification to connect without verifying the server")
 
 func (cfg *SSHForwardingConfig) validate() error {
 	if err := validateKnownHosts(cfg.KnownHosts); err != nil {

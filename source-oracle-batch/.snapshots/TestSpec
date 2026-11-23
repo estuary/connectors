@@ -103,9 +103,8 @@
               "skipHostKeyVerification": {
                 "type": "boolean",
                 "title": "Skip Host Key Verification",
-                "description": "Connect without verifying the SSH server's host key.",
-                "nonsensitive": true,
-                "x-hidden-field": true
+                "description": "Connect without verifying the SSH server's host key. This leaves the task open to man-in-the-middle attacks.",
+                "nonsensitive": true
               }
             },
             "additionalProperties": false,

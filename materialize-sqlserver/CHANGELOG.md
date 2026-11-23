@@ -4,9 +4,10 @@
 
 ### Added
 - New `knownHosts` network tunnel option makes the connector verify the SSH server's host key.
+- New `skipHostKeyVerification` network tunnel option connects without verifying the SSH server's host key.
 
 ### Changed
-- Network tunnels now require `knownHosts`.
+- Network tunnels now require `knownHosts` unless `skipHostKeyVerification` is set.
 
 ### Fixed
 - Tables with an apostrophe in their name or schema can now be created.

@@ -175,8 +175,7 @@ func configSchema() json.RawMessage {
 					"type": "boolean",
 					"title": "Skip Host Key Verification",
 					"description": ` + string(skipHostKeyVerificationDescription) + `,
-					"nonsensitive": true,
-					"x-hidden-field": true
+					"nonsensitive": true
 				  }
 				},
 				"additionalProperties": false,
