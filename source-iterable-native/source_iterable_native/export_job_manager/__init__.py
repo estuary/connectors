@@ -2,6 +2,7 @@ import asyncio
 import time
 from datetime import datetime
 from typing import AsyncGenerator
+from urllib.parse import urlsplit
 
 from estuary_cdk.capture.common import Logger
 from estuary_cdk.http import HTTPError, HTTPSession
@@ -82,9 +83,21 @@ class ExportJobManager:
         url = f"{self.base_export_url}/{job_id}/files"
         params = {"startAfter": start_after} if start_after else None
 
-        return GetExportFilesResponse.model_validate_json(
+        response = GetExportFilesResponse.model_validate_json(
             await self.http.request(self.log, url, params=params)
         )
+
+        # Export file URLs come from Iterable's response instead of the
+        # connector's config, so we refuse to request any that aren't HTTPS.
+        for file in response.files:
+            parts = urlsplit(file.url)
+            if parts.scheme != "https":
+                raise RuntimeError(
+                    f"Export job {job_id} returned a non-HTTPS URL for file {file.file} "
+                    f"(scheme {parts.scheme!r}, host {parts.hostname!r})."
+                )
+
+        return response
 
 
     async def _fetch_results(
