@@ -10,8 +10,7 @@ severity:
   - CRITICAL
 vulnerability:
   # A finding with no fixed release would block every connector it reaches
-  # with nothing its author can do. Those go through .trivyignore.yaml review
-  # instead.
+  # with nothing its author can do, so for now those aren't reported.
   ignore-unfixed: true
 exit-code: 1
 ignorefile: .trivyignore.yaml
