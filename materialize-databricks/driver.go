@@ -364,18 +364,8 @@ func newTransactor(
 
 	// Create a volume for storing staged files for all schemas in the scope of the materialization.
 	for sch := range schemas {
-		log.WithFields(log.Fields{
-			"schema":     sch,
-			"volumeName": volumeName,
-		}).Debug("creating volume for schema if it doesn't already exist")
-		if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS `%s`.`%s`;", sch, volumeName)); err != nil {
-			// Concurrent shards of a scaled-out task can race Unity Catalog's
-			// IF NOT EXISTS check.
-			if strings.Contains(strings.ToLower(err.Error()), "already exists") {
-				log.WithFields(log.Fields{"schema": sch}).Debug("volume was concurrently created")
-			} else {
-				return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS `%s`.`%s`;): %w", sch, volumeName, err)
-			}
+		if err := createStagingVolume(ctx, db, ep.Dialect, sch); err != nil {
+			return nil, err
 		}
 	}
 
@@ -387,6 +377,27 @@ func newTransactor(
 	d.profiler = newQueryProfiler(wsClient.QueryHistory, wsClient.Warehouses, cfg.warehouseID(), d.bindings, d.openDB)
 
 	return d, nil
+}
+
+// createStagingVolume creates the volume of a schema that holds staged files,
+// if it doesn't exist.
+func createStagingVolume(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, schema string) error {
+	log.WithFields(log.Fields{
+		"schema":     schema,
+		"volumeName": volumeName,
+	}).Debug("creating volume for schema if it doesn't already exist")
+
+	var stmt = fmt.Sprintf("CREATE VOLUME IF NOT EXISTS %s;", dialect.Identifier(schema, volumeName))
+	if _, err := db.ExecContext(ctx, stmt); err != nil {
+		// Concurrent shards of a scaled-out task can race Unity Catalog's
+		// IF NOT EXISTS check.
+		if strings.Contains(strings.ToLower(err.Error()), "already exists") {
+			log.WithFields(log.Fields{"schema": schema}).Debug("volume was concurrently created")
+			return nil
+		}
+		return fmt.Errorf("Exec(%s): %w", stmt, err)
+	}
+	return nil
 }
 
 func (t *transactor) openDB() (*stdsql.DB, error) {
@@ -1111,7 +1122,7 @@ func (d *transactor) copyIntoStagingTable(ctx context.Context, db *stdsql.DB, id
 }
 
 func stagingIdentifier(b *binding, name string) string {
-	return "delta.`" + strings.ReplaceAll(filepath.Join(b.rootStagingPath, name), "`", "``") + "`"
+	return "delta." + quoteIdentifier(filepath.Join(b.rootStagingPath, name))
 }
 
 func (d *transactor) startCommitState() (*pf.ConnectorState, error) {

@@ -250,7 +250,7 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 
 		if err := putRetry.Do(ctx, "staging file", func(ctx context.Context) error {
 			ctx = driverctx.NewContextWithStagingInfo(ctx, []string{f.dir})
-			_, err := db.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s' OVERWRITE`, file, filepath.Join(f.remoteDir(), fName)))
+			_, err := db.ExecContext(ctx, fmt.Sprintf("PUT %s INTO %s OVERWRITE", quoteLiteral(file), quoteLiteral(filepath.Join(f.remoteDir(), fName))))
 			return err
 		}); err != nil {
 			return fmt.Errorf("put file: %w", err)
