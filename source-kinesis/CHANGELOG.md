@@ -1,4 +1,6 @@
-# source-kinesis
+# Changelog
 
-## v1, 2022-07-27
-- Beginning of changelog.
+## 2026-11-23
+
+### Fixed
+- The connector reports an error instead of crashing when a record's data is `null`.

@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	glueTypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
+	"github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -258,6 +259,16 @@ func TestCaptureParsing(t *testing.T) {
 
 	advanceCapture(t, &capture)
 	cupaloy.SnapshotT(t, capture.Summary())
+}
+
+func TestProcessRecordsNullData(t *testing.T) {
+	records := []types.Record{{
+		Data:           []byte("null"),
+		SequenceNumber: aws.String("1"),
+		PartitionKey:   aws.String("key"),
+	}}
+	err := new(capture).processRecords(context.Background(), records, kinesisStream{}, "", 0, shardToRead{})
+	require.ErrorContains(t, err, "record data is null")
 }
 
 // testGlueConfig returns a config for Glue tests.
