@@ -1,0 +1,43 @@
+collections:
+  test/readings:
+    schema:
+      type: object
+      required: [series, time]
+      properties:
+        series: {type: string}
+        time: {type: string, format: date-time}
+    key: [/series, /time]
+  test/status:
+    schema:
+      type: object
+      required: [series, time]
+      properties:
+        series: {type: string}
+        time: {type: string, format: date-time}
+    key: [/series, /time]
+
+captures:
+  test/source-influxdb:
+    endpoint:
+      local:
+        command: [python, -m, source_influxdb]
+        config:
+          url: http://localhost:8087
+          credentials:
+            credentials_title: API Token
+            access_token: made-up-token
+          org: estuary
+          start_date: "2020-01-01T00:00:00Z"
+    bindings:
+      - resource:
+          name: sensors/readings
+          bucket: sensors
+          measurement: readings
+          interval: PT5M
+        target: test/readings
+      - resource:
+          name: sensors/status
+          bucket: sensors
+          measurement: status
+          interval: PT5M
+        target: test/status

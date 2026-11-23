@@ -1,0 +1,11 @@
+#group,false,false,true,true,false,false,true,true,true
+#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,long,string,string,string
+#default,_result,,,,,,,,
+,result,table,_start,_stop,_time,_value,_field,_measurement,host
+,,0,2020-01-01T00:00:00Z,2026-11-10T14:59:00Z,2026-11-10T12:00:00Z,7,count,status,a
+
+#group,false,false,true,true,false,false,true,true,true
+#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,string,string
+#default,_result,,,,,,,,
+,result,table,_start,_stop,_time,_value,_field,_measurement,host
+,,1,2020-01-01T00:00:00Z,2026-11-10T14:59:00Z,2026-11-10T12:00:00Z,up,state,status,a
