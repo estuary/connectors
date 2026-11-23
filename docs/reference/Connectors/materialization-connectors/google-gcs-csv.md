@@ -42,6 +42,7 @@ Estuary collections to your bucket.
 | `/prefix`                 | Prefix                | Optional prefix that will be used to store objects.                                                                                           | string  |                  |
 | `/fileSizeLimit`          | File Size Limit       | Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank.                                           | integer |                  |
 | `/csvConfig/skipHeaders`  | Skip Headers          | Do not write headers to files.                                                                                                                | integer |                  |
+| `/csvConfig/escapeFormulas` | Escape Spreadsheet Formulas | Prefix string values and headers that a spreadsheet application would evaluate as a formula with a single quote. See [Spreadsheet Formulas](#spreadsheet-formulas). | boolean | false            |
 
 #### Bindings
 
@@ -83,6 +84,22 @@ Here the values for **bucket** and **prefix** are from your endpoint configurati
 specific to the binding configuration. **v0000000000** represents the current **backfill counter**
 for binding and will be increased if the binding is re-backfilled, along with the file names
 starting back over from 0.
+
+## Spreadsheet Formulas
+
+String values and field names are written to the CSV files exactly as they appear in the collection.
+Spreadsheet applications such as Excel, Google Sheets and LibreOffice Calc evaluate a cell that
+starts with `=`, `+`, `-` or `@` as a formula, so a file that holds data from a source you don't
+control should not be opened in one as-is.
+
+If the files are meant to be opened in a spreadsheet application, enable **Escape Spreadsheet
+Formulas** (`/csvConfig/escapeFormulas`). String values and headers that start with `=`, `+`, `-`,
+`@`, a tab or a line break are then written with a leading single quote (`'`), which makes the
+application read them as text. Numbers, including strings that hold a signed number such as `-12.5`,
+are not changed.
+
+The option changes the values in the file. Leave it disabled when the files are loaded by a
+database, a query engine or other software.
 
 ## Eventual Consistency
 
