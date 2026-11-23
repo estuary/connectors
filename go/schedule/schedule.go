@@ -26,6 +26,9 @@ func Validate(desc string) error {
 // Parse turns a textual schedule description into an object with the Schedule interface.
 func Parse(desc string) (Schedule, error) {
 	if pollInterval, err := time.ParseDuration(desc); err == nil {
+		if pollInterval < 0 {
+			return nil, fmt.Errorf("interval can't be negative")
+		}
 		return NewPeriodicSchedule(pollInterval), nil
 	}
 	if strings.HasPrefix(desc, "daily at ") {
