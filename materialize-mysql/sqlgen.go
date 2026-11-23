@@ -200,7 +200,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 				},
 				sql.QuoteTransform("`", "``"),
 			)))),
-		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
+		Literaler: sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			return "?"
 		}),

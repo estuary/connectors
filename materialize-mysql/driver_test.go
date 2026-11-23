@@ -185,6 +185,27 @@ func TestIntegration(t *testing.T) {
 		require.Equal(t, "extra", tableComment, "expected comment set by AdditionalSql")
 	})
 
+	t.Run("literals", func(t *testing.T) {
+		for _, variant := range []string{"mysql", "mariadb", "singlestore"} {
+			t.Run(variant, func(t *testing.T) {
+				raw, err := boilerplate.ReadConfigFile("testdata/config." + variant + ".yaml")
+				require.NoError(t, err)
+				var cfg config
+				require.NoError(t, json.Unmarshal(raw, &cfg))
+
+				db, err := stdsql.Open("mysql", cfg.ToURI())
+				require.NoError(t, err)
+				defer db.Close()
+
+				for _, want := range literalRoundTripValues {
+					var got string
+					require.NoError(t, db.QueryRow("SELECT "+testDialect.Literal(want)).Scan(&got), want)
+					require.Equal(t, want, got)
+				}
+			})
+		}
+	})
+
 	t.Run("apply changes", func(t *testing.T) {
 		boilerplate.SkipRuntimeV1(t)
 		boilerplate.RunTestAllTasks(t, "testdata/apply-changes.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
