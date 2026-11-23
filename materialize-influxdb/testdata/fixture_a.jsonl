@@ -1,0 +1,10 @@
+["tests/readings", {"sensor": "s1", "ts": "2026-01-01T00:00:00Z", "temp": 20.5, "ok": true, "count": 1, "note": "say \"hi\", ok", "meta": {"fw": "1.2"}}]
+["tests/readings", {"sensor": "s1", "ts": "2026-01-01T00:01:00Z", "temp": 21, "note": "line 1\nline 2"}]
+["tests/readings", {"sensor": "lab 1", "ts": "2026-01-01T00:00:00Z", "temp": 19.5}]
+["tests/readings", {"sensor": "lab 1", "ts": "2026-01-01T00:00:00.000000001Z", "temp": 19.6}]
+["tests/orders", {"id": 1, "status": "new", "amount": 10.5}]
+["tests/orders", {"id": 2, "status": "paid", "amount": 20}]
+["tests/orders", {"id": 3, "status": "new", "amount": 7.25}]
+{"commit": true}
+["tests/orders", {"id": 3, "status": "paid", "amount": 7.25}]
+{"commit": true}

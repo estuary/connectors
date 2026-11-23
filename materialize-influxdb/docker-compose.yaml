@@ -1,0 +1,24 @@
+services:
+  db:
+    image: influxdb:2.7
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: test
+      DOCKER_INFLUXDB_INIT_PASSWORD: testtest123
+      DOCKER_INFLUXDB_INIT_ORG: estuary
+      DOCKER_INFLUXDB_INIT_BUCKET: sensors
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: made-up-influxdb-test-token
+    ports:
+      - "127.0.0.1:8088:8086"
+    healthcheck:
+      test: ["CMD", "influx", "bucket", "list", "--host", "http://localhost:8086", "--org", "estuary", "--token", "made-up-influxdb-test-token", "--name", "sensors"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+    networks:
+      - flow-test
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true

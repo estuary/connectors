@@ -47,6 +47,7 @@
 - name: materialize-google-sheets
 - name: materialize-hubspot
 - name: materialize-iceberg
+- name: materialize-influxdb
 - name: materialize-mongodb
 - name: materialize-motherduck
 - name: materialize-mysql
