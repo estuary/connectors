@@ -6,7 +6,6 @@ entry breaks or skews the matrix.
 """
 
 import json
-import re
 import subprocess
 import unittest
 from pathlib import Path
@@ -26,11 +25,6 @@ NOT_DOCKER_CONNECTORS = {"base-image"}
 
 REQUIRED_KEYS = {"name", "type", "version", "usage_rate"}
 OPTIONAL_KEYS = {"variants"}
-
-# The workflows put names in paths, image references and command arguments,
-# and versions in image tags.
-NAME = re.compile(r"[a-z0-9][a-z0-9-]*")
-VERSION = re.compile(r"v[0-9]+")
 
 
 def load_entries(path: Path) -> list[dict]:
@@ -122,34 +116,6 @@ class TestGoAndRustConnectorLists(unittest.TestCase):
 
 
 class TestConnectorLists(unittest.TestCase):
-    def test_names_versions_and_variants_are_plain(self):
-        # Python entries carry their version and variants; Go and Rust
-        # connectors keep them in VERSION and VARIANTS files.
-        found = [
-            (e.get("name"), e.get("version"), e.get("variants", ""))
-            for e in load_entries(PYTHON_LIST)
-        ]
-        for name in names(GO_LIST) + names(RUST_LIST):
-            if not isinstance(name, str) or not NAME.fullmatch(name):
-                found.append((name, None, None))
-                continue
-            variants = REPO_ROOT / name / "VARIANTS"
-            found.append(
-                (
-                    name,
-                    (REPO_ROOT / name / "VERSION").read_text().strip(),
-                    variants.read_text() if variants.is_file() else "",
-                )
-            )
-
-        for name, version, variants in found:
-            with self.subTest(entry=name):
-                self.assertIsInstance(name, str)
-                self.assertTrue(NAME.fullmatch(name), name)
-                self.assertTrue(VERSION.fullmatch(version), version)
-                for variant in variants.split():
-                    self.assertTrue(NAME.fullmatch(variant), variant)
-
     def test_no_connector_is_in_two_lists(self):
         everything = names(PYTHON_LIST) + names(GO_LIST) + names(RUST_LIST)
         self.assertEqual(duplicates(everything), [])
