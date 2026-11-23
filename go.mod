@@ -62,7 +62,7 @@ require (
 	github.com/klauspost/compress v1.19.0
 	github.com/klauspost/pgzip v1.2.6
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
-	github.com/microsoft/go-mssqldb v1.8.2
+	github.com/microsoft/go-mssqldb v1.9.8
 	github.com/microsoft/kiota-authentication-azure-go v1.3.1
 	github.com/microsoftgraph/msgraph-sdk-go v1.87.0
 	github.com/microsoftgraph/msgraph-sdk-go-core v1.4.0
