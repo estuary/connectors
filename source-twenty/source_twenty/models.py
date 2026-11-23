@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, ClassVar, Literal, Self
 
@@ -12,7 +13,7 @@ from estuary_cdk.capture.common import (
     ResourceConfigWithSchedule as ResourceConfig,
 )
 from estuary_cdk.flow import AccessToken
-from pydantic import AwareDatetime, BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, field_validator, model_validator
 
 
 class ApiKey(AccessToken):
@@ -95,6 +96,16 @@ class TwentyRecord(BaseDocument, extra="allow"):
         if self.deletedAt is not None:
             self.meta_ = TwentyRecord.Meta(op="d")
         return self
+
+
+class RecordCursor(BaseModel):
+    updatedAt: AwareDatetime
+    id: str
+
+    @field_validator("updatedAt", mode="before")
+    @classmethod
+    def parse_updated_at(cls, value: object) -> object:
+        return datetime.fromisoformat(value) if isinstance(value, str) else value
 
 
 class PageInfo(BaseModel):

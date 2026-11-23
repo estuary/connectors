@@ -198,7 +198,7 @@ def twenty_error(status, code, url=f"{BASE_URL}/rest/opportunities"):
 
 @pytest.fixture(autouse=True)
 def frozen_clock(monkeypatch):
-    monkeypatch.setattr(api, "now", lambda: NOW)
+    monkeypatch.setattr(api, "utc_now", lambda: NOW)
 
 
 def dns_error():
@@ -884,7 +884,7 @@ def test_resource_wiring_uses_the_same_millisecond_cutoff(monkeypatch):
     resource.open(None, 0, resource.initial_state, None, [])
     state = resource.initial_state
     backfill = collect(fetchers["fetch_page"](LOG, None, state.backfill.cutoff))
-    monkeypatch.setattr(api, "now", lambda: NOW + timedelta(minutes=5))
+    monkeypatch.setattr(api, "utc_now", lambda: NOW + timedelta(minutes=5))
     incremental = collect(fetchers["fetch_changes"](LOG, state.inc.cursor))
 
     assert [doc.id for doc in backfill] == [record(1)["id"]]

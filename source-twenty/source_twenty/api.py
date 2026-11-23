@@ -7,14 +7,20 @@ from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import Headers, HTTPSession, ShouldRetryProtocol
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from ijson import JSONError
-from pydantic import AwareDatetime, BaseModel, field_validator
 
-from .models import MetadataResponse, ObjectMetadata, RecordsRemainder, TwentyRecord
+from .models import (
+    MetadataResponse,
+    ObjectMetadata,
+    RecordCursor,
+    RecordsRemainder,
+    TwentyRecord,
+)
 
 # Twenty Cloud sits behind Cloudflare, which refuses some default user agents.
 HEADERS = {"User-Agent": "Estuary source-twenty"}
 
 # Twenty stamps updatedAt before commit; lag lets recent writes settle.
+# The lag bounds record eligibility independently of how often the binding polls.
 LAG = timedelta(minutes=1)
 # Record lists silently clamp larger limits to 200; metadata pages are requested at the same size.
 PAGE_SIZE = 200
@@ -22,20 +28,10 @@ PAGE_SIZE = 200
 VALIDATION_ATTEMPTS = 3
 
 
-class _RecordCursor(BaseModel):
-    updatedAt: AwareDatetime
-    id: str
-
-    @field_validator("updatedAt", mode="before")
-    @classmethod
-    def parse_updated_at(cls, value: object) -> object:
-        return datetime.fromisoformat(value) if isinstance(value, str) else value
-
-
 def _decode_cursor(cursor: str) -> tuple[datetime, str] | None:
     # Decoding is best-effort so a changed cursor format won't break captures.
     try:
-        decoded = _RecordCursor.model_validate_json(
+        decoded = RecordCursor.model_validate_json(
             b64decode(cursor + "=" * (-len(cursor) % 4), altchars=b"-_", validate=True)
         )
         return decoded.updatedAt, decoded.id
@@ -49,12 +45,12 @@ def validation_should_retry(
     return attempt < VALIDATION_ATTEMPTS
 
 
-def now() -> datetime:
+def utc_now() -> datetime:
     return datetime.now(tz=UTC)
 
 
 def capture_horizon() -> datetime:
-    timestamp = now()
+    timestamp = utc_now()
     return timestamp.replace(microsecond=timestamp.microsecond // 1000 * 1000) - LAG
 
 

@@ -41,6 +41,7 @@ from .models import (
 CAPTURED_SYSTEM_OBJECTS = {"noteTargets", "taskTargets"}
 # Discovery and validation read one row per object, a few objects at a time.
 PROBE_CONCURRENCY = 5
+PERMISSION_DENIED_CODE = "PERMISSION_DENIED"
 
 
 def _set_token_source(http: HTTPMixin, config: EndpointConfig) -> None:
@@ -161,7 +162,9 @@ def _permission_denied(err: HTTPError) -> bool:
     if err.code not in (400, 403) or err.body is None:
         return False
     try:
-        return ErrorResponse.model_validate_json(err.body).code == "PERMISSION_DENIED"
+        return (
+            ErrorResponse.model_validate_json(err.body).code == PERMISSION_DENIED_CODE
+        )
     except PydanticValidationError:
         return False
 
