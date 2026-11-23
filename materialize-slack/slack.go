@@ -38,7 +38,9 @@ func (api *SlackAPI) PostMessage(channel, text string, blocks []slack.Block, con
 	}
 
 	var options = []slack.MsgOption{
-		slack.MsgOptionText(text, false),
+		// Escaped so that Slack shows the text as written instead of reading
+		// mentions and links out of it.
+		slack.MsgOptionText(text, true),
 		slack.MsgOptionUsername(config.DisplayName),
 		slack.MsgOptionIconEmoji(config.LogoEmoji),
 		slack.MsgOptionIconURL(config.LogoPicture),
