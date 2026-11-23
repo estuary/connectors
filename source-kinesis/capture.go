@@ -531,6 +531,12 @@ func (c *capture) processRecords(
 				"unmarshalling record with sequenceNumber %q and partitionKey %q: %w",
 				*r.SequenceNumber, *r.PartitionKey, err,
 			)
+		} else if doc == nil {
+			// Unmarshal decodes a JSON null into a nil map without an error.
+			return fmt.Errorf(
+				"unmarshalling record with sequenceNumber %q and partitionKey %q: record data is null",
+				*r.SequenceNumber, *r.PartitionKey,
+			)
 		}
 
 		meta := map[string]any{
