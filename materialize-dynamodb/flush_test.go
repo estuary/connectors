@@ -44,7 +44,7 @@ func TestFlushFeatureFlags(t *testing.T) {
 			bindings: []binding{{
 				tableName:      "no_published_at",
 				path:           []string{"no_published_at"},
-				publishedAtErr: errors.New("the binding excludes the flow_published_at field, which must be included to enable deletion after a backfill"),
+				publishedAtErr: errors.New("the binding excludes the flow_published_at field, which must be included to enable truncation after a backfill"),
 			}},
 			truncateAfterBackfill: flags["truncate_after_backfill"],
 		}
@@ -98,7 +98,7 @@ func TestPublishedAtField(t *testing.T) {
 		{
 			name:    "field excluded",
 			values:  []boilerplate.MappedProjection[mappedType]{projection("other", "/other", nil)},
-			wantErr: "the binding excludes the flow_published_at field, which must be included to enable deletion after a backfill",
+			wantErr: "the binding excludes the flow_published_at field, which must be included to enable truncation after a backfill",
 		},
 		{
 			name:    "not a string",

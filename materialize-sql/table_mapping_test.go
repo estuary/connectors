@@ -34,7 +34,7 @@ func TestPublishedAtColumn(t *testing.T) {
 		{
 			name:    "field excluded",
 			values:  []Column{column("other", "/other", nil, false)},
-			wantErr: "the binding excludes the flow_published_at field, which must be included to enable deletion after a backfill",
+			wantErr: "the binding excludes the flow_published_at field, which must be included to enable truncation after a backfill",
 		},
 		{
 			name:    "user-defined DDL",

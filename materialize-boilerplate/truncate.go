@@ -9,7 +9,7 @@ import (
 
 // ErrPublishedAtExcluded is the reason given when no selected field projects
 // /_meta/uuid.
-var ErrPublishedAtExcluded = errors.New("the binding excludes the flow_published_at field, which must be included to enable deletion after a backfill")
+var ErrPublishedAtExcluded = errors.New("the binding excludes the flow_published_at field, which must be included to enable truncation after a backfill")
 
 // PublishedAtMismatch returns why a projection of /_meta/uuid cannot be
 // compared as each document's publication time, or nil if it can. The error
