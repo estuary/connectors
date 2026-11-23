@@ -12,13 +12,15 @@ import (
 // for example: fmt.Errorf("bucket_path %w", err).
 //
 // The bucket itself is configured separately, and the prefix is joined onto
-// object keys via path.Join. Two malformed inputs corrupt the resulting keys:
+// object keys via path.Join. Three malformed inputs corrupt the resulting keys:
 //
 //   - A leading "/" produces an object key that starts with "/".
 //   - A full URI such as "s3://bucket/prefix" is collapsed by path.Clean (which
 //     reduces "s3://" to "s3:/"), leaving a stray "s3:" path segment. Downstream
 //     readers such as Spark/Hadoop then fail to parse it, e.g.
 //     "java.net.URISyntaxException: Expected scheme-specific part at index 3: s3:".
+//   - A prefix that resolves above the root of the bucket, such as "../staging",
+//     names no location within the bucket.
 //
 // An empty prefix is always valid.
 func ValidateBucketPath(prefix string) error {
@@ -33,6 +35,9 @@ func ValidateBucketPath(prefix string) error {
 			"%q must be a bare key prefix within the bucket, not a full URI like \"s3://bucket/prefix\"; the bucket is configured separately",
 			prefix,
 		)
+	}
+	if cleaned := path.Clean(prefix); cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return fmt.Errorf("%q cannot use \"..\" to reach above the root of the bucket", prefix)
 	}
 	return nil
 }

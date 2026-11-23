@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-23
+
+### Changed
+- A Bucket Path that uses `..` to reach above the top of the bucket is now rejected.
 
 ## 2026-11-09
 
