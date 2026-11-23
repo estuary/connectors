@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timedelta, UTC
 from pydantic import AwareDatetime, BaseModel, Field, field_validator
 from typing import (
@@ -21,6 +22,11 @@ from estuary_cdk.flow import AccessToken
 from estuary_cdk.http import HTTPMixin
 
 ConnectorState = GenericConnectorState[ResourceState]
+
+# `data_center` starts the API's hostname. Allowing only hostname characters
+# keeps requests on qualtrics.com, because a character such as "/" or ":"
+# would end the hostname before ".qualtrics.com".
+HOST_LABEL_PATTERN = re.compile(r"[a-z0-9.-]+")
 
 
 class Auth(AccessToken):
@@ -76,7 +82,12 @@ class EndpointConfig(BaseModel):
     @field_validator("data_center")
     @classmethod
     def validate_data_center(cls, value: str) -> str:
-        return value.strip().lower()
+        value = value.strip().lower()
+        if not HOST_LABEL_PATTERN.fullmatch(value):
+            raise ValueError(
+                f"Data center ID may only contain letters, digits, dots, and hyphens, got {value!r}"
+            )
+        return value
 
 
 TApiResponse = TypeVar("TApiResponse", bound=BaseModel)
