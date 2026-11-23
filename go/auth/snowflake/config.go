@@ -70,8 +70,11 @@ func (c *CredentialConfig) ParsePrivateKey() (*rsa.PrivateKey, error) {
 			return nil, fmt.Errorf("invalid private key: must be PEM format")
 		} else if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
 			return nil, fmt.Errorf("parsing private key: %w", err)
+		} else if rsaKey, ok := key.(*rsa.PrivateKey); !ok {
+			// Snowflake key-pair authentication only accepts RSA keys.
+			return nil, fmt.Errorf("invalid private key: must be an RSA key, got %T", key)
 		} else {
-			return key.(*rsa.PrivateKey), nil
+			return rsaKey, nil
 		}
 	}
 
