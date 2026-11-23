@@ -58,7 +58,7 @@ type Config struct {
 	DiscoveryFilters discoveryFilters `json:"discoveryFilters,omitempty" jsonschema:"title=Discovery Filters,description=Options that restrict which tables are visible to discovery."`
 	Advanced         advancedConfig   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
-	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+	NetworkTunnel *networkTunnel.TunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
@@ -70,15 +70,6 @@ type advancedConfig struct {
 	RediscoveryInterval string `json:"rediscovery_interval,omitempty" jsonschema:"title=Rediscovery Interval,default=15m,description=How often the connector re-runs discovery while a capture is running to notice schema changes and newly added tables. Accepts duration strings like '15m' or '1h'. Defaults to 15m when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
 	MaxStartupDelay     string `json:"max_startup_delay,omitempty" jsonschema:"title=Maximum Startup Delay,description=How long the connector waits at most before connecting to the database and replicating changes on startup. The actual wait is random between zero and this duration. This is useful when many captures against the same server start at once because it spreads out the load on the database. Accepts duration strings like '30s' or '10m30s' or '2h'. No delay when unspecified." jsonschema_extras:"pattern=^([0-9]+(ms|s|m|h))+$,nonsensitive=true"`
 	FeatureFlags        string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
-}
-
-type tunnelConfig struct {
-	SSHForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
-}
-
-type sshForwarding struct {
-	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
-	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -260,24 +251,10 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage, _ c
 	}
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
-	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		host, port, err := net.SplitHostPort(config.Address)
-		if err != nil {
-			return nil, fmt.Errorf("splitting address to host and port: %w", err)
-		}
-
-		var sshConfig = &networkTunnel.SshConfig{
-			SshEndpoint: config.NetworkTunnel.SSHForwarding.SSHEndpoint,
-			PrivateKey:  []byte(config.NetworkTunnel.SSHForwarding.PrivateKey),
-			ForwardHost: host,
-			ForwardPort: port,
-			LocalPort:   defaultPort,
-		}
-		var tunnel = sshConfig.CreateTunnel()
-
+	if config.NetworkTunnel.InUse() {
 		// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
 		// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
-		if err := tunnel.Start(); err != nil {
+		if _, err := config.NetworkTunnel.Start(ctx, config.Address, defaultPort); err != nil {
 			return nil, err
 		}
 	}
@@ -327,7 +304,7 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 	}
 	// The tunnel itself is started in connectSQLServer. Here we just redirect the driver's TCP
 	// dial to its local listener while leaving the real hostname in the DSN.
-	if cfg := db.config.NetworkTunnel; cfg != nil && cfg.SSHForwarding != nil && cfg.SSHForwarding.SSHEndpoint != "" {
+	if db.config.NetworkTunnel.InUse() {
 		connector.Dialer = &tunnelDialer{localAddr: "localhost:" + defaultPort, address: db.config.Address}
 	}
 
