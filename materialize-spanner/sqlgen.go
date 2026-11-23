@@ -126,7 +126,9 @@ func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
 			}
 			return strings.Join(parts, ".")
 		}),
-		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
+		// Spanner string literals escape with a backslash, and do not accept a
+		// doubled quote.
+		Literaler: sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "\\'")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			// Cloud Spanner uses @p0, @p1, @p2, etc. for placeholders
 			return fmt.Sprintf("@p%d", index)
