@@ -63,6 +63,7 @@
         },
         "site": {
           "description": "The site prefix of your Chargebee account.",
+          "pattern": "^[A-Za-z0-9.-]+$",
           "title": "Site",
           "type": "string"
         },

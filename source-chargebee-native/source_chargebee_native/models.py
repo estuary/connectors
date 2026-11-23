@@ -16,6 +16,11 @@ from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
 
+# `site` starts the API's hostname. Allowing only hostname characters keeps
+# requests on chargebee.com, because a character such as "/" or ":" would
+# end the hostname before ".chargebee.com".
+HOST_LABEL_PATTERN = r"^[A-Za-z0-9.-]+$"
+
 
 def default_start_date():
     dt = datetime.now(tz=UTC) - timedelta(days=30)
@@ -48,6 +53,7 @@ class EndpointConfig(BaseModel):
     site: str = Field(
         description="The site prefix of your Chargebee account.",
         title="Site",
+        pattern=HOST_LABEL_PATTERN,
     )
     start_date: AwareDatetime = Field(
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data before this date will not be replicated. If left blank, defaults to 30 days before current time.",
