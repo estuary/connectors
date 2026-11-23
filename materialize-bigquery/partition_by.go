@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -26,6 +27,42 @@ func partitionExpr(rawResourceConfig json.RawMessage) (string, error) {
 		return "", fmt.Errorf("parsing resource config for partition_by: %w", err)
 	}
 	return strings.TrimSpace(rc.PartitionBy), nil
+}
+
+// partitionExprRe matches BigQuery's partition_expression forms, and nothing
+// else. Quoted columns are limited to the characters identifierSanitizer keeps.
+var partitionExprRe = func() *regexp.Regexp {
+	const (
+		col = "(?:[a-z_][a-z0-9_]*|`[-_0-9a-z]+`)"
+		num = `-?[0-9]+`
+	)
+	return regexp.MustCompile(`(?i)^(?:` + strings.Join([]string{
+		col,
+		`DATE\s*\(\s*` + col + `\s*\)`,
+		`(?:DATE|DATETIME|TIMESTAMP)_TRUNC\s*\(\s*` + col + `\s*,\s*(?:HOUR|DAY|MONTH|YEAR)\s*\)`,
+		`RANGE_BUCKET\s*\(\s*` + col + `\s*,\s*GENERATE_ARRAY\s*\(\s*` + num + `\s*,\s*` + num + `\s*(?:,\s*` + num + `\s*)?\)\s*\)`,
+	}, "|") + `)$`)
+}()
+
+// validatePartitionBy rejects a partition_by that is not a single BigQuery
+// partition expression, since it is rendered into the CREATE TABLE as-is.
+func validatePartitionBy(expr string) error {
+	if !partitionExprRe.MatchString(expr) {
+		return errors.New("must be a column, DATE(column), DATE_TRUNC, DATETIME_TRUNC or TIMESTAMP_TRUNC(column, HOUR | DAY | MONTH | YEAR), or RANGE_BUCKET(column, GENERATE_ARRAY(start, end[, interval])), where column may also be _PARTITIONDATE or _PARTITIONTIME")
+	}
+	return nil
+}
+
+// partitionClauseExpr is the partitionExpr to render into a CREATE TABLE.
+func partitionClauseExpr(rawResourceConfig json.RawMessage) (string, error) {
+	expr, err := partitionExpr(rawResourceConfig)
+	if err != nil || expr == "" {
+		return "", err
+	}
+	if err := validatePartitionBy(expr); err != nil {
+		return "", fmt.Errorf("'partition_by' expression %q is not valid: it %w", expr, err)
+	}
+	return expr, nil
 }
 
 // dryRunPartitionBy submits the binding's real CREATE TABLE DDL, with its

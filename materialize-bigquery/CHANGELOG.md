@@ -1,5 +1,12 @@
 # materialize-bigquery
 
+## 2026-11-23
+
+### Changed
+- Publishing a materialization now fails when a table's `partition_by` is
+  anything other than one of BigQuery's
+  [partition expressions](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#partition_expression).
+
 ## 2026-11-21
 
 ### Fixed

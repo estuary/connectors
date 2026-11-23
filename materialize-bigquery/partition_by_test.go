@@ -162,6 +162,20 @@ func TestValidatePartitionBy(t *testing.T) {
 			require.ErrorContains(t, err, "partition_by")
 		})
 
+		t.Run("rejects anything but a partition expression", func(t *testing.T) {
+			for _, expr := range []string{"DATE(flow_published_at); SELECT 1", "DATE(flow_published_at) OPTIONS(description='x')"} {
+				_, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, expr, 0, nil))
+				require.ErrorContains(t, err, "partition_by", expr)
+				require.ErrorContains(t, err, "must be a column", expr)
+
+				// Also with a backfill of an unchanged expression, which
+				// re-creates the table.
+				var lastSpec = specWithPartitionBy(t, cfg, tableName, expr, 0)
+				_, err = NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, expr, 1, lastSpec))
+				require.ErrorContains(t, err, "must be a column", expr)
+			}
+		})
+
 		t.Run("change without backfill is INCOMPATIBLE", func(t *testing.T) {
 			var lastSpec = specWithPartitionBy(t, cfg, tableName, "", 0)
 			resp, err := NewDriver().Validate(ctx, validatePartitionByReq(t, cfg, tableName, "DATE(flow_published_at)", 0, lastSpec))

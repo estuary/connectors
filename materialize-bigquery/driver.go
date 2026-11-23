@@ -99,9 +99,18 @@ func (d *driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 			continue
 		}
 
-		// Dry-run only an expression that is about to be applied to a fresh
-		// table. Existing tables will work as-is.
-		if newExpr == "" || (last != nil && newExpr == lastExpr) {
+		// Existing tables will work as-is. Otherwise the table may be created
+		// with this expression, so it must be one.
+		var unchanged = last != nil && newExpr == lastExpr
+		if newExpr == "" || (unchanged && rb.Backfill == last.Backfill) {
+			continue
+		}
+		if err := validatePartitionBy(newExpr); err != nil {
+			return nil, cerrors.NewUserError(err, fmt.Sprintf("'partition_by' expression %q is not valid for table %q: it %s", rc.PartitionBy, rc.Table, err))
+		}
+
+		// Dry-run only an expression that is new to the table.
+		if unchanged {
 			continue
 		}
 		if bq == nil {

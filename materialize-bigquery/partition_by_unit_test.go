@@ -38,6 +38,68 @@ func TestPartitionExpr(t *testing.T) {
 	}
 }
 
+func TestValidatePartitionByGrammar(t *testing.T) {
+	for _, expr := range []string{
+		"created_at",
+		"`created-at`",
+		"_PARTITIONDATE",
+		"DATE(_PARTITIONTIME)",
+		"DATE(created_at)",
+		"date ( `order` )",
+		"DATE_TRUNC(day, MONTH)",
+		"DATETIME_TRUNC(created_at, DAY)",
+		"TIMESTAMP_TRUNC(updated_at, MONTH)",
+		"timestamp_trunc(_PARTITIONTIME,\n\thour)",
+		"RANGE_BUCKET(id, GENERATE_ARRAY(0, 1000))",
+		"RANGE_BUCKET(id, GENERATE_ARRAY(-100, 1000, 10))",
+	} {
+		require.NoError(t, validatePartitionBy(expr), expr)
+	}
+
+	for _, expr := range []string{
+		"",
+		"DATE(created_at);",
+		"DATE(created_at); SELECT 1",
+		"DATE(created_at) -- note",
+		"DATE(created_at) # note",
+		"DATE(created_at) /* note */",
+		"DATE(created_at) OPTIONS(description='x')",
+		"DATE(created_at) CLUSTER BY id",
+		"DATE(created_at) AS SELECT 1",
+		"DATE(created_at), id",
+		"(DATE(created_at))",
+		"DATE(created_at))",
+		"DATE((SELECT 1))",
+		"DATE(created_at, 'UTC')",
+		"DATE(t.created_at)",
+		"DATE(`created at`)",
+		"DATE(`created_at\\``)",
+		"DATE(`created_at",
+		"TIMESTAMP_TRUNC(updated_at, WEEK)",
+		"TIMESTAMP_TRUNC(updated_at, `MONTH`)",
+		"CURRENT_DATE()",
+		"RANGE_BUCKET(id, GENERATE_ARRAY(0, 10 * 100, 10))",
+		"RANGE_BUCKET(id, GENERATE_ARRAY(0, (SELECT 1000), 10))",
+		"RANGE_BUCKET(id, [0, 10, 20])",
+		"DATE(created_at)\nDATE(created_at)",
+	} {
+		require.Error(t, validatePartitionBy(expr), expr)
+	}
+}
+
+// A partition_by that is not a partition expression never renders into DDL.
+func TestSQLGenerationPartitionByRejected(t *testing.T) {
+	_, tables := sql.RunSqlGenTests(t, testDialect, func(table string) []string {
+		return []string{"projectID", "dataset", table}
+	}, sql.TestTemplates{})
+
+	var table = tables[0]
+	table.ResourceConfigJson = json.RawMessage(`{"table":"target_table","partition_by":"DATE(flow_published_at); SELECT 1"}`)
+	rendered, err := sql.RenderTableTemplate(table, testTemplates.createTargetTable)
+	require.ErrorContains(t, err, "partition_by")
+	require.Empty(t, rendered)
+}
+
 func TestMustRecreateResourcePartitionBy(t *testing.T) {
 	var c = &client{}
 	var binding = func(raw string) *pf.MaterializationSpec_Binding {
