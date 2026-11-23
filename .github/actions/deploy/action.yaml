@@ -33,14 +33,22 @@ runs:
   using: "composite"
   steps:
 
-    # Each image is pushed with an SBOM and provenance attestation, which only
-    # survive when BuildKit pushes the image itself. The builder that
+    - uses: oras-project/setup-oras@v2
+      with:
+        version: 1.3.6
+
+    # Each image carries an SBOM and provenance attestation, which only
+    # survive when BuildKit exports the image itself. The builder that
     # setup-buildx-action selected runs BuildKit in a container, which can't
     # see the :local image in Docker's image store, and Docker's own builder,
     # which can, attaches no attestations on the classic image store. So :local
     # reaches the build as an OCI layout, named after the image it stands in
-    # for. `docker save` writes the layers uncompressed, and the push gzips them
-    # again, into the same layers `docker image push` produced.
+    # for. `docker save` writes the layers uncompressed, and the export gzips
+    # them again, into the same layers `docker image push` produced.
+    #
+    # BuildKit fails a whole push on the first request GHCR's rate limit
+    # rejects, so it writes the image to an OCI layout instead, and oras, which
+    # retries each rejected request, pushes it.
     - name: Push ${{ inputs.connector }} ${{ inputs.variants }} image(s) with commit SHA tag
       shell: bash
       env:
@@ -63,17 +71,20 @@ runs:
           if [ "$NAME_VARIANTS" = true ]; then
             NAME_ARG=(--build-arg "CONNECTOR_NAME=${VARIANT}")
           fi
+          OUT="${RUNNER_TEMP}/${VARIANT}-oci"
+          docker buildx build --build-context "${BASE_CONNECTOR}=oci-layout://${LAYOUT}:local" \
+                     --build-arg BASE_CONNECTOR=${BASE_CONNECTOR} \
+                     --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+                     --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
+                     "${NAME_ARG[@]}" \
+                     --sbom=true \
+                     --provenance=mode=min \
+                     --metadata-file "${RUNNER_TEMP}/${VARIANT}.metadata.json" \
+                     --output "type=oci,dest=${OUT},tar=false,name=ghcr.io/estuary/${VARIANT}:${TAG_SHA},compression=gzip,force-compression=true" \
+                     --file connector-variant.Dockerfile .;
+          DIGEST=$(jq -er '."containerimage.digest"' "${RUNNER_TEMP}/${VARIANT}.metadata.json")
           bash "${ACTION_PATH}/push-with-retry.sh" "ghcr.io/estuary/${VARIANT}:${TAG_SHA}" \
-            docker buildx build --build-context "${BASE_CONNECTOR}=oci-layout://${LAYOUT}:local" \
-                       --build-arg BASE_CONNECTOR=${BASE_CONNECTOR} \
-                       --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-                       --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
-                       "${NAME_ARG[@]}" \
-                       --sbom=true \
-                       --provenance=mode=min \
-                       --metadata-file "${RUNNER_TEMP}/${VARIANT}.metadata.json" \
-                       --output "type=image,name=ghcr.io/estuary/${VARIANT}:${TAG_SHA},push=true,compression=gzip,force-compression=true" \
-                       --file connector-variant.Dockerfile .;
+            oras cp --from-oci-layout "${OUT}@${DIGEST}" "ghcr.io/estuary/${VARIANT}:${TAG_SHA}";
         done
 
     # Re-running an old run would otherwise move `dev` and the version tag back
