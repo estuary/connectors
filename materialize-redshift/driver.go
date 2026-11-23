@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"path"
 	"slices"
@@ -68,35 +67,26 @@ var featureFlagDefaults = map[string]common.FlagDefault{
 	"truncate_after_backfill":          common.FlagEnabled,
 }
 
-type sshForwarding struct {
-	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
-	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
-}
-
-type tunnelConfig struct {
-	SshForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
-}
-
 type advancedConfig struct {
 	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
 	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 type config struct {
-	Address            string           `json:"address" jsonschema:"title=Address,description=Host and port of the database. Example: red-shift-cluster-name.account.us-east-2.redshift.amazonaws.com:5439" jsonschema_extras:"order=0"`
-	User               string           `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
-	Password           string           `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database           string           `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to. The materialization will attempt to connect to the default database for the provided user if omitted." jsonschema_extras:"order=3"`
-	Schema             string           `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 metadata table." jsonschema_extras:"order=4"`
-	Bucket             string           `json:"bucket" jsonschema:"title=S3 Staging Bucket,description=Name of the S3 bucket to use for staging data loads." jsonschema_extras:"order=5"`
-	AWSAccessKeyID     string           `json:"awsAccessKeyId" jsonschema:"title=Access Key ID,description=AWS Access Key ID for reading and writing data to the S3 staging bucket." jsonschema_extras:"order=6"`
-	AWSSecretAccessKey string           `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key,description=AWS Secret Access Key for reading and writing data to the S3 staging bucket." jsonschema_extras:"secret=true,order=7"`
-	Region             string           `json:"region" jsonschema:"title=Region,description=Region of the S3 staging bucket. For optimal performance this should be in the same region as the Redshift database cluster." jsonschema_extras:"order=8"`
-	BucketPath         string           `json:"bucketPath,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects in S3." jsonschema_extras:"order=9"`
-	HardDelete         bool             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=10,nonsensitive=true"`
-	Schedule           m.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
-	DBTJobTrigger      dbt.JobConfig    `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
-	NetworkTunnel      *tunnelConfig    `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your Redshift cluster through an SSH server that acts as a bastion host for your network."`
+	Address            string                      `json:"address" jsonschema:"title=Address,description=Host and port of the database. Example: red-shift-cluster-name.account.us-east-2.redshift.amazonaws.com:5439" jsonschema_extras:"order=0"`
+	User               string                      `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
+	Password           string                      `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database           string                      `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to. The materialization will attempt to connect to the default database for the provided user if omitted." jsonschema_extras:"order=3"`
+	Schema             string                      `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as the flow_checkpoints_v1 metadata table." jsonschema_extras:"order=4"`
+	Bucket             string                      `json:"bucket" jsonschema:"title=S3 Staging Bucket,description=Name of the S3 bucket to use for staging data loads." jsonschema_extras:"order=5"`
+	AWSAccessKeyID     string                      `json:"awsAccessKeyId" jsonschema:"title=Access Key ID,description=AWS Access Key ID for reading and writing data to the S3 staging bucket." jsonschema_extras:"order=6"`
+	AWSSecretAccessKey string                      `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key,description=AWS Secret Access Key for reading and writing data to the S3 staging bucket." jsonschema_extras:"secret=true,order=7"`
+	Region             string                      `json:"region" jsonschema:"title=Region,description=Region of the S3 staging bucket. For optimal performance this should be in the same region as the Redshift database cluster." jsonschema_extras:"order=8"`
+	BucketPath         string                      `json:"bucketPath,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects in S3." jsonschema_extras:"order=9"`
+	HardDelete         bool                        `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=10,nonsensitive=true"`
+	Schedule           m.ScheduleConfig            `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	DBTJobTrigger      dbt.JobConfig               `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
+	NetworkTunnel      *networkTunnel.TunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your Redshift cluster through an SSH server that acts as a bastion host for your network."`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
@@ -147,7 +137,7 @@ func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
 }
 
 func (c config) networkTunnelEnabled() bool {
-	return c.NetworkTunnel != nil && c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != ""
+	return c.NetworkTunnel.InUse()
 }
 
 func (c config) toURI() string {
@@ -232,21 +222,7 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 		StartTunnel: func(ctx context.Context, cfg config) error {
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.networkTunnelEnabled() {
-				host, port, err := net.SplitHostPort(cfg.Address)
-				if err != nil {
-					return fmt.Errorf("splitting address to host and port: %w", err)
-				}
-
-				var sshConfig = &networkTunnel.SshConfig{
-					SshEndpoint: cfg.NetworkTunnel.SshForwarding.SshEndpoint,
-					PrivateKey:  []byte(cfg.NetworkTunnel.SshForwarding.PrivateKey),
-					ForwardHost: host,
-					ForwardPort: port,
-					LocalPort:   "5432",
-				}
-				var tunnel = sshConfig.CreateTunnel()
-
-				if err := tunnel.Start(); err != nil {
+				if _, err := cfg.NetworkTunnel.Start(ctx, cfg.Address, "5432"); err != nil {
 					return err
 				}
 			}
