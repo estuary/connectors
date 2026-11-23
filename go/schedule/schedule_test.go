@@ -34,6 +34,15 @@ func TestPeriodicSchedule(t *testing.T) {
 	}
 }
 
+func TestParseNegativeInterval(t *testing.T) {
+	for _, desc := range []string{"-1m", "-24h", "-0.5s"} {
+		_, err := Parse(desc)
+		require.Error(t, err, desc)
+	}
+	_, err := Parse("0s")
+	require.NoError(t, err)
+}
+
 func TestDailySchedule(t *testing.T) {
 	for _, tc := range []struct {
 		Schedule string
