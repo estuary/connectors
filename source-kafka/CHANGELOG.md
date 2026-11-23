@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-23
+
+### Fixed
+- Keys shorter than 5 bytes that start with a 0 byte are captured as base64 under `_key` instead of crashing the connector. So are empty keys.
+
 ## 2026-11-03
 
 ### Fixed
