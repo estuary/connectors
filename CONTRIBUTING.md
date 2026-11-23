@@ -245,7 +245,9 @@ finding that has a fixed release; `trivy.yaml` holds those settings. A failed
 scan fails that connector's job, and with it the lane's connectors gate.
 
 To run the same scan locally, build the image and scan it. This needs Trivy
-v0.76.0 (the version CI pins), `yq` and `jq`:
+v0.76.0 (the version CI pins), [mikefarah's `yq`](https://github.com/mikefarah/yq)
+v4 and `jq`. The `yq` that `apt install yq` gives is a different tool and won't
+work.
 
 ```bash
 ./build-local.sh source-postgres

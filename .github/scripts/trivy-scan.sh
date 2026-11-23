@@ -37,6 +37,17 @@ if [ "$#" -eq 0 ] || [ $(($# % 2)) -ne 0 ]; then
     exit 2
 fi
 
+# Two unrelated tools are called yq, and this needs mikefarah's v4. The one
+# `apt install yq` gives on Debian and Ubuntu wraps jq, and would fail on every
+# ignore file in a way that blames the file.
+case "$(yq --version 2>/dev/null || true)" in
+    *mikefarah/yq*" version v4."*) ;;
+    *)
+        echo "This script needs mikefarah's yq v4 (https://github.com/mikefarah/yq), and the yq on PATH is missing or a different tool." >&2
+        exit 2
+        ;;
+esac
+
 while IFS= read -r var; do
     case "$var" in
         TRIVY_IMAGE_SRC | TRIVY_CACHE_DIR) ;;

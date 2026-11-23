@@ -175,6 +175,18 @@ class TestFailures(unittest.TestCase):
         self.assertEqual(self.repo.run().returncode, 2)
         self.assertEqual(self.repo.run("source-a").returncode, 2)
 
+    def test_a_different_yq_is_refused(self):
+        # kislyuk's jq wrapper, which `apt install yq` gives, and mikefarah's v3.
+        for version in ["yq 3.4.3", "yq version 3.4.1"]:
+            with self.subTest(version=version):
+                fake = self.repo.root / "bin" / "yq"
+                fake.write_text(f"#!/bin/sh\necho '{version}'\n")
+                fake.chmod(0o755)
+                proc = self.repo.run("source-a", "image-a")
+                self.assertEqual(proc.returncode, 2)
+                self.assertIn("mikefarah", proc.stderr)
+                self.assertIsNone(self.repo.exceptions("image-a"))
+
     def test_trivy_settings_from_the_environment_are_refused(self):
         # They would take precedence over trivy.yaml.
         for name in ["TRIVY_SEVERITY", "TRIVY_IGNOREFILE", "TRIVY_EXIT_CODE"]:
