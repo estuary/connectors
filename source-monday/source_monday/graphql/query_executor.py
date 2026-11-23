@@ -26,8 +26,8 @@ from .constants import API, API_VERSION
 # This provides buffer for concurrent requests and unpredictable query complexity.
 LOW_COMPLEXITY_BUDGET = 10000
 
-# Monday.com complexity budget resets every 60 seconds. We wait this duration when
-# hitting complexity limits before retrying queries.
+# Monday.com complexity budget resets every 60 seconds, so we never wait longer
+# than this for a reset.
 COMPLEXITY_RESET_WAIT_SECONDS = 60
 
 # Maximum number of retry attempts for transient GraphQL query failures
@@ -328,7 +328,10 @@ async def execute_query(
             remainder = processor.get_remainder()
 
             if remainder.data and remainder.data.complexity:
-                reset_in_seconds = remainder.data.complexity.reset_in_x_seconds
+                reset_in_seconds = min(
+                    remainder.data.complexity.reset_in_x_seconds,
+                    COMPLEXITY_RESET_WAIT_SECONDS,
+                )
 
             if remainder_processor is not None:
                 remainder_processor.process(log, remainder)
@@ -389,16 +392,20 @@ async def execute_query(
                 )
 
                 if remainder.data.complexity.after <= LOW_COMPLEXITY_BUDGET:
+                    reset_wait_seconds = min(
+                        remainder.data.complexity.reset_in_x_seconds,
+                        COMPLEXITY_RESET_WAIT_SECONDS,
+                    )
                     log.warning(
                         "Complexity budget critically low - waiting for reset",
                         {
                             "remaining_complexity": remainder.data.complexity.after,
                             "threshold": LOW_COMPLEXITY_BUDGET,
-                            "reset_wait_seconds": remainder.data.complexity.reset_in_x_seconds,
+                            "reset_wait_seconds": reset_wait_seconds,
                             "query_complexity": remainder.data.complexity.query,
                         },
                     )
-                    await asyncio.sleep(remainder.data.complexity.reset_in_x_seconds)
+                    await asyncio.sleep(reset_wait_seconds)
 
             return
 
