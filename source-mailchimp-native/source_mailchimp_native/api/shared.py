@@ -1,3 +1,4 @@
+import re
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from logging import Logger
@@ -34,6 +35,11 @@ from ..models import (
 API = "https://{dc}.api.mailchimp.com/3.0"
 OAUTH_METADATA_URL = "https://login.mailchimp.com/oauth2/metadata"
 
+# An API key's data center starts the API's hostname. Allowing only hostname
+# characters keeps requests on mailchimp.com, because a character such as "/"
+# or ":" would end the hostname before ".api.mailchimp.com".
+DATA_CENTER_PATTERN = re.compile(r"[A-Za-z0-9.-]+")
+
 
 async def resolve_base_url(
     log: Logger, http: HTTPSession, credentials: OAuth2Credentials | ApiKey
@@ -46,11 +52,11 @@ async def resolve_base_url(
     """
     if isinstance(credentials, ApiKey):
         _, sep, dc = credentials.password.rpartition("-")
-        if not sep or not dc:
+        if not sep or not DATA_CENTER_PATTERN.fullmatch(dc):
             raise ValidationError(
                 [
                     (
-                        "Mailchimp API key is missing its data center suffix "
+                        "Mailchimp API key is missing a valid data center suffix "
                         "(expected a key ending in e.g. -us21)."
                     )
                 ]
