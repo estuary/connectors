@@ -39,10 +39,6 @@ func (parts *pipeParts) toQualifiedName() string {
 	return strings.ToUpper(fmt.Sprintf("%s.%s.%s", parts.Catalog, parts.Schema, parts.toPipeName()))
 }
 
-// unquotedIdentifierRegexp matches a name that Snowflake reads as one
-// identifier without quotes.
-var unquotedIdentifierRegexp = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_$]*$`)
-
 // isQuotedIdentifier reports whether a name is already one quoted identifier.
 func isQuotedIdentifier(s string) bool {
 	return len(s) >= 2 && strings.HasPrefix(s, `"`) && strings.HasSuffix(s, `"`) &&
@@ -50,11 +46,12 @@ func isQuotedIdentifier(s string) bool {
 }
 
 // pipeIdentifier renders a qualified pipe name for use in a statement,
-// quoting each part that Snowflake would not read as one identifier.
+// quoting each part that is not a simple identifier. Pipe names are
+// uppercase, so a quoted part names the same object as the unquoted one.
 func pipeIdentifier(pipeName string) string {
 	var parts = strings.Split(pipeName, ".")
 	for i, part := range parts {
-		if !unquotedIdentifierRegexp.MatchString(part) && !isQuotedIdentifier(part) {
+		if !isSimpleIdentifier(part) && !isQuotedIdentifier(part) {
 			parts[i] = quoteIdentifier(part)
 		}
 	}
