@@ -18,13 +18,16 @@ func TestValidateBucketPath(t *testing.T) {
 		{"bare scheme rejected", "s3://", true},
 		{"https uri rejected", "https://example.com/prefix", true},
 		{"embedded scheme rejected", "estuary/s3://nested", true},
-		{"current directory segment is allowed", "./estuary/staging", false},
-		{"parent segment within the bucket is allowed", "estuary/../staging", false},
-		{"resolving to the bucket root is allowed", "estuary/..", false},
-		{"name starting with dots is allowed", "..estuary/staging", false},
-		{"parent of the bucket root rejected", "..", true},
-		{"prefix above the bucket root rejected", "../estuary", true},
-		{"prefix resolving above the bucket root rejected", "estuary/../../staging", true},
+		{"segment starting with a dot is allowed", ".estuary/staging", false},
+		{"segment starting with two dots is allowed", "..estuary/staging", false},
+		{"segment containing dots is allowed", "estuary/v1.2..3/staging", false},
+		{"current directory rejected", ".", true},
+		{"leading current directory segment rejected", "./estuary/staging", true},
+		{"current directory segment rejected", "estuary/./staging", true},
+		{"parent directory rejected", "..", true},
+		{"leading parent segment rejected", "../estuary", true},
+		{"parent segment rejected", "estuary/../staging", true},
+		{"trailing parent segment rejected", "estuary/..", true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ValidateBucketPath(tt.prefix)

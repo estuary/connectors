@@ -19,8 +19,8 @@ import (
 //     reduces "s3://" to "s3:/"), leaving a stray "s3:" path segment. Downstream
 //     readers such as Spark/Hadoop then fail to parse it, e.g.
 //     "java.net.URISyntaxException: Expected scheme-specific part at index 3: s3:".
-//   - A prefix that resolves above the root of the bucket, such as "../staging",
-//     names no location within the bucket.
+//   - A "." or ".." segment is resolved away by path.Join, and a ".." segment
+//     can resolve to a location above the root of the bucket.
 //
 // An empty prefix is always valid.
 func ValidateBucketPath(prefix string) error {
@@ -36,8 +36,10 @@ func ValidateBucketPath(prefix string) error {
 			prefix,
 		)
 	}
-	if cleaned := path.Clean(prefix); cleaned == ".." || strings.HasPrefix(cleaned, "../") {
-		return fmt.Errorf("%q cannot use \"..\" to reach above the root of the bucket", prefix)
+	for segment := range strings.SplitSeq(prefix, "/") {
+		if segment == "." || segment == ".." {
+			return fmt.Errorf("%q cannot contain a \".\" or \"..\" path segment", prefix)
+		}
 	}
 	return nil
 }
