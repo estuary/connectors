@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-23
+
+### Fixed
+- Logs and error messages from failed storage requests no longer include the SAS token.
+
 ## 2026-08-04
 
 ### Fixed
