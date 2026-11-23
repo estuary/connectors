@@ -22,6 +22,12 @@ pub fn parse_message_indexes(data: &[u8]) -> Result<(Vec<i32>, usize)> {
         return Ok((vec![0], offset));
     }
 
+    // Each index takes at least one byte, so a valid length is never larger
+    // than the bytes that remain.
+    if array_len < 0 || array_len as usize > data.len() - offset {
+        anyhow::bail!("invalid message index array length {array_len}");
+    }
+
     let mut indexes = Vec::with_capacity(array_len as usize);
     for _ in 0..array_len {
         let (idx, consumed) = decode_zigzag_varint(&data[offset..])
@@ -423,5 +429,13 @@ mod tests {
         let (indexes, consumed) = parse_message_indexes(&[0x04, 0x00, 0x02]).unwrap();
         assert_eq!(indexes, vec![0, 1]);
         assert_eq!(consumed, 3);
+    }
+
+    #[test]
+    fn test_parse_message_indexes_invalid_length() {
+        // Array length -1 (zigzag encoded as 1)
+        assert!(parse_message_indexes(&[0x01, 0x00]).is_err());
+        // Array length 2^40, with one byte after it
+        assert!(parse_message_indexes(&[0x80, 0x80, 0x80, 0x80, 0x80, 0x40, 0x00]).is_err());
     }
 }

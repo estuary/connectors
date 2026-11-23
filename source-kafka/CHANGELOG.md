@@ -4,6 +4,7 @@
 
 ### Fixed
 - Keys shorter than 5 bytes that start with a 0 byte are captured as base64 under `_key` instead of crashing the connector. So are empty keys.
+- Protobuf messages with an invalid message index count fail with an error instead of crashing the connector.
 
 ## 2026-11-03
 
