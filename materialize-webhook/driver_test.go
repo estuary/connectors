@@ -1,16 +1,19 @@
 package connector
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	m "github.com/estuary/connectors/go/materialize"
@@ -19,7 +22,10 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	pb "go.gazette.dev/core/broker/protocol"
+	pc "go.gazette.dev/core/consumer/protocol"
 )
 
 // testServerAddr is where testdata/config.local.yaml sends webhooks. The
@@ -34,6 +40,47 @@ func TestSpec(t *testing.T) {
 	formatted, err := json.MarshalIndent(response, "", "  ")
 	require.NoError(t, err)
 	cupaloy.SnapshotT(t, string(formatted))
+}
+
+// TestOpenRestatesSealedHeaderValues verifies that the config restated on Open
+// carries a header value as its ciphertext.
+func TestOpenRestatesSealedHeaderValues(t *testing.T) {
+	// Connector events are only emitted with the runtime's JSON log format.
+	var logs bytes.Buffer
+	var logger = log.StandardLogger()
+	var priorFormatter, priorOut = logger.Formatter, logger.Out
+	logger.SetFormatter(&log.JSONFormatter{})
+	logger.SetOutput(&logs)
+	t.Cleanup(func() { logger.SetFormatter(priorFormatter); logger.SetOutput(priorOut) })
+
+	const plain = `{"address":"https://example.com/hooks/","headers":{"customHeaders":[{"name":"Authorization","value":"Bearer a-token"}]}}`
+	const sealed = `{"address":"https://example.com/hooks/","headers":{"customHeaders":[{"name":"Authorization","value_sops":"ENC[AES256_GCM,data:xx]"}]},"sops":{"encrypted_suffix":"_sops","mac":"ENC[AES256_GCM,data:yy]"}}`
+
+	_, _, _, err := driver{}.NewTransactor(context.Background(), pm.Request_Open{
+		Materialization: &pf.MaterializationSpec{
+			Name:          "acmeCo/webhook",
+			ConfigJson:    json.RawMessage(plain),
+			CreatedAt:     "2099-01-01",
+			ShardTemplate: &pc.ShardSpec{Id: "acmeCo/webhook/shard", MaxTxnDuration: time.Second},
+			RecoveryLogTemplate: &pb.JournalSpec{
+				Name:        "recovery/acmeCo/webhook/log",
+				Replication: 3,
+				Fragment: pb.JournalSpec_Fragment{
+					Length:           1 << 29,
+					CompressionCodec: pb.CompressionCodec_GZIP,
+					RefreshInterval:  30 * time.Second,
+				},
+			},
+		},
+		Version:          "aVersion",
+		Range:            &pf.RangeSpec{KeyEnd: math.MaxUint32, RClockEnd: math.MaxUint32},
+		SealedConfigJson: json.RawMessage(sealed),
+	}, nil)
+	require.NoError(t, err)
+
+	require.Contains(t, logs.String(), `"eventType":"configUpdate"`)
+	require.Contains(t, logs.String(), "ENC[AES256_GCM,data:xx]")
+	require.NotContains(t, logs.String(), "a-token")
 }
 
 func TestValidateConstraints(t *testing.T) {
@@ -108,6 +155,7 @@ func TestStorePayloads(t *testing.T) {
 	var server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
+		require.Equal(t, "Bearer a-token", r.Header.Get("Authorization"))
 		mu.Lock()
 		requests[r.URL.Path] = append(requests[r.URL.Path], string(body))
 		mu.Unlock()
@@ -116,7 +164,10 @@ func TestStorePayloads(t *testing.T) {
 
 	var open = func(fieldSelection bool, bindings ...pf.MaterializationSpec_Binding) m.Transactor {
 		var ctx = context.Background()
-		var cfg = config{Address: pf.Endpoint(server.URL + "/")}
+		var cfg = config{
+			Address: pf.Endpoint(server.URL + "/"),
+			Headers: headers{CustomHeaders: []customHeader{{Name: "Authorization", Value: "Bearer a-token"}}},
+		}
 		materializer, err := NewMaterializer(ctx, "acmeCo/webhook", cfg, map[string]bool{"field_selection": fieldSelection})
 		require.NoError(t, err)
 
