@@ -2,6 +2,7 @@ package blob
 
 import (
 	"fmt"
+	"path"
 	"strings"
 )
 
@@ -34,4 +35,11 @@ func ValidateBucketPath(prefix string) error {
 		)
 	}
 	return nil
+}
+
+// JoinKey joins a bucket name and an object key as "bucket/key", for building
+// URIs. The key is cleaned with the bucket as its root, so that ".." segments
+// in the key never replace the bucket.
+func JoinKey(bucket, key string) string {
+	return path.Join(bucket, path.Join("/", key))
 }
