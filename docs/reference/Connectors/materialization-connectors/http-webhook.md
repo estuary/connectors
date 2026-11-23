@@ -22,7 +22,9 @@ The Webhooks connector is available for use in the Estuary web application. To l
 | Property           | Title          | Description                              | Type   | Required/Default       |
 |--------------------|----------------|------------------------------------------|--------|------------------------|
 | **`/address`**     | Address        | The URL of the endpoint to send data to. | string | Required               |
-| **`/headers/customHeaders`**     | Headers        | Array of additional headers to include in the HTTP request. | object |               |
+| **`/headers/customHeaders`**     | Custom Headers | Array of additional headers to include in the HTTP request. | object[] |               |
+| `/headers/customHeaders/-/name`  | Name           | Name of the header. | string | Required               |
+| `/headers/customHeaders/-/value` | Value          | Value of the header, which is stored encrypted. | string | Required               |
 | **`/advanced/feature_flags`** | Feature Flags | For Estuary internal use. Only modify as directed by Estuary support. | string |               |
 
 ### Bindings
