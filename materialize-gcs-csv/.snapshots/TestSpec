@@ -52,6 +52,13 @@
             "description": "Do not write headers to files.",
             "nonsensitive": true,
             "order": 2
+          },
+          "escapeFormulas": {
+            "type": "boolean",
+            "title": "Escape Spreadsheet Formulas",
+            "description": "Prefix string values and headers that start with = + - @ or a tab or line break with a single quote so that spreadsheet applications read them as text instead of formulas. This changes the written values. Leave it disabled when files are read by other programs.",
+            "nonsensitive": true,
+            "order": 3
           }
         },
         "additionalProperties": false,

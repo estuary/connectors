@@ -164,6 +164,7 @@ delimiter
 quote
 escape
 skipHeaders
+escapeFormulas
 ascendingKeys
 
 # --- connection behaviour (non-identifying) ---

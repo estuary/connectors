@@ -68,7 +68,8 @@ func NewParquetWriter(cfg ParquetConfig, b *pf.MaterializationSpec_Binding, w io
 }
 
 type CsvConfig struct {
-	SkipHeaders bool `json:"skipHeaders,omitempty" jsonschema:"title=Skip Headers,description=Do not write headers to files." jsonschema_extras:"order=2,nonsensitive=true"`
+	SkipHeaders    bool `json:"skipHeaders,omitempty" jsonschema:"title=Skip Headers,description=Do not write headers to files." jsonschema_extras:"order=2,nonsensitive=true"`
+	EscapeFormulas bool `json:"escapeFormulas,omitempty" jsonschema:"title=Escape Spreadsheet Formulas,description=Prefix string values and headers that start with = + - @ or a tab or line break with a single quote so that spreadsheet applications read them as text instead of formulas. This changes the written values. Leave it disabled when files are read by other programs." jsonschema_extras:"order=3,nonsensitive=true"`
 }
 
 func (c CsvConfig) Validate() error {
@@ -80,6 +81,9 @@ func NewCsvStreamWriter(cfg CsvConfig, b *pf.MaterializationSpec_Binding, w io.W
 
 	if cfg.SkipHeaders {
 		opts = append(opts, writer.WithCsvSkipHeaders())
+	}
+	if cfg.EscapeFormulas {
+		opts = append(opts, writer.WithCsvEscapeFormulas())
 	}
 
 	return writer.NewCsvWriter(w, b.FieldSelection.AllFields(), opts...)
