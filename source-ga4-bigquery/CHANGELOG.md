@@ -1,4 +1,6 @@
-# source-ga4-bigquery
+# Changelog
 
-## v1, 2026-05-05
-- Beginning of changelog.
+## 2026-11-23
+
+### Changed
+- Polling schedules no longer accept negative intervals.
