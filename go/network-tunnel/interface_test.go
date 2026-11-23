@@ -42,18 +42,22 @@ func TestValidateKnownHosts(t *testing.T) {
 	}
 }
 
-func TestSkipHostKeyVerification(t *testing.T) {
+func TestValidateHostKeyVerification(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		knownHosts string
+		skip       bool
 		wantErr    string
 	}{
-		{name: "alone", knownHosts: ""},
-		{name: "with whitespace known hosts", knownHosts: " \n"},
-		{name: "with known hosts", knownHosts: testKnownHostsEntry, wantErr: "both Skip Host Key Verification and SSH Known Hosts are set"},
+		{name: "known hosts", knownHosts: testKnownHostsEntry},
+		{name: "skip", skip: true},
+		{name: "skip with whitespace known hosts", knownHosts: " \n", skip: true},
+		{name: "neither", wantErr: "missing SSH Known Hosts"},
+		{name: "whitespace known hosts", knownHosts: " \n", wantErr: "missing SSH Known Hosts"},
+		{name: "both", knownHosts: testKnownHostsEntry, skip: true, wantErr: "both Skip Host Key Verification and SSH Known Hosts are set"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var cfg = SSHForwardingConfig{KnownHosts: tc.knownHosts, SkipHostKeyVerification: true}
+			var cfg = SSHForwardingConfig{KnownHosts: tc.knownHosts, SkipHostKeyVerification: tc.skip}
 			var err = cfg.validate()
 			if tc.wantErr == "" {
 				require.NoError(t, err)
@@ -65,17 +69,18 @@ func TestSkipHostKeyVerification(t *testing.T) {
 }
 
 func TestTunnelConfigStartKnownHosts(t *testing.T) {
-	var tunnelConfig = func(knownHosts string) *TunnelConfig {
+	var tunnelConfig = func(knownHosts string, skip bool) *TunnelConfig {
 		return &TunnelConfig{SSHForwarding: &SSHForwardingConfig{
-			SSHEndpoint: "ssh://user@bastion.example.com:2222",
-			PrivateKey:  "private key",
-			KnownHosts:  knownHosts,
+			SSHEndpoint:             "ssh://user@bastion.example.com:2222",
+			PrivateKey:              "private key",
+			KnownHosts:              knownHosts,
+			SkipHostKeyVerification: skip,
 		}}
 	}
 
 	t.Run("passed to the tunnel", func(t *testing.T) {
 		var dir = fakeTunnelBinary(t)
-		tunnel, err := tunnelConfig(testKnownHostsEntry).Start(context.Background(), "db.internal:5432", "5432")
+		tunnel, err := tunnelConfig(testKnownHostsEntry, false).Start(context.Background(), "db.internal:5432", "5432")
 		require.NoError(t, err)
 		t.Cleanup(tunnel.Stop)
 
@@ -84,7 +89,7 @@ func TestTunnelConfigStartKnownHosts(t *testing.T) {
 
 	t.Run("whitespace isn't passed", func(t *testing.T) {
 		var dir = fakeTunnelBinary(t)
-		tunnel, err := tunnelConfig(" \n").Start(context.Background(), "db.internal:5432", "5432")
+		tunnel, err := tunnelConfig(" \n", true).Start(context.Background(), "db.internal:5432", "5432")
 		require.NoError(t, err)
 		t.Cleanup(tunnel.Stop)
 
@@ -93,7 +98,7 @@ func TestTunnelConfigStartKnownHosts(t *testing.T) {
 
 	t.Run("invalid fails before the tunnel starts", func(t *testing.T) {
 		var dir = fakeTunnelBinary(t)
-		_, err := tunnelConfig("bastion.example.com").Start(context.Background(), "db.internal:5432", "5432")
+		_, err := tunnelConfig("bastion.example.com", false).Start(context.Background(), "db.internal:5432", "5432")
 		require.ErrorContains(t, err, "not a known_hosts entry")
 
 		_, statErr := os.Stat(filepath.Join(dir, "args"))

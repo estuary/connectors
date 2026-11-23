@@ -7,6 +7,7 @@
 
 ### Changed
 - Polling schedules no longer accept negative intervals.
+- Network tunnels now require `knownHosts`.
 
 ## 2026-11-02
 

@@ -7,6 +7,7 @@
 
 ### Changed
 - A Bucket Path with a `.` or `..` path segment is now rejected.
+- Network tunnels now require `knownHosts`.
 
 ## 2026-11-02
 
