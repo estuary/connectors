@@ -59,7 +59,8 @@ async def bulk_fetch_incremental(
         yield end
         return
 
-    _, lines = await http.request_lines(log, url)
+    # The results URL is signed, so it doesn't need the access token.
+    _, lines = await http.request_lines(log, url, with_token=False)
     ctx = StoreValidationContext(store=store)
     async for record in model.process_result(log, lines()):
         resource = model.model_validate(record, context=ctx)
@@ -87,7 +88,7 @@ async def bulk_fetch_snapshot(
         )
         return
 
-    _, lines = await http.request_lines(log, url)
+    _, lines = await http.request_lines(log, url, with_token=False)
     ctx = StoreValidationContext(store=store)
     async for record in model.process_result(log, lines()):
         resource = model.model_validate(record, context=ctx)

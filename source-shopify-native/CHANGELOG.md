@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-23
+
+### Changed
+- Bulk query results are downloaded without the store's access token.
+
 ## 2026-11-18
 
 ### Added
