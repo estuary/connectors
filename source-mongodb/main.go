@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"slices"
 	"strings"
@@ -106,15 +107,6 @@ func (r resource) getCursorField() string {
 	return idProperty
 }
 
-type sshForwarding struct {
-	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
-	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
-}
-
-type tunnelConfig struct {
-	SSHForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
-}
-
 type config struct {
 	Address              string `json:"address" jsonschema:"title=Address" jsonschema_description:"The connection URI for your database without the username and password. For example mongodb://my-mongo.test?authSource=admin." jsonschema_extras:"order=0"`
 	User                 string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
@@ -123,8 +115,8 @@ type config struct {
 	BatchAndChangeStream bool   `json:"batchAndChangeStream,omitempty" jsonschema:"title=Capture Batch Collections in Addition to Change Stream Collections,description=Discover collections that can only be batch captured if the deployment supports change streams. Check this box to capture views and time series collections as well as change streams. All collections will be captured in batch mode if the server does not support change streams regardless of this setting." jsonschema_extras:"order=4,nonsensitive=true"`
 	PollSchedule         string `json:"pollSchedule,omitempty" jsonschema:"title=Default Batch Collection Polling Schedule,description=When and how often to poll batch collections. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,order=5,nonsensitive=true"`
 
-	NetworkTunnel *tunnelConfig  `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network." jsonschema_extras:"order=6"`
-	Advanced      advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true,order=7"`
+	NetworkTunnel *networkTunnel.TunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network." jsonschema_extras:"order=6"`
+	Advanced      advancedConfig              `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true,order=7"`
 }
 
 type advancedConfig struct {
@@ -295,7 +287,7 @@ func (c *config) ToURI() *url.URL {
 
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:27017 to address
 	// through the bastion server, so we use the tunnel's address.
-	if c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+	if c.NetworkTunnel.InUse() {
 		uri.Host = "localhost:27017"
 	}
 
@@ -348,7 +340,7 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	}
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections.
-	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SSHForwarding != nil && cfg.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+	if cfg.NetworkTunnel.InUse() {
 		uri, err := url.Parse(cfg.Address)
 		if err != nil {
 			// A *url.Error repeats its input, which may contain a password, so unwrap it
@@ -356,16 +348,7 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 			return nil, fmt.Errorf("parsing address for network tunnel: %w", errors.Unwrap(err))
 		}
 
-		var sshConfig = &networkTunnel.SshConfig{
-			SshEndpoint: cfg.NetworkTunnel.SSHForwarding.SSHEndpoint,
-			PrivateKey:  []byte(cfg.NetworkTunnel.SSHForwarding.PrivateKey),
-			ForwardHost: uri.Hostname(),
-			ForwardPort: uri.Port(),
-			LocalPort:   "27017",
-		}
-		var tunnel = sshConfig.CreateTunnel()
-
-		if err := tunnel.Start(); err != nil {
+		if _, err := cfg.NetworkTunnel.Start(ctx, net.JoinHostPort(uri.Hostname(), uri.Port()), "27017"); err != nil {
 			return nil, err
 		}
 	} else if isDocDB {
