@@ -43,28 +43,36 @@ runs:
     # again, into the same layers `docker image push` produced.
     - name: Push ${{ inputs.connector }} ${{ inputs.variants }} image(s) with commit SHA tag
       shell: bash
+      env:
+        # Inputs reach the scripts through env. A `${{ }}` expression in a
+        # script is pasted in as script text.
+        CONNECTOR: ${{ inputs.connector }}
+        VARIANTS: ${{ inputs.variants }}
+        TAG_SHA: ${{ inputs.tag_sha }}
+        NAME_VARIANTS: ${{ inputs.name_variants }}
+        ACTION_PATH: ${{ github.action_path }}
       run: |
-        BASE_CONNECTOR=ghcr.io/estuary/${{ inputs.connector }}:local
-        LAYOUT="${RUNNER_TEMP}/${{ inputs.connector }}-local"
+        BASE_CONNECTOR="ghcr.io/estuary/${CONNECTOR}:local"
+        LAYOUT="${RUNNER_TEMP}/${CONNECTOR}-local"
         mkdir -p "$LAYOUT"
         docker image save "$BASE_CONNECTOR" | tar -x -C "$LAYOUT"
 
-        for VARIANT in ${{ inputs.connector }} ${{ inputs.variants }}; do
-          echo "Building and pushing ${VARIANT}:${{ inputs.tag_sha }}...";
+        for VARIANT in "$CONNECTOR" $VARIANTS; do
+          echo "Building and pushing ${VARIANT}:${TAG_SHA}...";
           NAME_ARG=()
-          if [ "${{ inputs.name_variants }}" = true ]; then
+          if [ "$NAME_VARIANTS" = true ]; then
             NAME_ARG=(--build-arg "CONNECTOR_NAME=${VARIANT}")
           fi
-          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }} \
+          bash "${ACTION_PATH}/push-with-retry.sh" "ghcr.io/estuary/${VARIANT}:${TAG_SHA}" \
             docker buildx build --build-context "${BASE_CONNECTOR}=oci-layout://${LAYOUT}:local" \
                        --build-arg BASE_CONNECTOR=${BASE_CONNECTOR} \
-                       --label org.opencontainers.image.revision=${{ github.sha }} \
+                       --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
                        --build-arg DOCS_URL=https://go.estuary.dev/${VARIANT} \
                        "${NAME_ARG[@]}" \
                        --sbom=true \
                        --provenance=mode=min \
                        --metadata-file "${RUNNER_TEMP}/${VARIANT}.metadata.json" \
-                       --output type=image,name=ghcr.io/estuary/${VARIANT}:${{ inputs.tag_sha }},push=true,compression=gzip,force-compression=true \
+                       --output "type=image,name=ghcr.io/estuary/${VARIANT}:${TAG_SHA},push=true,compression=gzip,force-compression=true" \
                        --file connector-variant.Dockerfile .;
         done
 
@@ -84,9 +92,10 @@ runs:
         IMAGE: ghcr.io/estuary/${{ inputs.connector }}
         REPO: ${{ github.repository }}
         SHA: ${{ github.sha }}
+        TAG_VERSION: ${{ inputs.tag_version }}
       run: |
         set -euo pipefail
-        fail() { echo "::error::$1; leaving dev and ${{ inputs.tag_version }} alone"; exit 1; }
+        fail() { echo "::error::$1; leaving dev and ${TAG_VERSION} alone"; exit 1; }
 
         # The SHA tag was pushed above, so the package exists and a missing
         # `:dev` reports `not found` rather than an authorization error.
@@ -116,7 +125,7 @@ runs:
           case "$STATUS" in
             ahead|identical) LATEST=true ;;
             behind)
-              echo "::notice::${IMAGE}:dev comes from ${DEPLOYED}, which is newer than ${SHA}; leaving dev and ${{ inputs.tag_version }} alone"
+              echo "::notice::${IMAGE}:dev comes from ${DEPLOYED}, which is newer than ${SHA}; leaving dev and ${TAG_VERSION} alone"
               LATEST=false
               ;;
             *) fail "${SHA} and ${IMAGE}:dev's ${DEPLOYED} are ${STATUS:-unordered}" ;;
@@ -127,17 +136,22 @@ runs:
     - name: Push ${{ inputs.connector }} image(s) with 'dev' and '${{ inputs.tag_version }}' tags
       if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && steps.guard.outputs.latest == 'true'
       shell: bash
+      env:
+        CONNECTOR: ${{ inputs.connector }}
+        VARIANTS: ${{ inputs.variants }}
+        TAG_VERSION: ${{ inputs.tag_version }}
+        ACTION_PATH: ${{ github.action_path }}
       run: |
         # Each tag is moved in the registry to the index the step above pushed,
         # which keeps the image's attestations with it.
-        for VARIANT in ${{ inputs.connector }} ${{ inputs.variants }}; do
+        for VARIANT in "$CONNECTOR" $VARIANTS; do
           DIGEST=$(jq -er '."containerimage.digest"' "${RUNNER_TEMP}/${VARIANT}.metadata.json")
           PUSHED=ghcr.io/estuary/${VARIANT}@${DIGEST}
 
-          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:dev \
+          bash "${ACTION_PATH}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:dev \
             docker buildx imagetools create --tag ghcr.io/estuary/${VARIANT}:dev "$PUSHED";
-          bash "${{ github.action_path }}/push-with-retry.sh" ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }} \
-            docker buildx imagetools create --tag ghcr.io/estuary/${VARIANT}:${{ inputs.tag_version }} "$PUSHED";
+          bash "${ACTION_PATH}/push-with-retry.sh" "ghcr.io/estuary/${VARIANT}:${TAG_VERSION}" \
+            docker buildx imagetools create --tag "ghcr.io/estuary/${VARIANT}:${TAG_VERSION}" "$PUSHED";
         done
 
     # Requeue is for connectors a push changed; scheduled and manual runs
@@ -161,6 +175,9 @@ runs:
       env:
         RT_ID: ${{ inputs.rt_id }}
         RT_SECRET: ${{ inputs.rt_secret }}
+        CONNECTOR: ${{ inputs.connector }}
+        VARIANTS: ${{ inputs.variants }}
+        TAG_VERSION: ${{ inputs.tag_version }}
       run: |
         set -euo pipefail
         SUPABASE_URL="https://eyrcnmuzzyriypdajwdk.supabase.co"
@@ -174,11 +191,11 @@ runs:
           echo "failed to obtain control-plane access token"; exit 1
         fi
 
-        for VARIANT in ${{ inputs.connector }} ${{ inputs.variants }}; do
+        for VARIANT in "$CONNECTOR" $VARIANTS; do
           echo "Re-queuing tags for ghcr.io/estuary/${VARIANT}";
           curl -sS --fail-with-body -X POST "$SUPABASE_URL/rest/v1/rpc/requeue_connector_tag" \
             -H "apikey: $ANON_KEY" -H "Authorization: Bearer $access_token" \
             -H "Content-Type: application/json" \
-            -d "{\"image_name\": \"ghcr.io/estuary/${VARIANT}\", \"image_tags\": [\":${{ inputs.tag_version }}\", \":dev\"]}";
+            -d "{\"image_name\": \"ghcr.io/estuary/${VARIANT}\", \"image_tags\": [\":${TAG_VERSION}\", \":dev\"]}";
         done
 

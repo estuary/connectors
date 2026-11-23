@@ -39,6 +39,11 @@ runs:
       run: |
         set -euo pipefail
         ALL=$(yq -o=json -I=0 '.' "$LIST")
+        # Names become paths, image references and command arguments.
+        if ! jq -e 'all(.[]; .name | type == "string" and test("^[a-z0-9]") and (test("[^a-z0-9-]") | not))' <<< "$ALL" > /dev/null; then
+          echo "::error::${LIST} has a connector name that is not lowercase letters, digits and hyphens"
+          exit 1
+        fi
         if [ "$CONNECTORS" = all ]; then
           MATRIX=$ALL
         else

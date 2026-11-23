@@ -141,4 +141,6 @@ jobs:
 
       - name: Link the PR
         if: steps.pr.outputs.pull-request-url != ''
-        run: echo "Opened ${{ steps.pr.outputs.pull-request-url }}" | tee -a "$GITHUB_STEP_SUMMARY"
+        env:
+          PR_URL: ${{ steps.pr.outputs.pull-request-url }}
+        run: echo "Opened $PR_URL" | tee -a "$GITHUB_STEP_SUMMARY"

@@ -42,8 +42,8 @@ jobs:
 
       # Runs here rather than in the classifier's workflow so that it also
       # runs on the change adding a connector.
-      - name: Check the connector lists
-        run: cd .github/scripts && python3 -m unittest test_connector_lists -v
+      - name: Check the connector lists and workflow scripts
+        run: cd .github/scripts && python3 -m unittest test_connector_lists test_workflow_scripts -v
 
       - id: classify
         uses: ./.github/actions/classify-changes
@@ -101,6 +101,10 @@ jobs:
       fail-fast: false
       matrix:
         connector: ${{ fromJSON(needs.classify_changes.outputs.matrix) }}
+    env:
+      # The connector's name reaches the scripts below through this variable.
+      # A `${{ }}` expression in a script is pasted in as script text.
+      CONNECTOR: ${{ matrix.connector.name }}
 
     steps:
       - uses: actions/checkout@v4
@@ -112,9 +116,9 @@ jobs:
         run: |
           TAG=$(echo $GITHUB_SHA | head -c7)
           echo ::set-output name=tag::${TAG}
-          VERSION=$(cat ${{ matrix.connector.name }}/VERSION | tr -d '\n')
+          VERSION=$(cat "$CONNECTOR/VERSION" | tr -d '\n')
           echo ::set-output name=version::${VERSION}
-          VARIANTS="$(cat ${{ matrix.connector.name }}/VARIANTS 2>/dev/null || true)"
+          VARIANTS="$(cat "$CONNECTOR/VARIANTS" 2>/dev/null || true)"
           echo ::set-output name=variants::${VARIANTS}
 
       - name: Restore Flow binaries
@@ -158,8 +162,8 @@ jobs:
           # --wait blocks until every service's healthcheck passes. Bound it:
           # without a timeout a healthcheck which never goes green hangs the
           # job until the workflow-level limit rather than failing here.
-          docker compose --file ${{ matrix.connector.name }}/docker-compose.yaml up --wait --wait-timeout 300
-          docker logs ${{ matrix.connector.name }}-db-1
+          docker compose --file "$CONNECTOR/docker-compose.yaml" up --wait --wait-timeout 300
+          docker logs "${CONNECTOR}-db-1"
 
       - name: Install system dependencies for Rust connectors
         if: |
@@ -219,13 +223,13 @@ jobs:
           contains(fromJson('[
             "source-kafka"
             ]'), matrix.connector.name)
-        run: CONNECTOR=${{ matrix.connector.name }} VERSION=local ./tests/smoke.sh;
+        run: VERSION=local ./tests/smoke.sh;
 
       - name: Materialization connector ${{ matrix.connector.name }} integration tests
         if: startsWith(matrix.connector.name, 'materialize-')
 
         run: |
-          CONNECTOR=${{ matrix.connector.name }} VERSION=local tests/materialize/run.sh;
+          VERSION=local tests/materialize/run.sh;
 
       # On a snapshot mismatch the harness writes this run's value beside the
       # snapshot as `<name>.actual`. Hand it back: a cloud-credentialed

@@ -55,6 +55,8 @@ runs:
       env:
         GH_TOKEN: ${{ github.token }}
         GO_IMPORT_GRAPH: ${{ runner.temp }}/go-import-graph.txt
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        BEFORE: ${{ github.event.before }}
       run: |
         set -uo pipefail
 
@@ -67,9 +69,9 @@ runs:
 
         # Scheduled and manual runs have no change to classify; they exist to
         # build everything.
-        case "${{ github.event_name }}" in
+        case "${GITHUB_EVENT_NAME}" in
           schedule | workflow_dispatch)
-            echo "${{ github.event_name }} run; building every connector"
+            echo "${GITHUB_EVENT_NAME} run; building every connector"
             printf 'python_connectors=all\ngo_connectors=all\nrust_connectors=all\ncdk=true\n' >> "$GITHUB_OUTPUT"
             exit 0
             ;;
@@ -96,10 +98,10 @@ runs:
         # too, since whatever used the file there is affected as much as its new
         # home. COUNT then counts paths, which can only reach a cap early and
         # build everything.
-        if [ "${{ github.event_name }}" = "pull_request" ]; then
+        if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
           # Paginated but capped at 3000 files. A list sitting at the 3000
           # path cap cannot be assumed complete.
-          gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" \
             --jq '.[] | .filename, (.previous_filename // empty)' > changed.txt ||
             fallback "could not list pull request files"
 
@@ -110,9 +112,9 @@ runs:
           # The compare endpoint reports at most 300 files and does not paginate
           # them. They appear only on the first page, so a diff sitting at
           # the 300 path cap cannot be assumed complete.
-          gh api "repos/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }}" \
+          gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE}...${GITHUB_SHA}" \
             --jq '.files[] | .filename, (.previous_filename // empty)' > changed.txt ||
-            fallback "could not compare ${{ github.event.before }}...${{ github.sha }}"
+            fallback "could not compare ${BEFORE}...${GITHUB_SHA}"
 
           COUNT=$(wc -l < changed.txt)
           [ "$COUNT" -lt 300 ] ||
@@ -127,7 +129,7 @@ runs:
           fallback "no paths enumerated"
         fi
 
-        SCRIPT="${{ github.workspace }}/.github/scripts/classify-changed-paths.sh"
+        SCRIPT="${GITHUB_WORKSPACE}/.github/scripts/classify-changed-paths.sh"
         if ! VERDICT=$("$SCRIPT" < changed.txt); then
           fallback "classifier exited non-zero"
         fi

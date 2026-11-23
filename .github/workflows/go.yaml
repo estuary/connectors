@@ -47,8 +47,8 @@ jobs:
 
       # Runs here rather than in the classifier's workflow so that it also
       # runs on the change adding a connector.
-      - name: Check the connector lists
-        run: cd .github/scripts && python3 -m unittest test_connector_lists -v
+      - name: Check the connector lists and workflow scripts
+        run: cd .github/scripts && python3 -m unittest test_connector_lists test_workflow_scripts -v
 
       - id: classify
         uses: ./.github/actions/classify-changes
@@ -162,6 +162,9 @@ jobs:
       matrix:
         connector: ${{ fromJSON(needs.classify_changes.outputs.matrix) }}
     env:
+      # The connector's name reaches the scripts below through this variable.
+      # A `${{ }}` expression in a script is pasted in as script text.
+      CONNECTOR: ${{ matrix.connector.name }}
       # Skip buildx's job summary and the build record it uploads.
       DOCKER_BUILD_SUMMARY: false
       DOCKER_BUILD_RECORD_UPLOAD: false
@@ -176,9 +179,9 @@ jobs:
         run: |
           TAG=$(echo $GITHUB_SHA | head -c7)
           echo ::set-output name=tag::${TAG}
-          VERSION=$(cat ${{ matrix.connector.name }}/VERSION | tr -d '\n')
+          VERSION=$(cat "$CONNECTOR/VERSION" | tr -d '\n')
           echo ::set-output name=version::${VERSION}
-          VARIANTS="$(cat ${{ matrix.connector.name }}/VARIANTS 2>/dev/null || true)"
+          VARIANTS="$(cat "$CONNECTOR/VARIANTS" 2>/dev/null || true)"
           echo ::set-output name=variants::${VARIANTS}
 
       - name: Set up Go
@@ -267,8 +270,8 @@ jobs:
           # --wait blocks until every service's healthcheck passes. Bound it:
           # without a timeout a healthcheck which never goes green hangs the
           # job until the workflow-level limit rather than failing here.
-          docker compose --file ${{ matrix.connector.name }}/docker-compose.yaml up --wait --wait-timeout 300
-          docker logs ${{ matrix.connector.name }}-db-1
+          docker compose --file "$CONNECTOR/docker-compose.yaml" up --wait --wait-timeout 300
+          docker logs "${CONNECTOR}-db-1"
 
       - name: Test setup
         if: matrix.connector.name == 'source-mongodb'
@@ -288,10 +291,10 @@ jobs:
           set -euo pipefail
           DEPS=$(go list -deps -test \
             -f '{{if and (not .ForTest) .Module (eq .Module.Path "github.com/estuary/connectors")}}{{.ImportPath}}{{end}}' \
-            './${{ matrix.connector.name }}/...')
+            "./${CONNECTOR}/...")
           PKGS=$(echo "$DEPS" \
             | grep -v '\.test$' \
-            | grep -Ev '^github.com/estuary/connectors/${{ matrix.connector.name }}(/|$)' \
+            | grep -Ev "^github.com/estuary/connectors/${CONNECTOR}(/|\$)" \
             | sort -u || true)
           [ -n "$PKGS" ] || exit 0
           go test -short -count=1 $PKGS
@@ -310,7 +313,7 @@ jobs:
             "source-sqs"
             ]'), matrix.connector.name)
         run: |
-          ${{ matrix.connector.name }}/run_tests.sh
+          "$CONNECTOR/run_tests.sh"
         env:
           # The estuary/flow repository contains a few large files in Git LFS. This can
           # present an issue with Go module checksums when using a commit-tagged version,
@@ -341,7 +344,7 @@ jobs:
           GIT_LFS_SKIP_SMUDGE: 1 # See 'Database Tests' step comment
         run: |
           set -euo pipefail
-          DOCKERFILE=${{ matrix.connector.name }}/Dockerfile
+          DOCKERFILE="$CONNECTOR/Dockerfile"
           CTX="$RUNNER_TEMP/builder"
 
           # Turn the builder stage into a shell script and run it:
@@ -406,7 +409,7 @@ jobs:
             "source-sftp",
             "source-sqlserver"
             ]'), matrix.connector.name)
-        run: CONNECTOR=${{ matrix.connector.name }} VERSION=local ./tests/smoke.sh;
+        run: VERSION=local ./tests/smoke.sh;
 
       - name: Source connector ${{ matrix.connector.name }} integration tests
         if: |
@@ -419,7 +422,7 @@ jobs:
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
-        run: CONNECTOR=${{ matrix.connector.name }} VERSION=local ./tests/run.sh;
+        run: VERSION=local ./tests/run.sh;
 
       # On failure, hand back what the capture actually produced. A snapshot
       # mismatch isn't actionable without it, and these fixtures -- localstack,
@@ -458,7 +461,7 @@ jobs:
         if: startsWith(matrix.connector.name, 'materialize-')
 
         run: |
-          CONNECTOR=${{ matrix.connector.name }} VERSION=local tests/materialize/run.sh;
+          VERSION=local tests/materialize/run.sh;
 
       # The step above drives the connector through runtime-next. This one checks
       # runtime v1 liveness: the same tests through legacy `flowctl preview` as a
@@ -484,7 +487,7 @@ jobs:
           FLOW_TEST_RUNTIME: v1
           FLOW_TEST_FLOWCTL: flowctl-v1
         run: |
-          cd ${{ matrix.connector.name }}
+          cd "$CONNECTOR"
           go test -v ./... -run '^TestIntegration' -timeout 20m
 
       # On a snapshot mismatch the harness writes this run's value beside the
