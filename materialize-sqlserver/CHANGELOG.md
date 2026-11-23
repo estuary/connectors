@@ -1,5 +1,10 @@
 # materialize-sqlserver
 
+## 2026-11-23
+
+### Fixed
+- Tables with an apostrophe in their name or schema can now be created.
+
 ## 2026-11-13
 
 ### Fixed
