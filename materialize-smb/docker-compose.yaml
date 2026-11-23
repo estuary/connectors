@@ -1,0 +1,32 @@
+services:
+  db:
+    image: dperson/samba:latest
+    command:
+      - -p
+      - -u
+      - test;testpassword
+      - -s
+      - data;/share;yes;no;no;test
+      - -s
+      - readonly;/readonly;yes;yes;no;test
+    ports:
+      - "1446:445"
+    volumes:
+      - share:/share
+      - readonly:/readonly
+    networks:
+      - flow-test
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 445"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  share: {}
+  readonly: {}
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true

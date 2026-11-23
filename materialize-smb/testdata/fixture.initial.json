@@ -1,0 +1,6 @@
+["tests/orders", {"id": 1, "status": "new", "canary": "o1"}]
+["tests/orders", {"id": 2, "status": "paid", "canary": "o2, \"quoted\""}]
+["tests/events", {"region": "us", "seq": 7, "canary": "e7"}]
+{"commit": true}
+["tests/orders", {"id": 3, "status": "new", "canary": "o3"}]
+{"commit": true}
