@@ -1,0 +1,54 @@
+collections:
+  tests/orders:
+    schema:
+      type: object
+      reduce: {strategy: merge}
+      required: [id]
+      properties:
+        id: {type: integer}
+        status: {type: string}
+        canary: {type: string}
+        amount: {type: number}
+        _meta:
+          type: object
+          properties:
+            op: {type: string}
+    key: [/id]
+
+  tests/types:
+    schema:
+      type: object
+      reduce: {strategy: merge}
+      required: [id]
+      properties:
+        id: {type: integer}
+        active: {type: boolean}
+        event_time: {type: string, format: date-time}
+        small_text: {type: string, maxLength: 100}
+        long_text: {type: string}
+        details: {type: object}
+        tags: {type: array}
+        select: {type: string}
+        field.with.dots: {type: string}
+        _meta:
+          type: object
+          properties:
+            op: {type: string}
+    key: [/id]
+
+  tests/keyed:
+    schema:
+      type: object
+      reduce: {strategy: merge}
+      required: [tenant_id, sku, event_time, code, note]
+      properties:
+        tenant_id: {type: string}
+        sku: {type: string, maxLength: 36}
+        event_time: {type: string, format: date-time}
+        code: {type: string, maxLength: 100}
+        note: {type: string}
+        _meta:
+          type: object
+          properties:
+            op: {type: string}
+    key: [/tenant_id, /sku, /event_time]

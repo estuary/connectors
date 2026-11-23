@@ -1,0 +1,9 @@
+["tests/orders", {"id": 1, "status": "new", "canary": "o1", "amount": 10.5}]
+["tests/orders", {"id": 2, "status": "new", "canary": "o2", "amount": 20}]
+["tests/types", {"id": 1, "active": true, "event_time": "2026-11-11T10:09:08.123456789+02:30", "small_text": "hello", "long_text": "__LONG_TEXT__", "details": {"nested": {"n": 1}}, "tags": [1, "two", true, null], "select": "reserved", "field.with.dots": "dotted"}]
+["tests/types", {"id": 2, "active": false}]
+["tests/keyed", {"tenant_id": "t1", "sku": "a", "event_time": "2026-11-11T10:09:08.123456789+02:30", "code": "", "note": ""}]
+["tests/keyed", {"tenant_id": "t1", "sku": "a", "event_time": "2026-11-11T07:39:08.123456789Z", "code": "c2", "note": "same instant"}]
+{"commit": true}
+["tests/orders", {"id": 3, "status": "new", "canary": "o3"}]
+{"commit": true}
