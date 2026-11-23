@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"iter"
-	"path"
 	"strings"
 
 	"github.com/estuary/connectors/go/blob"
@@ -37,7 +36,7 @@ type azureBucketWrapper struct {
 
 // URI returns the key in az:// format that MotherDuck expects for COPY operations.
 func (b *azureBucketWrapper) URI(key string) string {
-	return "az://" + path.Join(b.container, key)
+	return "az://" + blob.JoinKey(b.container, key)
 }
 
 // Delete converts az:// URIs back to HTTPS URLs before delegating to the Azure SDK.
