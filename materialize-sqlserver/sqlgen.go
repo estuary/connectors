@@ -203,9 +203,6 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 // stored binary fields as base64 text.
 func stringToVarbinaryCast(migration sql.ColumnTypeMigration) string {
 	colRef := xqueryColumnRef("", migration.Field)
-	// The whole XQuery is wrapped in a T-SQL '...' literal, so any single
-	// quotes that survived the inner escapes need to be doubled here.
-	colRef = strings.ReplaceAll(colRef, "'", "''")
 	return fmt.Sprintf(`CAST(N'' AS XML).value('xs:base64Binary(sql:column("%s"))', 'VARBINARY(MAX)')`, colRef)
 }
 
@@ -215,7 +212,6 @@ func stringToVarbinaryCast(migration sql.ColumnTypeMigration) string {
 // reverting from native binary back to base64 text storage.
 func varbinaryToStringCast(migration sql.ColumnTypeMigration) string {
 	colRef := xqueryColumnRef("", migration.Field)
-	colRef = strings.ReplaceAll(colRef, "'", "''")
 	return fmt.Sprintf(`CAST(N'' AS XML).value('xs:base64Binary(sql:column("%s"))', 'VARCHAR(MAX)')`, colRef)
 }
 
@@ -224,17 +220,16 @@ func varbinaryToStringCast(migration sql.ColumnTypeMigration) string {
 // string literal that is itself inside a T-SQL `'...'` literal.
 //
 // The column is referenced via T-SQL bracket-quoted identifier syntax, with
-// `]` doubled (T-SQL identifier escape) and `"` doubled (XQuery string escape).
-// The optional alias is prefixed unquoted; aliases in our generated SQL are
-// always simple identifiers ("l" / "r"), so they need no escaping. The caller
-// is still responsible for doubling any embedded `'` for the outer T-SQL
-// string literal.
+// `]` doubled (T-SQL identifier escape), `"` doubled (XQuery string escape)
+// and `'` doubled (outer T-SQL string literal escape). The optional alias is
+// prefixed unquoted; aliases in our generated SQL are always simple
+// identifiers ("l" / "r"), so they need no escaping.
 func xqueryColumnRef(alias, field string) string {
 	bracketed := "[" + strings.ReplaceAll(field, "]", "]]") + "]"
 	if alias != "" {
 		bracketed = alias + "." + bracketed
 	}
-	return strings.ReplaceAll(bracketed, `"`, `""`)
+	return strings.NewReplacer(`"`, `""`, "'", "''").Replace(bracketed)
 }
 
 type templates struct {
@@ -408,7 +403,7 @@ SELECT TOP 0 -1, NULL
 	       base64-encodes; in the migration path the source is VARCHAR and the
 	       target is VARBINARY(MAX), which base64-decodes. The column is
 	       referenced via XQueryColumnRef (T-SQL bracket-quoted identifier) so
-	       that field names containing ", ], or other characters are escaped
+	       that field names containing ", ], ', or other characters are escaped
 	       correctly. */ -}}
 	CAST(N'' AS XML).value('xs:base64Binary(sql:column("{{ XQueryColumnRef $.Alias $.Field }}"))', 'VARCHAR(MAX)')
 {{- else -}}
