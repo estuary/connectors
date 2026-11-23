@@ -19,6 +19,13 @@ func translateFlowField(f string) string {
 	return columnSanitizerRegexp.ReplaceAllString(f, "_")
 }
 
+// The quoting of a string literal and of one part of an identifier, for the
+// dialect and for statements built outside of its templates.
+var (
+	quoteLiteral    = sql.QuoteTransformEscapedBackslash("'", "\\'")
+	quoteIdentifier = sql.QuoteTransform("`", "``")
+)
+
 // createDatabricksDialect returns a representation of the Databricks SQL dialect.
 // https://docs.databricks.com/en/sql/language-manual/index.html
 func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
@@ -104,20 +111,18 @@ func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
 			notQuoted := func(s string) bool {
 				return sql.IsSimpleIdentifier(s) && !slices.Contains(DATABRICKS_RESERVED_WORDS, strings.ToLower(s))
 			}
-			quoteTf := sql.QuoteTransform("`", "``")
-
 			if len(path) == 1 {
 				translated := translateFlowField(path[0])
 				if notQuoted(translated) {
 					return translated
 				} else {
-					return quoteTf(translated)
+					return quoteIdentifier(translated)
 				}
 			} else {
-				return sql.JoinTransform(".", sql.PassThroughTransform(notQuoted, quoteTf))(path...)
+				return sql.JoinTransform(".", sql.PassThroughTransform(notQuoted, quoteIdentifier))(path...)
 			}
 		}),
-		Literaler: sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "\\'")),
+		Literaler: sql.ToLiteralFn(quoteLiteral),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
@@ -260,7 +265,7 @@ FROM {{ $.Table.Identifier }}{{ if $.Version }} VERSION AS OF {{ $.Version }} AS
 			{{- if $ind }}, {{ end -}}
 			{{ template "cast" $key -}}
 			{{- end }}
-			FROM json.`+"`{{ $file }}`"+`
+			FROM json.{{ QuotePath $file }}
 		)
 {{- end }}
 {{ end }}
@@ -296,7 +301,7 @@ FROM {{ $.Table.Identifier }}{{ if $.Version }} VERSION AS OF {{ $.Version }} AS
 			{{- if $ind }}, {{ end -}}
 			{{ template "cast" $key -}}
 			{{- end }}, _flow_delete::BOOLEAN
-			FROM json.`+"`{{ $file }}`"+`
+			FROM json.{{ QuotePath $file }}
 		)
 {{- end }}
 {{ end }}
@@ -413,7 +418,8 @@ CREATE TABLE IF NOT EXISTS {{ $.Identifier }} (
 	);
 {{ end }}
   `, template.FuncMap{
-		"QuoteAlias": sql.QuoteTransform("`", "``"),
+		"QuoteAlias": quoteIdentifier,
+		"QuotePath":  quoteIdentifier,
 	})
 
 	return templates{

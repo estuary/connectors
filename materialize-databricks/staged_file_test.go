@@ -116,3 +116,37 @@ func TestStagedSchemaDDL(t *testing.T) {
 			col("we`ird", "STRING"),
 		}, true))
 }
+
+// TestStagingStatementsQuoteNames covers the statements that name a catalog or
+// schema outside of a target table's identifier.
+func TestStagingStatementsQuoteNames(t *testing.T) {
+	const root = "/Volumes/o'cat/sch`ema/flow_staging/flow_temp_tables"
+
+	t.Run("create volume", func(t *testing.T) {
+		var db = recordingDB(t, nil)
+		require.NoError(t, createStagingVolume(t.Context(), db, testDialect, "sch`ema"))
+		require.Equal(t, []string{"CREATE VOLUME IF NOT EXISTS `sch``ema`.flow_staging;"}, recording.executed)
+	})
+
+	t.Run("put", func(t *testing.T) {
+		var dir = t.TempDir()
+		var path = filepath.Join(dir, "file.json.gz")
+		require.NoError(t, os.WriteFile(path, []byte("{}"), 0o644))
+
+		var db = recordingDB(t, nil)
+		var paths = make(chan string, 1)
+		paths <- path
+		close(paths)
+		var f = &stagedFile{dir: dir, root: root, txnDir: "txn"}
+		require.NoError(t, f.putWorker(t.Context(), db, paths))
+		require.Equal(t, []string{
+			"PUT '" + path + "' INTO '/Volumes/o\\'cat/sch`ema/flow_staging/flow_temp_tables/txn/file.json.gz' OVERWRITE",
+		}, recording.executed)
+	})
+
+	t.Run("merge of root-level files", func(t *testing.T) {
+		query, err := RenderTableWithStaged(renderableTable(), nil, pathsWithRoot(root, []string{"old.json.gz"}), "", testTemplates.mergeInto, nil)
+		require.NoError(t, err)
+		require.Contains(t, query, "FROM json.`/Volumes/o'cat/sch``ema/flow_staging/flow_temp_tables/old.json.gz`")
+	})
+}
