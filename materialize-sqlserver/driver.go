@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"strings"
 	"text/template"
@@ -88,15 +87,6 @@ func (c *CredentialsConfig) Validate() error {
 	return fmt.Errorf("unknown 'auth_type'")
 }
 
-type sshForwarding struct {
-	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
-	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
-}
-
-type tunnelConfig struct {
-	SshForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
-}
-
 type advancedConfig struct {
 	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false" jsonschema_extras:"nonsensitive=true"`
 	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
@@ -114,7 +104,7 @@ type config struct {
 
 	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 
-	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+	NetworkTunnel *networkTunnel.TunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
@@ -168,7 +158,7 @@ func (c *config) ToURI() (*url.URL, error) {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:1433
 	// to address through the bastion server, so we use the tunnel's address
-	if c.NetworkTunnel != nil && c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != "" {
+	if c.NetworkTunnel.InUse() {
 		address = "localhost:" + defaultPort
 	}
 
@@ -292,24 +282,10 @@ func NewDriver() *sql.Driver[config, tableConfig] {
 		DocumentationURL: "https://go.estuary.dev/materialize-sqlserver",
 		StartTunnel: func(ctx context.Context, cfg config) error {
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
-			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
-				host, port, err := net.SplitHostPort(cfg.Address)
-				if err != nil {
-					return fmt.Errorf("splitting address to host and port: %w", err)
-				}
-
-				var sshConfig = &networkTunnel.SshConfig{
-					SshEndpoint: cfg.NetworkTunnel.SshForwarding.SshEndpoint,
-					PrivateKey:  []byte(cfg.NetworkTunnel.SshForwarding.PrivateKey),
-					ForwardHost: host,
-					ForwardPort: port,
-					LocalPort:   defaultPort,
-				}
-				var tunnel = sshConfig.CreateTunnel()
-
+			if cfg.NetworkTunnel.InUse() {
 				// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
 				// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
-				if err := tunnel.Start(); err != nil {
+				if _, err := cfg.NetworkTunnel.Start(ctx, cfg.Address, defaultPort); err != nil {
 					return fmt.Errorf("error starting network tunnel: %w", err)
 				}
 			}
