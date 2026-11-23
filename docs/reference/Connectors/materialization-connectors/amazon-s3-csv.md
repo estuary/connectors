@@ -53,6 +53,7 @@ Estuary collections to your bucket.
 | `/fileSizeLimit`                     | File Size Limit       | Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank.                                           | integer |                  |
 | `/endpoint`                          | Custom S3 Endpoint    | The S3 endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS. Should normally be left blank. | string  |                  |
 | `/csvConfig/skipHeaders`             | Skip Headers          | Do not write headers to files.                                                                                                                | integer |                  |
+| `/csvConfig/escapeFormulas`          | Escape Spreadsheet Formulas | Prefix string values and headers that a spreadsheet application would evaluate as a formula with a single quote. See [Spreadsheet Formulas](#spreadsheet-formulas). | boolean | false            |
 
 #### Bindings
 
@@ -115,6 +116,22 @@ The following patterns are available:
 - `%S`: The second as a 2-digit number. (01, 02, ..., 59)
 - `%Z`: The timezone abbreviation. (will always be `UTC`)
 - `%z`: The timezone as an HHMM offset. (will always be `+0000`)
+
+## Spreadsheet Formulas
+
+String values and field names are written to the CSV files exactly as they appear in the collection.
+Spreadsheet applications such as Excel, Google Sheets and LibreOffice Calc evaluate a cell that
+starts with `=`, `+`, `-` or `@` as a formula, so a file that holds data from a source you don't
+control should not be opened in one as-is.
+
+If the files are meant to be opened in a spreadsheet application, enable **Escape Spreadsheet
+Formulas** (`/csvConfig/escapeFormulas`). String values and headers that start with `=`, `+`, `-`,
+`@`, a tab or a line break are then written with a leading single quote (`'`), which makes the
+application read them as text. Numbers, including strings that hold a signed number such as `-12.5`,
+are not changed.
+
+The option changes the values in the file. Leave it disabled when the files are loaded by a
+database, a query engine or other software.
 
 ## Multipart Upload Cleanup
 
