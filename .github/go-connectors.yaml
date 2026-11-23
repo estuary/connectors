@@ -52,6 +52,7 @@
 - name: materialize-mysql
 - name: materialize-pinecone
 - name: materialize-postgres
+- name: materialize-rabbitmq
 - name: materialize-redshift
 - name: materialize-s3-csv
 - name: materialize-s3-iceberg

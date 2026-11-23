@@ -1,0 +1,16 @@
+[
+  [
+    {"binding": 0, "key": [1], "values": ["new"], "doc": {"id": 1, "status": "new", "canary": "o1", "_meta": {"uuid": "13814000-1dd2-11b2-8000-071353030311", "op": "c"}}},
+    {"binding": 0, "key": [2], "values": ["paid"], "doc": {"id": 2, "status": "paid", "canary": "o2", "_meta": {"uuid": "13814000-1dd2-11b2-8000-071353030311", "op": "c"}}},
+    {"binding": 1, "key": ["us", 7], "doc": {"region": "us", "seq": 7, "canary": "e7", "_meta": {"uuid": "13814000-1dd2-11b2-8000-071353030311", "op": "c"}}},
+    {"binding": 2, "key": ["a1"], "doc": {"id": "a1", "canary": "a1", "_meta": {"uuid": "13814000-1dd2-11b2-8000-071353030311", "op": "c"}}}
+  ],
+  [
+    {"binding": 0, "key": [3], "values": ["new"], "doc": {"id": 3, "status": "new", "canary": "o3", "_meta": {"uuid": "13814000-1dd2-11b2-8000-071353030311", "op": "c"}}}
+  ],
+  [
+    {"binding": 0, "key": [2], "values": ["shipped"], "exists": true, "doc": {"id": 2, "status": "shipped", "canary": "o2-v2", "_meta": {"uuid": "13814001-1dd2-11b2-8000-071353030311", "op": "u"}}},
+    {"binding": 0, "key": [3], "values": [null], "delete": true, "exists": false, "doc": {"id": 3, "_meta": {"uuid": "13814001-1dd2-11b2-8000-071353030311", "op": "d"}}},
+    {"binding": 0, "key": [4], "values": ["new"], "doc": {"id": 4, "status": "new", "canary": "o4", "_meta": {"uuid": "13814001-1dd2-11b2-8000-071353030311", "op": "c"}}}
+  ]
+]

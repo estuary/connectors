@@ -1,0 +1,94 @@
+{
+  "bindings": [
+    {
+      "resource_path": [
+        "validate.orders"
+      ],
+      "delta_updates": true,
+      "projection_constraints": [
+        {
+          "field": "flow_document",
+          "constraint": {
+            "type": 2,
+            "reason": "The root document must be materialized"
+          }
+        },
+        {
+          "field": "id",
+          "constraint": {
+            "type": 4
+          }
+        },
+        {
+          "field": "status",
+          "constraint": {
+            "type": 2,
+            "reason": "The routing key field must be materialized"
+          }
+        }
+      ]
+    },
+    {
+      "resource_path": [
+        "validate.events"
+      ],
+      "delta_updates": true,
+      "projection_constraints": [
+        {
+          "field": "flow_document",
+          "constraint": {
+            "type": 2,
+            "reason": "The root document must be materialized"
+          }
+        },
+        {
+          "field": "region",
+          "constraint": {
+            "type": 4
+          }
+        },
+        {
+          "field": "seq",
+          "constraint": {
+            "type": 4
+          }
+        },
+        {
+          "field": "status",
+          "constraint": {
+            "type": 5,
+            "reason": "RabbitMQ only materializes the full document"
+          }
+        }
+      ]
+    },
+    {
+      "resource_path": [
+        "validate.audit"
+      ],
+      "delta_updates": true,
+      "projection_constraints": [
+        {
+          "field": "flow_document",
+          "constraint": {
+            "type": 2,
+            "reason": "The root document must be materialized"
+          }
+        },
+        {
+          "field": "id",
+          "constraint": {
+            "type": 4
+          }
+        },
+        {
+          "field": "status",
+          "constraint": {
+            "type": 5,
+            "reason": "RabbitMQ only materializes the full document"
+          }
+        }
+      ]
+    }
+  ]
+}
