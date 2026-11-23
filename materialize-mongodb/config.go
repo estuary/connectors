@@ -9,19 +9,11 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/go/common"
+	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 )
 
 var featureFlagDefaults = map[string]common.FlagDefault{
 	"truncate_after_backfill": common.FlagEnabled,
-}
-
-type sshForwarding struct {
-	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
-	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
-}
-
-type tunnelConfig struct {
-	SSHForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
 }
 
 type config struct {
@@ -33,7 +25,7 @@ type config struct {
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
-	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+	NetworkTunnel *networkTunnel.TunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
@@ -129,7 +121,7 @@ func (c *config) ToURI() string {
 
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:27017 to address
 	// through the bastion server, so we use the tunnel's address.
-	if c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+	if c.NetworkTunnel.InUse() {
 		uri.Host = "localhost:27017"
 	}
 
