@@ -31,15 +31,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type sshForwarding struct {
-	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
-	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
-}
-
-type tunnelConfig struct {
-	SSHForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
-}
-
 var postgresDriver = &sqlcapture.Driver{
 	ConfigSchema:     configSchema(),
 	DocumentationURL: "https://go.estuary.dev/source-postgresql",
@@ -63,24 +54,10 @@ func connectPostgres(ctx context.Context, name string, cfg json.RawMessage, _ co
 	config.SetDefaults()
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
-	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		host, port, err := net.SplitHostPort(config.Address)
-		if err != nil {
-			return nil, fmt.Errorf("splitting address to host and port: %w", err)
-		}
-
-		var sshConfig = &networkTunnel.SshConfig{
-			SshEndpoint: config.NetworkTunnel.SSHForwarding.SSHEndpoint,
-			PrivateKey:  []byte(config.NetworkTunnel.SSHForwarding.PrivateKey),
-			ForwardHost: host,
-			ForwardPort: port,
-			LocalPort:   "5432",
-		}
-		var tunnel = sshConfig.CreateTunnel()
-
+	if config.NetworkTunnel.InUse() {
 		// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
 		// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
-		if err := tunnel.Start(); err != nil {
+		if _, err := config.NetworkTunnel.Start(ctx, config.Address, "5432"); err != nil {
 			return nil, err
 		}
 	}
@@ -128,7 +105,7 @@ type Config struct {
 	DiscoveryFilters discoveryFilters `json:"discoveryFilters,omitempty" jsonschema:"title=Discovery Filters,description=Options that restrict which tables are visible to discovery."`
 	Advanced         advancedConfig   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
-	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+	NetworkTunnel *networkTunnel.TunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type authType string
@@ -373,7 +350,7 @@ func (c *Config) SetDefaults() {
 // Without a tunnel it returns "", and pgx checks each host it parsed from the
 // address against that host's own name.
 func (c *Config) tlsServerHost() string {
-	if !(c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "") {
+	if !c.NetworkTunnel.InUse() {
 		return ""
 	}
 	if host, _, err := net.SplitHostPort(c.Address); err == nil {
@@ -387,7 +364,7 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
 	// to address through the bastion server, so we use the tunnel's address
-	if c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+	if c.NetworkTunnel.InUse() {
 		address = "localhost:5432"
 	}
 

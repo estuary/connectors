@@ -16,6 +16,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/go/capture/blackbox"
+	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/flow"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -296,10 +297,10 @@ func TestConfigURI(t *testing.T) {
 }
 
 func TestTLSServerHost(t *testing.T) {
-	var tunnel = &tunnelConfig{SSHForwarding: &sshForwarding{SSHEndpoint: "ssh://user@bastion"}}
+	var tunnel = &networkTunnel.TunnelConfig{SSHForwarding: &networkTunnel.SSHForwardingConfig{SSHEndpoint: "ssh://user@bastion"}}
 	for _, tc := range []struct {
 		address string
-		tunnel  *tunnelConfig
+		tunnel  *networkTunnel.TunnelConfig
 		want    string
 	}{
 		// Without a tunnel pgx checks each host against its own name.
