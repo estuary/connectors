@@ -1,7 +1,6 @@
 package connector
 
 import (
-	"path"
 	"strings"
 	"testing"
 	"text/template"
@@ -170,38 +169,20 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 
 	snap.WriteString("--- Begin Copy From S3 With Case Sensitive Identifiers and Truncation ---")
 	require.NoError(t, testTemplates.copyFromS3.Execute(snap, copyParams))
-	snap.WriteString("--- End Copy From S3 With Case Sensitive Identifiers and Truncation ---")
+	snap.WriteString("--- End Copy From S3 With Case Sensitive Identifiers and Truncation ---\n\n")
 
-	cupaloy.SnapshotT(t, snap.String())
-}
-
-// Config values holding a single quote must stay inside the COPY's string
-// literals.
-func TestCopyFromS3QuotesConfigValues(t *testing.T) {
-	var tr = transactor{
-		templates: testTemplates,
-		store:     &s3Store{bucket: "some_bucket"},
-		cfg: config{
-			AWSAccessKeyID:     "access'KeyID",
-			AWSSecretAccessKey: "secret'Key",
-			Region:             "us-some'where-1",
-			BucketPath:         "pre'fix",
-		},
+	copyParams.ManifestURL = "s3://some_bucket/pre'fix/files.manifest"
+	copyParams.Config = config{
+		AWSAccessKeyID:     "access'KeyID",
+		AWSSecretAccessKey: "secret'Key",
+		Region:             "us-some'where-1",
 	}
 
-	got, err := tr.copyFromS3("my_temp_table", path.Join(tr.cfg.effectiveBucketPath(), "some-uuid", manifestFile), false)
-	require.NoError(t, err)
-	require.Equal(t, `
-COPY my_temp_table
-FROM 's3://some_bucket/pre''fix/some-uuid/files.manifest'
-MANIFEST
-CREDENTIALS 'aws_access_key_id=access''KeyID;aws_secret_access_key=secret''Key'
-REGION 'us-some''where-1'
-JSON 'auto ignorecase'
-GZIP
-DATEFORMAT 'auto'
-TIMEFORMAT 'auto';
-`, got)
+	snap.WriteString("--- Begin Copy From S3 With Quotes in Config Values ---")
+	require.NoError(t, testTemplates.copyFromS3.Execute(snap, copyParams))
+	snap.WriteString("--- End Copy From S3 With Quotes in Config Values ---")
+
+	cupaloy.SnapshotT(t, snap.String())
 }
 
 func TestTruncatedIdentifier(t *testing.T) {

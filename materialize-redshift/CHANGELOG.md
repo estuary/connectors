@@ -1,12 +1,5 @@
 # materialize-redshift
 
-## 2026-11-23
-
-### Fixed
-- A single quote in the Bucket Path, Region, Access Key ID or Secret Access
-  Key is now escaped in the `COPY` statement that loads staged files, instead
-  of ending the quoted value early.
-
 ## 2026-11-02
 
 ### Fixed

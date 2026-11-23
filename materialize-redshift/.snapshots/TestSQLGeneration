@@ -334,3 +334,16 @@ DATEFORMAT 'auto'
 TIMEFORMAT 'auto'
 TRUNCATECOLUMNS;
 --- End Copy From S3 With Case Sensitive Identifiers and Truncation ---
+
+--- Begin Copy From S3 With Quotes in Config Values ---
+COPY my_temp_table
+FROM 's3://some_bucket/pre''fix/files.manifest'
+MANIFEST
+CREDENTIALS 'aws_access_key_id=access''KeyID;aws_secret_access_key=secret''Key'
+REGION 'us-some''where-1'
+JSON 'auto'
+GZIP
+DATEFORMAT 'auto'
+TIMEFORMAT 'auto'
+TRUNCATECOLUMNS;
+--- End Copy From S3 With Quotes in Config Values ---
