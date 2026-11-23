@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-23
+
+### Added
+- New `knownHosts` network tunnel option makes the connector verify the SSH server's host key.
+
 ## 2026-11-19
 
 ### Fixed

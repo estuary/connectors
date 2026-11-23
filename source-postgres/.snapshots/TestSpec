@@ -330,6 +330,12 @@
                 "description": "Private key to connect to the remote SSH server.",
                 "multiline": true,
                 "secret": true
+              },
+              "knownHosts": {
+                "type": "string",
+                "title": "SSH Known Hosts",
+                "description": "Host keys of the SSH server in OpenSSH known_hosts format, one per line: the output of `ssh-keyscan -p 2222 bastion.example.com`, for example `[bastion.example.com]:2222 ssh-ed25519 AAAA...`.",
+                "multiline": true
               }
             },
             "additionalProperties": false,
