@@ -56,20 +56,36 @@ runs:
         load: true
         tags: ghcr.io/estuary/base-image:local
 
-    - name: Push base-image image
+    # BuildKit fails a whole push on the first request GHCR's rate limit
+    # rejects, so it writes the image to an OCI layout instead, and oras, which
+    # retries each rejected request, pushes it.
+    - name: Export base-image image
+      id: export
       if: ${{ github.actor != 'dependabot[bot]' }}
       uses: docker/build-push-action@v6
       with:
         context: .
         file: base-image/Dockerfile
-        push: true
-        tags: ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
+        outputs: type=oci,dest=${{ runner.temp }}/base-image-oci,tar=false
+
+    - if: ${{ github.actor != 'dependabot[bot]' }}
+      uses: oras-project/setup-oras@v2
+      with:
+        version: 1.3.6
+
+    - name: Push base-image image
+      if: ${{ github.actor != 'dependabot[bot]' }}
+      shell: bash
+      env:
+        LAYOUT: ${{ runner.temp }}/base-image-oci@${{ steps.export.outputs.digest }}
+        IMAGE: ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
+      run: bash .github/actions/deploy/push-with-retry.sh "$IMAGE" oras cp --from-oci-layout "$LAYOUT" "$IMAGE"
 
     - name: Push base-image image with 'dev' tag
       if: github.event_name == 'push' && inputs.push_dev_tags == 'true'
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        file: base-image/Dockerfile
-        push: true # See 'if' above
-        tags: ghcr.io/estuary/base-image:dev,ghcr.io/estuary/base-image:${{ steps.prep.outputs.version }}
+      shell: bash
+      env:
+        IMAGE: ghcr.io/estuary/base-image
+        DIGEST: ${{ steps.export.outputs.digest }}
+        VERSION: ${{ steps.prep.outputs.version }}
+      run: bash .github/actions/deploy/push-with-retry.sh "${IMAGE}:dev" oras tag "${IMAGE}@${DIGEST}" dev "$VERSION"
