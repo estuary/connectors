@@ -1,3 +1,5 @@
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
+
 # Rust Build Stage
 ################################################################################
 FROM rust:1-slim-trixie AS rust-builder
@@ -38,7 +40,7 @@ RUN go build -o ./connector -v ./source-mongodb/...
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:v2
+FROM ${BASE_IMAGE}
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

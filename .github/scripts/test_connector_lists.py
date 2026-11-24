@@ -164,5 +164,30 @@ class TestDockerfileInputs(unittest.TestCase):
                     )
 
 
+class TestDockerfileBaseImage(unittest.TestCase):
+    """go.yaml and rust.yaml build base-image in every run and pass it to each
+    connector's image as BASE_IMAGE. A Dockerfile that names a base-image tag
+    instead gets whatever that tag last pointed to. Only a push to main moves
+    the tag, so the nightly rebuild would leave such an image without the
+    Debian security fixes the run's own base-image picked up."""
+
+    def test_go_and_rust_images_build_on_the_base_image_argument(self):
+        for name in names(GO_LIST) + names(RUST_LIST):
+            lines = [
+                line.strip()
+                for line in (REPO_ROOT / name / "Dockerfile").read_text().splitlines()
+            ]
+            froms = [i for i, line in enumerate(lines) if line.split()[:1] == ["FROM"]]
+            with self.subTest(connector=name):
+                # The last stage is the image that ships.
+                self.assertEqual(lines[froms[-1]], "FROM ${BASE_IMAGE}")
+                # Declared before the first FROM so the FROM can use it, with a
+                # default so a local build without the argument still works.
+                self.assertTrue(
+                    any(line.startswith("ARG BASE_IMAGE=") for line in lines[: froms[0]]),
+                    f"{name}/Dockerfile has no ARG BASE_IMAGE default before its first FROM",
+                )
+
+
 if __name__ == "__main__":
     unittest.main()
