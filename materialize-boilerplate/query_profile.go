@@ -1,6 +1,7 @@
 package boilerplate
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"maps"
@@ -26,6 +27,9 @@ const (
 	QueryProfileMaxWait = 10 * time.Minute
 	// tableContextTimeout bounds reading a table's context.
 	tableContextTimeout = time.Minute
+	// queryProfileMaxBindings is the most bindings logged of a query over
+	// many of them: those it looks up the most keys of.
+	queryProfileMaxBindings = 10
 )
 
 // ErrQueryHistoryDenied is wrapped by a QueryHistory error when the
@@ -41,7 +45,8 @@ type QueryHistory interface {
 
 // QueryIDReporter has the database driver report the ID of a query run with
 // the returned context to setID. The returned func, if not nil, is called
-// once the query finishes, before its ID is read.
+// once the query finishes, before its ID is read. A connector whose driver
+// doesn't report IDs sets them with QueryTrace.SetID instead.
 type QueryIDReporter func(ctx context.Context, setID func(string)) (context.Context, func())
 
 // TableContext reads what explains a binding's slow queries beyond their
@@ -74,12 +79,20 @@ type QueryProfiler struct {
 	contextRead   []bool
 }
 
-// profiledQuery is a finished query awaiting its history.
+// profiledQuery is a finished query awaiting its history. One without an ID
+// has none to await.
 type profiledQuery struct {
 	id       string
-	binding  int
 	fields   log.Fields
+	tables   []profiledTable
 	finished time.Time
+}
+
+// profiledTable is the fields of a binding the query reads or writes, which
+// its table's context is added to.
+type profiledTable struct {
+	binding int
+	fields  log.Fields
 }
 
 // NewQueryProfiler starts a profiler of the queries of bindings with the given
@@ -171,13 +184,16 @@ func (qp *QueryProfile) Set(binding int, key string, value any) {
 
 // fields are the fields the binding's queries are logged with.
 func (qp *QueryProfile) fields(binding int) log.Fields {
+	qp.mu.Lock()
+	defer qp.mu.Unlock()
+	return qp.bindingFields(binding)
+}
+
+func (qp *QueryProfile) bindingFields(binding int) log.Fields {
 	var out = make(log.Fields)
 	if binding >= 0 && binding < len(qp.p.resourcePaths) {
 		out["resourcePath"] = qp.p.resourcePaths[binding]
 	}
-
-	qp.mu.Lock()
-	defer qp.mu.Unlock()
 	if b := qp.bindings[binding]; b != nil {
 		if b.keys > 0 {
 			out["keys"] = b.keys
@@ -190,15 +206,36 @@ func (qp *QueryProfile) fields(binding int) log.Fields {
 	return out
 }
 
+// tables are the fields of each binding the phase has learned of, for a query
+// over all of them, and how many bindings beyond the limit were left out.
+func (qp *QueryProfile) tables() (tables []profiledTable, omitted int) {
+	qp.mu.Lock()
+	defer qp.mu.Unlock()
+
+	var bindings = slices.SortedFunc(maps.Keys(qp.bindings), func(a, b int) int {
+		return cmp.Or(cmp.Compare(qp.bindings[b].keys, qp.bindings[a].keys), cmp.Compare(a, b))
+	})
+	if len(bindings) > queryProfileMaxBindings {
+		omitted = len(bindings) - queryProfileMaxBindings
+		bindings = bindings[:queryProfileMaxBindings]
+	}
+	for _, binding := range bindings {
+		tables = append(tables, profiledTable{binding: binding, fields: qp.bindingFields(binding)})
+	}
+	return tables, omitted
+}
+
 // QueryTrace measures one query run. Its methods other than SetID must be
 // called from one goroutine.
 type QueryTrace struct {
 	profile   *QueryProfile
 	binding   int
+	all       bool
 	kind      string
 	started   time.Time
 	collectID func()
 	id        atomic.Pointer[string]
+	fields    log.Fields
 
 	executeTook    time.Duration
 	docs, docBytes int
@@ -214,14 +251,37 @@ func (qp *QueryProfile) Trace(ctx context.Context, binding int, kind string) (co
 	return ctx, t
 }
 
+// TraceAll starts measuring a query over every binding the phase has learned
+// of, such as a union of their loads. See Trace.
+func (qp *QueryProfile) TraceAll(ctx context.Context, kind string) (context.Context, *QueryTrace) {
+	var ctx2, t = qp.Trace(ctx, -1, kind)
+	t.all = true
+	return ctx2, t
+}
+
 // SetID records the ID the warehouse gave the query.
 func (t *QueryTrace) SetID(id string) {
 	t.id.Store(&id)
 }
 
+// Set sets a field of the query's profile, such as a metric its result came
+// with.
+func (t *QueryTrace) Set(key string, value any) {
+	if t.fields == nil {
+		t.fields = make(log.Fields)
+	}
+	t.fields[key] = value
+}
+
 // Elapsed is the time since the query was traced.
 func (t *QueryTrace) Elapsed() time.Duration {
 	return time.Since(t.started)
+}
+
+// Slow reports whether the query has run long enough to be profiled, for a
+// connector that must ask the warehouse for its ID.
+func (t *QueryTrace) Slow() bool {
+	return t.Elapsed() >= t.profile.p.minDuration
 }
 
 // Executed records that the query's results began to arrive. The profile of a
@@ -247,13 +307,28 @@ func (t *QueryTrace) Finish(err error) {
 	if t.collectID != nil {
 		t.collectID()
 	}
-	var id = t.id.Load()
-	if id == nil {
-		return
-	}
 
-	var q = &profiledQuery{id: *id, binding: t.binding, fields: t.profile.fields(t.binding), finished: time.Now()}
-	maps.Copy(q.fields, log.Fields{"query": t.kind, "queryId": *id, "took": took.String()})
+	var q = &profiledQuery{finished: time.Now()}
+	if t.all {
+		var tables, omitted = t.profile.tables()
+		var bindings = make([]log.Fields, len(tables))
+		for i, table := range tables {
+			bindings[i] = table.fields
+		}
+		q.fields, q.tables = log.Fields{"bindings": bindings}, tables
+		if omitted > 0 {
+			q.fields["bindingsOmitted"] = omitted
+		}
+	} else {
+		q.fields = t.profile.fields(t.binding)
+		q.tables = []profiledTable{{binding: t.binding, fields: q.fields}}
+	}
+	maps.Copy(q.fields, t.fields)
+	maps.Copy(q.fields, log.Fields{"query": t.kind, "took": took.String()})
+	if id := t.id.Load(); id != nil {
+		q.id = *id
+		q.fields["queryId"] = *id
+	}
 	if t.executeTook > 0 {
 		maps.Copy(q.fields, log.Fields{"executeTook": t.executeTook.String(), "docs": t.docs, "docBytes": t.docBytes})
 	}
@@ -287,14 +362,17 @@ func (p *QueryProfiler) run(ctx context.Context) {
 // fetch logs each awaiting query whose history is final, or which has waited
 // too long for it, and returns the others.
 func (p *QueryProfiler) fetch(ctx context.Context, awaiting []*profiledQuery, now time.Time) []*profiledQuery {
+	var ids []string
+	for _, q := range awaiting {
+		if q.id != "" {
+			ids = append(ids, q.id)
+		}
+	}
+
 	var history = make(map[string]log.Fields)
-	for batch := range slices.Chunk(awaiting, queryProfileBatchSize) {
+	for ids := range slices.Chunk(ids, queryProfileBatchSize) {
 		if p.history == nil {
 			break
-		}
-		var ids = make([]string, len(batch))
-		for i, q := range batch {
-			ids[i] = q.id
 		}
 		fetched, err := p.history.Fetch(ctx, ids)
 		if errors.Is(err, ErrQueryHistoryDenied) {
@@ -315,24 +393,26 @@ func (p *QueryProfiler) fetch(ctx context.Context, awaiting []*profiledQuery, no
 
 	var rest = awaiting[:0]
 	for _, q := range awaiting {
-		if fields, ok := history[q.id]; ok {
-			var out = maps.Clone(q.fields)
-			maps.Copy(out, fields)
-			p.emit(p.addTableContext(ctx, q.binding, out))
-		} else if p.history == nil || now.Sub(q.finished) >= QueryProfileMaxWait {
-			p.emit(p.addTableContext(ctx, q.binding, q.fields))
-		} else {
+		var fields, ok = history[q.id]
+		if !ok && q.id != "" && p.history != nil && now.Sub(q.finished) < QueryProfileMaxWait {
 			rest = append(rest, q)
+			continue
 		}
+		maps.Copy(q.fields, fields)
+		for _, table := range q.tables {
+			p.addTableContext(ctx, table)
+		}
+		p.emit(q.fields)
 	}
 	return rest
 }
 
 // addTableContext adds the binding's table context to its first logged
 // profile.
-func (p *QueryProfiler) addTableContext(ctx context.Context, binding int, fields log.Fields) log.Fields {
+func (p *QueryProfiler) addTableContext(ctx context.Context, table profiledTable) {
+	var binding = table.binding
 	if p.tableContext == nil || binding < 0 || binding >= len(p.contextRead) || p.contextRead[binding] {
-		return fields
+		return
 	}
 	p.contextRead[binding] = true
 
@@ -342,8 +422,7 @@ func (p *QueryProfiler) addTableContext(ctx context.Context, binding int, fields
 	if err != nil {
 		log.WithError(err).WithField("resourcePath", p.resourcePaths[binding]).Debug("reading table context for query profiles failed")
 	}
-	maps.Copy(fields, extra)
-	return fields
+	maps.Copy(table.fields, extra)
 }
 
 // StatementKind names a query by its leading keyword, such as "merge" or
