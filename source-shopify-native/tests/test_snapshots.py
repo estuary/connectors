@@ -1,5 +1,6 @@
 import json
 import subprocess
+from typing import Callable
 
 
 def sanitize_tokens(data):
@@ -45,21 +46,29 @@ def test_capture(request, snapshot):
     lines = [json.loads(line) for line in result.stdout.splitlines()]
 
     # Keep one representative document per stream, preserving first-appearance order.
-    # Prefer the first order whose nested list isn't empty, so the snapshot shows its items.
-    NESTED_LIST_KEYS = {
-        "acmeCo/order_returns": "returns",
-        "acmeCo/order_shipping_lines": "shippingLines",
+    # For the streams below, prefer the first document that has data in its nested lists, so the
+    # snapshot shows their items rather than empty lists.
+    def has_refund_details(record: dict) -> bool:
+        refunds = record.get("refunds", [])
+        return any(r.get("orderAdjustments") for r in refunds) and any(
+            r.get("refundShippingLines") for r in refunds
+        )
+
+    PREFERRED: dict[str, Callable[[dict], bool]] = {
+        "acmeCo/order_returns": lambda r: bool(r.get("returns")),
+        "acmeCo/order_shipping_lines": lambda r: bool(r.get("shippingLines")),
+        "acmeCo/order_refunds": has_refund_details,
     }
     chosen: dict[str, list] = {}
     order: list[str] = []
 
     for line in lines:
         stream, record = line[0], line[1]
-        list_key = NESTED_LIST_KEYS.get(stream)
+        prefer = PREFERRED.get(stream)
         if stream not in chosen:
             chosen[stream] = line
             order.append(stream)
-        elif list_key and not chosen[stream][1].get(list_key) and record.get(list_key):
+        elif prefer and not prefer(chosen[stream][1]) and prefer(record):
             chosen[stream] = line
 
     unique_stream_lines = []
