@@ -85,7 +85,9 @@ func TestQueryHistoryFetch(t *testing.T) {
 
 	fields, err := newTableContext(cfg.toURI(), []sql.InfoTableLocation{ep.TableLocator([]string{table})})(ctx, 0)
 	require.NoError(t, err)
-	require.Equal(t, int64(4), fields["table"].(log.Fields)["rows"])
+	// The merge's updates leave the rows they replaced to be vacuumed.
+	require.GreaterOrEqual(t, fields["table"].(log.Fields)["rows"], int64(4))
+	require.Contains(t, fields["table"].(log.Fields), "visibleRows")
 	require.NotEmpty(t, fields["table"].(log.Fields)["distStyle"])
 	require.NotEmpty(t, fields["warehouse"].(log.Fields)["version"])
 }

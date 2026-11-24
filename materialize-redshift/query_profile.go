@@ -248,15 +248,15 @@ func newTableContext(uri string, locations []sql.InfoTableLocation) boilerplate.
 // tables that have rows, to users granted it.
 func describeTable(ctx context.Context, conn *pgx.Conn, loc sql.InfoTableLocation) (log.Fields, error) {
 	var distStyle, sortKey, encoded *string
-	var sortKeys, size, rows *int64
+	var sortKeys, size, rows, visibleRows *int64
 	var pctUsed, unsorted, statsOff, skewRows, sortBenefit *float64
 	if err := conn.QueryRow(ctx, `
 SELECT TRIM(diststyle), TRIM(sortkey1), sortkey_num::bigint, TRIM(encoded), size::bigint, tbl_rows::bigint,
-	pct_used::float8, unsorted::float8, stats_off::float8, skew_rows::float8, vacuum_sort_benefit::float8
+	estimated_visible_rows::bigint, pct_used::float8, unsorted::float8, stats_off::float8, skew_rows::float8, vacuum_sort_benefit::float8
 FROM svv_table_info
 WHERE database = current_database() AND LOWER("schema") = LOWER($1) AND LOWER("table") = LOWER($2)`,
 		loc.TableSchema, loc.TableName,
-	).Scan(&distStyle, &sortKey, &sortKeys, &encoded, &size, &rows, &pctUsed, &unsorted, &statsOff, &skewRows, &sortBenefit); errors.Is(err, pgx.ErrNoRows) {
+	).Scan(&distStyle, &sortKey, &sortKeys, &encoded, &size, &rows, &visibleRows, &pctUsed, &unsorted, &statsOff, &skewRows, &sortBenefit); errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("svv_table_info: %w", err)
@@ -268,8 +268,9 @@ WHERE database = current_database() AND LOWER("schema") = LOWER($1) AND LOWER("t
 			out[name] = *v
 		}
 	}
-	// size is in 1 MB blocks.
-	for name, v := range map[string]*int64{"sortKeys": sortKeys, "sizeMB": size, "rows": rows} {
+	// size is in 1 MB blocks. rows counts those deleted but not yet vacuumed,
+	// which scans still read.
+	for name, v := range map[string]*int64{"sortKeys": sortKeys, "sizeMB": size, "rows": rows, "visibleRows": visibleRows} {
 		if v != nil {
 			out[name] = *v
 		}
