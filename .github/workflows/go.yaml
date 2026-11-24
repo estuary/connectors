@@ -395,6 +395,23 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/estuary/build-cache:${{ matrix.connector.name }}
           cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('type=registry,ref=ghcr.io/estuary/build-cache:{0},mode=max,ignore-error=true', matrix.connector.name) || '' }}
 
+      # A pull request scans the image it built for HIGH and CRITICAL findings.
+      # The scan runs as soon as the image exists, so a test failure below
+      # doesn't hide its result, but it doesn't fail the job here: "Require a
+      # clean image scan" does, just before Deployment pushes anything, so a
+      # finding doesn't hide the test results either. See CONTRIBUTING.md for
+      # exceptions. Builds of main aren't scanned here: failing them would only
+      # leave the previous image, with the same finding, deployed. The Image
+      # Scan workflow scans what they publish.
+      - name: Scan ${{ matrix.connector.name }} image
+        id: scan
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: ./.github/actions/scan-images
+        with:
+          images: ${{ matrix.connector.name }} ghcr.io/estuary/${{ matrix.connector.name }}:local
+          image_src: docker
+
       # Fetch the spec from the built image, to catch images which are entirely
       # broken. This is the only image-level coverage for connectors whose real
       # tests drive the connector as a local command or in-process driver.
@@ -513,6 +530,13 @@ jobs:
           include-hidden-files: true
           retention-days: 7
           if-no-files-found: ignore
+
+      # Fails closed: a scan that didn't succeed for any reason fails the job.
+      - name: Require a clean image scan
+        if: github.event_name == 'pull_request' && steps.scan.outcome != 'success'
+        run: |
+          echo "::error::ghcr.io/estuary/${{ matrix.connector.name }}:local has a HIGH or CRITICAL finding with a fixed release, or could not be scanned. See the 'Scan ${{ matrix.connector.name }} image' step, and CONTRIBUTING.md for exceptions."
+          exit 1
 
       - name: Deployment
         uses: ./.github/actions/deploy

@@ -1,0 +1,21 @@
+# Trivy exceptions that apply to every connector image, for findings in what
+# many of them share: base-image under every Go and Rust connector, the Python
+# base image under every Python one, or the flow-network-tunnel binary in those
+# that support SSH tunnels. An exception for one connector goes in that
+# connector's own <connector>/.trivyignore.yaml instead, where it applies only
+# when that connector's image (and its variants) is scanned.
+#
+# .github/scripts/trivy-scan.sh merges this file with the connector's when it
+# scans an image. Every entry needs an `id`, a `statement` giving its rationale,
+# and an `expired_at` date, after which Trivy reports the finding again and it
+# must be re-justified. Operations approves every change; see CONTRIBUTING.md.
+# For example:
+#
+#   vulnerabilities:
+#     - id: CVE-0000-00000
+#       expired_at: 2027-01-31
+#       statement: >-
+#         Why this finding does not affect what we ship, or why it cannot be
+#         fixed yet, and what would change that.
+
+vulnerabilities: []
