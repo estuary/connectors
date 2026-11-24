@@ -24,7 +24,8 @@ func nextJobID(prefix string, attempt uint32) string {
 
 // queryIdempotent runs the provided query with its associated files and ensures
 // that it is only run a single time. Job IDs are computed deterministically
-// from the prefix, and once one has succeeded it will not be run again.
+// from the prefix, and once one has succeeded it will not be run again. It
+// returns the ID and final status of the job that succeeded.
 func (c client) queryIdempotent(
 	ctx context.Context,
 	schema bigquery.Schema,
@@ -32,7 +33,7 @@ func (c client) queryIdempotent(
 	jobPrefix string,
 	sourceURIs []string,
 	tempTableName string,
-) (*bigquery.JobStatus, error) {
+) (string, *bigquery.JobStatus, error) {
 	q := c.bigqueryClient.Query(query)
 	q.Location = c.cfg.Region
 	if tempTableName != "" {
@@ -55,11 +56,11 @@ func (c client) queryIdempotent(
 				// If it is still running, we can wait for it to finish.
 				j, err := c.bigqueryClient.JobFromIDLocation(ctx, jobID, c.cfg.Region)
 				if err != nil {
-					return nil, fmt.Errorf("getting job metadata for %q: %w", jobID, err)
+					return "", nil, fmt.Errorf("getting job metadata for %q: %w", jobID, err)
 				}
 
 				if stat, err := j.Status(ctx); err != nil {
-					return nil, fmt.Errorf("getting job status of previously submitted job %q: %w", jobID, err)
+					return "", nil, fmt.Errorf("getting job status of previously submitted job %q: %w", jobID, err)
 				} else if stat.Err() != nil {
 					log.WithFields(log.Fields{
 						"error": err,
@@ -73,7 +74,7 @@ func (c client) queryIdempotent(
 					// but before it could acknowledge the commit to the Flow
 					// runtime.
 					log.WithField("jobID", jobID).Info("previously submitted job completed successfully")
-					return stat, nil
+					return jobID, stat, nil
 				}
 
 				log.WithFields(log.Fields{
@@ -82,44 +83,44 @@ func (c client) queryIdempotent(
 
 				stat, err := j.Wait(ctx)
 				if err != nil {
-					return nil, fmt.Errorf("getting job status of previously submitted job %q while waiting for it to finish: %w", jobID, err)
+					return "", nil, fmt.Errorf("getting job status of previously submitted job %q while waiting for it to finish: %w", jobID, err)
 				} else if stat.Err() != nil {
-					return nil, fmt.Errorf("waited for previously submitted job %q to finish but it resulted in an error: %w", jobID, err)
+					return "", nil, fmt.Errorf("waited for previously submitted job %q to finish but it resulted in an error: %w", jobID, err)
 				} else if !stat.Done() {
-					return nil, fmt.Errorf("interal application error: previously submitted job not done after waiting with no error")
+					return "", nil, fmt.Errorf("interal application error: previously submitted job not done after waiting with no error")
 				}
 
 				log.WithFields(log.Fields{
 					"jobID": jobID,
 				}).Info("previously submitted job finished successfully after waiting")
-				return stat, nil
+				return jobID, stat, nil
 			}
 
 			// Other errors will crash the connector and automatically be
 			// retried when it restarts.
-			return nil, err
+			return "", nil, err
 		}
 
 		// Check the job status to see if it failed immediately, which has been
 		// observed to happen under some circumstances and can cause `job.Wait`
 		// to hang.
 		if stat, err := job.Status(ctx); err != nil {
-			return nil, fmt.Errorf("getting job status: %w", err)
+			return "", nil, fmt.Errorf("getting job status: %w", err)
 		} else if stat.Err() != nil {
-			return nil, fmt.Errorf("job failed: %w", stat.Err())
+			return "", nil, fmt.Errorf("job failed: %w", stat.Err())
 		}
 
 		// Wait for the job to complete, ensuring that it does so without error.
 		stat, err := job.Wait(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("waiting for job: %w", err)
+			return "", nil, fmt.Errorf("waiting for job: %w", err)
 		} else if stat.Err() != nil {
-			return nil, fmt.Errorf("job failed after waiting: %w", stat.Err())
+			return "", nil, fmt.Errorf("job failed after waiting: %w", stat.Err())
 		} else if !stat.Done() {
-			return nil, fmt.Errorf("interal application error: job not done after waiting with no error")
+			return "", nil, fmt.Errorf("interal application error: job not done after waiting with no error")
 		}
 
-		return stat, nil
+		return jobID, stat, nil
 	}
 }
 
