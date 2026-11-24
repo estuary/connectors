@@ -52,7 +52,9 @@ type QueryIDReporter func(ctx context.Context, setID func(string)) (context.Cont
 // TableContext reads what explains a binding's slow queries beyond their
 // history, such as its table's layout and maintenance. It's called once per
 // binding, in the background, and its fields are added to the binding's first
-// logged profile. Fields it returns with an error are still logged.
+// logged profile. Fields it returns with an error are still logged. In the
+// profile of a query over several bindings its "table" field is logged with
+// the binding, and its other fields, such as the warehouse's, with the query.
 type TableContext func(ctx context.Context, binding int) (log.Fields, error)
 
 // ProfileBounds are the key bounds a binding's queries are restricted to.
@@ -411,7 +413,7 @@ func (p *QueryProfiler) fetch(ctx context.Context, awaiting []*profiledQuery, no
 		}
 		maps.Copy(q.fields, fields)
 		for _, table := range q.tables {
-			p.addTableContext(ctx, table)
+			p.addTableContext(ctx, q, table)
 		}
 		p.emit(q.fields)
 	}
@@ -420,7 +422,7 @@ func (p *QueryProfiler) fetch(ctx context.Context, awaiting []*profiledQuery, no
 
 // addTableContext adds the binding's table context to its first logged
 // profile.
-func (p *QueryProfiler) addTableContext(ctx context.Context, table profiledTable) {
+func (p *QueryProfiler) addTableContext(ctx context.Context, q *profiledQuery, table profiledTable) {
 	var binding = table.binding
 	if p.tableContext == nil || binding < 0 || binding >= len(p.contextRead) || p.contextRead[binding] {
 		return
@@ -433,7 +435,13 @@ func (p *QueryProfiler) addTableContext(ctx context.Context, table profiledTable
 	if err != nil {
 		log.WithError(err).WithField("resourcePath", p.resourcePaths[binding]).Debug("reading table context for query profiles failed")
 	}
-	maps.Copy(table.fields, extra)
+	for k, v := range extra {
+		if k == "table" {
+			table.fields[k] = v
+		} else {
+			q.fields[k] = v
+		}
+	}
 }
 
 // StatementKind names a query by its leading keyword, such as "merge" or

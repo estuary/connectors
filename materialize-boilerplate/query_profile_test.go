@@ -308,7 +308,7 @@ func TestQueryProfilerTableContext(t *testing.T) {
 	})
 
 	t.Run("adds each table's context to a query over several bindings", func(t *testing.T) {
-		var p, emitted, calls = withContext(log.Fields{"table": "x"}, nil)
+		var p, emitted, calls = withContext(log.Fields{"table": "x", "warehouse": "w"}, nil)
 		var first, second = log.Fields{"keys": 1}, log.Fields{"keys": 2}
 		var q = &profiledQuery{
 			fields:   log.Fields{"bindings": []log.Fields{first, second}},
@@ -317,7 +317,7 @@ func TestQueryProfilerTableContext(t *testing.T) {
 		}
 		p.fetch(context.Background(), []*profiledQuery{q}, now)
 		require.Equal(t, []int{1, 0}, *calls)
-		require.Equal(t, []log.Fields{{"bindings": []log.Fields{
+		require.Equal(t, []log.Fields{{"warehouse": "w", "bindings": []log.Fields{
 			{"keys": 1, "table": "x"}, {"keys": 2, "table": "x"},
 		}}}, *emitted)
 	})
