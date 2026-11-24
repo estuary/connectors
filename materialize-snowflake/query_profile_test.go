@@ -5,6 +5,8 @@ import (
 	stdsql "database/sql"
 	"testing"
 
+	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -52,4 +54,40 @@ func TestQueryHistoryFetch(t *testing.T) {
 
 	require.Equal(t, "FAILED_WITH_ERROR", history[failed]["status"])
 	require.NotContains(t, history[failed], "partitionsTotal")
+}
+
+func TestTableContext(t *testing.T) {
+	cfg := mustGetCfg(t)
+	dsn, err := cfg.toURI(true, "query-profile-test")
+	require.NoError(t, err)
+	db, err := stdsql.Open("snowflake", dsn)
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+
+	ctx := context.Background()
+	var dialect = snowflakeDialect(cfg.Schema, cfg.TimestampType, nil)
+	var name = "query_profile_" + uuid.NewString()[:8]
+	var identifier = dialect.Identifier(name)
+	_, err = db.ExecContext(ctx, "CREATE TABLE "+identifier+" AS SELECT SEQ4() AS id FROM TABLE(GENERATOR(ROWCOUNT => 1000))")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, err := db.ExecContext(ctx, "DROP TABLE "+identifier)
+		require.NoError(t, err)
+	})
+
+	var b = &binding{target: sql.Table{
+		Identifier:   identifier,
+		InfoLocation: dialect.TableLocator([]string{name}),
+		Keys:         []sql.Column{{Identifier: "id"}},
+	}}
+	fields, err := newTableContext(db, []*binding{b})(ctx, 0)
+	require.NoError(t, err)
+
+	var table, warehouse = fields["table"].(map[string]any), fields["warehouse"].(map[string]any)
+	require.Equal(t, int64(1000), table["rows"])
+	require.Positive(t, table["bytes"])
+	require.Equal(t, int64(1), table["partitions"])
+	require.Contains(t, table, "keyAverageDepth")
+	require.NotEmpty(t, warehouse["version"])
+	require.NotEmpty(t, warehouse["size"])
 }

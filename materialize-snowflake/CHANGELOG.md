@@ -1,5 +1,14 @@
 # materialize-snowflake
 
+## 2026-11-24
+
+### Added
+- The first slow query of each table in a run also logs, on its query profile
+  line, the table's row count, size and clustering key, how many
+  micro-partitions it has and how much they overlap on its key columns, and
+  the warehouse's size, type, cluster counts, scaling policy and query
+  acceleration settings where the role may see them.
+
 ## 2026-11-23
 
 ### Fixed
