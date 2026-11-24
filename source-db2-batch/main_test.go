@@ -206,6 +206,46 @@ func TestSpec(t *testing.T) {
 	cupaloy.SnapshotT(t, string(formatted))
 }
 
+func TestValidateTemplateCursorUse(t *testing.T) {
+	const incremental = `{{if .IsFirstQuery}}SELECT * FROM "DB"."T" ORDER BY "UPDATED_AT";{{else}}SELECT * FROM "DB"."T" WHERE "UPDATED_AT" > @flow_cursor_value[0] ORDER BY "UPDATED_AT";{{end}}`
+	for _, tc := range []struct {
+		Name     string
+		Resource Resource
+		WantErr  string
+	}{
+		{Name: "IncrementalNoCursor", Resource: Resource{Name: "t", Template: incremental}, WantErr: "no cursor columns are set"},
+		{Name: "PlaceholderTextInBothBranches", Resource: Resource{Name: "t", Template: `{{if .IsFirstQuery}}SELECT 'cost ?' AS note FROM t{{else}}SELECT 'cost ?' AS note FROM t ORDER BY id{{end}}`}},
+		{Name: "PlaceholderTextOnlyInLaterBranch", Resource: Resource{Name: "t", Template: `{{if .IsFirstQuery}}SELECT 1 FROM t{{else}}SELECT 'cost ?' AS note FROM t{{end}}`}, WantErr: "no cursor columns are set"},
+		{Name: "PlaceholderTextRepeatedInLaterBranch", Resource: Resource{Name: "t", Template: `{{if .IsFirstQuery}}SELECT 'cost ?' AS note FROM t{{else}}SELECT 'cost ?' AS note FROM t WHERE x > ?{{end}}`}, WantErr: "no cursor columns are set"},
+		{Name: "LaterBranchRenderError", Resource: Resource{Name: "t", Template: `{{if .IsFirstQuery}}SELECT 1 FROM t{{else}}SELECT {{index .CursorFields 0}} FROM t{{end}}`}, WantErr: "error generating query"},
+		{Name: "IncrementalWithCursor", Resource: Resource{Name: "t", Template: incremental, Cursor: []string{"updated_at"}}},
+		{Name: "DefaultTemplateNoCursor", Resource: Resource{Name: "t", SchemaName: "db", TableName: "t", Template: tableQueryTemplateCursor}},
+		{Name: "PlainQueryNoCursor", Resource: Resource{Name: "t", Template: `SELECT * FROM "DB"."T";`}},
+		{Name: "NoTemplateNoCursor", Resource: Resource{Name: "t", SchemaName: "db", TableName: "t"}},
+	} {
+		t.Run(tc.Name, func(t *testing.T) {
+			var err = validateTemplateCursorUse(tc.Resource)
+			if tc.WantErr != "" {
+				require.ErrorContains(t, err, tc.WantErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+// If Validate stops calling validateTemplateCursorUse, the unit test above still
+// passes, so this test checks the call. It needs a database because Validate
+// connects first.
+func TestValidateRejectsTemplateWithoutCursor(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	resourceJSON, err := json.Marshal(Resource{Name: "t", Template: `{{if .IsFirstQuery}}SELECT 1 FROM t{{else}}SELECT 1 FROM t WHERE x > @flow_cursor_value[0]{{end}}`})
+	require.NoError(t, err)
+	cs.Bindings = []*pf.CaptureSpec_Binding{{ResourceConfigJson: resourceJSON}}
+	_, err = cs.Validate(ctx, t)
+	require.ErrorContains(t, err, "no cursor columns are set")
+}
+
 // TestIncorrectLogin verifies that the connector returns a useful error message
 // when the user provides incorrect login credentials.
 func TestIncorrectLogin(t *testing.T) {
