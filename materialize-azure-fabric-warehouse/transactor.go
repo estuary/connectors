@@ -446,10 +446,16 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					}
 					if n, err := exec(t.templates.storeInsertQuery, "insert", "insert"); err != nil {
 						return err
-					} else if _, err := exec(t.templates.dropStoreTable, "drop store table", ""); err != nil {
-						return err
 					} else {
 						bindingAffected += n
+					}
+
+					// A DROP TABLE can't be labelled, so it isn't profiled.
+					var dropQuery strings.Builder
+					if err := t.templates.dropStoreTable.Execute(&dropQuery, params); err != nil {
+						return err
+					} else if _, err := txn.ExecContext(ctx, dropQuery.String()); err != nil {
+						return fmt.Errorf("executing store drop store table query for binding[%d]: %w", idx, err)
 					}
 				}
 				t.be.FinishedResourceCommit(b.target.Path)
@@ -538,11 +544,8 @@ func commitTraced(ctx context.Context, txn *stdsql.Tx, profiler *boilerplate.Que
 }
 
 // execTraced runs a query of the binding in the transaction, profiled as the
-// binding's unless it has no kind.
+// binding's.
 func execTraced(ctx context.Context, txn *stdsql.Tx, profile *boilerplate.QueryProfile, binding int, kind, query string) (stdsql.Result, error) {
-	if kind == "" {
-		return txn.ExecContext(ctx, query)
-	}
 	var _, trace = profile.Trace(ctx, binding, kind)
 	res, err := txn.ExecContext(ctx, labelQuery(trace, query))
 	trace.Finish(err)
