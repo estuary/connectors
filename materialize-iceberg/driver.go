@@ -71,12 +71,23 @@ type computeJob struct {
 	SparkJobProperties []sparkJobProperty
 }
 
+// jobResult is what a compute backend reports of a job it ran, which it may
+// also do of a job that failed.
+type jobResult struct {
+	// id is the backend's ID of the run, if its runs have one.
+	id string
+	// fields are the backend's own measurements of the run, for its query
+	// profile.
+	fields log.Fields
+	stats  python.JobStats
+}
+
 // computeRunner abstracts the execution backend that runs the materialization's
 // PySpark jobs. emrClient submits to AWS EMR Serverless for production
 // deployments; sparkClient shells out to a local Spark standalone cluster
 // running in docker-compose for integration tests.
 type computeRunner interface {
-	runJob(ctx context.Context, job computeJob) error
+	runJob(ctx context.Context, job computeJob) (jobResult, error)
 	checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr)
 	ensureSecret(ctx context.Context, wantCred string) error
 }
@@ -627,7 +638,7 @@ func (d *materialization) UpdateResource(
 			})
 			ll.Info("running column migration job")
 			ts := time.Now()
-			if err := d.compute.runJob(ctx, computeJob{
+			if _, err := d.compute.runJob(ctx, computeJob{
 				Input:            python.ExecInput{Query: q.String()},
 				EntryPointURI:    d.pyFiles.exec,
 				PyFilesCommonURI: d.pyFiles.common,
@@ -686,6 +697,7 @@ func (d *materialization) NewTransactor(
 		storeFiles:            boilerplate.NewStagedFiles(stagedFileClient{}, d.bucket, fileSizeLimit, d.cfg.Compute.BucketPath, true, true),
 		pyFiles:               *pyFiles,
 		truncateAfterBackfill: d.truncateAfterBackfill,
+		profiler:              newQueryProfiler(d.catalog, d.compute, mappedBindings),
 	}
 
 	for idx, mapped := range mappedBindings {

@@ -286,7 +286,7 @@ func (h *morHarness) merge(mb morBinding, rows []morRow) {
 		binding: binding{Idx: 0, Mapped: &mb},
 		Bounds:  morBounds(mb, ids),
 	}))
-	require.NoError(h.t, h.mat.compute.runJob(h.ctx, computeJob{
+	_, err := h.mat.compute.runJob(h.ctx, computeJob{
 		Input: python.MergeInput{Bindings: []python.MergeBinding{{
 			Binding:          0,
 			Query:            q.String(),
@@ -298,7 +298,8 @@ func (h *morHarness) merge(mb morBinding, rows []morRow) {
 		PyFilesCommonURI: h.mat.pyFiles.common,
 		Name:             "merge",
 		WorkingPrefix:    path.Join(h.cfg.Compute.BucketPath, uuid.NewString()),
-	}), q.String())
+	})
+	require.NoError(h.t, err, q.String())
 }
 
 // load runs the connector's load query for the keys and returns n by id,
@@ -316,7 +317,7 @@ func (h *morHarness) load(mb morBinding, ids []string) map[string]int64 {
 	}))
 
 	outputPrefix := path.Join(h.cfg.Compute.BucketPath, uuid.NewString())
-	require.NoError(h.t, h.mat.compute.runJob(h.ctx, computeJob{
+	_, err := h.mat.compute.runJob(h.ctx, computeJob{
 		Input: python.LoadInput{
 			Query:          q.String(),
 			Bindings:       []python.LoadBinding{{Binding: 0, Keys: keys, Files: []string{h.stage([]string{"id"}, values)}}},
@@ -326,7 +327,8 @@ func (h *morHarness) load(mb morBinding, ids []string) map[string]int64 {
 		PyFilesCommonURI: h.mat.pyFiles.common,
 		Name:             "load",
 		WorkingPrefix:    outputPrefix,
-	}), q.String())
+	})
+	require.NoError(h.t, err, q.String())
 
 	got := map[string]int64{}
 	for obj := range h.mat.bucket.List(h.ctx, blob.Query{Prefix: outputPrefix}) {

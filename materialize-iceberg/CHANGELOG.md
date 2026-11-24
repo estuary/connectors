@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-11-24
+
+### Added
+- Load and merge jobs that run for at least five seconds are logged with what
+  the job measured of itself: how long the load query ran once Spark had
+  started, and for each table how long its merge and backfill truncation
+  took, how often the merge was retried, and the files, records and deletes
+  its snapshot added and removed. With EMR Serverless, the log also has the
+  job run's ID, how long it waited to start and ran, and the vCPU, memory
+  and storage its workers used and were billed for. A load also logs the
+  keys it looked up in each table and the key bounds it was restricted to,
+  and a merge its rows and key bounds. A merge job over more than ten tables
+  logs the ten it took the longest over. The first slow job of each table in
+  a run also logs the table's format version, partitioning, sort order,
+  Iceberg table properties and the files, deletes and records of its
+  current snapshot, and the EMR application's release and capacity where the
+  execution role may call `emr-serverless:GetApplication`.
+
 ## 2026-11-23
 
 ### Changed

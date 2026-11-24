@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	"github.com/estuary/connectors/materialize-iceberg/python"
 	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
 )
@@ -58,19 +59,22 @@ func (s *sparkClient) ensureSecret(ctx context.Context, wantCred string) error {
 // (load.py, merge.py, exec.py); pyFilesCommonURI and workingPrefix are part
 // of the EMR contract but unused here — the daemon imports the python modules
 // directly and returns status in the HTTP response body.
-func (s *sparkClient) runJob(ctx context.Context, job computeJob) error {
+func (s *sparkClient) runJob(ctx context.Context, job computeJob) (jobResult, error) {
 	action, err := actionFromEntryPoint(job.EntryPointURI)
 	if err != nil {
-		return err
+		return jobResult{}, err
 	}
 
 	log.WithFields(log.Fields{"job": job.Name, "action": action}).Debug("submitting spark job to daemon")
 
-	var result daemonResult
-	if err := s.postDaemon(ctx, action, job.Input, &result); err != nil {
-		return fmt.Errorf("spark job %q: %w", job.Name, err)
+	var result struct {
+		daemonResult
+		Stats python.JobStats `json:"stats"`
 	}
-	return nil
+	if err := s.postDaemon(ctx, action, job.Input, &result); err != nil {
+		return jobResult{}, fmt.Errorf("spark job %q: %w", job.Name, err)
+	}
+	return jobResult{stats: result.Stats}, nil
 }
 
 // daemonResult is the status every daemon action reports. Actions that return

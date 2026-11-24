@@ -19,6 +19,19 @@ type mergeBound struct {
 	LiteralUpper string
 }
 
+// mergeBounds are the bounds of each of a binding's key fields.
+type mergeBounds []mergeBound
+
+// ProfileFields describes the bounds as sql.MergeBounds does.
+func (bounds mergeBounds) ProfileFields() map[string]any {
+	var out = make(sql.MergeBounds, len(bounds))
+	for i, b := range bounds {
+		out[i].Field = b.Field
+		out[i].LiteralLower, out[i].LiteralUpper = b.LiteralLower, b.LiteralUpper
+	}
+	return out.ProfileFields()
+}
+
 type mergeBoundsBuilder struct {
 	keys      []boilerplate.MappedProjection[mapped]
 	literaler func(any) string

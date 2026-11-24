@@ -41,22 +41,24 @@ type migrateInput struct {
 
 func quoteIdentifier(in string) string { return "`" + strings.ReplaceAll(in, "`", "``") + "`" }
 
+// tableFQN is the fully qualified 3-part path of a table,
+// `estuary`.`database`.`table`, under the catalog name the python scripts
+// use. Queries use it to prevent ambiguity in case the database has the same
+// name as the catalog.
+func tableFQN(path []string) string {
+	quotedParts := make([]string, 0, 3)
+	quotedParts = append(quotedParts, "`estuary`")
+	for _, part := range path {
+		quotedParts = append(quotedParts, quoteIdentifier(part))
+	}
+	return strings.Join(quotedParts, ".")
+}
+
 func parseTemplates() templates {
 	tpl := template.New("root").Funcs(template.FuncMap{
 		"QuoteIdentifier": quoteIdentifier,
-		"TableFQN": func(in []string) string {
-			quotedParts := make([]string, 0, 3)
-			// This is the catalog name used by the python scripts, we use a
-			// fully qualified 3-part path: `spark_catalog`.`database`.`table`
-			// in queries to prevent abiguity in case the database has the same
-			// name as the catalog.
-			quotedParts = append(quotedParts, "`estuary`")
-			for _, part := range in {
-				quotedParts = append(quotedParts, quoteIdentifier(part))
-			}
-			return strings.Join(quotedParts, ".")
-		},
-		"IsBinary": func(m mapped) bool { return m.type_.Equals(iceberg.BinaryType{}) },
+		"TableFQN":        tableFQN,
+		"IsBinary":        func(m mapped) bool { return m.type_.Equals(iceberg.BinaryType{}) },
 		// DocumentAsJSON is the document column of alias as JSON text: a
 		// variant document is rendered through TO_JSON so that loaded
 		// documents and the delete sentinel comparison see the same text a

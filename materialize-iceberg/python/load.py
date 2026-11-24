@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from common import (
     NestedField,
     common_args,
@@ -23,6 +25,7 @@ def run(spark, input):
             f"load_view_{bindingIdx}"
         )
 
+    started = time.time()
     spark.sql(query).write.csv(
         output_location,
         mode="error",
@@ -31,10 +34,13 @@ def run(spark, input):
         sep=chr(0),
         quote=chr(0),
     )
+    query_ms = int((time.time() - started) * 1000)
 
     for binding in bindings:
         bindingIdx: int = binding["binding"]
         spark.catalog.dropTempView(f"load_view_{bindingIdx}")
+
+    return {"stats": {"query_ms": query_ms}}
 
 
 if __name__ == "__main__":

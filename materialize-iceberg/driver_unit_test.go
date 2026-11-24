@@ -44,10 +44,10 @@ type recordingComputeRunner struct {
 	jobsRun   int
 }
 
-func (r *recordingComputeRunner) runJob(_ context.Context, job computeJob) error {
+func (r *recordingComputeRunner) runJob(_ context.Context, job computeJob) (jobResult, error) {
 	r.lastInput = job.Input
 	r.jobsRun++
-	return nil
+	return jobResult{}, nil
 }
 
 func (r *recordingComputeRunner) checkPrereqs(context.Context, *cerrors.PrereqErr) {}
@@ -94,6 +94,7 @@ func TestAcknowledgeRecoveryTruncateOnly(t *testing.T) {
 		}}},
 		recovery:   true,
 		compute:    compute,
+		profiler:   boilerplate.NewQueryProfiler(nil, profileInterval, nil, nil, nil),
 		bucket:     noopBucket{},
 		storeFiles: boilerplate.NewStagedFiles(stagedFileClient{}, noopBucket{}, 0, "", true, true),
 	}
@@ -134,6 +135,7 @@ func TestAcknowledgeRecoveryMergeAndTruncateAlreadyCompleted(t *testing.T) {
 		}}},
 		recovery:   true,
 		compute:    compute,
+		profiler:   boilerplate.NewQueryProfiler(nil, profileInterval, nil, nil, nil),
 		bucket:     noopBucket{},
 		storeFiles: boilerplate.NewStagedFiles(stagedFileClient{}, noopBucket{}, 0, "", true, true),
 	}
