@@ -197,19 +197,28 @@ def log():
 
 @pytest.mark.asyncio
 async def test_top_level_list_inline(log):
-    """A refund whose inline page is complete is flattened with no extra request."""
+    """A refund whose inline pages are complete is flattened with no extra request."""
     order = {
         "id": "gid://shopify/Order/1",
         "refunds": [
-            {"id": "gid://shopify/Refund/1", "refundLineItems": _conn([{"id": "a"}, {"id": "b"}])},
+            {
+                "id": "gid://shopify/Refund/1",
+                "refundLineItems": _conn([{"id": "a"}, {"id": "b"}]),
+                "orderAdjustments": _conn([{"id": "c"}]),
+                "refundShippingLines": _conn([{"id": "d"}]),
+                "transactions": _conn([{"id": "e"}]),
+            },
         ],
     }
     http = MockHTTP(outer_pages=[_outer_page("orders", [order])])
 
     docs = await _capture(OrderRefunds, http, log)
 
-    dumped = docs[0].model_dump(by_alias=True)
-    assert dumped["refunds"][0]["refundLineItems"] == [{"id": "a"}, {"id": "b"}]
+    refund = docs[0].model_dump(by_alias=True)["refunds"][0]
+    assert refund["refundLineItems"] == [{"id": "a"}, {"id": "b"}]
+    assert refund["orderAdjustments"] == [{"id": "c"}]
+    assert refund["refundShippingLines"] == [{"id": "d"}]
+    assert refund["transactions"] == [{"id": "e"}]
     assert len(http.queries) == 1  # outer query only
 
 
@@ -224,27 +233,42 @@ async def test_top_level_list_missing_raises(log):
 
 
 @pytest.mark.asyncio
-async def test_top_level_list_overflow_drains(log):
+@pytest.mark.parametrize(
+    "field", ["refundLineItems", "orderAdjustments", "refundShippingLines", "transactions"]
+)
+async def test_top_level_list_overflow_drains(log, field):
     """A refund whose inline page reports hasNextPage drains the rest via node(id: <refund>)."""
-    order = {
-        "id": "gid://shopify/Order/1",
-        "refunds": [
-            {
-                "id": "gid://shopify/Refund/1",
-                "refundLineItems": _conn([{"id": "a"}], has_next=True, end_cursor="C1"),
-            },
-        ],
+    # Every connection on the refund is complete and empty except `field`, which has more pages.
+    refund = {
+        "id": "gid://shopify/Refund/1",
+        "refundLineItems": _conn([]),
+        "orderAdjustments": _conn([]),
+        "refundShippingLines": _conn([]),
+        "transactions": _conn([]),
     }
+    refund[field] = _conn([{"id": "a"}], has_next=True, end_cursor="C1")
+    order = {"id": "gid://shopify/Order/1", "refunds": [refund]}
     http = MockHTTP(
         outer_pages=[_outer_page("orders", [order])],
-        node_pages={"gid://shopify/Refund/1": [_node_page("refundLineItems", [{"id": "b"}])]},
+        node_pages={"gid://shopify/Refund/1": [_node_page(field, [{"id": "b"}])]},
     )
 
     docs = await _capture(OrderRefunds, http, log)
 
     dumped = docs[0].model_dump(by_alias=True)
-    assert dumped["refunds"][0]["refundLineItems"] == [{"id": "a"}, {"id": "b"}]
-    assert any('node(id: "gid://shopify/Refund/1"' in q for q in http.queries)
+    assert dumped["refunds"][0][field] == [{"id": "a"}, {"id": "b"}]
+    assert len(http.queries) == 2
+    overflow_query = http.queries[1]
+    assert 'node(id: "gid://shopify/Refund/1")' in overflow_query
+    assert "... on Refund" in overflow_query
+    assert f'{field}(first: 250, after: "C1")' in overflow_query
+    # GraphQL rejects a fragment the query defines but never uses. Every connection except
+    # `transactions` selects money amounts through _MoneyBagFields.
+    if field == "transactions":
+        assert "_MoneyBagFields" not in overflow_query
+    else:
+        assert "fragment _MoneyBagFields on MoneyBag" in overflow_query
+        assert "..._MoneyBagFields" in overflow_query
 
 
 # --- []: connection directly on the node ----------------------------------------------------------
