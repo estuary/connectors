@@ -116,7 +116,8 @@ func NewQueryProfiler(history QueryHistory, interval time.Duration, reportIDs Qu
 	return p
 }
 
-// Stop ends the profiler, dropping the queries still awaiting their history.
+// Stop ends the profiler, logging the queries still awaiting their history
+// without it.
 func (p *QueryProfiler) Stop() {
 	p.cancel()
 	p.done.Wait()
@@ -350,7 +351,17 @@ func (p *QueryProfiler) run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			return
+			for {
+				select {
+				case q := <-p.queue:
+					awaiting = append(awaiting, q)
+				default:
+					for _, q := range awaiting {
+						p.emit(q.fields)
+					}
+					return
+				}
+			}
 		case q := <-p.queue:
 			awaiting = append(awaiting, q)
 		case <-ticker.C:

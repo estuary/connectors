@@ -324,6 +324,16 @@ func TestQueryProfilerTableContext(t *testing.T) {
 }
 
 func TestQueryProfilerStop(t *testing.T) {
-	var p = NewQueryProfiler(nil, time.Hour, nil, nil, nil)
+	var p = NewQueryProfiler(&fakeHistory{}, time.Hour, fakeReportIDs, [][]string{{"a"}}, nil)
+	var emitted []log.Fields
+	p.emit = func(fields log.Fields) { emitted = append(emitted, fields) }
+	p.minDuration = 0
+
+	var _, trace = p.Trace(withID("q1"), 0, "merge")
+	trace.Finish(errors.New("boom"))
 	p.Stop()
+
+	require.Len(t, emitted, 1)
+	require.Equal(t, "q1", emitted[0]["queryId"])
+	require.Equal(t, true, emitted[0]["failed"])
 }
