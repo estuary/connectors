@@ -7,7 +7,7 @@ use crate::{
 use anyhow::Context;
 use axum::{
     body::Bytes,
-    extract::{DefaultBodyLimit, Json, Path, Query, State},
+    extract::{DefaultBodyLimit, FromRequest, Json, Path, Query, Request, State},
     routing, Router,
 };
 use doc::Validator;
@@ -158,7 +158,7 @@ async fn handle_webhook(
     matched_path: axum::extract::MatchedPath,
     path_params: Option<Path<serde_json::Map<String, Value>>>,
     Query(query_params): Query<serde_json::Map<String, serde_json::Value>>,
-    body: Bytes,
+    request: Request,
 ) -> (StatusCode, Json<Value>) {
     match handler
         .handle_webhook(
@@ -166,7 +166,7 @@ async fn handle_webhook(
             path_params.map(|p| p.0).unwrap_or_default(),
             request_headers,
             query_params,
-            body,
+            request,
         )
         .await
     {
@@ -425,7 +425,7 @@ impl Handler {
         path_params: serde_json::Map<String, Value>,
         request_headers: axum::http::header::HeaderMap,
         query_params: serde_json::Map<String, serde_json::Value>,
-        body: Bytes,
+        request: Request,
     ) -> anyhow::Result<(StatusCode, Json<Value>)> {
         if let Some(expected_header) = self.require_auth_header.as_ref() {
             match required_string_header(&request_headers, "Authorization") {
@@ -442,6 +442,19 @@ impl Handler {
                 }
             }
         }
+
+        // Read the body only after checking the token, so a request without it
+        // is rejected before its body takes up memory.
+        let body = match Bytes::from_request(request, &()).await {
+            Ok(b) => b,
+            Err(rejection) => {
+                return Ok(err_response(
+                    rejection.status(),
+                    anyhow::anyhow!(rejection.body_text()),
+                    matched_path,
+                ));
+            }
+        };
 
         let body = match self.signature_verifier.verify_request(&request_headers, body) {
             Ok(b) => b,
