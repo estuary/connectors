@@ -35,6 +35,10 @@
   to: /reference/Connectors/capture-connectors/jira-native/
 - from: /reference/Connectors/capture-connectors/Salesforce/salesforce-real-time/
   to: /reference/Connectors/capture-connectors/Salesforce/salesforce-native/
+- from: /reference/Connectors/capture-connectors/Salesforce/
+  to: /reference/Connectors/capture-connectors/salesforce-native/
+- from: /reference/Connectors/capture-connectors/Salesforce/salesforce-native
+  to: /reference/Connectors/capture-connectors/salesforce-native/
 - from: /reference/Connectors/capture-connectors/shopify/
   to: /reference/Connectors/capture-connectors/shopify-native/
 - from: /reference/Connectors/capture-connectors/stripe/
