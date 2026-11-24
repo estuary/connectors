@@ -74,6 +74,49 @@ async fn test_http_request_processing() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[tokio::test]
+async fn test_wrong_token_rejected_before_body() -> Result<(), anyhow::Error> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_source-http-ingest"))
+        .kill_on_drop(true)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .env("SOURCE_HTTP_INGEST_PORT", "27174")
+        .env("LOG_LEVEL", "info")
+        .spawn()?;
+
+    let mut stdin = child.stdin.take().unwrap();
+    let mut reader = BufReader::new(child.stdout.take().unwrap());
+
+    let mut open = open_json();
+    open["open"]["capture"]["config"] = serde_json::json!({"requireAuthToken": "secret"});
+    write_capture_request(&open, &mut stdin).await?;
+    read_response(&mut reader).await.context("reading opened")?;
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+    // Promise a large body but send only its first byte, so the connector can
+    // only respond if it doesn't wait for the rest.
+    let mut conn = tokio::net::TcpStream::connect("127.0.0.1:27174").await?;
+    conn.write_all(
+        b"POST /aliceCo/test/webhook-data HTTP/1.1\r\n\
+          Host: localhost\r\n\
+          Authorization: Bearer wrong\r\n\
+          Content-Type: application/json\r\n\
+          Content-Length: 1000000\r\n\r\n[",
+    )
+    .await?;
+
+    let mut response = [0; 64];
+    let n = tokio::time::timeout(std::time::Duration::from_secs(5), conn.read(&mut response))
+        .await
+        .context("timed out waiting for a response")??;
+    let response = String::from_utf8_lossy(&response[..n]);
+    anyhow::ensure!(response.starts_with("HTTP/1.1 403"), "{response}");
+    Ok(())
+}
+
 async fn run_http_request_processing(
     mut stdin: ChildStdin,
     stdout: ChildStdout,
