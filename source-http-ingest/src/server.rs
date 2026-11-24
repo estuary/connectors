@@ -19,7 +19,7 @@ use tower_http::{cors, decompression::RequestDecompressionLayer};
 use utoipa::openapi::{self, schema, security, OpenApi, OpenApiBuilder, Type};
 use utoipa_swagger_ui::SwaggerUi;
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::io;
 use tokio::sync::{Mutex, Semaphore, SemaphorePermit};
 
@@ -29,6 +29,10 @@ const MAX_BODY_SIZE: usize = 64 * 1024 * 1024;
 
 /// The most memory that buffered request bodies may take up at once.
 const BODY_MEMORY_BUDGET: usize = 256 * 1024 * 1024;
+
+/// How long a request may take to send its body, so a request that stops
+/// sending can't hold its part of the budget indefinitely.
+const BODY_READ_TIMEOUT: Duration = Duration::from_secs(120);
 
 pub fn parse_cors_allowed_origins(
     cors_allow_origins: &[String],
@@ -455,11 +459,22 @@ impl Handler {
 
         // Read the body only after checking the token, so a request without it
         // is rejected before its body takes up memory.
-        let (body, _body_permit) =
-            match read_body(request.into_body(), MAX_BODY_SIZE, &self.body_budget).await {
-                Ok(read) => read,
-                Err((status, err)) => return Ok(err_response(status, err, matched_path)),
-            };
+        let (body, _body_permit) = match tokio::time::timeout(
+            BODY_READ_TIMEOUT,
+            read_body(request.into_body(), MAX_BODY_SIZE, &self.body_budget),
+        )
+        .await
+        {
+            Ok(Ok(read)) => read,
+            Ok(Err((status, err))) => return Ok(err_response(status, err, matched_path)),
+            Err(_) => {
+                return Ok(err_response(
+                    StatusCode::REQUEST_TIMEOUT,
+                    anyhow::anyhow!("timed out reading the request body"),
+                    matched_path,
+                ));
+            }
+        };
 
         let body = match self.signature_verifier.verify_request(&request_headers, body) {
             Ok(b) => b,
