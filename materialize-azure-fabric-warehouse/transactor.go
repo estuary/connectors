@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	stdsql "database/sql"
 	"fmt"
 	"strings"
 	"text/template"
@@ -51,6 +52,7 @@ type transactor struct {
 	loadFiles  *boilerplate.StagedFiles
 	bindings   []*binding
 	be         *m.BindingEvents
+	profiler   *boilerplate.QueryProfiler
 
 	// truncateAfterBackfill permits deleting rows published before a
 	// completed backfill.
@@ -123,6 +125,7 @@ func newTransactor(
 		b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal)
 		t.bindings = append(t.bindings, b)
 	}
+	t.profiler = newQueryProfiler(cfg, t.bindings)
 
 	return t, nil
 }
@@ -160,12 +163,14 @@ func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSp
 	return t.fence.Checkpoint, nil
 }
 
-func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (returnErr error) {
 	var ctx = it.Context()
 
 	hadLoads := false
+	var profile = t.profiler.NewProfile()
 	for it.Next() {
 		hadLoads = true
+		profile.AddKeys(it.Binding, 1)
 		b := t.bindings[it.Binding]
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
@@ -211,17 +216,19 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("flushing store file: %w", err)
 		}
 
+		var bounds = b.load.mergeBounds.Build()
+		profile.SetBounds(idx, bounds)
 		params := &queryParams{
 			Table:             b.target,
 			URIs:              uris,
 			StorageAccountKey: t.cfg.StorageAccountKey,
-			Bounds:            b.load.mergeBounds.Build(),
+			Bounds:            bounds,
 		}
 
 		var createQuery strings.Builder
 		if err := t.templates.createLoadTable.Execute(&createQuery, params); err != nil {
 			return fmt.Errorf("rendering create load table: %w", err)
-		} else if _, err := txn.ExecContext(ctx, createQuery.String()); err != nil {
+		} else if _, err := execTraced(ctx, txn, profile, idx, "copy", createQuery.String()); err != nil {
 			log.WithField(
 				"query", redactedQuery(createQuery, t.cfg.StorageAccountKey),
 			).Error("create load table query failed")
@@ -248,12 +255,15 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	q := strings.Join(unionQueries, "\nUNION ALL\n")
-	rows, err := txn.QueryContext(ctx, q)
+	var _, trace = profile.TraceAll(ctx, "load")
+	defer func() { trace.Finish(returnErr) }()
+	rows, err := txn.QueryContext(ctx, labelQuery(trace, q))
 	if err != nil {
 		log.WithField("query", q).Error("load query failed")
 		return fmt.Errorf("querying load documents: %w", err)
 	}
 	defer rows.Close()
+	trace.Executed()
 	t.be.FinishedEvaluatingLoads()
 
 	for rows.Next() {
@@ -265,6 +275,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 
 		doc := json.RawMessage(document)
+		trace.AddDocument(len(doc))
 		if b := t.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
@@ -373,6 +384,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		affected := make([]int64, len(t.bindings))
 		truncated := make(map[int]int64, len(t.truncations))
 
+		var profile = t.profiler.NewProfile()
+		for idx, b := range t.bindings {
+			if parameters[idx] != nil && b.store.mustMerge {
+				profile.SetBounds(idx, sql.MergeBounds(parameters[idx].Bounds))
+			}
+		}
+
 		if err := commitRetry.Do(ctx, "committing store transaction", func(ctx context.Context) error {
 			txn, err := db.BeginTx(ctx, nil)
 			if err != nil {
@@ -389,12 +407,12 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				// Statements run one per Exec: go-mssqldb sums the row counts of
 				// every statement in a batch, which would fold the staging load
 				// into the count of target rows affected.
-				exec := func(tpl *template.Template, name string) (int64, error) {
+				exec := func(tpl *template.Template, name, kind string) (int64, error) {
 					var query strings.Builder
 					if err := tpl.Execute(&query, params); err != nil {
 						return 0, err
 					}
-					res, err := txn.ExecContext(ctx, query.String())
+					res, err := execTraced(ctx, txn, profile, idx, kind, query.String())
 					if err != nil {
 						log.WithField(
 							"query", redactedQuery(query, t.cfg.StorageAccountKey),
@@ -410,25 +428,25 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				if !b.store.mustMerge && !b.hasBinaryColumns {
 					// All values are new and need no conversion, so the data can
 					// be loaded directly into the target table.
-					if n, err := exec(t.templates.storeCopyIntoDirectQuery, "copy into"); err != nil {
+					if n, err := exec(t.templates.storeCopyIntoDirectQuery, "copy into", "copy"); err != nil {
 						return err
 					} else {
 						bindingAffected += n
 					}
 				} else {
-					if _, err := exec(t.templates.createStoreTable, "create store table"); err != nil {
+					if _, err := exec(t.templates.createStoreTable, "create store table", "copy"); err != nil {
 						return err
 					}
 					if b.store.mustMerge {
-						if n, err := exec(t.templates.storeDeleteQuery, "delete"); err != nil {
+						if n, err := exec(t.templates.storeDeleteQuery, "delete", "delete"); err != nil {
 							return err
 						} else {
 							bindingAffected += n
 						}
 					}
-					if n, err := exec(t.templates.storeInsertQuery, "insert"); err != nil {
+					if n, err := exec(t.templates.storeInsertQuery, "insert", "insert"); err != nil {
 						return err
-					} else if _, err := exec(t.templates.dropStoreTable, "drop store table"); err != nil {
+					} else if _, err := exec(t.templates.dropStoreTable, "drop store table", ""); err != nil {
 						return err
 					} else {
 						bindingAffected += n
@@ -452,7 +470,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				}); err != nil {
 					return fmt.Errorf("evaluating truncate query for %s: %w", b.target.Identifier, err)
 				}
-				res, err := txn.ExecContext(ctx, query.String())
+				res, err := execTraced(ctx, txn, t.profiler.NewProfile(), binding, "delete", query.String())
 				if err != nil {
 					log.WithField("query", redactedQuery(query, t.cfg.StorageAccountKey)).Error("truncate query failed")
 					return fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
@@ -467,7 +485,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				return fmt.Errorf("getting fence update rows affected: %w", err)
 			} else if rows != 1 {
 				return fmt.Errorf("this instance was fenced off by another")
-			} else if err := txn.Commit(); err != nil {
+			} else if err := commitTraced(ctx, txn, t.profiler); err != nil {
 				return fmt.Errorf("committing store transaction: %w", err)
 			}
 
@@ -506,7 +524,30 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-func (t *transactor) Destroy() {}
+func (t *transactor) Destroy() {
+	t.profiler.Stop()
+}
+
+// commitTraced commits the transaction, profiled as a query of no binding.
+// Query insights can't be asked for it: a COMMIT takes no label.
+func commitTraced(ctx context.Context, txn *stdsql.Tx, profiler *boilerplate.QueryProfiler) error {
+	var _, trace = profiler.Trace(ctx, -1, "commit")
+	var err = txn.Commit()
+	trace.Finish(err)
+	return err
+}
+
+// execTraced runs a query of the binding in the transaction, profiled as the
+// binding's unless it has no kind.
+func execTraced(ctx context.Context, txn *stdsql.Tx, profile *boilerplate.QueryProfile, binding int, kind, query string) (stdsql.Result, error) {
+	if kind == "" {
+		return txn.ExecContext(ctx, query)
+	}
+	var _, trace = profile.Trace(ctx, binding, kind)
+	res, err := txn.ExecContext(ctx, labelQuery(trace, query))
+	trace.Finish(err)
+	return res, err
+}
 
 func redactedQuery(query strings.Builder, storageAccountKey string) string {
 	return strings.ReplaceAll(query.String(), storageAccountKey, "REDACTED")
