@@ -333,7 +333,7 @@ func TestPartitionByDataPath(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{}), profiler: testProfiler()}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -426,6 +426,7 @@ func TestRecoveryAfterPartitionChangingBackfill(t *testing.T) {
 		_range:    &pf.RangeSpec{},
 		ensured:   make(chan struct{}),
 		state:     make(connectorState),
+		profiler:  testProfiler(),
 	}
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
@@ -575,7 +576,7 @@ func TestStoreTablePartitionDrift(t *testing.T) {
 	_, err = db.ExecContext(ctx, staleSQL)
 	require.NoError(t, err)
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{}), profiler: testProfiler()}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
