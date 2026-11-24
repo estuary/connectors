@@ -1,5 +1,10 @@
 # source-mysql-batch
 
+## 2026-11-24
+
+### Changed
+- A publish now fails when a binding's query template override uses cursor values but the binding has no cursor columns.
+
 ## 2026-11-23
 
 ### Added

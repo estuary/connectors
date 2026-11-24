@@ -118,6 +118,57 @@ func (r Resource) Validate() error {
 	return nil
 }
 
+// validateTemplateCursorUse rejects a template that uses cursor values when the
+// binding has no cursor columns. Without cursor columns `.IsFirstQuery` is always
+// true, so the branch with cursor values never runs and every poll reads the
+// whole table.
+//
+// It is not in Resource.Validate because Pull also calls that, and a running
+// task should not start to fail when it restarts.
+func validateTemplateCursorUse(res Resource) error {
+	if res.Template == "" || len(res.Cursor) > 0 {
+		return nil
+	}
+	queryTemplate, err := template.New("query").Funcs(templateFuncs).Parse(res.Template)
+	if err != nil {
+		return fmt.Errorf("binding %q: error parsing template: %w", res.Name, err)
+	}
+	var placeholders = func(isFirstQuery bool) ([]string, error) {
+		var queryBuf = new(strings.Builder)
+		if err := queryTemplate.Execute(queryBuf, map[string]any{
+			"IsFirstQuery": isFirstQuery,
+			"CursorFields": []string(nil),
+			"SchemaName":   res.SchemaName,
+			"TableName":    res.TableName,
+		}); err != nil {
+			return nil, fmt.Errorf("binding %q: error generating query: %w", res.Name, err)
+		}
+		return queryPlaceholderRegexp.FindAllString(queryBuf.String(), -1), nil
+	}
+	firstPlaceholders, err := placeholders(true)
+	if err != nil {
+		return err
+	}
+	laterPlaceholders, err := placeholders(false)
+	if err != nil {
+		return err
+	}
+	// The first query already runs with no cursor values, so placeholder text in
+	// it, such as in a string literal, is not a real placeholder. Counting that
+	// text would reject templates that work.
+	var firstCounts = make(map[string]int)
+	for _, p := range firstPlaceholders {
+		firstCounts[p]++
+	}
+	for _, p := range laterPlaceholders {
+		if firstCounts[p] == 0 {
+			return fmt.Errorf("binding %q: the query template uses cursor values, but no cursor columns are set; set cursor columns, or remove the cursor values from the template", res.Name)
+		}
+		firstCounts[p]--
+	}
+	return nil
+}
+
 // documentMetadata contains the metadata located at /_meta
 type documentMetadata struct {
 	Polled time.Time `json:"polled" jsonschema:"title=Polled Timestamp,description=The time at which the update query which produced this document as executed."`
@@ -187,6 +238,9 @@ func (drv *BatchSQLDriver) Validate(ctx context.Context, req *pc.Request_Validat
 		var res Resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
+		}
+		if err := validateTemplateCursorUse(res); err != nil {
+			return nil, err
 		}
 
 		out = append(out, &pc.Response_Validated_Binding{
