@@ -2,6 +2,10 @@
 
 ## 2026-11-23
 
+### Added
+- New `payouts` and `balance_transactions` streams capture Shopify Payments
+  payouts and balance transactions.
+
 ### Changed
 - Bulk query results are downloaded without the store's access token.
 - Waits at most 5 minutes at a time for Shopify's API rate limit to recover.

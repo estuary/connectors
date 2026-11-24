@@ -18,7 +18,7 @@ class StaffMembers(ShopifyGraphQLResource):
     NAME = "staff_members"
     QUERY_ROOT = "staffMembers"
     SHOULD_USE_BULK_QUERIES = False
-    QUALIFYING_SCOPES = {"read_users"}
+    QUALIFYING_SCOPES = [{"read_users"}]
     REQUIRES_PLUS_OR_ADVANCED_PLAN = True
     QUERY = """
     id

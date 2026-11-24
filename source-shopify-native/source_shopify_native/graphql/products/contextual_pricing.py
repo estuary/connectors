@@ -38,7 +38,7 @@ class ProductVariantContextualPricing(ShopifyGraphQLResource):
     # productVariants can filter on updated_at but offers no updated_at sortKey, so the connector
     # routes this stream to the unsorted incremental path.
     SORT_KEY = None
-    QUALIFYING_SCOPES = {"read_products"}
+    QUALIFYING_SCOPES = [{"read_products"}]
     # A change to a market's price adjustment, fixed prices, rounding or exchange rate doesn't
     # advance a variant's updatedAt. To capture those changes, we re-backfill the binding every
     # day; the incremental stream keeps capturing variant edits while the backfill runs.

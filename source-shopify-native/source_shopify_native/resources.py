@@ -35,6 +35,7 @@ from .api import (
     bulk_fetch_snapshot,
     fetch_incremental,
     fetch_incremental_unsorted,
+    fetch_payouts,
     fetch_snapshot,
     snapshot_price_list_prices,
 )
@@ -178,6 +179,8 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.LocationMetafields,
     gql.SubscriptionContracts,
     gql.Disputes,
+    gql.Payouts,
+    gql.BalanceTransactions,
 ]
 
 PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {
@@ -256,8 +259,10 @@ def _get_available_resources(
     available: set[type[ShopifyGraphQLResource]] = set()
 
     for resource in INCREMENTAL_RESOURCES + FULL_REFRESH_RESOURCES:
-        # Skip if none of the qualifying scopes are granted
-        if resource.QUALIFYING_SCOPES.isdisjoint(granted_scopes):
+        # Skip unless at least one scope from each qualifying set is granted
+        if not resource.QUALIFYING_SCOPES or any(
+            scopes.isdisjoint(granted_scopes) for scopes in resource.QUALIFYING_SCOPES
+        ):
             continue
         # Skip PII resources for custom app tokens when plan doesn't allow PII
         if uses_custom_app_token and resource in PII_RESOURCES and not can_access_pii:
@@ -585,13 +590,18 @@ def _build_incremental_resource(
         stores_with_access, config.start_date, use_backfill
     )
     legacy_store_id = config._legacy_store or config.stores[0].store
+    # A blank start_date defaults to 30 days before each start, which can cut into the window a
+    # payouts read looks back over. So those reads only honor a start_date the config sets.
+    configured_start_date = (
+        config.start_date if "start_date" in config.model_fields_set else None
+    )
 
     async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
-        _all_bindings,
+        all_bindings: list[tuple[CaptureBinding[ResourceConfig], Resource]],
     ):
         await _reconcile_connector_state(
             stores_with_access,
@@ -604,7 +614,7 @@ def _build_incremental_resource(
 
         # Warn if FulfillmentOrders has partial scope coverage
         if model == gql.FulfillmentOrders:
-            fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES
+            fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES[0]
             for store_id in stores_with_access:
                 granted = store_contexts[store_id].capabilities.scopes
                 if fo_scopes & granted and not fo_scopes <= granted:
@@ -626,6 +636,19 @@ def _build_incremental_resource(
         # removed stores is inert and intentionally preserved.
         fetch_changes: dict[str, functools.partial] = {}
         fetch_page: dict[str, functools.partial] = {}
+
+        balance_transactions_binding = (
+            next(
+                (
+                    index
+                    for index, (_, resource) in enumerate(all_bindings)
+                    if resource.name == gql.BalanceTransactions.NAME
+                ),
+                None,
+            )
+            if model is gql.Payouts
+            else None
+        )
 
         for store_id in stores_with_access:
             ctx = store_contexts[store_id]
@@ -655,6 +678,26 @@ def _build_incremental_resource(
                     ctx.capabilities,
                     datetime.fromtimestamp(0, tz=UTC),
                     build_query=build_query,
+                )
+            elif model is gql.Payouts:
+                fetch_changes[store_id] = functools.partial(
+                    fetch_payouts,
+                    ctx.client,
+                    create_response_data_model(gql.Payouts),
+                    create_response_data_model(gql.BalanceTransactions),
+                    store_id,
+                    ctx.capabilities,
+                    configured_start_date,
+                    balance_transactions_binding,
+                )
+                fetch_page[store_id] = functools.partial(
+                    backfill_incremental_unsorted,
+                    ctx.client,
+                    model,
+                    data_model,
+                    store_id,
+                    ctx.capabilities,
+                    config.start_date,
                 )
             elif model.SHOULD_USE_BULK_QUERIES:
                 fetch_changes[store_id] = functools.partial(

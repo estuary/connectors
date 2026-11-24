@@ -18,7 +18,7 @@ class Disputes(ShopifyGraphQLResource):
     # The disputes query offers no datetime sortKey, so the connector routes
     # this stream to the unsorted incremental path.
     SORT_KEY = None
-    QUALIFYING_SCOPES = {"read_shopify_payments_disputes"}
+    QUALIFYING_SCOPES = [{"read_shopify_payments_disputes"}]
     # Disputes are filtered based off of the initiatedAt field, which lets the
     # connector incrementally capture creations of new records but miss updates
     # to older records. To capture updates, we re-backfill the binding every day.
