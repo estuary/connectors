@@ -11,7 +11,9 @@ if [[ ${#db2icrt[@]} -ne 1 || ! -x "${db2icrt[0]}" ]]; then
     echo "Expected one Db2 instance installer at /opt/ibm/db2/V*/instance/db2icrt" >&2
     exit 1
 fi
-"${db2icrt[0]}" -update-instance-if-exists -u db2fenc1 -nosharedgroup db2inst1
+if [[ ! -f ~db2inst1/sqllib/db2profile ]]; then
+    "${db2icrt[0]}" -update-instance-if-exists -u db2fenc1 -nosharedgroup db2inst1
+fi
 
 su - db2inst1 -c 'bash -s' <<'DB2'
 source "$HOME/sqllib/db2profile"
