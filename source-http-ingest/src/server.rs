@@ -6,11 +6,13 @@ use crate::{
 
 use anyhow::Context;
 use axum::{
-    body::Bytes,
-    extract::{DefaultBodyLimit, FromRequest, Json, Path, Query, Request, State},
+    body::{Body, Bytes},
+    extract::{Json, Path, Query, Request, State},
     routing, Router,
 };
+use bytes::BytesMut;
 use doc::Validator;
+use futures::StreamExt;
 use http::{header::InvalidHeaderValue, status::StatusCode, HeaderValue};
 use serde_json::Value;
 use tower_http::{cors, decompression::RequestDecompressionLayer};
@@ -19,7 +21,14 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use std::{collections::HashMap, sync::Arc};
 use tokio::io;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Semaphore, SemaphorePermit};
+
+/// The largest request body we accept, which is the same as the max document
+/// size allowed by Flow.
+const MAX_BODY_SIZE: usize = 64 * 1024 * 1024;
+
+/// The most memory that buffered request bodies may take up at once.
+const BODY_MEMORY_BUDGET: usize = 256 * 1024 * 1024;
 
 pub fn parse_cors_allowed_origins(
     cors_allow_origins: &[String],
@@ -73,12 +82,10 @@ pub async fn run_server(
             .route(&openapi_path, routing::get(handle_get));
     }
 
-    // Set the body limit to be the same as the max document size allowed by Flow (64MiB)
     router = router
-        .layer(DefaultBodyLimit::max(64 * 1024 * 1024))
-        // Handle decompression of request bodies. The order of these is important!
-        // This layer applies to all routes defined _before_ it, so the max body size is
-        // the size after decompression.
+        // Decompress request bodies before the webhook handler reads them, so the
+        // body limit and memory budget in `read_body` count decompressed bytes.
+        // A layer only wraps the routes added before it.
         .layer(RequestDecompressionLayer::new())
         .route_layer(
             tower_http::trace::TraceLayer::new_for_http()
@@ -358,6 +365,8 @@ struct Handler {
     /// Map of http url path (without the leading slash) to the handler for that collection.
     handlers_by_path: Mutex<HashMap<String, CollectionHandler>>,
     io: Transactor,
+    /// Limits how many bytes of request bodies are held in memory at once.
+    body_budget: Semaphore,
 }
 
 impl Handler {
@@ -416,6 +425,7 @@ impl Handler {
             signature_verifier,
             io,
             require_auth_header,
+            body_budget: Semaphore::new(BODY_MEMORY_BUDGET),
         })
     }
 
@@ -445,16 +455,11 @@ impl Handler {
 
         // Read the body only after checking the token, so a request without it
         // is rejected before its body takes up memory.
-        let body = match Bytes::from_request(request, &()).await {
-            Ok(b) => b,
-            Err(rejection) => {
-                return Ok(err_response(
-                    rejection.status(),
-                    anyhow::anyhow!(rejection.body_text()),
-                    matched_path,
-                ));
-            }
-        };
+        let (body, _body_permit) =
+            match read_body(request.into_body(), MAX_BODY_SIZE, &self.body_budget).await {
+                Ok(read) => read,
+                Err((status, err)) => return Ok(err_response(status, err, matched_path)),
+            };
 
         let body = match self.signature_verifier.verify_request(&request_headers, body) {
             Ok(b) => b,
@@ -983,6 +988,84 @@ mod test {
         }
         "###);
     }
+
+    #[tokio::test]
+    async fn test_read_body() {
+        let budget = Semaphore::new(10);
+
+        let (body, permit) = read_body(Body::from("12345678"), 10, &budget)
+            .await
+            .unwrap();
+        assert_eq!(body, "12345678");
+
+        // The first body still holds 8 of the budget's 10 bytes.
+        let (status, _) = read_body(Body::from("12345678"), 10, &budget)
+            .await
+            .unwrap_err();
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+
+        drop(permit);
+        assert!(read_body(Body::from("12345678"), 10, &budget).await.is_ok());
+
+        let (status, _) = read_body(Body::from("12345678901"), 10, &budget)
+            .await
+            .unwrap_err();
+        assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    }
+}
+
+/// Reads a request body of at most `max_size` bytes into one buffer, charging
+/// `budget` for the buffer as it grows. Callers must hold the returned permit
+/// until they're done with the body. A request gets a 503 when the budget runs
+/// out because waiting could leave two partly read bodies each waiting on budget
+/// the other holds.
+async fn read_body<'a>(
+    body: Body,
+    max_size: usize,
+    budget: &'a Semaphore,
+) -> Result<(Bytes, Option<SemaphorePermit<'a>>), (StatusCode, anyhow::Error)> {
+    let mut buf = BytesMut::new();
+    let mut permit: Option<SemaphorePermit<'a>> = None;
+    let mut stream = body.into_data_stream();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|err| {
+            (
+                StatusCode::BAD_REQUEST,
+                anyhow::anyhow!("failed to read request body: {err}"),
+            )
+        })?;
+        if buf.len() + chunk.len() > max_size {
+            return Err((
+                StatusCode::PAYLOAD_TOO_LARGE,
+                anyhow::anyhow!("request body is larger than {max_size} bytes"),
+            ));
+        }
+
+        // The buffer can grow by more than the chunk, so charge for the capacity
+        // it adds.
+        let capacity = buf.capacity();
+        buf.reserve(chunk.len());
+        let added = buf.capacity() - capacity;
+        if added > 0 {
+            let Ok(added_permit) = budget.try_acquire_many(added as u32) else {
+                return Err((
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    anyhow::anyhow!("too many request bodies are being read, please retry"),
+                ));
+            };
+            permit = Some(match permit.take() {
+                Some(mut permit) => {
+                    permit.merge(added_permit);
+                    permit
+                }
+                None => added_permit,
+            });
+        }
+        buf.extend_from_slice(&chunk);
+    }
+
+    Ok((buf.freeze(), permit))
 }
 
 fn err_response(
