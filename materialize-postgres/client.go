@@ -91,6 +91,14 @@ func preReqs(ctx context.Context, conf config, _ map[string]bool) *cerrors.Prere
 }
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+	if schemas, err := c.ListSchemas(ctx); err != nil {
+		return fmt.Errorf("listing schemas: %w", err)
+	} else {
+		for _, schema := range schemas {
+			is.PushNamespace(schema)
+		}
+	}
+
 	catalog := c.cfg.Database
 	if catalog == "" {
 		// An endpoint-level database configuration is not required, so query for the active

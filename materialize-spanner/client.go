@@ -246,6 +246,14 @@ func (c *client) FlushDDL(ctx context.Context) error {
 }
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+	if schemas, err := c.ListSchemas(ctx); err != nil {
+		return fmt.Errorf("listing schemas: %w", err)
+	} else {
+		for _, schema := range schemas {
+			is.PushNamespace(schema)
+		}
+	}
+
 	if len(resourcePaths) == 0 {
 		return nil
 	}

@@ -270,16 +270,6 @@ func (s *sqlMaterialization[EC, RC]) PopulateInfoSchema(ctx context.Context, is 
 		paths = append(paths, s.endpoint.MetaCheckpoints.Path)
 	}
 
-	if schemaLister, ok := s.client.(SchemaManager); ok {
-		schemas, err := schemaLister.ListSchemas(ctx)
-		if err != nil {
-			return fmt.Errorf("listing schemas: %w", err)
-		}
-		for _, schema := range schemas {
-			is.PushNamespace(schema)
-		}
-	}
-
 	return s.client.PopulateInfoSchema(ctx, is, paths)
 }
 

@@ -47,6 +47,14 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 }
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+	if schemas, err := c.ListSchemas(ctx); err != nil {
+		return fmt.Errorf("listing schemas: %w", err)
+	} else {
+		for _, schema := range schemas {
+			is.PushNamespace(schema)
+		}
+	}
+
 	// The body of this function is a copy of sql.StdPopulateInfoSchema, except the
 	// identifiers for the information schema views need to be in capital
 	// letters for Fabric Warehouse. I'd hope to replace this at some point with
