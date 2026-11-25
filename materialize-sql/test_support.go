@@ -492,7 +492,7 @@ func RunSqlGenTests(
 }
 
 func ListCheckpointsEntries(ctx context.Context, db *stdsql.DB, tableIdentifier string) ([]string, error) {
-	rows, err := db.QueryContext(ctx, fmt.Sprintf("select materialization from %s;", tableIdentifier))
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("select materialization from %s", tableIdentifier))
 	if err != nil {
 		return nil, fmt.Errorf("querying materializations from checkpoints table: %w", err)
 	}
@@ -515,7 +515,7 @@ func ListCheckpointsEntries(ctx context.Context, db *stdsql.DB, tableIdentifier 
 
 func DeleteCheckpointsEntry(ctx context.Context, db *stdsql.DB, tableIdentifier, taskName string) error {
 	_, err := db.ExecContext(ctx, fmt.Sprintf(
-		"delete from %s where materialization='%s';",
+		"delete from %s where materialization='%s'",
 		tableIdentifier,
 		taskName,
 	))
@@ -524,7 +524,7 @@ func DeleteCheckpointsEntry(ctx context.Context, db *stdsql.DB, tableIdentifier,
 }
 
 func SnapshotTestTable(ctx context.Context, db *stdsql.DB, tableIdentifier string) ([]string, [][]any, error) {
-	return SnapshotTestTableQuery(ctx, db, tableIdentifier, fmt.Sprintf("select * from %s;", tableIdentifier))
+	return SnapshotTestTableQuery(ctx, db, tableIdentifier, fmt.Sprintf("select * from %s", tableIdentifier))
 }
 
 // SnapshotTestTableQuery runs an arbitrary SELECT query and formats its rows
