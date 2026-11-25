@@ -17,6 +17,7 @@ from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
 from .api import (
+    EVENTS_EVENTUAL_CONSISTENCY_HORIZON,
     SESSIONS_CURSOR_TICK,
     SESSIONS_LOOKBACK_LAG,
     SESSIONS_REALTIME_LAG,
@@ -53,11 +54,6 @@ TOMBSTONE = BaseDocument(_meta=BaseDocument.Meta(op="d"))
 
 REALTIME = "realtime"
 LOOKBACK = "lookback"
-
-# PostHog events eventual consistency horizon.
-# Events may be delayed in appearing in query results due to ClickHouse replication
-# and Kafka processing. The lookback stream trails behind to capture delayed events.
-EVENTS_EVENTUAL_CONSISTENCY_HORIZON = timedelta(hours=1)
 
 RESOURCE_REQUIRED_SCOPES: dict[str, str] = {
     "Cohorts": "cohort:read",

@@ -277,3 +277,75 @@ def test_persons_cache_keeps_only_what_the_next_poll_can_read():
     # The cursor is at 19:00, so the next poll reads from 18:00.
     assert cursor == T0 + timedelta(hours=4)
     assert cache.count_for(f"persons/{PROJECT_ID}") == 2
+
+
+# Events dedupe cache
+
+
+def _events_backfill(fake: Any, start: datetime, cutoff: datetime) -> list[str]:
+    """Run an Events backfill to the end, the way the CDK calls it."""
+    ids: list[str] = []
+    page = None
+    while True:
+        items = _run(
+            api.backfill_project_events(
+                fake, _config(start), PROJECT_ID, LOG, page, cutoff
+            )
+        )
+        ids += _ids(items)
+        if not items or not isinstance(items[-1], str):
+            return ids
+        page = items[-1]
+
+
+def test_events_backfill_caches_only_the_lookback_overlap():
+    cutoff = T0
+    # One event an hour for two days, plus three in the last hour.
+    rows = [_event(i, cutoff - timedelta(hours=48 - i)) for i in range(48)]
+    rows += [_event(100 + i, cutoff - timedelta(minutes=10 * (i + 1))) for i in range(3)]
+    fake: Any = FakePostHog("events", ["uuid", "timestamp"], rows)
+
+    ids = _events_backfill(fake, cutoff - timedelta(days=3), cutoff)
+
+    assert sorted(ids) == sorted(r["uuid"] for r in rows)
+    # Only the three after the overlap start. The event exactly one hour
+    # before the cutoff is not in the overlap.
+    assert cache.count_for(f"events/{PROJECT_ID}") == 3
+
+
+def test_events_lookback_skips_what_the_backfill_emitted_and_cleans_up():
+    cutoff = T0
+    lookback_cursor = cutoff - api.EVENTS_EVENTUAL_CONSISTENCY_HORIZON
+    rows = [_event(i, cutoff - timedelta(minutes=10 * (i + 1))) for i in range(3)]
+    fake: Any = FakePostHog("events", ["uuid", "timestamp"], rows)
+
+    backfilled = _events_backfill(fake, cutoff - timedelta(days=1), cutoff)
+    assert len(backfilled) == 3
+
+    # The lookback subtask runs two hours later and reads the same events.
+    lookback = _run(
+        api.fetch_project_events(
+            fake,
+            _config(T0),
+            PROJECT_ID,
+            api.EVENTS_EVENTUAL_CONSISTENCY_HORIZON,
+            LOG,
+            lookback_cursor,
+        )
+    )
+    assert _ids(lookback) == []
+    assert cache.count_for(f"events/{PROJECT_ID}") == 3
+
+    # Its next poll starts past them, so they are removed.
+    next_cursor = lookback[-1]
+    _run(
+        api.fetch_project_events(
+            fake,
+            _config(T0),
+            PROJECT_ID,
+            api.EVENTS_EVENTUAL_CONSISTENCY_HORIZON,
+            LOG,
+            next_cursor,
+        )
+    )
+    assert cache.count_for(f"events/{PROJECT_ID}") == 0

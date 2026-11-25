@@ -37,6 +37,11 @@ P = ParamSpec("P")
 HOGQL_PAGE_SIZE = 50_000
 BACKFILL_TIMEOUT_PERIOD = timedelta(minutes=5)
 
+# PostHog events eventual consistency horizon.
+# Events may be delayed in appearing in query results due to ClickHouse replication
+# and Kafka processing. The lookback stream trails behind to capture delayed events.
+EVENTS_EVENTUAL_CONSISTENCY_HORIZON = timedelta(hours=1)
+
 # How far before the start of the cursor's hour each Persons poll reads again.
 # PostHog rounds `last_seen_at` down to the hour, so the cursor's own hour has
 # to be read again in any case. The extra hour catches persons that PostHog
@@ -737,6 +742,11 @@ async def backfill_project_events(
         return
 
     base_url = config.advanced.base_url
+    cache_name = f"events/{project_id}"
+    # The lookback incremental starts this far before the cutoff, so only
+    # events after this instant can be read by both. Caching only those keeps
+    # the cache small: a full history would not fit in memory.
+    overlap_start = cutoff - EVENTS_EVENTUAL_CONSISTENCY_HORIZON
     new_cursor = start_date
     doc_count = 0
 
@@ -746,9 +756,13 @@ async def backfill_project_events(
         item_cursor = item.get_cursor()
         new_cursor = max(new_cursor, item_cursor)
 
-        if cache.should_yield("events", f"{project_id}/{item.id}", item_cursor):
-            doc_count += 1
-            yield item
+        if item_cursor > overlap_start and not cache.should_yield(
+            cache_name, item.id, item_cursor
+        ):
+            continue
+
+        doc_count += 1
+        yield item
 
     log.info(f"Backfilled {doc_count} events from project {project_id}")
 
@@ -770,6 +784,9 @@ async def fetch_project_events(
     now = datetime.now(tz=UTC)
     upper_bound = now - horizon if horizon else None
 
+    # One cache per project, so one project's cleanup cannot remove another
+    # project's entries.
+    cache_name = f"events/{project_id}"
     new_cursor = cursor
     doc_count = 0
 
@@ -779,9 +796,15 @@ async def fetch_project_events(
         item_cursor = item.get_cursor()
         new_cursor = max(new_cursor, item_cursor)
 
-        if cache.should_yield("events", f"{project_id}/{item.id}", item_cursor):
+        if cache.should_yield(cache_name, item.id, item_cursor):
             doc_count += 1
             yield item
+
+    if horizon is not None:
+        # Only the lookback subtask (the one with a horizon) cleans up. It
+        # trails the realtime subtask, so no subtask reads at or before its
+        # starting cursor again.
+        cache.cleanup(cache_name, cursor)
 
     log.info(f"Fetched {doc_count} events from project {project_id}")
 
