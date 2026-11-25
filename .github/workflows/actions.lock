@@ -74,6 +74,8 @@ workflows:
         - 'google-github-actions/setup-gcloud@v2.2.1'
         - 'oras-project/setup-oras@v2.0.4'
         - 'swatinem/rust-cache@v2.9.3'
+    '.github/workflows/verify-actions-lock.yaml':
+        - 'actions/checkout@v4.4.0'
 dependencies:
     'actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb':
         ref: 'v5.0.1'

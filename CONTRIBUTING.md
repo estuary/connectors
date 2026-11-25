@@ -293,3 +293,27 @@ change to a connector's file rebuilds and rescans that connector, so the pull
 request shows whether the exception clears it. A change to the root file
 rebuilds nothing, so that it can merge without waiting on every connector's
 tests. The Image Scan workflow checks it against the published images instead.
+
+## GitHub Actions lockfile
+
+`.github/workflows/actions.lock` records the commit of every action our
+workflows use, including the actions those actions use. GitHub runs the
+recorded commit even if the action's tag moves, and fails a job that uses an
+action missing from the lockfile. The Actions Lockfile workflow checks it on
+every pull request that changes `.github/workflows/` or `.github/actions/`.
+
+After adding a workflow or changing a `uses:` line, regenerate the lockfile
+and commit it with the change. This needs the `gh-actions-lock` extension,
+v0.5.1 (the version CI pins).
+
+```bash
+gh extension install github/gh-actions-lock --pin v0.5.1
+gh actions-lock
+```
+
+Reference an outside action by its exact release, such as
+`actions/checkout@v4.4.0`. Call one of our shared actions with `$/`, such as
+`uses: $/.github/actions/setup`, because the lockfile can't cover the actions
+a `./` path uses. Don't edit the lockfile by hand. If `gh actions-lock` reports
+that a locked commit is no longer in its tag's history, check the action's
+releases before accepting the new commit with `--accept-moved`.
