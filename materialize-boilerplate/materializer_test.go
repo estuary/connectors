@@ -579,9 +579,8 @@ func (m *testMaterializer) MustRecreateResource(req *pm.Request_Apply, lastBindi
 }
 
 type testEndpointConfiger struct {
-	Image         string          `json:"image"`
-	Config        map[string]any  `json:"config"`
-	NetworkTunnel json.RawMessage `json:"networkTunnel,omitempty"`
+	Image  string         `json:"image"`
+	Config map[string]any `json:"config"`
 }
 
 func (c testEndpointConfiger) Validate() error {
