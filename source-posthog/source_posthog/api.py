@@ -887,7 +887,8 @@ async def fetch_persons(
     after the cursor moved can still carry the cursor's own value. Each poll
     reads again from the hour before the cursor's hour, which also catches
     persons written up to an hour late. A person is emitted again only when
-    its cursor value changes.
+    its cursor value changes. Persons with a cursor value in the future wait
+    until that time arrives.
     """
     assert isinstance(cursor, datetime)
 
@@ -898,11 +899,15 @@ async def fetch_persons(
     # One cache per project, so one project's cleanup cannot remove another
     # project's entries.
     cache_name = f"persons/{project_id}"
+    # PostHog accepts events up to about a day in the future, and
+    # `last_seen_at` follows them. Without this bound, one such person moves
+    # the cursor ahead, and persons seen before that hour are never read.
+    end = datetime.now(tz=UTC)
     new_cursor = cursor
     doc_count = 0
 
     async for item in _fetch_hogql_between(
-        Person, start, None, base_url, project_id, http, log, inclusive_start=True
+        Person, start, end, base_url, project_id, http, log, inclusive_start=True
     ):
         item_cursor = item.get_cursor()
         new_cursor = max(new_cursor, item_cursor)

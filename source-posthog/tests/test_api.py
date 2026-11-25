@@ -408,3 +408,20 @@ def test_events_backfill_checkpoints_each_window_and_resumes_from_it():
     # is done.
     assert _ids(second) == [rows[1]["uuid"]]
     assert not isinstance(second[-1], str)
+
+
+def test_a_future_person_does_not_move_the_cursor_past_other_persons():
+    now = datetime.now(tz=UTC).replace(minute=0, second=0, microsecond=0)
+    future = _person(0, now - timedelta(hours=1), now + timedelta(hours=20))
+    fake: Any = FakePostHog(
+        "persons", ["id", "created_at", "last_seen_at"], [future]
+    )
+
+    ids, cursor = _poll_persons(fake, now - timedelta(minutes=30))
+    assert ids == []
+    assert cursor < now + timedelta(hours=1)
+
+    # A person seen in the current hour, after the future one arrived.
+    fake.rows.append(_person(1, now + timedelta(minutes=1), now))
+    ids, _ = _poll_persons(fake, cursor)
+    assert ids == [fake.rows[1]["id"]]
