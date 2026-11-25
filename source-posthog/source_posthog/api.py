@@ -733,9 +733,14 @@ async def backfill_sessions(
 
         # The lookback subtask opens an hour before this cutoff, so the tail of
         # the backfill's range is walked by both.
-        if cache.should_yield(cache_name, item.id, item_cursor):
-            doc_count += 1
-            yield item
+        if cache.has_as_recent_as(cache_name, item.id, item_cursor):
+            continue
+
+        doc_count += 1
+        yield item
+        # Added only after the yield: when the timeout wrapper drops a session
+        # and returns, this line never runs, so the next call still emits it.
+        cache.add_recent(cache_name, item.id, item_cursor)
 
     log.info(f"Backfilled {doc_count} sessions from project {project_id}")
 
@@ -779,13 +784,16 @@ async def backfill_project_events(
     ):
         item_cursor = item.get_cursor()
 
-        if item_cursor > overlap_start and not cache.should_yield(
-            cache_name, item.id, item_cursor
-        ):
+        in_overlap = item_cursor > overlap_start
+        if in_overlap and cache.has_as_recent_as(cache_name, item.id, item_cursor):
             continue
 
         doc_count += 1
         yield item
+        # Added only after the yield: when the timeout wrapper drops an event
+        # and returns, this line never runs, so the next call still emits it.
+        if in_overlap:
+            cache.add_recent(cache_name, item.id, item_cursor)
 
     log.info(
         f"Backfilled {doc_count} events from project {project_id}",

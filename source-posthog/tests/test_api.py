@@ -425,3 +425,29 @@ def test_a_future_person_does_not_move_the_cursor_past_other_persons():
     fake.rows.append(_person(1, now + timedelta(minutes=1), now))
     ids, _ = _poll_persons(fake, cursor)
     assert ids == [fake.rows[1]["id"]]
+
+
+def _drop_second_event(gen: AsyncGenerator[Any, None]) -> list[Any]:
+    """Take two items, then stop, the way the timeout wrapper drops the second."""
+
+    async def run() -> list[Any]:
+        taken = [await anext(gen), await anext(gen)]
+        await gen.aclose()
+        return taken
+
+    return asyncio.run(run())
+
+
+def test_an_event_dropped_by_the_backfill_timeout_is_not_cached():
+    cutoff = T0
+    rows = [_event(i, cutoff - timedelta(minutes=10 - i)) for i in range(2)]
+    fake: Any = FakePostHog("events", ["uuid", "timestamp"], rows)
+
+    inner = api.backfill_project_events.__wrapped__  # type: ignore[attr-defined]
+    _drop_second_event(
+        inner(fake, _config(cutoff - timedelta(days=1)), PROJECT_ID, LOG, None, cutoff)
+    )
+
+    name = f"events/{PROJECT_ID}"
+    assert cache.has_as_recent_as(name, rows[0]["uuid"], _ts(rows[0]["timestamp"]))
+    assert not cache.has_as_recent_as(name, rows[1]["uuid"], _ts(rows[1]["timestamp"]))
