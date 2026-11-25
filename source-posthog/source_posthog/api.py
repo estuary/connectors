@@ -171,45 +171,67 @@ async def _get_hogql_columns(
     return HogQLResponseMeta.model_validate_json(response).columns
 
 
+def _hogql_datetime(when: datetime) -> str:
+    """Write `when` as a HogQL UTC timestamp with microsecond precision."""
+    serialized = when.astimezone(UTC).replace(tzinfo=None).isoformat()
+    return f"toDateTime64('{serialized}', 6, 'UTC')"
+
+
+def _hogql_cursor(model: type[HogQLEntity[str]] | type[HogQLEntity[int]]) -> str:
+    # A bare column lets PostHog use it to skip data, which PostHog's docs
+    # recommend for paging `events` by `timestamp`.
+    if len(model.cursor_columns) == 1:
+        return model.cursor_columns[0]
+    return f"COALESCE({', '.join(model.cursor_columns)})"
+
+
 async def _query_hogql[T: HogQLEntity[str] | HogQLEntity[int]](
     model: type[T],
-    start_date: datetime,
-    end_date: datetime | None,
+    column_names: list[str],
+    start: datetime,
+    inclusive_start: bool,
+    after_id: str | int | None,
+    end: datetime | None,
     base_url: str,
     project_id: int,
     http: HTTPSession,
     log: Logger,
 ) -> AsyncGenerator[T]:
+    """Yield one page of rows ordered by (cursor, id), up to `end` inclusive.
+
+    Without `after_id`, the page opens at `start`. With it, the page opens
+    after the row (`start`, `after_id`), the last row of the previous page.
+    """
     log.debug(
         "Querying HogQL",
         {
             "table": model.table_name,
             "project_id": project_id,
-            "start": start_date,
-            "end": end_date,
+            "start": start,
+            "after_id": after_id,
+            "end": end,
         },
     )
 
     url = model.get_api_endpoint_url(base_url, project_id)
-    column_names = await _get_hogql_columns(model, base_url, project_id, http, log)
+    cursor = _hogql_cursor(model)
+    # Compare as strings: the ORDER BY uses the same expression, so the
+    # comparison and the sort always agree, whatever the column's type.
+    tiebreak = f"toString({model.tiebreak_column})"
 
-    coalesced_cursor_fields = f'COALESCE({",".join(model.cursor_columns)})'
+    if after_id is not None:
+        lower_bound = (
+            f"({cursor} > {_hogql_datetime(start)} OR "
+            + f"({cursor} = {_hogql_datetime(start)} "
+            + f"AND {tiebreak} > {_hogql_string(str(after_id))}))"
+        )
+    elif inclusive_start:
+        lower_bound = f"{cursor} >= {_hogql_datetime(start)}"
+    else:
+        lower_bound = f"{cursor} > {_hogql_datetime(start)}"
 
-    serialized_start_date = start_date.astimezone(UTC).replace(tzinfo=None).isoformat()
-    serialized_end_date = (
-        end_date.astimezone(UTC).replace(tzinfo=None).isoformat()
-        if end_date is not None
-        else None
-    )
-
-    start_date_clause = (
-        f"WHERE {coalesced_cursor_fields} > "
-        + f"toDateTime64('{serialized_start_date}', 6, 'UTC') "
-    )
-    end_date_clause = (
-        f"AND {coalesced_cursor_fields} <= toDateTime64('{serialized_end_date}', 6, 'UTC') "
-        if end_date is not None
-        else ""
+    upper_bound = (
+        f"AND {cursor} <= {_hogql_datetime(end)} " if end is not None else ""
     )
 
     payload = {
@@ -217,9 +239,9 @@ async def _query_hogql[T: HogQLEntity[str] | HogQLEntity[int]](
             "kind": "HogQLQuery",
             "query": f"SELECT {", ".join(column_names)} "
             + f"FROM {model.table_name} "
-            + start_date_clause
-            + end_date_clause
-            + f"ORDER BY {coalesced_cursor_fields} ASC "
+            + f"WHERE {lower_bound} "
+            + upper_bound
+            + f"ORDER BY {cursor} ASC, {tiebreak} ASC "
             + f"LIMIT {HOGQL_PAGE_SIZE}",
         },
     }
@@ -237,6 +259,60 @@ async def _query_hogql[T: HogQLEntity[str] | HogQLEntity[int]](
             dict(zip(column_names, row.root, strict=True)),
             context=ProjectIdValidationContext(project_id),
         )
+
+
+async def _fetch_hogql_between[T: HogQLEntity[str] | HogQLEntity[int]](
+    model: type[T],
+    start: datetime,
+    end: datetime | None,
+    base_url: str,
+    project_id: int,
+    http: HTTPSession,
+    log: Logger,
+    inclusive_start: bool = False,
+) -> AsyncGenerator[T]:
+    """Yield every row with a cursor after `start` and at or before `end`.
+
+    With `inclusive_start`, rows at `start` are included too. A missing `end`
+    means no upper bound. Rows come in (cursor, id) order, and each row comes
+    once, even when many rows share one cursor value.
+    """
+    column_names = await _get_hogql_columns(model, base_url, project_id, http, log)
+    reached = start
+    after_id: str | int | None = None
+
+    while True:
+        batch_count = 0
+        page_start = (reached, after_id)
+
+        async for item in _query_hogql(
+            model,
+            column_names,
+            reached,
+            inclusive_start,
+            after_id,
+            end,
+            base_url,
+            project_id,
+            http,
+            log,
+        ):
+            batch_count += 1
+            # Both halves of the position come from the same row, the last one
+            # the server sent, so the next page opens exactly where this ended.
+            reached = item.get_cursor()
+            after_id = item.id
+            yield item
+
+        if batch_count < HOGQL_PAGE_SIZE:
+            break
+
+        # A full page that does not move the position would repeat forever.
+        if (reached, after_id) == page_start:
+            raise RuntimeError(
+                f"HogQL paging on {model.table_name} did not advance past "
+                + f"({reached.isoformat()}, {after_id}) in project {project_id}"
+            )
 
 
 async def backfill_feature_flags(
@@ -658,28 +734,15 @@ async def backfill_project_events(
     new_cursor = start_date
     doc_count = 0
 
-    while True:
-        batch_count = 0
+    async for item in _fetch_hogql_between(
+        Event, start_date, cutoff, base_url, project_id, http, log
+    ):
+        item_cursor = item.get_cursor()
+        new_cursor = max(new_cursor, item_cursor)
 
-        async for item in _query_hogql(
-            Event,
-            new_cursor,
-            cutoff,
-            base_url,
-            project_id,
-            http,
-            log,
-        ):
-            item_cursor = item.get_cursor()
-            batch_count += 1
-            new_cursor = max(new_cursor, item_cursor)
-
-            if cache.should_yield("events", f"{project_id}/{item.id}", item_cursor):
-                doc_count += 1
-                yield item
-
-        if batch_count < HOGQL_PAGE_SIZE:
-            break
+        if cache.should_yield("events", f"{project_id}/{item.id}", item_cursor):
+            doc_count += 1
+            yield item
 
     log.info(f"Backfilled {doc_count} events from project {project_id}")
 
@@ -704,29 +767,15 @@ async def fetch_project_events(
     new_cursor = cursor
     doc_count = 0
 
-    while True:
-        batch_count = 0
+    async for item in _fetch_hogql_between(
+        Event, cursor, upper_bound, base_url, project_id, http, log
+    ):
+        item_cursor = item.get_cursor()
+        new_cursor = max(new_cursor, item_cursor)
 
-        async for item in _query_hogql(
-            Event,
-            new_cursor,
-            upper_bound,
-            base_url,
-            project_id,
-            http,
-            log,
-        ):
-            item_cursor = item.get_cursor()
-            batch_count += 1
-
-            new_cursor = max(new_cursor, item_cursor)
-
-            if cache.should_yield("events", f"{project_id}/{item.id}", item_cursor):
-                doc_count += 1
-                yield item
-
-        if batch_count < HOGQL_PAGE_SIZE:
-            break
+        if cache.should_yield("events", f"{project_id}/{item.id}", item_cursor):
+            doc_count += 1
+            yield item
 
     log.info(f"Fetched {doc_count} events from project {project_id}")
 
@@ -755,27 +804,12 @@ async def backfill_persons(
     new_cursor = start_date
     doc_count = 0
 
-    while True:
-        batch_count = 0
-
-        async for item in _query_hogql(
-            Person,
-            new_cursor,
-            cutoff,
-            base_url,
-            project_id,
-            http,
-            log,
-        ):
-            batch_count += 1
-            doc_count += 1
-
-            new_cursor = max(new_cursor, item.get_cursor())
-
-            yield item
-
-        if batch_count < HOGQL_PAGE_SIZE:
-            break
+    async for item in _fetch_hogql_between(
+        Person, start_date, cutoff, base_url, project_id, http, log
+    ):
+        doc_count += 1
+        new_cursor = max(new_cursor, item.get_cursor())
+        yield item
 
     log.info(f"Backfilled {doc_count} persons from project {project_id}")
 
@@ -796,27 +830,12 @@ async def fetch_persons(
     new_cursor = cursor
     doc_count = 0
 
-    while True:
-        batch_count = 0
-
-        async for item in _query_hogql(
-            Person,
-            new_cursor,
-            None,
-            base_url,
-            project_id,
-            http,
-            log,
-        ):
-            batch_count += 1
-            doc_count += 1
-            item_cursor = item.get_cursor()
-            new_cursor = max(new_cursor, item_cursor)
-
-            yield item
-
-        if batch_count < HOGQL_PAGE_SIZE:
-            break
+    async for item in _fetch_hogql_between(
+        Person, cursor, None, base_url, project_id, http, log
+    ):
+        doc_count += 1
+        new_cursor = max(new_cursor, item.get_cursor())
+        yield item
 
     log.info(f"Fetched {doc_count} persons from project {project_id}")
 
