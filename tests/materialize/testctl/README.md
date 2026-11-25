@@ -74,6 +74,7 @@ never touched.
 - `materialize-mongodb`
 - `materialize-motherduck`
 - `materialize-mysql`
+- `materialize-oracle`
 - `materialize-postgres`
 - `materialize-redshift`
 - `materialize-s3-iceberg`

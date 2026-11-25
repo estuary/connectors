@@ -1,0 +1,47 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.migrate-base.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-oracle:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
+        include:
+          # Materialize the object field, which becomes a string (objects are
+          # FIELD_OPTIONAL and skipped by recommended selection).
+          objectToString: {}
+        exclude:
+          # The fixture's documents are larger than a VARCHAR2 holds. The test
+          # runs the binding as delta updates, which can leave them out.
+          - flow_document
+          # int128 and wider integers are stored as VARCHAR2 because they don't
+          # fit in Oracle's NUMBER type, so converting that VARCHAR2 back into a
+          # numeric type is not possible.
+          - int128ToNum
+          - int128ToNumStr
+          - int128ToIntStr128
+          - int129ToNum
+          - int129ToNumStr
+          - int256ToNum
+          - int256ToNumStr
+          - int257ToNum
+          - int257ToNumStr
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257ToNum
+          - intStr257ToNumStr
+          # Binary fields are RAW, which has no migration to or from text.
+          - binaryToMulti
+          - binaryToString
+          - stringToBinary
+          - 'stringToBinary"With"Quote'
