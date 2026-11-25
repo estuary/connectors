@@ -73,7 +73,7 @@ jobs:
 
       - name: Scan
         id: scan
-        uses: ./.github/actions/scan-images
+        uses: $/.github/actions/scan-images
         with:
           images: ${{ steps.list.outputs.images }}
           image_src: remote

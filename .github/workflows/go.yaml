@@ -51,12 +51,12 @@ jobs:
         run: cd .github/scripts && python3 -m unittest test_connector_lists -v
 
       - id: classify
-        uses: ./.github/actions/classify-changes
+        uses: $/.github/actions/classify-changes
 
       # The connector list lives in its own file so it can be read as data.
       # The matrix is the connectors the classifier reported, or all of them.
       - id: matrix
-        uses: ./.github/actions/select-connectors
+        uses: $/.github/actions/select-connectors
         with:
           list: .github/go-connectors.yaml
           connectors: ${{ steps.classify.outputs.go_connectors }}
@@ -71,7 +71,7 @@ jobs:
       # Only the binaries the connector jobs use. flowctl runs
       # flow-connector-init, and the file source images copy flow-parser.
       - name: Fetch Flow binaries
-        uses: ./.github/actions/fetch-flow-artifact
+        uses: $/.github/actions/fetch-flow-artifact
         with:
           paths: |
             flow-bin/flowctl
@@ -92,7 +92,7 @@ jobs:
           fetch-depth: 0
 
       - id: base_image
-        uses: ./.github/actions/build-base-image
+        uses: $/.github/actions/build-base-image
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -215,7 +215,7 @@ jobs:
           git diff --exit-code -- source-tpc-ds
 
       - name: Restore Flow binaries
-        uses: ./.github/actions/restore-flow-binaries
+        uses: $/.github/actions/restore-flow-binaries
 
       - name: Authenticate with GCloud
         uses: google-github-actions/auth@v2.1.13
@@ -407,7 +407,7 @@ jobs:
         id: scan
         if: github.event_name == 'pull_request'
         continue-on-error: true
-        uses: ./.github/actions/scan-images
+        uses: $/.github/actions/scan-images
         with:
           images: ${{ matrix.connector.name }} ghcr.io/estuary/${{ matrix.connector.name }}:local
           image_src: docker
@@ -539,7 +539,7 @@ jobs:
           exit 1
 
       - name: Deployment
-        uses: ./.github/actions/deploy
+        uses: $/.github/actions/deploy
         with:
           connector: ${{ matrix.connector.name }}
           rt_id: ${{ secrets.CONNECTOR_REFRESH_RT_ID }}
@@ -561,7 +561,7 @@ jobs:
       - uses: actions/checkout@v4.4.0
 
       # Reads the same `run` output the build jobs gate on.
-      - uses: ./.github/actions/connectors-gate
+      - uses: $/.github/actions/connectors-gate
         with:
           results: ${{ join(needs.*.result, ' ') }}
           run: ${{ needs.classify_changes.outputs.run }}
