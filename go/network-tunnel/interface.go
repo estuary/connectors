@@ -15,7 +15,7 @@ type SSHForwardingConfig struct {
 	SSHEndpoint             string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint" jsonschema_extras:"pattern=^ssh://.+@.+$"`
 	PrivateKey              string `json:"privateKey" jsonschema:"title=SSH Private Key" jsonschema_extras:"secret=true,multiline=true"`
 	KnownHosts              string `json:"knownHosts,omitempty" jsonschema:"title=SSH Known Hosts" jsonschema_extras:"multiline=true"`
-	SkipHostKeyVerification bool   `json:"skipHostKeyVerification,omitempty" jsonschema:"title=Skip Host Key Verification" jsonschema_extras:"nonsensitive=true,x-hidden-field=true"`
+	SkipHostKeyVerification bool   `json:"skipHostKeyVerification,omitempty" jsonschema:"title=Skip Host Key Verification" jsonschema_extras:"nonsensitive=true"`
 }
 
 func (SSHForwardingConfig) GetFieldDocString(fieldName string) string {
@@ -27,18 +27,23 @@ func (SSHForwardingConfig) GetFieldDocString(fieldName string) string {
 	case "KnownHosts":
 		return "Host keys of the SSH server in OpenSSH known_hosts format, one per line: the output of `ssh-keyscan -p 2222 bastion.example.com`, for example `[bastion.example.com]:2222 ssh-ed25519 AAAA...`."
 	case "SkipHostKeyVerification":
-		return "Connect without verifying the SSH server's host key."
+		return "Connect without verifying the SSH server's host key. This leaves the task open to man-in-the-middle attacks."
 	default:
 		return ""
 	}
 }
 
+var errMissingKnownHosts = errors.New("missing SSH Known Hosts: paste the host keys of the SSH server, as printed by `ssh-keyscan -p <port> <host>`, or set Skip Host Key Verification to connect without verifying the server")
+
 func (cfg *SSHForwardingConfig) validate() error {
 	if err := validateKnownHosts(cfg.KnownHosts); err != nil {
 		return err
 	}
-	if strings.TrimSpace(cfg.KnownHosts) != "" && cfg.SkipHostKeyVerification {
+	var hasKnownHosts = strings.TrimSpace(cfg.KnownHosts) != ""
+	if hasKnownHosts && cfg.SkipHostKeyVerification {
 		return errors.New("both Skip Host Key Verification and SSH Known Hosts are set. Keep SSH Known Hosts to verify the SSH server, or clear it and keep Skip Host Key Verification to connect without verification, but not both")
+	} else if !hasKnownHosts && !cfg.SkipHostKeyVerification {
+		return errMissingKnownHosts
 	}
 	return nil
 }
@@ -99,12 +104,7 @@ func (cfg *TunnelConfig) Start(ctx context.Context, address string, localPort st
 	var knownHosts = cfg.SSHForwarding.KnownHosts
 	if strings.TrimSpace(knownHosts) == "" {
 		knownHosts = ""
-		var logEntry = log.WithField("ssh-endpoint", cfg.SSHForwarding.SSHEndpoint)
-		if cfg.SSHForwarding.SkipHostKeyVerification {
-			logEntry.Warn("Skip Host Key Verification is enabled, so the SSH server's host key isn't verified.")
-		} else {
-			logEntry.Warn("SSH Known Hosts isn't set, so the SSH server's host key isn't verified. A future version will require it.")
-		}
+		log.WithField("ssh-endpoint", cfg.SSHForwarding.SSHEndpoint).Warn("Skip Host Key Verification is enabled, so the SSH server's host key isn't verified.")
 	}
 
 	host, port, err := net.SplitHostPort(address)
