@@ -10,6 +10,7 @@ from estuary_cdk.http import HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from ..models import (
+    IdAndUpdatedAt,
     IncrementalKeysetPaginatedResponse,
     TimestampedResource,
 )
@@ -139,6 +140,59 @@ async def _fetch_incremental_keyset_paginated_window(
             yield resource
 
         remainder = processor.get_remainder()
+
+        if not remainder.meta.has_more or remainder.meta.after_cursor is None:
+            return
+
+        params["page[after]"] = remainder.meta.after_cursor
+
+
+async def _fetch_incremental_keyset_paginated_ids_by_page(
+    http: HTTPSession,
+    subdomain: str,
+    response_model: type[IncrementalKeysetPaginatedResponse],
+    lower_bound: datetime,
+    upper_bound: datetime,
+    log: Logger,
+) -> AsyncGenerator[IdAndUpdatedAt | datetime, None]:
+    """
+    Yields the id and updated_at of each record that
+    `_fetch_incremental_keyset_paginated_window` would yield, with the same
+    checkpoints. It yields nothing from a page until it has read the whole
+    page and closed its response, so a caller can make other requests
+    between yields without keeping a response open.
+    """
+    url = f"{url_base(subdomain)}/{response_model.PATH}"
+
+    params: dict[str, str | int] = {
+        "sort": "updated_at",
+        "page[size]": CURSOR_PAGINATION_PAGE_SIZE,
+        "page[after]": build_seek_cursor(lower_bound),
+        **response_model.REQUEST_PARAMS,
+    }
+
+    window = KeysetWindow(response_model.ITEMS_KEY, lower_bound, upper_bound)
+
+    while True:
+        _, body = await http.request_stream(log, url, params=params)
+        processor = IncrementalJsonProcessor(
+            body(),
+            f"{response_model.ITEMS_KEY}.item",
+            IdAndUpdatedAt,
+            response_model,
+        )
+        records = [record async for record in processor]
+        remainder = processor.get_remainder()
+
+        for record in records:
+            is_past_window, checkpoint = window.advance(record)
+            if is_past_window:
+                return
+
+            if checkpoint is not None:
+                yield checkpoint
+
+            yield record
 
         if not remainder.meta.has_more or remainder.meta.after_cursor is None:
             return
