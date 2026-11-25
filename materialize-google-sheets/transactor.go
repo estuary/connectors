@@ -11,7 +11,10 @@ import (
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
+	"go.gazette.dev/core/message"
 	"google.golang.org/api/sheets/v4"
 )
 
@@ -45,6 +48,14 @@ type transactor struct {
 	round int64
 	// Spreadsheet to which we're materializing.
 	spreadsheetId string
+	be            *m.BindingEvents
+
+	// truncateAfterBackfill permits marking the rows published before a
+	// completed backfill deleted.
+	truncateAfterBackfill bool
+	// truncations maps a binding index to the boundary of a completed
+	// backfill, for marking within this transaction's stores.
+	truncations map[int]time.Time
 }
 
 type transactorRow struct {
@@ -61,6 +72,9 @@ type transactorBinding struct {
 	UserSheetId int64
 	// User-facing sheet name for this binding.
 	UserSheetName string
+	// opColumn is the sheet column of the selected field projecting
+	// /_meta/op, or -1 if the binding excludes it.
+	opColumn int64
 }
 
 func (b transactorBinding) columnCount() int {
@@ -71,7 +85,22 @@ func (b transactorBinding) columnCount() int {
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
 func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMessage, stateKeys []string) (*pf.ConnectorState, error) { return nil, nil }
 
-func (t *transactor) Flush(context.Context, map[int]time.Time) error {
+func (t *transactor) Flush(_ context.Context, completes map[int]time.Time) error {
+	t.truncations = make(map[int]time.Time, len(completes))
+	for binding, boundary := range completes {
+		var b = &t.bindings[binding]
+		if !t.truncateAfterBackfill {
+			log.WithFields(log.Fields{
+				"sheet":    b.UserSheetName,
+				"boundary": boundary,
+			}).Info("rows published before the backfill were not marked deleted because feature flags disable it")
+			continue
+		} else if b.opColumn < 0 {
+			t.be.Warn(b.UserSheetName, fmt.Sprintf("Rows published before the backfill of sheet %q were not marked deleted because the binding excludes the _meta/op field, which must be included to mark them.", b.UserSheetName))
+			continue
+		}
+		t.truncations[binding] = boundary
+	}
 	return nil
 }
 
@@ -143,11 +172,15 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	// batchRequests collects all sub-requests made to each sheet.
 	var batchRequests []*sheets.Request
+	// rowStats maps a binding index to what this transaction does to its
+	// sheet, reported once the batch is applied.
+	var rowStats = make(map[int]m.RowStats, len(d.bindings))
 
 	for bindInd := range d.bindings {
 		var stores = stores[bindInd]
+		var boundary, truncating = d.truncations[bindInd]
 
-		if len(stores) == 0 {
+		if len(stores) == 0 && !truncating {
 			continue
 		}
 
@@ -165,6 +198,10 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// for keys, and which then update cells to stored values using their after-add
 		// adjusted row indexes.
 		var addRows, updateCells []*sheets.Request
+
+		// A store over a rolled-back placeholder row counts as an insert, as
+		// Load reported no document for its key.
+		var inserted, updated int64
 
 		for pi != len(prev) || si != len(stores) {
 			// Verify that our in-memory view of the sheet has not grown excessively large would
@@ -207,6 +244,12 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 			// Does a `prev` row corresponding with this store document exist?
 			// If so include this prior version in the state.
+			if cmp == 0 && prev[pi].Round != 0 {
+				updated++
+			} else {
+				inserted++
+			}
+
 			if cmp == 0 {
 				s.PrevDoc = prev[pi].Doc
 				s.PrevRound = prev[pi].Round
@@ -258,9 +301,24 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		} // Done with merge of `prev` and `stored` into `next`.
 
-		d.bindings[bindInd].rows = next
 		batchRequests = append(batchRequests, addRows...)
 		batchRequests = append(batchRequests, updateCells...)
+		var stats = m.ExactRowStats(inserted, updated, 0)
+
+		// Marks follow the inserts and updates, so their row indexes address
+		// the sheet as `next` lays it out.
+		if truncating {
+			var b = &d.bindings[bindInd]
+			marks, marked, err := markStaleRowsDeleted(next, d.round, boundary, b.UserSheetId, b.opColumn)
+			if err != nil {
+				return nil, fmt.Errorf("marking rows of sheet %q deleted after backfill: %w", b.UserSheetName, err)
+			}
+			batchRequests = append(batchRequests, marks...)
+			stats = stats.WithTruncated(marked)
+		}
+
+		d.bindings[bindInd].rows = next
+		rowStats[bindInd] = stats
 	}
 
 	// InsertDimension shifts rows down, so repeating a batch that may have been
@@ -275,6 +333,19 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, err
 	}
 
+	for bindInd, stats := range rowStats {
+		var b = &d.bindings[bindInd]
+		if stats.Truncated != nil {
+			log.WithFields(log.Fields{
+				"sheet":    b.UserSheetName,
+				"boundary": d.truncations[bindInd],
+				"marked":   *stats.Truncated,
+			}).Info("marked rows published before the backfill deleted")
+		}
+		d.be.ReportRowStats(it.Round, []string{b.UserSheetName}, stats)
+	}
+	clear(d.truncations)
+
 	// Ensure transactions are spread out enough to not exceed google sheets rate limits.
 	<-time.After(transactionDelay - time.Since(started))
 
@@ -284,6 +355,84 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			MergePatch:  false,
 		}, nil
 	}, nil
+}
+
+// markStaleRowsDeleted returns the UpdateCells requests that set the opColumn
+// cell of each row published before boundary to "d", and how many rows
+// they mark. Only that cell changes: the row and its document are kept. The
+// sheet row of rows[i] is i+1, below the header. Rows stored in round,
+// rolled-back placeholders, and rows whose document is already a deletion are
+// not marked.
+func markStaleRowsDeleted(rows []transactorRow, round int64, boundary time.Time, sheetID, opColumn int64) ([]*sheets.Request, int64, error) {
+	var requests []*sheets.Request
+	var marked int64
+
+	for i, row := range rows {
+		if row.Round == 0 || row.Round == round {
+			continue
+		}
+		meta, err := readDocMeta(row.Doc)
+		if err != nil {
+			return nil, 0, err
+		} else if meta.op == "d" || !meta.publishedAt.Before(boundary) {
+			continue
+		}
+		marked++
+
+		// One request covers each run of adjacent marked rows: a row directly
+		// below the previous request's range extends it rather than starting
+		// a new one.
+		var sheetRow = int64(i + 1)
+		var cells = &sheets.RowData{Values: []*sheets.CellData{valueToCell("d")}}
+		if l := len(requests); l != 0 && requests[l-1].UpdateCells.Range.EndRowIndex == sheetRow {
+			requests[l-1].UpdateCells.Rows = append(requests[l-1].UpdateCells.Rows, cells)
+			requests[l-1].UpdateCells.Range.EndRowIndex++
+			continue
+		}
+		requests = append(requests, &sheets.Request{
+			UpdateCells: &sheets.UpdateCellsRequest{
+				Range: &sheets.GridRange{
+					SheetId:          sheetID,
+					StartRowIndex:    sheetRow,
+					EndRowIndex:      sheetRow + 1,
+					StartColumnIndex: opColumn,
+					EndColumnIndex:   opColumn + 1,
+				},
+				Rows:   []*sheets.RowData{cells},
+				Fields: "userEnteredValue",
+			},
+		})
+	}
+
+	return requests, marked, nil
+}
+
+// docMeta is the part of a document's /_meta that marking stale rows needs.
+type docMeta struct {
+	publishedAt time.Time
+	op          string
+}
+
+// readDocMeta returns the publication time carried by the /_meta/uuid of doc
+// along with its /_meta/op.
+func readDocMeta(doc json.RawMessage) (docMeta, error) {
+	var parsed struct {
+		Meta struct {
+			UUID string `json:"uuid"`
+			Op   string `json:"op"`
+		} `json:"_meta"`
+	}
+	if err := json.Unmarshal(doc, &parsed); err != nil {
+		return docMeta{}, fmt.Errorf("parsing document: %w", err)
+	} else if parsed.Meta.UUID == "" {
+		return docMeta{}, fmt.Errorf("document has no /_meta/uuid to compare with the backfill boundary")
+	}
+
+	id, err := uuid.Parse(parsed.Meta.UUID)
+	if err != nil {
+		return docMeta{}, fmt.Errorf("parsing /_meta/uuid %q: %w", parsed.Meta.UUID, err)
+	}
+	return docMeta{publishedAt: message.GetClock(id).AsTime(), op: parsed.Meta.Op}, nil
 }
 
 func valueToCell(e tuple.TupleElement) *sheets.CellData {
