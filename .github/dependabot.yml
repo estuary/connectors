@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Go, Python, and Rust dependencies get Dependabot's security updates, which
+  # don't need an entry here.
+  - package-ecosystem: github-actions
+    # "/" covers .github/workflows but not our shared actions, so they're
+    # listed too.
+    directories:
+      - "/"
+      - "/.github/actions/*"
+    schedule:
+      interval: weekly
+    # A change to a shared action rebuilds every connector, so minor and patch
+    # updates share one pull request. Each major update gets its own, since it
+    # may need changes on our side.
+    groups:
+      github-actions:
+        patterns: ["*"]
+        update-types: [minor, patch]

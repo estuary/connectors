@@ -22,7 +22,7 @@ runs:
       run: ./fetch-flow.sh
 
     - name: Upload them as this run's flow-bin artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v4.6.2
       with:
         name: flow-bin
         path: ${{ inputs.paths }}

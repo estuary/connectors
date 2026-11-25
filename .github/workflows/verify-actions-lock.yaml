@@ -1,0 +1,41 @@
+name: Actions Lockfile
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths: &lockfile_paths
+      - ".github/workflows/**"
+      - ".github/actions/**"
+
+  pull_request:
+    branches: [main]
+    paths: *lockfile_paths
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # GitHub fails a job whose actions aren't in the lockfile, but only when that
+  # job runs. This checks every workflow, including ones a pull request doesn't
+  # run, such as the scheduled delayed-tag.yaml.
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Install gh-actions-lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh extension install github/gh-actions-lock --pin v0.5.1
+
+      # --verify also looks up each locked commit upstream, and some action
+      # owners' IP allow lists reject the runner's requests. GitHub still checks
+      # each locked commit when a job starts.
+      - name: Verify the lockfile
+        run: gh actions-lock --verify-local

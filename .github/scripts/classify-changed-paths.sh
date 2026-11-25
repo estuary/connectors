@@ -111,6 +111,8 @@ while IFS= read -r path || [ -n "$path" ]; do
     case "$path" in
         # Documentation and agent tooling build nothing.
         docs/* | .claude/*) lane="none" ;;
+        # Dependabot's config only changes which update PRs it opens.
+        .github/dependabot.yml) lane="none" ;;
         # Except a connector's own docs, such as its README or CHANGELOG. A
         # change to them says the connector changed, so they build it like
         # any other file in its directory.
