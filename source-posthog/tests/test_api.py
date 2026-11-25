@@ -141,8 +141,10 @@ def small_pages(monkeypatch):
     # Three rows to a page, so a handful of rows spans several pages.
     monkeypatch.setattr(api, "HOGQL_PAGE_SIZE", 3)
     cache.emitted_cache.clear()
+    api._hogql_columns_cache.clear()
     yield
     cache.emitted_cache.clear()
+    api._hogql_columns_cache.clear()
 
 
 # Paging
@@ -349,3 +351,60 @@ def test_events_lookback_skips_what_the_backfill_emitted_and_cleans_up():
         )
     )
     assert cache.count_for(f"events/{PROJECT_ID}") == 0
+
+
+# Events backfill windows
+
+
+def _query_bounds(query: str) -> tuple[datetime, datetime]:
+    stamps = [_ts(m) for m in re.findall(_TS, query)]
+    return stamps[0], stamps[-1]
+
+
+def test_events_backfill_reads_one_day_per_query_and_ends_at_the_cutoff():
+    cutoff = T0
+    start = cutoff - timedelta(days=5, hours=6)
+    # A few events on some days, none on others, one at the cutoff.
+    rows = [
+        _event(0, start + timedelta(minutes=1)),
+        _event(1, start + timedelta(days=2)),
+        _event(2, start + timedelta(days=2)),
+        _event(3, cutoff),
+    ]
+    fake: Any = FakePostHog("events", ["uuid", "timestamp"], rows)
+
+    ids = _events_backfill(fake, start, cutoff)
+
+    assert sorted(ids) == sorted(r["uuid"] for r in rows)
+    data_queries = [q for q in fake.queries if "WHERE" in q]
+    for query in data_queries:
+        low, high = _query_bounds(query)
+        assert high - low <= api.EVENTS_BACKFILL_WINDOW
+    # Six windows: five whole days and the six hours before the cutoff.
+    assert len(data_queries) == 6
+    assert _query_bounds(data_queries[-1])[1] == cutoff
+    # The columns are looked up one time, not before each window.
+    assert len(fake.queries) == len(data_queries) + 1
+
+
+def test_events_backfill_checkpoints_each_window_and_resumes_from_it():
+    cutoff = T0
+    start = cutoff - timedelta(days=2)
+    rows = [_event(0, start + timedelta(hours=1)), _event(1, cutoff)]
+    fake: Any = FakePostHog("events", ["uuid", "timestamp"], rows)
+
+    first = _run(
+        api.backfill_project_events(fake, _config(start), PROJECT_ID, LOG, None, cutoff)
+    )
+    assert _ids(first) == [rows[0]["uuid"]]
+    assert first[-1] == (start + timedelta(days=1)).isoformat()
+
+    second = _run(
+        api.backfill_project_events(
+            fake, _config(start), PROJECT_ID, LOG, first[-1], cutoff
+        )
+    )
+    # The last window ends at the cutoff, so no cursor follows: the backfill
+    # is done.
+    assert _ids(second) == [rows[1]["uuid"]]
+    assert not isinstance(second[-1], str)

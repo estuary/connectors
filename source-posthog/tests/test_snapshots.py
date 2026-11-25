@@ -59,8 +59,11 @@ def test_capture(request, snapshot):
             request.fspath.dirname + "/../test.flow.yaml",
             "--sessions",
             "1",
+            # The Events backfill reads one day per query, starting from the
+            # pinned start date. 30s is not enough time to reach the first
+            # test event, which is approximately three weeks later.
             "--delay",
-            "30s",
+            "90s",
         ],
         stdout=subprocess.PIPE,
         text=True,

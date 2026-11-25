@@ -37,6 +37,12 @@ P = ParamSpec("P")
 HOGQL_PAGE_SIZE = 50_000
 BACKFILL_TIMEOUT_PERIOD = timedelta(minutes=5)
 
+# PostHog stops each query after 10 seconds
+# (https://posthog.com/docs/api/queries). A query over the whole backfill range
+# reads too much data to finish in that time, so the backfill reads one window
+# at a time.
+EVENTS_BACKFILL_WINDOW = timedelta(days=1)
+
 # PostHog events eventual consistency horizon.
 # Events may be delayed in appearing in query results due to ClickHouse replication
 # and Kafka processing. The lookback stream trails behind to capture delayed events.
@@ -65,6 +71,12 @@ SESSIONS_LOOKBACK_LAG = timedelta(hours=1)
 
 # Cache for project IDs per organization (avoids re-fetching on retry).
 _project_ids_cache = None
+
+# Columns of each HogQL table, by (table, project), for the life of the
+# process. The Events backfill sends one query for each day of history, and a
+# lookup before each one would double its requests against PostHog's hourly
+# limit. A column that PostHog adds is picked up at the next restart.
+_hogql_columns_cache: dict[tuple[str, int], list[str]] = {}
 
 
 async def fetch_project_ids(
@@ -288,7 +300,14 @@ async def _fetch_hogql_between[T: HogQLEntity[str] | HogQLEntity[int]](
     means no upper bound. Rows come in (cursor, id) order, and each row comes
     once, even when many rows share one cursor value.
     """
-    column_names = await _get_hogql_columns(model, base_url, project_id, http, log)
+    cache_key = (model.table_name, project_id)
+    column_names = _hogql_columns_cache.get(cache_key)
+    if column_names is None:
+        column_names = await _get_hogql_columns(
+            model, base_url, project_id, http, log
+        )
+        _hogql_columns_cache[cache_key] = column_names
+
     reached = start
     after_id: str | int | None = None
 
@@ -733,6 +752,11 @@ async def backfill_project_events(
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Event | PageCursor, None]:
+    """Emit the events in one window after the page cursor, up to the cutoff.
+
+    Each call reads at most EVENTS_BACKFILL_WINDOW and checkpoints the window's
+    end, so a long backfill resumes from the last window it finished.
+    """
     assert isinstance(page, str | None)
     assert isinstance(cutoff, datetime)
 
@@ -741,20 +765,19 @@ async def backfill_project_events(
     if start_date >= cutoff:
         return
 
+    window_end = min(start_date + EVENTS_BACKFILL_WINDOW, cutoff)
     base_url = config.advanced.base_url
     cache_name = f"events/{project_id}"
     # The lookback incremental starts this far before the cutoff, so only
     # events after this instant can be read by both. Caching only those keeps
     # the cache small: a full history would not fit in memory.
     overlap_start = cutoff - EVENTS_EVENTUAL_CONSISTENCY_HORIZON
-    new_cursor = start_date
     doc_count = 0
 
     async for item in _fetch_hogql_between(
-        Event, start_date, cutoff, base_url, project_id, http, log
+        Event, start_date, window_end, base_url, project_id, http, log
     ):
         item_cursor = item.get_cursor()
-        new_cursor = max(new_cursor, item_cursor)
 
         if item_cursor > overlap_start and not cache.should_yield(
             cache_name, item.id, item_cursor
@@ -764,10 +787,15 @@ async def backfill_project_events(
         doc_count += 1
         yield item
 
-    log.info(f"Backfilled {doc_count} events from project {project_id}")
+    log.info(
+        f"Backfilled {doc_count} events from project {project_id}",
+        {"window_start": start_date, "window_end": window_end},
+    )
 
-    if new_cursor > start_date:
-        yield new_cursor.isoformat()
+    # The last window ends at the cutoff. Returning without a cursor ends the
+    # backfill.
+    if window_end < cutoff:
+        yield window_end.isoformat()
 
 
 async def fetch_project_events(
