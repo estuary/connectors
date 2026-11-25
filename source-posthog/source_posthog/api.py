@@ -818,7 +818,10 @@ async def fetch_project_events(
 
     base_url = config.advanced.base_url
     now = datetime.now(tz=UTC)
-    upper_bound = now - horizon if horizon else None
+    # PostHog accepts events up to about a day in the future. Without a bound
+    # at the present, one such event moves the realtime cursor ahead, and the
+    # realtime subtask stops reading until that time arrives.
+    upper_bound = now - horizon if horizon else now
 
     # One cache per project, so one project's cleanup cannot remove another
     # project's entries.

@@ -451,3 +451,22 @@ def test_an_event_dropped_by_the_backfill_timeout_is_not_cached():
     name = f"events/{PROJECT_ID}"
     assert cache.has_as_recent_as(name, rows[0]["uuid"], _ts(rows[0]["timestamp"]))
     assert not cache.has_as_recent_as(name, rows[1]["uuid"], _ts(rows[1]["timestamp"]))
+
+
+def test_a_future_event_does_not_move_the_realtime_cursor():
+    now = datetime.now(tz=UTC)
+    future = _event(0, now + timedelta(hours=20))
+    fake: Any = FakePostHog("events", ["uuid", "timestamp"], [future])
+    cursor = now - timedelta(minutes=10)
+
+    items = _run(
+        api.fetch_project_events(fake, _config(T0), PROJECT_ID, None, LOG, cursor)
+    )
+    assert items == []
+
+    # An event from now, read by the next poll.
+    fake.rows.append(_event(1, now - timedelta(minutes=1)))
+    items = _run(
+        api.fetch_project_events(fake, _config(T0), PROJECT_ID, None, LOG, cursor)
+    )
+    assert _ids(items) == [fake.rows[1]["uuid"]]
