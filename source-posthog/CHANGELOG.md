@@ -9,12 +9,13 @@
 - `Persons` now captures changes made to a person later in the same hour.
 - `Events` and `Persons` no longer delay or skip data after PostHog receives an event dated in the future.
 - `Events` and `Sessions` backfills no longer lose a document when they pause to checkpoint.
-- `Events` no longer runs out of memory during a large backfill.
-- The `Events` backfill now finishes on projects with a long history.
 
 ### Changed
 
-- `Events`, `Sessions` and `Persons` send fewer queries to PostHog on busy projects.
+- The `Events` backfill now queries PostHog one day at a time.
+- `Events` no longer keeps every captured event in memory.
+- `Persons` now emits every person seen in the last one to two hours on each poll.
+- `Events`, `Sessions` and `Persons` now wait the binding's `interval` between polls instead of polling back to back.
 
 ## 2026-10-02
 
