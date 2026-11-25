@@ -616,6 +616,7 @@ async def fetch_sessions(
     project_id: int,
     lag: timedelta,
     should_evict_emitted_changes: bool,
+    interval: timedelta,
     log: Logger,
     cursor: LogCursor,
 ) -> AsyncGenerator[Session | LogCursor, None]:
@@ -638,11 +639,18 @@ async def fetch_sessions(
     the realtime subtask, SESSIONS_LOOKBACK_LAG for the one that re-walks the
     same span later to pick up rows that were not yet queryable. Only the
     trailing subtask sets `should_evict_emitted_changes`.
+
+    A poll whose window would be shorter than `interval` returns without
+    reading, so the CDK waits a full interval before the next one.
     """
     assert isinstance(cursor, datetime)
 
     horizon = datetime.now(tz=UTC).replace(microsecond=0) - lag
-    if horizon <= cursor:
+    # Both subtasks' cursors trail the present by at least `lag`. The CDK polls
+    # again at once after a checkpoint when the cursor is more than `interval`
+    # behind, so without this each poll would read only the few seconds since
+    # the last one, back to back.
+    if horizon <= cursor or horizon - cursor < interval:
         return
 
     # Namespaced per project so one project's pruning cannot evict another's
@@ -811,6 +819,7 @@ async def fetch_project_events(
     config: EndpointConfig,
     project_id: int,
     horizon: timedelta | None,
+    interval: timedelta,
     log: Logger,
     cursor: LogCursor,
 ) -> AsyncGenerator[Event | LogCursor, None]:
@@ -822,6 +831,13 @@ async def fetch_project_events(
     # at the present, one such event moves the realtime cursor ahead, and the
     # realtime subtask stops reading until that time arrives.
     upper_bound = now - horizon if horizon else now
+
+    # The lookback cursor trails the present by about `horizon`. The CDK polls
+    # again at once after a checkpoint when the cursor is more than `interval`
+    # behind, so without this each lookback poll would read only the few
+    # seconds since the last one, back to back.
+    if upper_bound - cursor < interval:
+        return
 
     # One cache per project, so one project's cleanup cannot remove another
     # project's entries.

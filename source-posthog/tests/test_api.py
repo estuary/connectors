@@ -17,6 +17,7 @@ LOG = logging.getLogger("test")
 BASE_URL = "https://posthog.test/"
 PROJECT_ID = 1
 T0 = datetime(2026, 11, 24, 15, 0, tzinfo=UTC)
+INTERVAL = timedelta(minutes=5)
 
 _TS = r"toDateTime64\('([^']+)', 6, 'UTC'\)"
 _CURSOR = r"(?:COALESCE\([^)]*\)|\w+)"
@@ -160,7 +161,7 @@ def test_events_page_through_rows_that_share_a_timestamp():
 
     items = _run(
         api.fetch_project_events(
-            fake, _config(T0), PROJECT_ID, None, LOG, T0 - timedelta(seconds=1)
+            fake, _config(T0), PROJECT_ID, None, INTERVAL, LOG, T0 - timedelta(seconds=1)
         )
     )
 
@@ -194,7 +195,7 @@ def test_single_cursor_column_is_not_wrapped_in_coalesce():
 
     _run(
         api.fetch_project_events(
-            fake, _config(T0), PROJECT_ID, None, LOG, T0 - timedelta(seconds=1)
+            fake, _config(T0), PROJECT_ID, None, INTERVAL, LOG, T0 - timedelta(seconds=1)
         )
     )
 
@@ -331,6 +332,7 @@ def test_events_lookback_skips_what_the_backfill_emitted_and_cleans_up():
             _config(T0),
             PROJECT_ID,
             api.EVENTS_EVENTUAL_CONSISTENCY_HORIZON,
+            INTERVAL,
             LOG,
             lookback_cursor,
         )
@@ -346,6 +348,7 @@ def test_events_lookback_skips_what_the_backfill_emitted_and_cleans_up():
             _config(T0),
             PROJECT_ID,
             api.EVENTS_EVENTUAL_CONSISTENCY_HORIZON,
+            INTERVAL,
             LOG,
             next_cursor,
         )
@@ -460,13 +463,30 @@ def test_a_future_event_does_not_move_the_realtime_cursor():
     cursor = now - timedelta(minutes=10)
 
     items = _run(
-        api.fetch_project_events(fake, _config(T0), PROJECT_ID, None, LOG, cursor)
+        api.fetch_project_events(fake, _config(T0), PROJECT_ID, None, INTERVAL, LOG, cursor)
     )
     assert items == []
 
     # An event from now, read by the next poll.
     fake.rows.append(_event(1, now - timedelta(minutes=1)))
     items = _run(
-        api.fetch_project_events(fake, _config(T0), PROJECT_ID, None, LOG, cursor)
+        api.fetch_project_events(fake, _config(T0), PROJECT_ID, None, INTERVAL, LOG, cursor)
     )
     assert _ids(items) == [fake.rows[1]["uuid"]]
+
+
+def test_a_lookback_poll_shorter_than_the_interval_reads_nothing():
+    # The lookback ran a minute ago, so its window would be a minute long.
+    horizon = api.EVENTS_EVENTUAL_CONSISTENCY_HORIZON
+    cursor = datetime.now(tz=UTC) - horizon - timedelta(minutes=1)
+    fake: Any = FakePostHog("events", ["uuid", "timestamp"], [_event(0, cursor)])
+
+    items = _run(
+        api.fetch_project_events(
+            fake, _config(T0), PROJECT_ID, horizon, INTERVAL, LOG, cursor
+        )
+    )
+
+    # No cursor, so the CDK sleeps a full interval before the next poll.
+    assert items == []
+    assert fake.queries == []
