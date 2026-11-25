@@ -350,6 +350,7 @@ INCREMENTAL_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, FilterParam, str, t
 class IncrementalKeysetPaginatedResponse(BaseModel, extra="allow"):
     PATH: ClassVar[str]
     ITEMS_KEY: ClassVar[str]
+    REQUEST_PARAMS: ClassVar[dict[str, str]] = {}
 
     meta: FullRefreshCursorPaginatedResponse.Meta
 
@@ -366,6 +367,31 @@ class UsersListResponse(IncrementalKeysetPaginatedResponse):
     ITEMS_KEY: ClassVar[str] = "users"
 
     resources: list[TimestampedResource] = Field(alias=ITEMS_KEY)
+
+
+# Zendesk leaves out tickets handled entirely by its AI agent unless
+# support_type_scope is all.
+ALL_SUPPORT_TYPES = {"support_type_scope": "all"}
+
+
+class TicketsListResponse(IncrementalKeysetPaginatedResponse):
+    PATH: ClassVar[str] = "tickets"
+    ITEMS_KEY: ClassVar[str] = "tickets"
+    REQUEST_PARAMS: ClassVar[dict[str, str]] = ALL_SUPPORT_TYPES
+
+    resources: list[TimestampedResource] = Field(alias=ITEMS_KEY)
+
+
+class DeletedTicket(ZendeskResource):
+    deleted_at: AwareDatetime
+
+
+class DeletedTicketsResponse(IncrementalKeysetPaginatedResponse):
+    PATH: ClassVar[str] = "deleted_tickets"
+    ITEMS_KEY: ClassVar[str] = "deleted_tickets"
+    REQUEST_PARAMS: ClassVar[dict[str, str]] = ALL_SUPPORT_TYPES
+
+    resources: list[DeletedTicket] = Field(alias=ITEMS_KEY)
 
 
 class DeletedUsersResponse(BaseModel, extra="allow"):

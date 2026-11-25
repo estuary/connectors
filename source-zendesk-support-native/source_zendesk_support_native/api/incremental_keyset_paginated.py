@@ -114,6 +114,7 @@ async def _fetch_incremental_keyset_paginated_window(
         "sort": "updated_at",
         "page[size]": CURSOR_PAGINATION_PAGE_SIZE,
         "page[after]": build_seek_cursor(lower_bound),
+        **response_model.REQUEST_PARAMS,
     }
 
     window = KeysetWindow(response_model.ITEMS_KEY, lower_bound, upper_bound)
