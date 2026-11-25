@@ -11,6 +11,7 @@ import (
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
+	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -909,6 +910,10 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		return nil, nil, nil, err
 	}
 	featureFlags := resolveFlags(epCfg, createdAt)
+	// This runs before the materializer connects to the destination, so a task
+	// whose connection fails still gets `skipHostKeyVerification`. Any later
+	// configUpdate must start from sealedConfig, or it will drop that setting.
+	sealedConfig := networkTunnel.RecordSkipHostKeyVerification(req.Materialization.ConfigJson, req.SealedConfigJson)
 	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), epCfg, featureFlags)
 	if err != nil {
 		return nil, nil, nil, err
@@ -953,7 +958,7 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	}
 
 	if openOpts.featureFlagsPath != nil {
-		pinFeatureFlags(epCfg, req.SealedConfigJson, createdAt, openOpts)
+		pinFeatureFlags(epCfg, sealedConfig, createdAt, openOpts)
 	}
 
 	return transactor, &pm.Response_Opened{
