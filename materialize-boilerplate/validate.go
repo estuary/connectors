@@ -34,8 +34,9 @@ type Validator struct {
 	is *InfoSchema
 	// maxFieldLength is used to produce "forbidden" constraints on fields that are too long. If
 	// maxFieldLength is 0, no constraints are enforced. The length of a field name is in terms of
-	// characters, not bytes.
-	maxFieldLength int
+	// characters, not bytes, unless fieldLengthInBytes is set.
+	maxFieldLength     int
+	fieldLengthInBytes bool
 
 	// caseInsensitiveFields indicates if fields that differ only in capitalization will
 	// conflict in the materialized resource. This is passed to the protocol-level
@@ -145,7 +146,7 @@ func (v Validator) ValidateBinding(
 		}
 	}
 
-	return forbidLongFields(v.maxFieldLength, boundCollection, constraints)
+	return forbidLongFields(v.maxFieldLength, v.fieldLengthInBytes, boundCollection, constraints)
 }
 
 // ValidatedConstraints flattens per-field constraint lists into the Validated
@@ -499,7 +500,7 @@ func FindLastBinding(resourcePath []string, lastSpec *pf.MaterializationSpec) *p
 // if all of the projections of a location that is required have names that are too long - at least
 // one of the projections of a required location must be able to be materialized. If maxLength is 0
 // no restrictions are enforced.
-func forbidLongFields(maxLength int, collection pf.CollectionSpec, constraints map[string][]*pm.Response_Validated_Constraint) (map[string][]*pm.Response_Validated_Constraint, error) {
+func forbidLongFields(maxLength int, inBytes bool, collection pf.CollectionSpec, constraints map[string][]*pm.Response_Validated_Constraint) (map[string][]*pm.Response_Validated_Constraint, error) {
 	if maxLength == 0 {
 		return constraints, nil
 	}
@@ -512,7 +513,11 @@ func forbidLongFields(maxLength int, collection pf.CollectionSpec, constraints m
 
 	requiredLocations := make(map[string]bool)
 	for field, cs := range constraints {
-		tooLong := len([]rune(field)) > maxLength
+		length := len([]rune(field))
+		if inBytes {
+			length = len(field)
+		}
+		tooLong := length > maxLength
 
 		p := collection.GetProjection(field)
 
@@ -534,7 +539,7 @@ func forbidLongFields(maxLength int, collection pf.CollectionSpec, constraints m
 			return nil, fmt.Errorf(
 				"field '%s' is required to be materialized but has a length of %d which exceeds the maximum length allowable by the destination of %d",
 				field,
-				len(field),
+				length,
 				maxLength,
 			)
 		}
@@ -544,7 +549,7 @@ func forbidLongFields(maxLength int, collection pf.CollectionSpec, constraints m
 			Reason: fmt.Sprintf(
 				"Field '%s' has a length of %d which exceeds the maximum length allowable by the destination of %d. Use an alternate projection with a shorter name to materialize this location",
 				field,
-				len(field),
+				length,
 				maxLength,
 			),
 			FoldedField: cs[0].FoldedField,
