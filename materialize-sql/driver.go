@@ -404,7 +404,6 @@ func checkColumnLimit(dialect Dialect, table Table, existing, added int) error {
 func (s *sqlMaterialization[EC, RC]) NewTransactor(
 	ctx context.Context,
 	open pm.Request_Open,
-	is boilerplate.InfoSchema,
 	bindings []boilerplate.MappedBinding[EC, RC, MappedType],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
@@ -445,7 +444,17 @@ func (s *sqlMaterialization[EC, RC]) NewTransactor(
 		}
 	}
 
-	return s.endpoint.NewTransactor(ctx, s.materializationName, s.featureFlags, s.endpoint, fence, tables, open, &is, be)
+	paths := make([][]string, 0, len(bindings))
+	for _, binding := range bindings {
+		paths = append(paths, binding.ResourcePath)
+	}
+
+	is := boilerplate.InitInfoSchema(s.Config())
+	if err := s.PopulateInfoSchema(ctx, is, paths); err != nil {
+		return nil, err
+	}
+
+	return s.endpoint.NewTransactor(ctx, s.materializationName, s.featureFlags, s.endpoint, fence, tables, open, is, be)
 }
 
 func (s *sqlMaterialization[EC, RC]) FlushDDL(ctx context.Context) error {

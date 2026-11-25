@@ -25,7 +25,6 @@ func drainPendingState[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, E
 	materializer Materializer[EC, FC, RC, MT],
 	req *pm.Request_Apply,
 	endpointCfg EC,
-	is *InfoSchema,
 	stateKeys []string,
 ) (*pf.ConnectorState, error) {
 	lastSpec := req.LastMaterialization
@@ -51,7 +50,7 @@ func drainPendingState[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, E
 		StateJson: req.StateJson,
 	}
 
-	transactor, err := materializer.NewTransactor(ctx, open, *is, mapped, m.NewBindingEvents())
+	transactor, err := materializer.NewTransactor(ctx, open, mapped, m.NewBindingEvents())
 	if err != nil {
 		return nil, fmt.Errorf("building transactor: %w", err)
 	}
