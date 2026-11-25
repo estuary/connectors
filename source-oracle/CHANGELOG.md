@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-25
+
+### Changed
+- Backfills of tables without a primary key now read 64 MiB of table data at a time instead of 256 MiB.
+
 ## 2026-11-23
 
 ### Added
