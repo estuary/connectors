@@ -48,14 +48,14 @@ jobs:
       failed: ${{ steps.scan.outputs.failed }}
       failed_connectors: ${{ steps.scan.outputs.failed_connectors }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@v5.1.0
 
       - name: Test the scan script
         run: cd .github/scripts && python3 -m unittest test_trivy_scan -v
 
       # Pull as this repository, which publishes the images, not anonymously.
       - name: Log in to ghcr.io
-        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
+        uses: docker/login-action@v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}

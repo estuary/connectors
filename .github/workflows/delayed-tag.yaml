@@ -46,21 +46,21 @@ jobs:
   publish_delayed:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           # Full history is required: the plan step walks first-parent commits
           # per connector directory and checks for revert references on main.
           fetch-depth: 0
 
       - name: Login to GitHub package docker registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v4.4.1
 
       - name: Run unit tests
         run: cd .github/scripts && python3 -m unittest test_delayed_tag -v
@@ -84,7 +84,7 @@ jobs:
         # only call Claude for connectors that actually moved. The key is unique
         # per run (so each run saves a fresh entry); restore-keys falls back to
         # the most recent prior save.
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v4.3.0
         with:
           path: verdict-cache
           key: delayed-verdict-${{ github.run_id }}
@@ -113,7 +113,7 @@ jobs:
         # verdicts (dropping connectors no longer in the plan), and on a crash
         # the restored copy is preserved under the new key so it isn't lost.
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v4.3.0
         with:
           path: verdict-cache
           key: delayed-verdict-${{ github.run_id }}

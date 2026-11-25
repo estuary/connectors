@@ -32,7 +32,7 @@ runs:
     # Only the toolchain go.mod asks for is needed: `go list` parses imports
     # from source, so nothing is downloaded and there's nothing to cache.
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v5.6.0
       with:
         go-version-file: go.mod
         cache: false

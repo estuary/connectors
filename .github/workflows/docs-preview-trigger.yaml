@@ -74,7 +74,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Mint token for estuary/docs
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v2.2.2
         id: app-token
         with:
           app-id: ${{ vars.PREVIEW_APP_ID }}

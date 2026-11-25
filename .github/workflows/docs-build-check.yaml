@@ -82,14 +82,14 @@ jobs:
 
       - name: Check out this PR
         if: steps.gate.outputs.build == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
         with:
           path: connectors
 
       - name: Mint token for estuary/docs
         id: app-token
         if: steps.gate.outputs.build == 'true'
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v2.2.2
         with:
           app-id: ${{ vars.PREVIEW_APP_ID }}
           private-key: ${{ secrets.PREVIEW_APP_PRIVATE_KEY }}
@@ -98,7 +98,7 @@ jobs:
 
       - name: Check out estuary/docs at main
         if: steps.gate.outputs.build == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
         with:
           repository: estuary/docs
           ref: main
@@ -134,7 +134,7 @@ jobs:
 
       - name: Setup Node
         if: steps.gate.outputs.build == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4.4.0
         with:
           node-version: 22
           cache: npm

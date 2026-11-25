@@ -59,7 +59,7 @@ jobs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       cdk: ${{ steps.classify.outputs.cdk }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
 
       # Runs here rather than in the classifier's workflow so that it also
       # runs on the change adding a connector.
@@ -82,7 +82,7 @@ jobs:
     if: needs.classify_changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
 
       # These tests only invoke flowctl, but flowctl shells out to sops to
       # decrypt each test.flow.yaml's encrypted config, and runs each image
@@ -120,7 +120,7 @@ jobs:
       CONNECTOR: ${{ matrix.connector.name }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
 
       - name: Download flow-network-tunnel and add it to $PATH
         run: |
@@ -142,7 +142,7 @@ jobs:
       # uv provisions the interpreter itself, so there is no separate
       # setup-python step. Keep the pin in step with estuary-cdk/*.Dockerfile.
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v5.4.2
         with:
           version: "0.13.3"
           enable-cache: true
@@ -189,7 +189,7 @@ jobs:
           echo "path=${DOCKERFILE_PATH}" >> $GITHUB_OUTPUT
 
       - name: Build ${{ matrix.connector.name }} Docker Image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ${{ steps.dockerfile.outputs.path }}
@@ -276,12 +276,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
 
       # uv provisions the interpreter itself, so there is no separate
       # setup-python step. Keep the pin in step with estuary-cdk/*.Dockerfile.
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v5.4.2
         with:
           version: "0.13.3"
           enable-cache: true
@@ -335,10 +335,10 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v5.4.2
         with:
           version: "0.13.3"
           enable-cache: true
@@ -423,7 +423,7 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
 
       # Reads the same `run` output the build jobs gate on.
       - uses: ./.github/actions/connectors-gate
@@ -470,13 +470,13 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           # cdk-release-version.py needs tags and history.
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v5.4.2
         with:
           version: "0.13.3"
           enable-cache: true
@@ -510,7 +510,7 @@ jobs:
           uv build --package estuary_cdk --wheel --out-dir dist
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@v1.14.3
         with:
           # PyPI refuses to replace a file it holds; most runs rebuild one.
           skip-existing: true

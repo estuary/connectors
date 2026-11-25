@@ -51,7 +51,7 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
 
       - name: Fetch the CA bundles
         run: $CLOUDCAS_DIR/update.sh
@@ -84,7 +84,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
 
       - name: Skip if a refresh PR is already open
         id: open
@@ -130,7 +130,7 @@ jobs:
       - name: Open the refresh PR
         id: pr
         if: steps.diff.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v7.0.11
         with:
           branch: ${{ env.REFRESH_BRANCH }}
           delete-branch: true

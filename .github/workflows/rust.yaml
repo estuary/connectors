@@ -38,7 +38,7 @@ jobs:
       run: ${{ steps.matrix.outputs.run }}
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
 
       # Runs here rather than in the classifier's workflow so that it also
       # runs on the change adding a connector.
@@ -61,7 +61,7 @@ jobs:
     if: needs.classify_changes.outputs.run == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
 
       - name: Fetch Flow binaries
         uses: ./.github/actions/fetch-flow-artifact
@@ -75,7 +75,7 @@ jobs:
     outputs:
       tag: ${{ steps.base_image.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           fetch-depth: 0
 
@@ -107,7 +107,7 @@ jobs:
       CONNECTOR: ${{ matrix.connector.name }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           fetch-depth: 0
 
@@ -125,26 +125,26 @@ jobs:
         uses: ./.github/actions/restore-flow-binaries
 
       - name: Authenticate with GCloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v2.1.13
         with:
           project_id: estuary-theatre
           workload_identity_provider: projects/417581116910/locations/global/workloadIdentityPools/github/providers/connectors
           service_account: storage-testing@estuary-theatre.iam.gserviceaccount.com
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v2.2.1
         with:
           project_id: estuary-theatre
 
       - name: Login to GitHub package docker registry
-        uses: docker/login-action@v4
+        uses: docker/login-action@v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v4.4.1
         with:
           driver-opts: |
             network=host
@@ -183,7 +183,7 @@ jobs:
       # Actions cache with a copy of target/ per branch.
       - name: Cache Cargo registry and build artifacts
         if: matrix.connector.name == 'source-kafka'
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.3
         with:
           workspaces: source-kafka -> target
           save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -194,7 +194,7 @@ jobs:
         run: cargo test --locked --manifest-path source-kafka/Cargo.toml
 
       - name: Build ${{ matrix.connector.name }} Docker Image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v6.19.2
         with:
           context: .
           file: ${{ matrix.connector.name }}/Dockerfile
@@ -256,7 +256,7 @@ jobs:
       # destination schemas and fixture rows, never endpoint configuration.
       - name: Upload ${{ matrix.connector.name }} snapshot mismatches
         if: failure() && startsWith(matrix.connector.name, 'materialize-')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: snapshot-mismatch-${{ matrix.connector.name }}
           path: ${{ matrix.connector.name }}/.snapshots/*.actual
@@ -292,7 +292,7 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
 
       # Reads the same `run` output the build jobs gate on.
       - uses: ./.github/actions/connectors-gate
