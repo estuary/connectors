@@ -15,7 +15,7 @@
 
 - The `Events` backfill reads one day of events per query instead of the whole range since the start date. This may let the backfill finish on projects where a query over the whole range took longer than PostHog's 10-second limit.
 - `Events` and `Sessions` wait a full interval between polls instead of polling back to back on busy projects.
-- `Persons` now emits every person seen in the last one to two hours on each poll.
+- `Persons` emits every person seen since the start of the previous hour on each poll instead of only persons whose `last_seen_at` changed. A person is emitted again on every poll while they stay in that range, so the collection receives more documents.
 
 ## 2026-10-02
 
