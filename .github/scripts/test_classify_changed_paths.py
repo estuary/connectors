@@ -159,6 +159,11 @@ class TestLanes(unittest.TestCase):
         # this rule it would fall through to the Go & Rust lane like go.mod.
         self.assertEqual(classify("ruff.toml"), (False, False, []))
 
+    def test_dependabot_config_triggers_neither_connector_lane(self):
+        # Without this rule it would fall through to the Go & Rust lane and
+        # build every connector there.
+        self.assertEqual(classify(".github/dependabot.yml"), (False, False, []))
+
     def test_image_scan_verdict_inputs_trigger_neither_connector_lane(self):
         # They change no image; image-scan.yaml checks a change to them against
         # the published images instead. The scan's scripts and workflow are
