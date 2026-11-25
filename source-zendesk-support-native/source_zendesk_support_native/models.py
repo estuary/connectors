@@ -6,6 +6,7 @@ from typing import Annotated, Any, ClassVar, Literal, TYPE_CHECKING
 from estuary_cdk.capture.common import (
     BasicAuth,
     BaseDocument,
+    BaseResourceState,
     LongLivedClientCredentialsOAuth2Credentials,
     RotatingOAuth2Credentials,
     OAuth2Spec,
@@ -161,6 +162,18 @@ class EndpointConfig(BaseModel):
         return schema
 
 ConnectorState = GenericConnectorState[ResourceState]
+
+
+class CursorExportStatePatch(BaseResourceState):
+    """
+    A checkpoint that moves a binding from the keyset sweep's subtask cursors
+    back to the cursor-based export's single cursor. ResourceState can't express
+    it because one merge patch has to set `inc.cursor` to the export's cursor
+    and every subtask key to None.
+    """
+
+    inc: dict[str, tuple[str] | None]
+    backfill: ResourceState.Backfill | None = None
 
 
 class FullRefreshResource(BaseDocument, extra="allow"):
@@ -345,6 +358,21 @@ class OrganizationsListResponse(IncrementalKeysetPaginatedResponse):
     PATH: ClassVar[str] = "organizations"
     ITEMS_KEY: ClassVar[str] = "organizations"
 
+    resources: list[TimestampedResource] = Field(alias=ITEMS_KEY)
+
+
+class UsersListResponse(IncrementalKeysetPaginatedResponse):
+    PATH: ClassVar[str] = "users"
+    ITEMS_KEY: ClassVar[str] = "users"
+
+    resources: list[TimestampedResource] = Field(alias=ITEMS_KEY)
+
+
+class DeletedUsersResponse(BaseModel, extra="allow"):
+    PATH: ClassVar[str] = "deleted_users"
+    ITEMS_KEY: ClassVar[str] = "deleted_users"
+
+    meta: FullRefreshCursorPaginatedResponse.Meta
     resources: list[TimestampedResource] = Field(alias=ITEMS_KEY)
 
 

@@ -1,17 +1,19 @@
 from datetime import datetime, timedelta, UTC
 import functools
 from logging import Logger
-from typing import Any
+from typing import Any, AsyncGenerator, Callable
 
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.capture import common, Task
-from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
+from estuary_cdk.http import HTTPMixin, HTTPSession, TokenSource, HTTPError
 
 from .models import (
     AccountSettings,
     AuditLog,
     ClientSideIncrementalOffsetPaginatedResponse,
     ClientSideIncrementalCursorPaginatedResponse,
+    ConnectorState,
+    CursorExportStatePatch,
     EndpointConfig,
     FilterParam,
     FullRefreshResponse,
@@ -42,6 +44,7 @@ from .models import (
     OAUTH2_SPEC,
     TICKET_CHILD_RESOURCES,
     POST_CHILD_RESOURCES,
+    UsersListResponse,
     update_oauth_spec,
 )
 from .api import (
@@ -55,9 +58,11 @@ from .api import (
     backfill_side_conversations,
     backfill_ticket_child_resources,
     backfill_ticket_metrics,
+    cursor_export_cursor_to_dt,
     fetch_audit_logs,
     fetch_client_side_incremental_offset_paginated_resources,
     fetch_client_side_incremental_cursor_paginated_resources,
+    fetch_deleted_users,
     fetch_incremental_time_export_resources,
     fetch_incremental_keyset_paginated_resources,
     fetch_incremental_cursor_export_resources,
@@ -768,6 +773,139 @@ def incremental_keyset_paginated_resources(
     return resources
 
 
+def _migrate_export_cursor_to_keyset_subtasks(
+    state: ResourceState,
+    subtask_ids: tuple[str, ...],
+    margin: timedelta,
+) -> ResourceState | None:
+    """
+    Returns the state to checkpoint when `state` is the cursor-based export's,
+    or None when it's already the keyset sweep's. Each subtask and an
+    in-progress backfill start `margin` before the export's cursor.
+    """
+    if isinstance(state.inc, dict):
+        return None
+
+    assert isinstance(state.inc, ResourceState.Incremental) and isinstance(state.inc.cursor, tuple)
+    export_cursor = state.inc.cursor[0]
+    assert isinstance(export_cursor, str)
+
+    cursor = cursor_export_cursor_to_dt(export_cursor) - margin
+
+    inc: dict[str, ResourceState.Incremental | None] = {
+        # The runtime merge-patches checkpoints, so None removes the export's
+        # cursor from the saved state.
+        "cursor": None,
+    }
+    for subtask_id in subtask_ids:
+        inc[subtask_id] = ResourceState.Incremental(cursor=cursor)
+
+    migrated = ResourceState(inc=inc)
+
+    if isinstance(state.backfill, ResourceState.Backfill) and isinstance(state.backfill.next_page, str):
+        page_dt = cursor_export_cursor_to_dt(state.backfill.next_page) - margin
+        migrated.backfill = ResourceState.Backfill(
+            cutoff=state.backfill.cutoff,
+            next_page=dt_to_s(page_dt),
+        )
+
+    return migrated
+
+
+# Nothing calls this yet. A later PR adds the feature flag that switches
+# users from the cursor-based export to these resources (#5357).
+def incremental_keyset_paginated_resources_with_deletions(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    async def open(
+        name: str,
+        response_model: type[IncrementalKeysetPaginatedResponse],
+        fetch_deletions: Callable[[HTTPSession, str, Logger, common.LogCursor], AsyncGenerator[ZendeskResource | common.LogCursor, None]],
+        margin: timedelta,
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        migrated = _migrate_export_cursor_to_keyset_subtasks(
+            state, (name, f"deleted_{name}"), margin,
+        )
+
+        if migrated is not None:
+            state.inc = migrated.inc
+            if migrated.backfill is not None:
+                state.backfill = migrated.backfill
+
+            task.log.info(f"Migrated {name} state from the cursor-based export to the keyset sweep.", {
+                "resource": binding.resourceConfig.name,
+                "migrated_state": migrated.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: migrated}),
+            )
+
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes={
+                name: functools.partial(
+                    fetch_incremental_keyset_paginated_resources,
+                    http,
+                    config.subdomain,
+                    response_model,
+                ),
+                f"deleted_{name}": functools.partial(
+                    fetch_deletions,
+                    http,
+                    config.subdomain,
+                ),
+            },
+            fetch_page=functools.partial(
+                backfill_incremental_keyset_paginated_resources,
+                http,
+                config.subdomain,
+                response_model,
+                config.start_date,
+            )
+        )
+
+    def resource(
+        name: str,
+        response_model: type[IncrementalKeysetPaginatedResponse],
+        fetch_deletions: Callable[[HTTPSession, str, Logger, common.LogCursor], AsyncGenerator[ZendeskResource | common.LogCursor, None]],
+        margin: timedelta,
+    ) -> common.Resource:
+        cutoff = (datetime.now(tz=UTC) - INCREMENTAL_LAG).replace(microsecond=0)
+
+        return common.Resource(
+            name=name,
+            key=["/id"],
+            model=TimestampedResource,
+            open=functools.partial(open, name, response_model, fetch_deletions, margin),
+            initial_state=ResourceState(
+                inc={
+                    name: ResourceState.Incremental(cursor=cutoff),
+                    f"deleted_{name}": ResourceState.Incremental(cursor=cutoff),
+                },
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+
+    return [
+        # The export's cursor can stop partway through a second, so the sweep
+        # starts a second earlier and reads that whole second again.
+        resource("users", UsersListResponse, fetch_deleted_users, timedelta(seconds=1)),
+    ]
+
+
 def talk_incremental_export_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -829,11 +967,44 @@ def talk_incremental_export_resources(
     return resources
 
 
+def _migrate_keyset_subtasks_to_export(state: ResourceState) -> CursorExportStatePatch | None:
+    """
+    Returns the patch to checkpoint when `state` is the keyset sweep's, or None
+    when it's already the cursor-based export's.
+    """
+    if not isinstance(state.inc, dict):
+        return None
+
+    subtask_cursors: list[datetime] = []
+    for subtask in state.inc.values():
+        if subtask is not None:
+            assert isinstance(subtask.cursor, datetime)
+            subtask_cursors.append(subtask.cursor)
+
+    # A deletion subtask can trail the other subtask by over an hour, and list
+    # endpoints never return deleted records. Starting the export at the
+    # earliest subtask cursor reads the deletions in between again.
+    patch = CursorExportStatePatch(
+        inc={
+            **{subtask_id: None for subtask_id in state.inc},
+            "cursor": (str(dt_to_s(min(subtask_cursors))),),
+        },
+    )
+
+    if isinstance(state.backfill, ResourceState.Backfill) and isinstance(state.backfill.next_page, int):
+        patch.backfill = ResourceState.Backfill(
+            cutoff=state.backfill.cutoff,
+            next_page=str(state.backfill.next_page),
+        )
+
+    return patch
+
+
 def incremental_cursor_export_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
-    def open(
+    async def open(
         name: INCREMENTAL_CURSOR_EXPORT_TYPES,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -841,6 +1012,23 @@ def incremental_cursor_export_resources(
         task: Task,
         all_bindings,
     ):
+        patch = _migrate_keyset_subtasks_to_export(state)
+
+        if patch is not None:
+            cursor = patch.inc["cursor"]
+            assert cursor is not None
+            state.inc = ResourceState.Incremental(cursor=cursor)
+            if patch.backfill is not None:
+                state.backfill = patch.backfill
+
+            task.log.info(f"Migrated {name} state from the keyset sweep to the cursor-based export.", {
+                "resource": binding.resourceConfig.name,
+                "migrated_state": patch.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                common.ConnectorState[CursorExportStatePatch](bindingStateV1={binding.stateKey: patch}),
+            )
+
         common.open_binding(
             binding,
             binding_index,
