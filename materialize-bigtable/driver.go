@@ -31,7 +31,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-var featureFlagDefaults = map[string]common.FlagDefault{}
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"retain_existing_data_on_backfill": common.FlagDisabled,
+	"truncate_after_backfill":          common.FlagEnabled,
+}
+
+// truncateAfterBackfill reports whether flags permit deleting the rows
+// published before a completed backfill. Retaining existing data on backfill
+// forbids it, since those rows are exactly the data being retained.
+func truncateAfterBackfill(flags map[string]bool) bool {
+	return flags["truncate_after_backfill"] && !flags["retain_existing_data_on_backfill"]
+}
 
 type AuthType string
 
@@ -256,6 +266,9 @@ type materialization struct {
 	cfg         config
 	adminClient *bigtable.AdminClient
 	dataClient  *bigtable.Client
+	// truncateAfterBackfill permits deleting rows published before a
+	// completed backfill.
+	truncateAfterBackfill bool
 }
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
@@ -273,9 +286,10 @@ func NewMaterializer(ctx context.Context, materializationName string, cfg config
 	}
 
 	return &materialization{
-		cfg:         cfg,
-		adminClient: admin,
-		dataClient:  data,
+		cfg:                   cfg,
+		adminClient:           admin,
+		dataClient:            data,
+		truncateAfterBackfill: truncateAfterBackfill(featureFlags),
 	}, nil
 }
 
@@ -411,7 +425,6 @@ func (d *materialization) UpdateResource(
 func (d *materialization) NewTransactor(
 	ctx context.Context,
 	req pm.Request_Open,
-	is boilerplate.InfoSchema,
 	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
@@ -420,12 +433,15 @@ func (d *materialization) NewTransactor(
 	}
 
 	bindings := make([]binding, 0, len(mappedBindings))
-	for _, mb := range mappedBindings {
+	for idx, mb := range mappedBindings {
+		pubField, pubErr := publishedAtField(&mappedBindings[idx])
 		b := binding{
-			tableName: mb.ResourcePath[0],
-			path:      mb.ResourcePath,
-			table:     d.dataClient.Open(mb.ResourcePath[0]),
-			docField:  mb.FieldSelection.Document, // Usually "flow_document", but can be projected to a different field name
+			tableName:        mb.ResourcePath[0],
+			path:             mb.ResourcePath,
+			table:            d.dataClient.Open(mb.ResourcePath[0]),
+			docField:         mb.FieldSelection.Document, // Usually "flow_document", but can be projected to a different field name
+			publishedAtField: pubField,
+			publishedAtErr:   pubErr,
 		}
 		for _, p := range mb.SelectedProjections() {
 			if !p.IsRootDocumentProjection() {
@@ -435,7 +451,36 @@ func (d *materialization) NewTransactor(
 		bindings = append(bindings, b)
 	}
 
-	return &transactor{bindings: bindings, hardDelete: d.cfg.HardDelete, be: be}, nil
+	return &transactor{
+		bindings:              bindings,
+		hardDelete:            d.cfg.HardDelete,
+		be:                    be,
+		truncateAfterBackfill: d.truncateAfterBackfill,
+	}, nil
+}
+
+// publishedAtField returns the name of the selected field that projects
+// /_meta/uuid as a date-time, used to find rows published before a completed
+// backfill. The error is a clause stating why no field qualifies, suited for
+// an operator to act on.
+func publishedAtField(b *boilerplate.MappedBinding[config, resource, mappedType]) (string, error) {
+	var reason error
+	for i := range b.Values {
+		var p = &b.Values[i]
+		if p.Ptr != "/_meta/uuid" {
+			continue
+		}
+		var err = boilerplate.PublishedAtMismatch(&p.Projection.Projection)
+		if err != nil {
+			reason = err
+			continue
+		}
+		return p.Field, nil
+	}
+	if reason == nil {
+		reason = boilerplate.ErrPublishedAtExcluded
+	}
+	return "", reason
 }
 
 func (d *materialization) ListTestTasks(ctx context.Context) ([]string, error)        { return nil, nil }

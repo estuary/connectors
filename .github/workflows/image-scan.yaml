@@ -1,0 +1,151 @@
+name: Image Scan
+permissions:
+  contents: read
+
+# Scans every connector image the connector workflows publish: each Go, Rust
+# and Python connector's version tag, and its variants', as listed by
+# .github/scripts/published-images.sh. A connector image must not ship with an
+# unresolved HIGH or CRITICAL finding. Pull requests scan the images they build
+# (see go.yaml, python.yaml and rust.yaml); this nightly run catches
+# vulnerabilities published since an image was built, in images no pull
+# request has rebuilt since. It runs after the connector workflows' own nightly
+# builds at 08:00, so it scans what they published.
+#
+# A pull request runs it when it changes what decides a scan's verdict without
+# changing any image: trivy.yaml, the root .trivyignore.yaml, or the scan
+# itself. Those build no connector (see classify-changed-paths.sh), so this is
+# what checks them, against the images in production. A connector's own
+# .trivyignore.yaml rebuilds and rescans that connector instead.
+on:
+  schedule:
+    - cron: "0 10 * * *"
+  workflow_dispatch: {}
+  pull_request:
+    branches: [main]
+    paths:
+      - trivy.yaml
+      - .trivyignore.yaml
+      - .github/actions/scan-images/**
+      - .github/scripts/trivy-scan.sh
+      - .github/scripts/test_trivy_scan.py
+      - .github/scripts/published-images.sh
+      - .github/workflows/image-scan.yaml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image-scan:
+    name: Image Scan
+    runs-on: ubuntu-24.04
+    # A cold scan of every image takes about half an hour.
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      failed: ${{ steps.scan.outputs.failed }}
+      failed_connectors: ${{ steps.scan.outputs.failed_connectors }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Test the scan script
+        run: cd .github/scripts && python3 -m unittest test_trivy_scan -v
+
+      # Pull as this repository, which publishes the images, not anonymously.
+      - name: Log in to ghcr.io
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      # Assigned before it's written out, so a failed listing fails the step
+      # rather than scanning nothing.
+      - name: List the published images
+        id: list
+        run: |
+          set -euo pipefail
+          images=$(.github/scripts/published-images.sh)
+          echo "$images"
+          echo "images=${images//$'\n'/ }" >> "$GITHUB_OUTPUT"
+
+      - name: Scan
+        id: scan
+        uses: ./.github/actions/scan-images
+        with:
+          images: ${{ steps.list.outputs.images }}
+          image_src: remote
+
+  # A failed nightly or manual scan of main opens an issue, or comments on the
+  # one already open, so the finding is tracked rather than living only in one
+  # person's email. The next passing scan closes it. Pull requests report
+  # through their own check instead.
+  report:
+    name: Report
+    needs: image-scan
+    if: >-
+      always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' &&
+      contains(fromJSON('["success", "failure"]'), needs.image-scan.result)
+    runs-on: ubuntu-24.04
+    permissions:
+      issues: write
+    steps:
+      - name: Open, update or close the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RESULT: ${{ needs.image-scan.result }}
+          FAILED: ${{ needs.image-scan.outputs.failed }}
+          FAILED_CONNECTORS: ${{ needs.image-scan.outputs.failed_connectors }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          # The connector teams own the fixes. GitHub assigns issues only to
+          # users, not teams, and this job's token cannot list team members,
+          # so one person from each is assigned by name. Keep this in step
+          # with the teams. They are added after the issue is created, so a
+          # stale name cannot stop it opening.
+          TEAMS: "@estuary/capture @estuary/materialization"
+          ASSIGNEES: Alex-Bair,mdibaiee
+        run: |
+          set -euo pipefail -o noglob
+
+          # Anyone can open an issue with this title, so only reuse one this
+          # workflow opened. Otherwise a failure would comment on someone
+          # else's issue instead of opening one that tags the teams and assigns
+          # people.
+          title="Image Scan failed on main"
+          issue=$(gh issue list --state open --search "in:title \"${title}\" author:app/github-actions" \
+            --json number,title,author \
+            --jq "map(select(.title == \"${title}\" and .author.login == \"app/github-actions\")) | first | .number // empty")
+
+          if [ "$RESULT" = failure ]; then
+            if [ -n "$FAILED" ]; then
+              # shellcheck disable=SC2086 # space-separated lists
+              body=$(
+                echo "The Image Scan of main failed: ${RUN_URL}"
+                echo
+                echo "Connectors with a HIGH or CRITICAL finding that has a fixed release, or with an image that could not be scanned:"
+                echo
+                printf -- '- `%s`\n' $FAILED_CONNECTORS
+                echo
+                echo "Images:"
+                echo
+                printf -- '- `%s`\n' $FAILED
+                echo
+                echo "The Scan step's log names each package, CVE and fixed version. Fix the finding, or add an exception as CONTRIBUTING.md describes."
+              )
+            else
+              body="The Image Scan of main failed before it finished, so it names no image: ${RUN_URL}"$'\n\n'"The scan did not run to completion. Its log says which step failed."
+            fi
+
+            if [ -n "$issue" ]; then
+              gh issue comment "$issue" --body "$body"
+            else
+              url=$(gh issue create --title "$title" --body "${TEAMS} ${body}")
+              gh issue edit "$url" --add-assignee "$ASSIGNEES" ||
+                echo "::warning::Could not assign ${ASSIGNEES} to ${url}"
+            fi
+          elif [ -n "$issue" ]; then
+            gh issue close "$issue" --comment "The Image Scan of main passed: ${RUN_URL}"
+          fi

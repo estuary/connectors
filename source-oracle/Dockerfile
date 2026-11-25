@@ -20,10 +20,10 @@ ENV PATH="/builder/bin:$PATH"
 
 # Run automated tests. To skip tests which interact with an external database,
 # specify `--build-arg TEST_DATABASE=no` in the Docker command line.
-ARG TEST_DATABASE=no
+ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
 ENV CI_BUILD=yes
-RUN go test -short -failfast ./source-oracle/...
+RUN go test -short -failfast -timeout 20m ./source-oracle/...
 
 # Build the connector.
 RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \

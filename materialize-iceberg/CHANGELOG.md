@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-25
+
+### Changed
+- Starting a task no longer loads every bound table from the catalog.
+
 ## 2026-11-24
 
 ### Added

@@ -116,7 +116,7 @@ Integrations with streaming systems, queue services, and webhooks.
 - [Outreach](./outreach.md)
 - [Pylon](./pylon.md)
 - [RingCentral](./ringcentral.md)
-- [Salesforce](./Salesforce/salesforce-native.md)
+- [Salesforce](./salesforce-native.md)
 - [Zendesk Chat](./zendesk-chat.md)
 - [Zendesk Support](./zendesk-support-native.md)
 - [Zoho CRM](./zoho-crm.md)

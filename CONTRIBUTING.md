@@ -233,3 +233,63 @@ If you use Claude Code, run `/changelog` in a session that has your PR
 branch checked out. It reads the diff, identifies which connector(s) are
 affected, and drafts an entry for each `CHANGELOG.md`. Review and edit
 before committing.
+
+## Image vulnerability scans
+
+A connector image must not ship with an unresolved HIGH or CRITICAL
+vulnerability unless an approved exception is in place. Every pull request
+scans each connector image it builds with [Trivy](https://trivy.dev), after
+the image is built and before anything is pushed, and the Image Scan workflow
+scans every published image nightly. A scan fails on any HIGH or CRITICAL
+finding that has a fixed release; `trivy.yaml` holds those settings. A failed
+scan fails that connector's job, and with it the lane's connectors gate.
+
+To run the same scan locally, build the image and scan it. This needs Trivy
+v0.76.0 (the version CI pins), [mikefarah's `yq`](https://github.com/mikefarah/yq)
+v4 and `jq`. The `yq` that `apt install yq` gives is a different tool and won't
+work.
+
+```bash
+./build-local.sh source-postgres
+.github/scripts/trivy-scan.sh source-postgres ghcr.io/estuary/source-postgres:local
+```
+
+The output names each package, CVE and fixed version. The fix is usually to
+upgrade the package: in `go.mod`, `uv.lock` or the connector's `Cargo.lock`,
+or in the image a Dockerfile builds on. Every Go connector shares `go.mod` and
+every Python connector shares `uv.lock`, so such an upgrade rebuilds and
+rescans all of them.
+
+### Adding an exception
+
+When a finding can't be fixed yet, or doesn't affect what we ship, record an
+exception in one of two places:
+
+- `<connector>/.trivyignore.yaml`, for a finding in one connector's image. It
+  applies only when that connector's image, or one of its variants', is
+  scanned, never to any other connector.
+- The root `.trivyignore.yaml`, for a finding in what many images share:
+  `base-image` under every Go and Rust connector, the Python base image under
+  every Python one, or `flow-network-tunnel` in those that support SSH
+  tunnels. It applies to every connector.
+
+Every entry needs an `id`, a `statement` giving the rationale, and an
+`expired_at` date. After that date the finding fails the scan again, and has
+to be fixed or re-justified. The scan refuses a file with an entry missing
+any of them.
+
+```yaml
+vulnerabilities:
+  - id: CVE-2026-00000
+    expired_at: 2027-01-31
+    statement: >-
+      Why this finding does not affect the connector, or why it cannot be
+      fixed yet, and what would change that.
+```
+
+`@estuary/operations` owns every `.trivyignore.yaml` (see
+`.github/CODEOWNERS`), so an exception needs their approval to merge. A
+change to a connector's file rebuilds and rescans that connector, so the pull
+request shows whether the exception clears it. A change to the root file
+rebuilds nothing, so that it can merge without waiting on every connector's
+tests. The Image Scan workflow checks it against the published images instead.

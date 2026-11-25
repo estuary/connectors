@@ -672,7 +672,6 @@ func (d *materialization) UpdateResource(
 func (d *materialization) NewTransactor(
 	ctx context.Context,
 	req pm.Request_Open,
-	is boilerplate.InfoSchema,
 	mappedBindings []boilerplate.MappedBinding[config, resource, mapped],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {

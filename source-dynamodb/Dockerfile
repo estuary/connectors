@@ -1,3 +1,5 @@
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v2
+
 # Build Stage
 ################################################################################
 FROM golang:1.27-trixie AS builder
@@ -25,7 +27,7 @@ RUN go build -o ./connector -v ./source-dynamodb/...
 
 # Runtime Stage
 ################################################################################
-FROM ghcr.io/estuary/base-image:v2
+FROM ${BASE_IMAGE}
 
 WORKDIR /connector
 ENV PATH="/connector:$PATH"

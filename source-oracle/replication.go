@@ -61,6 +61,13 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.Raw
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
+	// Once the stream exists, it closes the pool when it stops.
+	var streamCreated bool
+	defer func() {
+		if !streamCreated {
+			dbConn.Close()
+		}
+	}()
 	conn, err := dbConn.Conn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
@@ -152,6 +159,7 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.Raw
 		db:        db,
 		conn:      conn,
 		innerConn: innerConn,
+		connPool:  dbConn,
 
 		lastTxnEndSCN: startSCN,
 
@@ -166,6 +174,7 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.Raw
 	stream.tables.active = make(map[sqlcapture.StreamID]struct{})
 	stream.tables.keyColumns = make(map[sqlcapture.StreamID][]string)
 	stream.tables.discovery = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo)
+	streamCreated = true
 	return stream, nil
 }
 
@@ -565,6 +574,11 @@ type replicationStream struct {
 	conn      *sql.Conn
 	innerConn *sql.Conn
 
+	// connPool holds conn and innerConn. Closing a *sql.Conn only returns it to
+	// the pool, so the Oracle sessions and their LogMiner sessions stay open
+	// until connPool is closed.
+	connPool *sql.DB
+
 	cancel context.CancelFunc            // Cancel function for the replication goroutine's context
 	errCh  chan error                    // Error channel for the final exit status of the replication goroutine
 	events chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
@@ -755,13 +769,17 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 		if cerr := s.innerConn.Close(); cerr != nil {
 			logrus.WithError(cerr).Warn("closing inner replication connection")
 		}
+		if cerr := s.connPool.Close(); cerr != nil {
+			logrus.WithError(cerr).Warn("closing replication connection pool")
+		}
 		s.errCh <- err
 	}()
 
 	return nil
 }
 
-const pollInterval = 10 * time.Second
+// Tests shorten this so each capture doesn't wait 10 seconds for its first poll.
+var pollInterval = 10 * time.Second
 
 // run is the main loop of the replicationStream which loops message
 // receiving and relaying
@@ -1410,6 +1428,9 @@ func (s *replicationStream) Close(ctx context.Context) error {
 	}
 	if cerr := s.innerConn.Close(); cerr != nil {
 		logrus.WithError(cerr).Warn("closing inner replication connection")
+	}
+	if cerr := s.connPool.Close(); cerr != nil {
+		logrus.WithError(cerr).Warn("closing replication connection pool")
 	}
 	return <-s.errCh
 }

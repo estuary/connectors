@@ -1,6 +1,6 @@
 services:
   db:
-    image: 'gvenzl/oracle-free:23.2'
+    image: 'gvenzl/oracle-free:23.3'
     platform: 'linux/amd64'
     ports:
       - "1521:1521"
@@ -11,9 +11,13 @@ services:
         "APP_USER": "FLOW",
         "APP_USER_PASSWORD": "FLOW123"
       }
+    # The image's healthcheck.sh passes before docker-initdb.sql runs, so we
+    # check for FLOW_WATERMARKS, which that script creates last.
     healthcheck:
-      test: "healthcheck.sh"
+      test: ["CMD-SHELL", "printf 'WHENEVER SQLERROR EXIT FAILURE\\nSELECT 1 FROM FLOW_WATERMARKS WHERE 1 = 0;\\n' | sqlplus -s -L 'C##FLOW_TEST_LOGMINER/secret1234@localhost/FREE'"]
       interval: 10s
+      start_period: 300s
+      start_interval: 5s
     networks:
       - flow-test
     volumes:

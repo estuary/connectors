@@ -205,17 +205,22 @@ func (db *oracleDatabase) WatermarksTable() sqlcapture.StreamID {
 	return sqlcapture.JoinStreamID(bits[0], bits[1])
 }
 
+// keylessBackfillChunkMiB is how much on-disk table data one keyless backfill chunk
+// reads. A row is several times larger as JSON than on disk, and 64 MiB keeps a
+// chunk under the runtime's 512 MiB checkpoint limit at up to about 6x expansion.
+// Tests lower it so a small table splits into several chunks.
+var keylessBackfillChunkMiB = 64
+
 func (db *oracleDatabase) fetchBackfillRowIDRange(ctx context.Context, schemaName string, tableName string) error {
 	var streamID = sqlcapture.JoinStreamID(schemaName, tableName)
 	if _, ok := db.backfillRowIDRanges[streamID]; ok {
 		return nil
 	}
 
-	// This query starts by reading dba_extents which has information on data blocks of tables
-	// and splits those blocks into 1g buckets by calculating how many blocks are required to fill
-	// 1gb based on db_block_size, then dividing up the blocks into buckets using width_bucket,
-	// calculating the range begin end values necessary to construct rowids and
-	// finally generating ROWID ranges based on these buckets so we can do backfills 1gb at a time
+	// This query reads the table's data blocks from dba_extents and splits them into
+	// buckets of keylessBackfillChunkMiB each, using db_block_size to turn MiB into
+	// blocks. It then turns each bucket's first block into a ROWID, so each backfill
+	// chunk reads one bucket.
 	var query = `
     with extents_data as (
       select o.data_object_id, e.file_id, e.block_id, e.blocks
@@ -231,7 +236,7 @@ func (db *oracleDatabase) fetchBackfillRowIDRange(ctx context.Context, schemaNam
       select sum(blocks) over() total_blocks,
         sum(blocks) over(order by data_object_id, file_id, block_id) - blocks cumul_prev_blocks,
         sum(blocks) over(order by data_object_id, file_id, block_id) cumul_current_blocks,
-        greatest(1, FLOOR((sum(blocks) over())/(SELECT (1024*1024*256) / TO_NUMBER(value) FROM v$parameter WHERE name='db_block_size'))) num_buckets,
+        greatest(1, FLOOR((sum(blocks) over())/(SELECT (:3 * 1024 * 1024) / TO_NUMBER(value) FROM v$parameter WHERE name='db_block_size'))) num_buckets,
         e.*
       from extents_data e
     )
@@ -281,7 +286,7 @@ func (db *oracleDatabase) fetchBackfillRowIDRange(ctx context.Context, schemaNam
     order by bucket
     `
 
-	var rows, err = db.conn.QueryContext(ctx, query, schemaName, tableName)
+	var rows, err = db.conn.QueryContext(ctx, query, schemaName, tableName, keylessBackfillChunkMiB)
 	if err != nil {
 		return fmt.Errorf("querying rowid range: %w", err)
 	}

@@ -209,6 +209,22 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/estuary/build-cache:${{ matrix.connector.name }}
           cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && format('type=registry,ref=ghcr.io/estuary/build-cache:{0},mode=max,ignore-error=true', matrix.connector.name) || '' }}
 
+      # A pull request scans the image it built for HIGH and CRITICAL findings.
+      # It doesn't fail the job here: "Require a clean image scan" does, just
+      # before Deployment pushes anything, so a finding doesn't hide the smoke
+      # test's result. See CONTRIBUTING.md for exceptions. Builds of main aren't
+      # scanned here: failing them would only leave the previous image, with
+      # the same finding, deployed. The Image Scan workflow scans what they
+      # publish.
+      - name: Scan ${{ matrix.connector.name }} image
+        id: scan
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: ./.github/actions/scan-images
+        with:
+          images: ${{ matrix.connector.name }} ghcr.io/estuary/${{ matrix.connector.name }}:local
+          image_src: docker
+
       # The tests run in the workspace venv, which also holds the dev group, so
       # an import that only a dev dependency satisfies still passes them.
       # Asking the built image for its spec imports the connector from what
@@ -225,6 +241,13 @@ jobs:
               bindings: []
           EOF
           flowctl raw spec --source "${RUNNER_TEMP}/smoke.flow.yaml" > /dev/null
+
+      # Fails closed: a scan that didn't succeed for any reason fails the job.
+      - name: Require a clean image scan
+        if: github.event_name == 'pull_request' && steps.scan.outcome != 'success'
+        run: |
+          echo "::error::ghcr.io/estuary/${{ matrix.connector.name }}:local has a HIGH or CRITICAL finding with a fixed release, or could not be scanned. See the 'Scan ${{ matrix.connector.name }} image' step, and CONTRIBUTING.md for exceptions."
+          exit 1
 
       - name: Deployment
         uses: ./.github/actions/deploy
