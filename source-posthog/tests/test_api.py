@@ -201,3 +201,79 @@ def test_single_cursor_column_is_not_wrapped_in_coalesce():
     for query in data_queries:
         assert "COALESCE" not in query
         assert "ORDER BY timestamp ASC, toString(uuid) ASC" in query
+
+
+# Persons incremental
+
+
+def _poll_persons(fake: Any, cursor: datetime) -> tuple[list[str], datetime]:
+    """Run one Persons poll and check the CDK's cursor rules on the result."""
+    items = _run(api.fetch_persons(fake, _config(T0), PROJECT_ID, LOG, cursor))
+    cursors = [i for i in items if isinstance(i, datetime)]
+    ids = _ids(items)
+
+    # The CDK rejects documents without a final cursor, and any cursor that is
+    # not strictly greater than the one before.
+    if ids:
+        assert cursors and not isinstance(items[-1], Person)
+    for c in cursors:
+        assert c > cursor
+    return ids, cursors[-1] if cursors else cursor
+
+
+def test_persons_added_later_in_the_cursors_hour_are_captured():
+    persons: list[dict[str, Any]] = [_person(0, T0 + timedelta(minutes=2), T0)]
+    fake: Any = FakePostHog("persons", ["id", "created_at", "last_seen_at"], persons)
+
+    ids, cursor = _poll_persons(fake, T0 - timedelta(minutes=55))
+    assert ids == [persons[0]["id"]]
+    assert cursor >= T0
+
+    # Added later in the same hour, so PostHog gives it the same `last_seen_at`
+    # as the cursor. The connector used to skip these.
+    persons.append(_person(1, T0 + timedelta(minutes=20), T0))
+    ids, cursor = _poll_persons(fake, cursor)
+    assert ids == [persons[1]["id"]]
+
+    # Nothing changed: nothing is emitted, and the cursor stays.
+    ids, same_cursor = _poll_persons(fake, cursor)
+    assert ids == []
+    assert same_cursor == cursor
+
+
+def test_persons_written_late_for_the_previous_hour_are_captured():
+    fake: Any = FakePostHog("persons", ["id", "created_at", "last_seen_at"], [])
+    cursor = T0 + timedelta(minutes=5)
+
+    # Seen at 14:50, written after the cursor reached 15:05.
+    fake.rows.append(
+        _person(0, T0 - timedelta(minutes=10), T0 - timedelta(hours=1))
+    )
+    ids, _ = _poll_persons(fake, cursor)
+    assert ids == [fake.rows[0]["id"]]
+
+
+def test_persons_seen_in_a_new_hour_are_emitted_again():
+    person = _person(0, T0 - timedelta(hours=3), T0)
+    fake: Any = FakePostHog("persons", ["id", "created_at", "last_seen_at"], [person])
+
+    ids, cursor = _poll_persons(fake, T0 - timedelta(minutes=1))
+    assert ids == [person["id"]]
+
+    person["last_seen_at"] = (T0 + timedelta(hours=1)).isoformat()
+    ids, _ = _poll_persons(fake, cursor)
+    assert ids == [person["id"]]
+
+
+def test_persons_cache_keeps_only_what_the_next_poll_can_read():
+    fake: Any = FakePostHog(
+        "persons",
+        ["id", "created_at", "last_seen_at"],
+        [_person(i, T0 + timedelta(hours=i), T0 + timedelta(hours=i)) for i in range(5)],
+    )
+
+    _, cursor = _poll_persons(fake, T0 - timedelta(minutes=1))
+
+    # The cursor is at 19:00, so the next poll reads from 18:00.
+    assert cursor == T0 + timedelta(hours=4)
+    assert cache.count_for(f"persons/{PROJECT_ID}") == 2

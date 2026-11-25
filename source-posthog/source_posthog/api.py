@@ -37,6 +37,12 @@ P = ParamSpec("P")
 HOGQL_PAGE_SIZE = 50_000
 BACKFILL_TIMEOUT_PERIOD = timedelta(minutes=5)
 
+# How far before the start of the cursor's hour each Persons poll reads again.
+# PostHog rounds `last_seen_at` down to the hour, so the cursor's own hour has
+# to be read again in any case. The extra hour catches persons that PostHog
+# writes late. Persons written more than about an hour late are still missed.
+PERSONS_REREAD = timedelta(hours=1)
+
 # How far a session's ingestion (`max_inserted_at`) may trail its last event
 # (`$end_timestamp`) and still be captured. The query bounds `$end_timestamp`
 # by it so PostHog's backend can skip old data, which the computed cursor can't
@@ -824,18 +830,49 @@ async def fetch_persons(
     log: Logger,
     cursor: LogCursor,
 ) -> AsyncGenerator[Person | LogCursor, None]:
+    """Emit persons added or seen since the last poll.
+
+    PostHog writes `last_seen_at` as the start of the hour, so persons added
+    after the cursor moved can still carry the cursor's own value. Each poll
+    reads again from the hour before the cursor's hour, which also catches
+    persons written up to an hour late. A person is emitted again only when
+    its cursor value changes.
+    """
     assert isinstance(cursor, datetime)
 
     base_url = config.advanced.base_url
+    # From the start of the cursor's hour, so the small step added to the
+    # cursor below never moves the re-read window.
+    start = cursor.replace(minute=0, second=0, microsecond=0) - PERSONS_REREAD
+    # One cache per project, so one project's cleanup cannot remove another
+    # project's entries.
+    cache_name = f"persons/{project_id}"
     new_cursor = cursor
     doc_count = 0
 
     async for item in _fetch_hogql_between(
-        Person, cursor, None, base_url, project_id, http, log
+        Person, start, None, base_url, project_id, http, log, inclusive_start=True
     ):
-        doc_count += 1
-        new_cursor = max(new_cursor, item.get_cursor())
-        yield item
+        item_cursor = item.get_cursor()
+        new_cursor = max(new_cursor, item_cursor)
+
+        if cache.should_yield(cache_name, item.id, item_cursor):
+            doc_count += 1
+            yield item
+
+    # The CDK requires a strictly greater cursor after any documents. A new
+    # person in the cursor's own hour has the same value as the cursor, so
+    # step forward by the smallest amount.
+    if doc_count > 0:
+        new_cursor = max(new_cursor, cursor + timedelta(microseconds=1))
+
+    # The next poll reads from `next_start` (inclusive), so it cannot need
+    # entries from before it. `cleanup` removes entries at or before its
+    # argument.
+    next_start = (
+        new_cursor.replace(minute=0, second=0, microsecond=0) - PERSONS_REREAD
+    )
+    cache.cleanup(cache_name, next_start - timedelta(microseconds=1))
 
     log.info(f"Fetched {doc_count} persons from project {project_id}")
 
