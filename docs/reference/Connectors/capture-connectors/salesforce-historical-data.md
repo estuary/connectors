@@ -1,6 +1,7 @@
 ---
 title: Salesforce — Historical data (deprecated)
 description: Deprecated Salesforce historical capture connector. Use Estuary's native Salesforce connector instead for both historical and real-time data.
+slug: /reference/Connectors/capture-connectors/Salesforce/salesforce-historical-data
 ---
 
 <head>

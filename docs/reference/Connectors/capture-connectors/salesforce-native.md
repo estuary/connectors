@@ -7,13 +7,26 @@ description: Use Estuary's Salesforce connector to capture Salesforce standard a
 This connector captures data from Salesforce objects into Estuary collections.
 It uses Salesforce's [Bulk API 2.0](https://developer.salesforce.com/docs/atlas.en-us.api_asynch.meta/api_asynch/asynch_api_intro.htm) and [REST API](https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_rest.htm).
 
+## Features
+
 This connector offers several unique advantages:
 
 - **Efficient Backfills**: Uses Salesforce's Bulk API 2.0 for initial data loads and backfills, enabling significantly faster data transfer rates while preserving REST API call limits. Note: Bulk API 2.0 has its own usage limits, and bulk jobs submitted by the connector count against those.
+If the Bulk API limit is reached, Estuary falls back to using the REST API.
 
 - **Formula Field Handling**: The connector automatically refreshes formula fields on a configurable schedule (default: daily). This ensures your formula field data stays current without manual intervention, even though Salesforce doesn't track formula field changes in record modification timestamps.
 
 - **Custom Field Support**: Enhanced handling of custom fields with better type detection and mapping, ensuring all your custom Salesforce objects and fields are captured accurately.
+
+| Feature | Availability | Notes |
+| --- | --- | --- |
+| Configurable sync interval | ✅ | Select sync interval per object |
+| Salesforce [formula fields](#formula-fields) | ✅ | Refreshed on a configurable schedule |
+| Custom data | ✅ | Supports custom objects and custom fields |
+| [Capture deletes](#handling-deletes) | ✅ | Captures `IsDeleted` fields as soft deletes |
+| [OAuth and Client Credential auth](#authentication) | ✅ | Supports different setups |
+| [Private networking](/private-byoc/privatelink) | ✅ <br/>On [private or BYOC deployments](/private-byoc) |  |
+| [Field redaction](/features/redaction) | ✅ | Block or hash columns |
 
 ## Supported data resources
 
@@ -22,9 +35,7 @@ This connector captures Salesforce [standard objects](https://developer.salesfor
 All available objects will appear after connecting to Salesforce.
 
 :::info
-
 To reduce how many API calls are needed to discover objects, the connector maintains an internal list of standard objects available for replication. If a standard object does not appear as an available binding after connecting to Salesforce, please contact us via [Slack](https://go.estuary.dev/slack) or [email](mailto://support@estuary.dev) to request the standard object's addition to the connector's internal list.
-
 :::
 
 Because most Salesforce accounts contain large volumes of data, you may only want to capture a subset of the available objects.
@@ -32,8 +43,8 @@ There are several ways to control this:
 
 * Create a [dedicated Salesforce user](#create-a-read-only-salesforce-user) with access only to the objects you'd like to capture.
 
-* During [capture creation in the web application](../../../../guides/create-dataflow.md#create-a-capture),
-disable the bindings for objects you don't want to capture.
+* During capture creation [in the dashboard](/guides/create-dataflow/#create-a-capture)
+or via [spec file](#configuration), disable the bindings for objects you don't want to capture.
 
 ## Prerequisites
 
@@ -55,7 +66,7 @@ Sign in to Salesforce from the Estuary web app and grant access. Estuary handles
 
 #### Client Credentials
 
-Authenticate via Salesforce's [OAuth 2.0 Client Credentials flow](https://help.salesforce.com/s/articleView?id=xcloud.remoteaccess_oauth_client_credentials_flow.htm&type=5) using a Salesforce [External Client App](https://help.salesforce.com/s/articleView?id=xcloud.external_client_apps_overview.htm&type=5) (or a legacy Connected App). The connector exchanges the app's Consumer Key and Consumer Secret for an access token minted as the app's configured "Run As" user.
+Authenticate via Salesforce's [OAuth 2.0 Client Credentials flow](https://help.salesforce.com/s/articleView?id=xcloud.remoteaccess_oauth_client_credentials_flow.htm&type=5) using a Salesforce [External Client App](https://help.salesforce.com/s/articleView?id=xcloud.external_client_apps.htm&type=5). The connector exchanges the app's Consumer Key and Consumer Secret for an access token minted as the app's configured "Run As" user.
 
 Use this option when your organization enforces SSO or other login restrictions that prevent the other authentication methods from working. The [`my_domain`](#endpoint) field is required since the Client Credentials flow must hit your org's My Domain token endpoint.
 
@@ -139,14 +150,10 @@ Follow these steps to create an External Client App in Salesforce for use with C
 
 You must also provide your My Domain URL when configuring the connector with the Client Credentials flow - for example, `mycompany.my.salesforce.com`.
 
-:::note
-If your org does not yet expose the External Client App Manager, you can use a legacy [Connected App](https://help.salesforce.com/s/articleView?id=sf.connected_app_create_basics.htm&type=5) instead. The connector works the same way with either app type - it just needs the Consumer Key and Consumer Secret. The Client Credentials Flow and integration user configuration steps are equivalent in the Connected App UI.
-:::
-
 ## Configuration
 
 You configure connectors either in the Estuary web app, or by directly editing the Data Flow specification file.
-See [connectors](../../../../concepts/connectors.md#using-connectors) to learn more about using connectors. The values and specification sample below provide configuration details specific to the Salesforce source connector.
+See [connectors](/concepts/connectors/#using-connectors) to learn more about using connectors. The values and specification sample below provide configuration details specific to the Salesforce source connector.
 
 ### Properties
 
@@ -156,7 +163,7 @@ See [connectors](../../../../concepts/connectors.md#using-connectors) to learn m
 |---|---|---|---|---|
 | `/start_date` | Start Date | Start date in the format YYYY-MM-DD. Data added on and after this date will be captured. If left blank, the start date will be set to Salesforce's founding date. | string | 1999-02-03T00:00:00Z |
 | `/my_domain` | My Domain | Your Salesforce My Domain login host. Enter the full host ending in .my.salesforce.com to login with your My Domain host. e.g. mycompany.my.salesforce.com, acme--uat.sandbox.my.salesforce.com. Leave blank to log in via the standard login/test endpoint. Required when authenticating with Client Credentials. | string | `""` |
-| `/is_sandbox` | Sandbox | Whether you&#x27;re using a [Salesforce Sandbox](https://help.salesforce.com/s/articleView?id=sf.deploy_sandboxes_parent.htm&type=5). | boolean | `false` |
+| `/is_sandbox` | Sandbox | Whether you're using a [Salesforce Sandbox](https://help.salesforce.com/s/articleView?id=sf.deploy_sandboxes_parent.htm&type=5). | boolean | `false` |
 | **`/credentials`** | Authentication | Credentials for the chosen [authentication method](#authentication). See the per-method credential properties below. | object | Required |
 | `/advanced/window_size` | Incremental Query Window Size | How much time a single incremental query covers when the connector sweeps for changes. Typically left as the default unless Estuary Support or the connector logs indicate otherwise. | object | `{"window_type": "days", "days": 18250}` |
 | `/advanced/window_size/window_type` | Window Type | Either `days` or `interval`. Selects which of the two properties below sets the window size. | string | `days` |
@@ -175,6 +182,14 @@ See [connectors](../../../../concepts/connectors.md#using-connectors) to learn m
 | **`/credentials/refresh_token`** | OAuth Refresh Token | The refresh token received from the OAuth app. | string | Required |
 | **`/credentials/instance_url`** | Instance URL | The URL for the instance of your Salesforce organization. | string | Required |
 
+**Client Credentials:**
+
+| Property | Title | Description | Type | Required/Default |
+|---|---|---|---|---|
+| **`/credentials/credentials_title`** | Authentication Method | Must be `Client Credentials`. | string | Required |
+| **`/credentials/client_id`** | Consumer Key | The Consumer Key of the External Client App. | string | Required |
+| **`/credentials/client_secret`** | Consumer Secret | The Consumer Secret of the External Client App. | string | Required |
+
 **Username, Password, & Security Token (deprecated):**
 
 | Property | Title | Description | Type | Required/Default |
@@ -183,14 +198,6 @@ See [connectors](../../../../concepts/connectors.md#using-connectors) to learn m
 | **`/credentials/username`** | Username | The user's username. | string | Required |
 | **`/credentials/password`** | Password | The user's password. | string | Required |
 | **`/credentials/security_token`** | Security Token | The user's security token. | string | Required |
-
-**Client Credentials:**
-
-| Property | Title | Description | Type | Required/Default |
-|---|---|---|---|---|
-| **`/credentials/credentials_title`** | Authentication Method | Must be `Client Credentials`. | string | Required |
-| **`/credentials/client_id`** | Consumer Key | The Consumer Key of the External Client App or Connected App. | string | Required |
-| **`/credentials/client_secret`** | Consumer Secret | The Consumer Secret of the External Client App or Connected App. | string | Required |
 
 #### Bindings
 
@@ -238,6 +245,21 @@ Salesforce objects can contain [formula fields](https://help.salesforce.com/s/ar
 To address this challenge, the Salesforce connector is able to refresh the values of formula fields on a schedule after the initial backfill completes. This is controlled at a binding level by the cron expression in the [`schedule` property](#bindings). When a scheduled formula field refresh occurs, the connector fetches every record's current formula field values and merges them into the associated collection with a top-level [`merge` reduction strategy](/reference/reduction-strategies/merge).
 
 Note that formula field refreshes emit partial documents containing only the record's key and formula field values. By default, these are combined with previously captured complete documents, and this works well for [standard updates materializations](/concepts/materialization/#how-continuous-materialization-works). However, [delta updates materializations](/concepts/materialization/#delta-updates) do not fully reduce documents, so partial documents from formula field refreshes are materialized as-is with all non-formula fields as `null`.
+
+## Handling Deletes
+
+Salesforce objects include an `IsDeleted` field that you can use to manage
+deletions. `IsDeleted` provides soft deletes, similar to Estuary's `_meta/op`
+field.
+
+Salesforce records are not currently hard deleted at the destination, even when
+hard deletes are enabled on the materialization. You may implement your own
+filtering logic in a [derivation](/concepts/derivations) or in your destination,
+such as filtering on `where not IsDeleted`.
+
+If records are deleted in Salesforce and then purged from the Recycle Bin
+before Estuary's next sync interval, the records in Estuary may remain as
+`IsDeleted = false`.
 
 ## Troubleshooting
 
