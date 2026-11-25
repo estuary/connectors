@@ -502,7 +502,7 @@ func newTransactor(
 
 	// Setup bindings first to get the createLoadTableSQL for each
 	for _, binding := range bindings {
-		if err := t.addBinding(ctx, binding, is); err != nil {
+		if err := t.addBinding(ctx, binding); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 		// Debug: dump actual table schema from Spanner
@@ -554,7 +554,7 @@ func newTransactor(
 	return t, nil
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	b := &spannerBinding{target: target}
 
 	if t.cfg.Advanced.NoFlowDocument {

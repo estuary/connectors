@@ -82,6 +82,9 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	if err != nil {
 		return fmt.Errorf("listing schemas: %w", err)
 	}
+	for _, schema := range existingSchemas {
+		is.PushNamespace(schema)
+	}
 
 	for sc := range rpSchemas {
 		if !slices.Contains(existingSchemas, sc) {

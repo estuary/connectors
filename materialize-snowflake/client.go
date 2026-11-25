@@ -115,6 +115,9 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	if err != nil {
 		return fmt.Errorf("listing schemas: %w", err)
 	}
+	for _, schema := range existingSchemas {
+		is.PushNamespace(schema)
+	}
 
 	// Filter down to just schemas that are relevant for the included resource
 	// paths, and for each of those fetch & filter down to just the tables that

@@ -37,6 +37,14 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 }
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+	if schemas, err := c.ListSchemas(ctx); err != nil {
+		return fmt.Errorf("listing schemas: %w", err)
+	} else {
+		for _, schema := range schemas {
+			is.PushNamespace(schema)
+		}
+	}
+
 	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, c.ep.Config.Database, resourcePaths)
 }
 
