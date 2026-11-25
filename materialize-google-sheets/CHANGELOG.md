@@ -1,5 +1,11 @@
 # materialize-google-sheets
 
+## 2026-11-25
+
+### Added
+- Rows published before a backfill began now have their `_meta/op` column set
+  to `d` once the backfill completes.
+
 ## 2026-11-05
 
 ### Fixed

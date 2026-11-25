@@ -72,10 +72,24 @@ func buildTransactorBindings(
 			Fields:        binding.FieldSelection,
 			UserSheetId:   state.SheetID,
 			UserSheetName: state.SheetName,
+			opColumn:      opColumn(binding),
 		})
 	}
 
 	return out, nil
+}
+
+// opColumn returns the sheet column of the selected value field projecting
+// /_meta/op, or -1 if the binding excludes it. Column 0 holds the row state,
+// followed by the key fields and then the value fields.
+func opColumn(binding *pf.MaterializationSpec_Binding) int64 {
+	var fields = binding.FieldSelection
+	for i, field := range fields.Values {
+		if p := binding.Collection.GetProjection(field); p != nil && p.Ptr == "/_meta/op" {
+			return int64(1 + len(fields.Keys) + i)
+		}
+	}
+	return -1
 }
 
 func writeSheetHeaders(ctx context.Context, client *sheets.Service, spreadsheetID string, bindings []transactorBinding) error {

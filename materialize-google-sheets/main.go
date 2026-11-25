@@ -11,6 +11,7 @@ import (
 	"time"
 
 	google_auth "github.com/estuary/connectors/go/auth/google"
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -25,12 +26,22 @@ import (
 // Scopes required for OAuth authentication
 var scopes = []string{sheets.SpreadsheetsScope}
 
+var featureFlagDefaults = map[string]common.FlagDefault{
+	"truncate_after_backfill": common.FlagEnabled,
+}
+
 // driver implements the pm.DriverServer interface.
 type driver struct{}
 
 type config struct {
 	SpreadsheetURL string                        `json:"spreadsheetUrl" jsonschema:"title=Spreadsheet URL"`
 	Credentials    *google_auth.CredentialConfig `json:"credentials" jsonschema:"title=Authentication"`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+}
+
+type advancedConfig struct {
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support." jsonschema_extras:"nonsensitive=true"`
 }
 
 func (config) GetFieldDocString(fieldName string) string {
@@ -49,6 +60,12 @@ func (c config) Validate() error {
 	}
 
 	return c.Credentials.Validate()
+}
+
+func (c config) DefaultNamespace() string { return "" }
+
+func (c config) FeatureFlags() (string, map[string]common.FlagDefault) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
 func (c config) spreadsheetID() string {
@@ -240,7 +257,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	return &pm.Response_Applied{ActionDescription: description}, nil
 }
 
-func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	if err := boilerplate.RequireSingleShard(open); err != nil {
 		return nil, nil, nil, err
 	}
@@ -248,6 +265,11 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.Bind
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+	}
+
+	flags, err := boilerplate.ResolveFlags(cfg, open.Materialization)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	var checkpoint driverCheckpoint
@@ -287,10 +309,12 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.Bind
 	}
 
 	var transactor = &transactor{
-		bindings:      bindings,
-		client:        svc,
-		round:         checkpoint.Round,
-		spreadsheetId: cfg.spreadsheetID(),
+		bindings:              bindings,
+		client:                svc,
+		round:                 checkpoint.Round,
+		spreadsheetId:         cfg.spreadsheetID(),
+		be:                    be,
+		truncateAfterBackfill: flags["truncate_after_backfill"],
 	}
 	return transactor, &pm.Response_Opened{}, nil, nil
 }
