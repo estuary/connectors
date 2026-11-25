@@ -393,13 +393,13 @@ type transactor struct {
 	templates templates
 	// Variables exclusively used by Load.
 	load struct {
-		conn     *stdsql.Conn
+		session  *session
 		unionSQL string
 		infile   *infile
 	}
 	// Variables exclusively used by Store.
 	store struct {
-		conn         *stdsql.Conn
+		session      *session
 		fence        sql.Fence
 		insertInfile *infile
 		updateInfile *infile
@@ -491,15 +491,17 @@ func prepareNewTransactor(
 		d.store.fence = fence
 
 		// Establish connections.
-		if db, err := stdsql.Open("mysql", cfg.ToURI()); err != nil {
-			return nil, fmt.Errorf("load sql.Open: %w", err)
-		} else if d.load.conn, err = db.Conn(ctx); err != nil {
-			return nil, fmt.Errorf("load db.Conn: %w", err)
+		db, err := stdsql.Open("mysql", cfg.ToURI())
+		if err != nil {
+			return nil, fmt.Errorf("sql.Open: %w", err)
 		}
-		if db, err := stdsql.Open("mysql", cfg.ToURI()); err != nil {
-			return nil, fmt.Errorf("store sql.Open: %w", err)
-		} else if d.store.conn, err = db.Conn(ctx); err != nil {
-			return nil, fmt.Errorf("store db.Conn: %w", err)
+		d.load.session = &session{db: db}
+		if err := d.load.session.connect(ctx, nil); err != nil {
+			return nil, fmt.Errorf("connecting the load session: %w", err)
+		}
+		d.store.session = &session{db: db}
+		if err := d.store.session.connect(ctx, nil); err != nil {
+			return nil, fmt.Errorf("connecting the store session: %w", err)
 		}
 
 		for _, binding := range bindings {
@@ -651,15 +653,15 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	t.bindings = append(t.bindings, b)
 
 	// Create a binding-scoped temporary table for staged keys to load.
-	if _, err := t.load.conn.ExecContext(ctx, b.createLoadTableSQL); err != nil {
+	if _, err := t.load.session.conn.ExecContext(ctx, b.createLoadTableSQL); err != nil {
 		return fmt.Errorf("Exec(%s): %w", b.createLoadTableSQL, err)
 	}
 
-	if _, err := t.store.conn.ExecContext(ctx, b.createUpdateTableSQL); err != nil {
+	if _, err := t.store.session.conn.ExecContext(ctx, b.createUpdateTableSQL); err != nil {
 		return fmt.Errorf("Exec(%s): %w", b.createUpdateTableSQL, err)
 	}
 
-	if _, err := t.store.conn.ExecContext(ctx, b.createDeleteTableSQL); err != nil {
+	if _, err := t.store.session.conn.ExecContext(ctx, b.createDeleteTableSQL); err != nil {
 		return fmt.Errorf("Exec(%s): %w", b.createDeleteTableSQL, err)
 	}
 
@@ -676,6 +678,31 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	b.tempVarcharMetas = tempColumnMetas
 
 	return nil
+}
+
+// loadTempTables returns the statements that create the load temporary tables
+// with the key columns that Load has widened so far.
+func (t *transactor) loadTempTables() []string {
+	var out []string
+	for _, b := range t.bindings {
+		out = append(out, b.createLoadTableSQL)
+		for _, meta := range b.tempVarcharMetas {
+			if meta.identifier != "" && meta.maxLength > 256 {
+				out = append(out, fmt.Sprintf(varcharTableAlter, b.tempTableName, meta.identifier, meta.maxLength))
+			}
+		}
+	}
+	return out
+}
+
+// storeTempTables returns the statements that create the store temporary
+// tables.
+func (t *transactor) storeTempTables() []string {
+	var out []string
+	for _, b := range t.bindings {
+		out = append(out, b.createUpdateTableSQL, b.createDeleteTableSQL)
+	}
+	return out
 }
 
 // addTruncation prepares b to delete the rows whose col is earlier than a
@@ -706,14 +733,19 @@ func addTruncation(b *binding, col *sql.Column, is *boilerplate.InfoSchema) erro
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
-	var txn, err = d.load.conn.BeginTx(ctx, &stdsql.TxOptions{})
+	// The transaction begins at the first key, because the wait for that key
+	// is unbounded and a connection is only replaceable between transactions.
+	if !it.Next() {
+		return it.Err()
+	}
+	var txn, err = d.load.session.begin(ctx, d.loadTempTables())
 	if err != nil {
 		return fmt.Errorf("DB.BeginTx: %w", err)
 	}
 	defer txn.Rollback()
 
 	var lastBinding = -1
-	for it.Next() {
+	for more := true; more; more = it.Next() {
 		if lastBinding == -1 {
 			lastBinding = it.Binding
 		}
@@ -750,7 +782,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 					}).Info("column will be altered to VARCHAR(stringLength) to accommodate large string value")
 					b.tempVarcharMetas[idx].maxLength = l
 
-					if _, err := d.load.conn.ExecContext(ctx, fmt.Sprintf(varcharTableAlter, b.tempTableName, varcharMeta.identifier, l)); err != nil {
+					if _, err := d.load.session.conn.ExecContext(ctx, fmt.Sprintf(varcharTableAlter, b.tempTableName, varcharMeta.identifier, l)); err != nil {
 						return fmt.Errorf("altering size for column %s of table %s: %w", varcharMeta.identifier, b.tempTableName, err)
 					}
 				}
@@ -821,7 +853,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
-	txn, err := d.store.conn.BeginTx(ctx, &stdsql.TxOptions{})
+	txn, err := d.store.session.begin(ctx, d.storeTempTables())
 	if err != nil {
 		return nil, fmt.Errorf("DB.BeginTx: %w", err)
 	}
@@ -902,7 +934,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 						}).Info("column will be altered to VARCHAR(stringLength) to accommodate large string value")
 						b.varcharColumnMetas[idx].maxLength = l
 
-						if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf(varcharTableAlter, b.target.Identifier, varcharMeta.identifier, l)); err != nil {
+						if _, err := d.store.session.conn.ExecContext(ctx, fmt.Sprintf(varcharTableAlter, b.target.Identifier, varcharMeta.identifier, l)); err != nil {
 							return nil, fmt.Errorf("altering size for column %s of table %s: %w", varcharMeta.identifier, b.target.Identifier, err)
 						}
 					}
@@ -1040,6 +1072,6 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 }
 
 func (d *transactor) Destroy() {
-	d.load.conn.Close()
-	d.store.conn.Close()
+	d.load.session.close()
+	d.store.session.close()
 }

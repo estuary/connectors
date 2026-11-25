@@ -34,10 +34,33 @@ func testConfig() config {
 	}
 }
 
-func TestIntegration(t *testing.T) {
+// startDatabase runs the local databases for the duration of t, and skips t
+// in short mode.
+func startDatabase(t *testing.T) {
+	t.Helper()
 	if testing.Short() {
-		t.Skip()
+		t.Skip("skipping test in short mode")
 	}
+	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
+	t.Cleanup(func() {
+		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
+	})
+}
+
+// variantConfig returns the configuration for the local database of variant.
+func variantConfig(t *testing.T, variant string) config {
+	t.Helper()
+	raw, err := boilerplate.ReadConfigFile("testdata/config." + variant + ".yaml")
+	require.NoError(t, err)
+	var cfg config
+	require.NoError(t, json.Unmarshal(raw, &cfg))
+	return cfg
+}
+
+var variants = []string{"mysql", "mariadb", "singlestore"}
+
+func TestIntegration(t *testing.T) {
+	startDatabase(t)
 
 	makeResourceFn := func(table string, delta bool) tableConfig {
 		return tableConfig{
@@ -45,11 +68,6 @@ func TestIntegration(t *testing.T) {
 			Delta: delta,
 		}
 	}
-
-	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
-	t.Cleanup(func() {
-		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
-	})
 
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, NewDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil,

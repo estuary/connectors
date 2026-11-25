@@ -1,5 +1,12 @@
 # materialize-mysql
 
+## 2026-11-25
+
+### Fixed
+- The materialization now reconnects when the database or the network closes
+  an idle connection, instead of failing with "invalid connection" or
+  "broken pipe".
+
 ## 2026-11-23
 
 ### Added
