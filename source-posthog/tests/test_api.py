@@ -224,62 +224,69 @@ def _poll_persons(fake: Any, cursor: datetime) -> tuple[list[str], datetime]:
     return ids, cursors[-1] if cursors else cursor
 
 
+def _this_hour() -> datetime:
+    # The Persons cursor is the real time of the poll, so these tests work
+    # from the real current hour.
+    return datetime.now(tz=UTC).replace(minute=0, second=0, microsecond=0)
+
+
 def test_persons_added_later_in_the_cursors_hour_are_captured():
-    persons: list[dict[str, Any]] = [_person(0, T0 + timedelta(minutes=2), T0)]
+    hour = _this_hour()
+    persons: list[dict[str, Any]] = [_person(0, hour, hour)]
     fake: Any = FakePostHog("persons", ["id", "created_at", "last_seen_at"], persons)
 
-    ids, cursor = _poll_persons(fake, T0 - timedelta(minutes=55))
+    ids, cursor = _poll_persons(fake, hour - timedelta(minutes=55))
     assert ids == [persons[0]["id"]]
-    assert cursor >= T0
 
     # Added later in the same hour, so PostHog gives it the same `last_seen_at`
-    # as the cursor. The connector used to skip these.
-    persons.append(_person(1, T0 + timedelta(minutes=20), T0))
-    ids, cursor = _poll_persons(fake, cursor)
-    assert ids == [persons[1]["id"]]
+    # as the first one.
+    persons.append(_person(1, hour, hour))
+    ids, _ = _poll_persons(fake, cursor)
+    assert persons[1]["id"] in ids
 
-    # Nothing changed: nothing is emitted, and the cursor stays.
-    ids, same_cursor = _poll_persons(fake, cursor)
-    assert ids == []
-    assert same_cursor == cursor
+
+def test_persons_are_emitted_again_by_every_poll_that_reads_their_hour():
+    # A person changed later in the hour keeps the same `last_seen_at`, so the
+    # connector cannot tell a change apart and emits them again.
+    hour = _this_hour()
+    person = _person(0, hour, hour)
+    fake: Any = FakePostHog("persons", ["id", "created_at", "last_seen_at"], [person])
+
+    ids, cursor = _poll_persons(fake, hour - timedelta(minutes=1))
+    assert ids == [person["id"]]
+    ids, _ = _poll_persons(fake, cursor)
+    assert ids == [person["id"]]
+    assert cache.count_for(f"persons/{PROJECT_ID}") == 0
 
 
 def test_persons_written_late_for_the_previous_hour_are_captured():
+    hour = _this_hour()
     fake: Any = FakePostHog("persons", ["id", "created_at", "last_seen_at"], [])
-    cursor = T0 + timedelta(minutes=5)
+    cursor = datetime.now(tz=UTC) - timedelta(seconds=1)
 
-    # Seen at 14:50, written after the cursor reached 15:05.
-    fake.rows.append(
-        _person(0, T0 - timedelta(minutes=10), T0 - timedelta(hours=1))
-    )
+    # Seen in the previous hour, written after the cursor moved into this one.
+    fake.rows.append(_person(0, hour - timedelta(hours=1), hour - timedelta(hours=1)))
     ids, _ = _poll_persons(fake, cursor)
     assert ids == [fake.rows[0]["id"]]
 
 
-def test_persons_seen_in_a_new_hour_are_emitted_again():
-    person = _person(0, T0 - timedelta(hours=3), T0)
-    fake: Any = FakePostHog("persons", ["id", "created_at", "last_seen_at"], [person])
-
-    ids, cursor = _poll_persons(fake, T0 - timedelta(minutes=1))
-    assert ids == [person["id"]]
-
-    person["last_seen_at"] = (T0 + timedelta(hours=1)).isoformat()
-    ids, _ = _poll_persons(fake, cursor)
-    assert ids == [person["id"]]
-
-
-def test_persons_cache_keeps_only_what_the_next_poll_can_read():
+def test_the_persons_cursor_is_the_time_of_the_poll():
+    hour = _this_hour()
     fake: Any = FakePostHog(
-        "persons",
-        ["id", "created_at", "last_seen_at"],
-        [_person(i, T0 + timedelta(hours=i), T0 + timedelta(hours=i)) for i in range(5)],
+        "persons", ["id", "created_at", "last_seen_at"], [_person(0, hour, hour)]
     )
 
-    _, cursor = _poll_persons(fake, T0 - timedelta(minutes=1))
+    before = datetime.now(tz=UTC)
+    _, cursor = _poll_persons(fake, hour - timedelta(minutes=1))
+    # Close to the present, so the CDK waits a full interval before the next
+    # poll.
+    assert before <= cursor <= datetime.now(tz=UTC)
 
-    # The cursor is at 19:00, so the next poll reads from 18:00.
-    assert cursor == T0 + timedelta(hours=4)
-    assert cache.count_for(f"persons/{PROJECT_ID}") == 2
+    # A poll that emits nothing leaves the cursor where it was.
+    fake.rows.clear()
+    ids, same_cursor = _poll_persons(fake, cursor)
+    assert ids == []
+    assert same_cursor == cursor
 
 
 # Events dedupe cache

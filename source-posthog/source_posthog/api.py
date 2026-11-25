@@ -908,56 +908,38 @@ async def fetch_persons(
     log: Logger,
     cursor: LogCursor,
 ) -> AsyncGenerator[Person | LogCursor, None]:
-    """Emit persons added or seen since the last poll.
+    """Emit every person seen from the hour before the cursor's hour to now.
 
-    PostHog writes `last_seen_at` as the start of the hour, so persons added
-    after the cursor moved can still carry the cursor's own value. Each poll
-    reads again from the hour before the cursor's hour, which also catches
-    persons written up to an hour late. A person is emitted again only when
-    its cursor value changes. Persons with a cursor value in the future wait
-    until that time arrives.
+    PostHog writes `last_seen_at` as the start of the hour, so it does not
+    change when a person changes again later in the same hour. Each poll
+    therefore emits every person in its window, including ones an earlier poll
+    already emitted; they replace themselves in the collection. The window
+    also catches persons written up to an hour late. Persons with a cursor
+    value in the future wait until that time arrives.
     """
     assert isinstance(cursor, datetime)
 
     base_url = config.advanced.base_url
-    # From the start of the cursor's hour, so the small step added to the
-    # cursor below never moves the re-read window.
     start = cursor.replace(minute=0, second=0, microsecond=0) - PERSONS_REREAD
-    # One cache per project, so one project's cleanup cannot remove another
-    # project's entries.
-    cache_name = f"persons/{project_id}"
     # PostHog accepts events up to about a day in the future, and
-    # `last_seen_at` follows them. Without this bound, one such person moves
-    # the cursor ahead, and persons seen before that hour are never read.
+    # `last_seen_at` follows them. The query stops at the present so those
+    # persons wait for their time instead of being read early.
     end = datetime.now(tz=UTC)
-    new_cursor = cursor
+    if end <= cursor:
+        return
+
     doc_count = 0
 
     async for item in _fetch_hogql_between(
         Person, start, end, base_url, project_id, http, log, inclusive_start=True
     ):
-        item_cursor = item.get_cursor()
-        new_cursor = max(new_cursor, item_cursor)
-
-        if cache.should_yield(cache_name, item.id, item_cursor):
-            doc_count += 1
-            yield item
-
-    # The CDK requires a strictly greater cursor after any documents. A new
-    # person in the cursor's own hour has the same value as the cursor, so
-    # step forward by the smallest amount.
-    if doc_count > 0:
-        new_cursor = max(new_cursor, cursor + timedelta(microseconds=1))
-
-    # The next poll reads from `next_start` (inclusive), so it cannot need
-    # entries from before it. `cleanup` removes entries at or before its
-    # argument.
-    next_start = (
-        new_cursor.replace(minute=0, second=0, microsecond=0) - PERSONS_REREAD
-    )
-    cache.cleanup(cache_name, next_start - timedelta(microseconds=1))
+        doc_count += 1
+        yield item
 
     log.info(f"Fetched {doc_count} persons from project {project_id}")
 
-    if new_cursor > cursor:
-        yield new_cursor
+    # The cursor is this poll's start time, not the newest `last_seen_at`. The
+    # newest value sits at the top of the hour for a whole hour, so the CDK
+    # would see the cursor more than an interval behind and poll again at once.
+    if doc_count > 0:
+        yield end
