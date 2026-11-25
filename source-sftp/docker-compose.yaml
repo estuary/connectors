@@ -3,7 +3,9 @@ version: "3.7"
 services:
   # Not really a db, but calling it that makes it easier to incorporate into our CI system.
   db:
-    image: lscr.io/linuxserver/openssh-server:version-9.1_p1-r2
+    # The same image as lscr.io's, pulled from ghcr.io so CI's registry login
+    # applies instead of the anonymous rate limit.
+    image: ghcr.io/linuxserver/openssh-server:version-9.1_p1-r2
     environment:
       - PASSWORD_ACCESS=true
       - USER_NAME=test
