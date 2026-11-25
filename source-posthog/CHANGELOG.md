@@ -4,10 +4,17 @@
 
 ### Fixed
 
-- `Events` and `Persons` no longer skip rows when a page of results ends among rows that share one timestamp.
-- `Persons` now captures persons added or seen after the first poll of each hour. PostHog rounds `last_seen_at` down to the hour, and the connector skipped persons that had the same value as its cursor. Re-backfill `Persons` to get the persons that were missed.
-- `Events` no longer keeps every captured event in memory, which grew without limit and could run out of memory during a large backfill.
-- The `Events` backfill now reads one day per query. A query over the whole range from the start date took longer than PostHog's 10-second query limit, so the backfill never finished.
+- `Events` and `Persons` no longer skip rows that share a timestamp with the end of a page of results.
+- `Persons` now captures persons added later in the same hour as the previous poll.
+- `Persons` now captures changes made to a person later in the same hour.
+- `Events` and `Persons` no longer delay or skip data after PostHog receives an event dated in the future.
+- `Events` and `Sessions` backfills no longer lose a document when they pause to checkpoint.
+- `Events` no longer runs out of memory during a large backfill.
+- The `Events` backfill now finishes on projects with a long history.
+
+### Changed
+
+- `Events`, `Sessions` and `Persons` send fewer queries to PostHog on busy projects.
 
 ## 2026-10-02
 
