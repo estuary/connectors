@@ -1,5 +1,10 @@
 # materialize-mongodb
 
+## 2026-11-25
+
+### Changed
+- Starting a task no longer lists the database's collections.
+
 ## 2026-11-23
 
 ### Added
