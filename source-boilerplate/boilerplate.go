@@ -21,7 +21,6 @@ import (
 
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
-	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	protoio "github.com/gogo/protobuf/io"
@@ -180,7 +179,6 @@ func (s *ConnectorServer) Capture(stream pc.Connector_CaptureServer) error {
 			}
 		case request.Open != nil:
 			log.WithField("eventType", "connectorStatus").Info("Starting capture")
-			networkTunnel.RecordSkipHostKeyVerification(request.Open.Capture.ConfigJson, request.Open.SealedConfigJson)
 			return s.Connector.Pull(request.Open, &PullOutput{
 				Connector_CaptureServer: stream,
 				NumBindings:             len(request.Open.Capture.Bindings),
