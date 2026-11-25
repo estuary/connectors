@@ -43,6 +43,7 @@ from .models import (
     TALK_INCREMENTAL_EXPORT_RESOURCES,
     OAUTH2_SPEC,
     TICKET_CHILD_RESOURCES,
+    TicketMetricEventsResponse,
     POST_CHILD_RESOURCES,
     TicketsListResponse,
     UsersListResponse,
@@ -76,6 +77,7 @@ from .api import (
     fetch_incremental_cursor_paginated_resources,
     fetch_post_child_resources,
     fetch_post_comment_votes,
+    fetch_metric_events_of_tickets,
     fetch_satisfaction_ratings,
     fetch_side_conversations,
     fetch_side_conversations_of_tickets,
@@ -661,16 +663,14 @@ def incremental_cursor_paginated_resources(
     resources: list[common.Resource] = []
 
     for (name, path, filter_param, cursor_field, response_model) in INCREMENTAL_CURSOR_PAGINATED_RESOURCES:
-        lag = TICKET_METRIC_EVENTS_LAG if name == "ticket_metric_events" else INCREMENTAL_LAG
-
-        cutoff = datetime.now(tz=UTC) - max(lag, TIME_PARAMETER_DELAY)
+        cutoff = datetime.now(tz=UTC) - max(INCREMENTAL_LAG, TIME_PARAMETER_DELAY)
 
         resources.append(
             common.Resource(
                 name=name,
                 key=["/id"],
                 model=ZendeskResource,
-                open=functools.partial(open, path, filter_param, cursor_field, response_model, lag),
+                open=functools.partial(open, path, filter_param, cursor_field, response_model, INCREMENTAL_LAG),
                 initial_state=ResourceState(
                     inc=ResourceState.Incremental(cursor=cutoff),
                     backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
@@ -683,6 +683,96 @@ def incremental_cursor_paginated_resources(
         )
 
     return resources
+
+
+def _restart_backfill_with_other_page_type(state: ResourceState, expected_page_type: type) -> ResourceState | None:
+    """
+    Returns a state that restarts an in-progress backfill from start_date when
+    its page isn't an `expected_page_type`, or None otherwise. The incremental
+    ticket metric events export pages with an opaque cursor that the keyset
+    sweep can't convert to or from.
+    """
+    backfill = state.backfill
+
+    if (
+        not isinstance(backfill, ResourceState.Backfill) or
+        backfill.next_page is None or
+        isinstance(backfill.next_page, expected_page_type)
+    ):
+        return None
+
+    return ResourceState(
+        backfill=ResourceState.Backfill(cutoff=backfill.cutoff, next_page=None),
+    )
+
+
+def ticket_metric_events(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> common.Resource:
+
+    async def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        restarted = _restart_backfill_with_other_page_type(state, str)
+
+        if restarted is not None:
+            state.backfill = restarted.backfill
+
+            task.log.info("Restarted an in-progress backfill whose page came from the other code path.", {
+                "resource": binding.resourceConfig.name,
+                "migrated_state": restarted.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: restarted}),
+            )
+
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_incremental_cursor_paginated_resources,
+                http,
+                config.subdomain,
+                "incremental/ticket_metric_events",
+                FilterParam.START_TIME,
+                "time",
+                TicketMetricEventsResponse,
+                TICKET_METRIC_EVENTS_LAG,
+            ),
+            fetch_page=functools.partial(
+                backfill_incremental_cursor_paginated_resources,
+                http,
+                config.subdomain,
+                "incremental/ticket_metric_events",
+                FilterParam.START_TIME,
+                "time",
+                TicketMetricEventsResponse,
+                config.start_date,
+            )
+        )
+
+    cutoff = datetime.now(tz=UTC) - max(TICKET_METRIC_EVENTS_LAG, TIME_PARAMETER_DELAY)
+
+    return common.Resource(
+        name="ticket_metric_events",
+        key=["/id"],
+        model=ZendeskResource,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+        ),
+        initial_config=ResourceConfig(
+            name="ticket_metric_events", interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
 
 
 def incremental_time_export_resources(
@@ -1079,6 +1169,73 @@ def incremental_keyset_paginated_ticket_child_resources(
             functools.partial(backfill_incremental_keyset_paginated_ticket_metrics, http, config.subdomain, config.start_date),
         ),
     ]
+
+
+# Nothing calls this yet. A later PR adds the feature flag that switches
+# ticket_metric_events from its incremental export to this resource (#5357).
+def incremental_keyset_paginated_ticket_metric_events(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> common.Resource:
+
+    fetch_children = functools.partial(fetch_metric_events_of_tickets, http, config.subdomain)
+
+    async def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        restarted = _restart_backfill_with_other_page_type(state, int)
+
+        if restarted is not None:
+            state.backfill = restarted.backfill
+
+            task.log.info("Restarted an in-progress backfill whose page came from the other code path.", {
+                "resource": binding.resourceConfig.name,
+                "migrated_state": restarted.model_dump(mode="json", exclude_unset=True),
+            })
+            await task.checkpoint(
+                ConnectorState(bindingStateV1={binding.stateKey: restarted}),
+            )
+
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_incremental_keyset_paginated_ticket_children,
+                http,
+                config.subdomain,
+                fetch_children,
+                TICKET_METRIC_EVENTS_LAG,
+            ),
+            fetch_page=functools.partial(
+                backfill_incremental_keyset_paginated_ticket_children,
+                http,
+                config.subdomain,
+                fetch_children,
+                config.start_date,
+            )
+        )
+
+    cutoff = (datetime.now(tz=UTC) - TICKET_METRIC_EVENTS_LAG).replace(microsecond=0)
+
+    return common.Resource(
+        name="ticket_metric_events",
+        key=["/id"],
+        model=ZendeskResource,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+        ),
+        initial_config=ResourceConfig(
+            name="ticket_metric_events", interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
 
 
 def talk_incremental_export_resources(
@@ -1512,6 +1669,7 @@ def _generate_resources(
         *client_side_filtered_cursor_paginated_resources(log, http, config),
         satisfaction_ratings(log, http, config),
         *incremental_cursor_paginated_resources(log, http, config),
+        ticket_metric_events(log, http, config),
         *incremental_time_export_resources(log, http, config),
         *talk_incremental_export_resources(log, http, config),
         *incremental_cursor_export_resources(log, http, config),
