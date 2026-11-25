@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-25
+
+### Changed
+- Starting a task now loads each bound table from the catalog once instead of twice.
+
 ## 2026-11-23
 
 ### Changed

@@ -1,5 +1,10 @@
 # materialize-elasticsearch
 
+## 2026-11-25
+
+### Changed
+- Starting a task no longer fetches the metadata of every index.
+
 ## 2026-11-23
 
 ### Added

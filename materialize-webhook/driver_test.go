@@ -177,7 +177,7 @@ func TestStorePayloads(t *testing.T) {
 			require.NoError(t, json.Unmarshal(b.ResourceConfigJson, &res))
 			mapped = append(mapped, boilerplate.MappedBinding[config, resource, mappedType]{MaterializationSpec_Binding: b, Config: res})
 		}
-		transactor, err := materializer.NewTransactor(ctx, pm.Request_Open{}, boilerplate.InfoSchema{}, mapped, nil)
+		transactor, err := materializer.NewTransactor(ctx, pm.Request_Open{}, mapped, nil)
 		require.NoError(t, err)
 		return transactor
 	}

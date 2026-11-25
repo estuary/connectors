@@ -303,7 +303,7 @@ type Materializer[
 
 	// NewTransactor builds a new transactor for handling the
 	// transactions lifecycle of the materialization.
-	NewTransactor(context.Context, pm.Request_Open, InfoSchema, []MappedBinding[EC, RC, MT], *m.BindingEvents) (m.Transactor, error)
+	NewTransactor(context.Context, pm.Request_Open, []MappedBinding[EC, RC, MT], *m.BindingEvents) (m.Transactor, error)
 
 	// ListTestTasks produces a list of identifiers for test task metadata that
 	// might need to be cleaned up after an integration test. For example, the
@@ -803,7 +803,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		slices.Sort(commitKeys)
 
 		if len(commitKeys) > 0 {
-			if patch, err := drainPendingState(ctx, materializer, req, endpointCfg, is, commitKeys); err != nil {
+			if patch, err := drainPendingState(ctx, materializer, req, endpointCfg, commitKeys); err != nil {
 				return nil, fmt.Errorf("committing pending transaction before applying schema updates: %w", err)
 			} else if patch != nil {
 				return &pm.Response_Applied{
@@ -920,16 +920,6 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	}
 	mCfg := materializer.Config()
 
-	paths := make([][]string, 0, len(req.Materialization.Bindings))
-	for _, b := range req.Materialization.Bindings {
-		paths = append(paths, b.ResourcePath)
-	}
-
-	is := InitInfoSchema(mCfg)
-	if err := materializer.PopulateInfoSchema(ctx, is, paths); err != nil {
-		return nil, nil, nil, err
-	}
-
 	mapped := make([]MappedBinding[EC, RC, MT], 0, len(req.Materialization.Bindings))
 	for bindingIdx := range req.Materialization.Bindings {
 		if m, err := buildMappedBinding(epCfg, materializer, *req.Materialization, bindingIdx); err != nil {
@@ -939,7 +929,7 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		}
 	}
 
-	transactor, err := materializer.NewTransactor(ctx, req, *is, mapped, be)
+	transactor, err := materializer.NewTransactor(ctx, req, mapped, be)
 	if err != nil {
 		return nil, nil, nil, err
 	}

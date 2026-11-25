@@ -652,7 +652,7 @@ func (t testMappedTyper) CanMigrate(e ExistingField) bool {
 	return len(t.jsonTypes) > 1 || (e.Name == "key" && t.jsonTypes[0] == "boolean")
 }
 
-func (m *testMaterializer) NewTransactor(ctx context.Context, req pm.Request_Open, is InfoSchema, bindings []MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper], be *m.BindingEvents) (m.Transactor, error) {
+func (m *testMaterializer) NewTransactor(ctx context.Context, req pm.Request_Open, bindings []MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper], be *m.BindingEvents) (m.Transactor, error) {
 	return &testTransactor{}, nil
 }
 
@@ -759,7 +759,7 @@ func (d *drainTestMaterializer) TruncateResource(ctx context.Context, path []str
 	return "", d.countingAction(), nil
 }
 
-func (d *drainTestMaterializer) NewTransactor(ctx context.Context, req pm.Request_Open, is InfoSchema, bindings []MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper], be *m.BindingEvents) (m.Transactor, error) {
+func (d *drainTestMaterializer) NewTransactor(ctx context.Context, req pm.Request_Open, bindings []MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper], be *m.BindingEvents) (m.Transactor, error) {
 	d.rec.openedSpec = req.Materialization
 	d.rec.openedVersion = req.Version
 	return &drainTestTransactor{rec: d.rec}, nil

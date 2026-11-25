@@ -1,5 +1,10 @@
 # materialize-dynamodb
 
+## 2026-11-25
+
+### Changed
+- Starting a task no longer describes every bound table.
+
 ## 2026-11-16
 
 ### Added
