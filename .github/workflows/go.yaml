@@ -122,7 +122,7 @@ jobs:
           key: go-cache-${{ runner.os }}-go${{ steps.go.outputs.go-version }}-${{ hashFiles('go.mod', 'go.sum') }}
           lookup-only: true
 
-      # Compile errors are ignored: source-db2-batch can't build without IBM's
+      # Compile errors are ignored: the Db2 connectors can't build without IBM's
       # headers, and each connector's own job reports its errors.
       - name: Compile every package and test
         if: steps.cache.outputs.cache-hit != 'true'
@@ -336,6 +336,21 @@ jobs:
           # even when using a commit pseudo-version.
           GIT_LFS_SKIP_SMUDGE: 1
 
+      - name: Go Connector source-db2 Database Tests
+        if: matrix.connector.name == 'source-db2'
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1
+          TEST_DATABASE: "yes"
+          TEST_DB2_PASSWORD: flowtest1
+        run: |
+          set -euo pipefail
+          trap 'bash tests/source-db2/cleanup.sh' EXIT
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libxml2
+          go run github.com/ibmdb/go_ibm_db/installer@v0.5.4
+          source tests/source-db2/setup.sh
+          source-db2/run_tests.sh -run Integration -db_capture_addr localhost:50000 -db_capture_user db2inst1 -db_name TESTDB
+
       # Runs the `go test` and `go build` lines of the Dockerfile's builder stage
       # on the runner, where the Go cache is warm. The image build below takes
       # the output in place of that stage. Skipped connectors need more than Go.
@@ -343,6 +358,7 @@ jobs:
         id: builder
         if: |
           !contains(fromJson('[
+            "source-db2",
             "source-db2-batch",
             "source-mongodb",
             "source-tpc-ds"
@@ -424,6 +440,7 @@ jobs:
       - name: Source connector ${{ matrix.connector.name }} image smoke test
         if: |
           contains(fromJson('[
+            "source-db2",
             "source-dynamodb",
             "source-gcs",
             "source-kinesis",
@@ -438,6 +455,7 @@ jobs:
       - name: Source connector ${{ matrix.connector.name }} integration tests
         if: |
           contains(fromJson('[
+            "source-db2",
             "source-gcs",
             "source-kinesis",
             "source-s3",
@@ -461,6 +479,7 @@ jobs:
       - name: Upload ${{ matrix.connector.name }} capture output
         if: |
           failure() && contains(fromJson('[
+            "source-db2",
             "source-gcs",
             "source-kinesis",
             "source-s3",

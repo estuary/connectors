@@ -20,6 +20,7 @@ and other [advanced features](/guides/customize-dataflows/#sql-captures).
 - [Amazon RDS SQL Server](./SQLServer/amazon-rds-sqlserver.md)
 - [Azure SQL Server](./SQLServer/)
 - [Google Cloud SQL Server](./SQLServer/google-cloud-sql-sqlserver.md)
+- [IBM Db2](./db2.md)
 - [MariaDB](./MariaDB/)
 - [Microsoft SQL Server](./SQLServer/)
 - [MySQL](./MySQL/)

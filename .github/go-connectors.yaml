@@ -1,6 +1,7 @@
 # The Go connectors that go.yaml builds, tests and deploys.
 - name: source-alpaca
 - name: source-bigquery-batch
+- name: source-db2
 - name: source-db2-batch
 - name: source-dropbox
 - name: source-dynamodb

@@ -1,0 +1,37 @@
+services:
+  db:
+    image: icr.io/db2_community/db2:12.1.5.0
+    platform: linux/amd64
+    hostname: db2server
+    privileged: true
+    mem_limit: 4g
+    ports:
+      - "50000:50000"
+    environment:
+      LICENSE: accept
+      DB2INSTANCE: db2inst1
+      DB2INST1_PASSWORD: flowtest1
+      DBNAME: ""
+      AUTOCONFIG: "false"
+      SAMPLEDB: "false"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -f /tmp/flow-db2-ready &&
+          su - db2inst1 -c '. "$$HOME/sqllib/db2profile" &&
+          trap "db2 terminate" EXIT &&
+          db2 connect to TESTDB'
+      interval: 5s
+      timeout: 10s
+      retries: 120
+      start_period: 120s
+    networks:
+      flow-test:
+        aliases:
+          - source-db2-db.flow-test
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
