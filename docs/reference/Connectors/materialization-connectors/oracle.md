@@ -137,30 +137,25 @@ with non-ASCII characters can be shorter than 128 characters.
 
 | Collection type                                 | Oracle column type                                                   |
 | ----------------------------------------------- | -------------------------------------------------------------------- |
-| integer                                         | `NUMBER(38,0)`, or `VARCHAR2` when its schema allows more than 38 digits |
+| integer                                         | `NUMBER(38,0)`, or a string's `VARCHAR2` when its schema allows values outside 64 bits |
 | number, or string with `format: number`         | `BINARY_DOUBLE`                                                      |
 | boolean                                         | `BOOLEAN`                                                            |
-| string                                          | `VARCHAR2(n CHAR)` of its `maxLength`, up to `VARCHAR2(4000 CHAR)`   |
-| string with `format: integer`                   | `NUMBER(38,0)`, or `VARCHAR2` when its `maxLength` exceeds 38        |
+| string                                          | `VARCHAR2` of the most it holds, until a value doesn't fit (see [Long strings](#long-strings)) |
+| string with `format: integer`                   | `NUMBER(38,0)`, or a string's `VARCHAR2` when its `maxLength` exceeds 38 |
 | string with `format: date`                      | `DATE`                                                               |
 | string with `format: date-time`                 | `TIMESTAMP(9) WITH TIME ZONE`, stored in UTC                         |
-| string with `format: time`                      | `VARCHAR2(n CHAR)` of its `maxLength`, up to 1000                    |
-| string with `contentEncoding: base64`           | `RAW(2000)`                                                          |
-| object, array, or several types                 | `VARCHAR2(4000 CHAR)` holding JSON                                   |
-| the root document (`flow_document`)             | `VARCHAR2(4000 CHAR)` holding JSON                                   |
+| string with `contentEncoding: base64`           | `BLOB`                                                               |
+| object, array, or several types                 | `CLOB` holding JSON                                                  |
+| the root document (`flow_document`)             | `CLOB` holding JSON                                                  |
 
 Collection keys use types that Oracle allows in a primary key: strings,
-including dates, date-times and times, are `VARCHAR2(n CHAR)` of at most 1000
-characters, and binary keys are `RAW(2000)`.
+including dates and date-times, are `VARCHAR2(n CHAR)` of their `maxLength`, up
+to 1000 characters, and binary keys are `RAW(2000)`.
 
 Oracle stores an empty string or binary value as `NULL`. String and binary
 columns therefore always allow `NULL`, and an empty string or binary value in a
-collection key fails the materialization.
-
-The connector doesn't store data in `CLOB` or `BLOB` columns. A value longer than its
-`VARCHAR2` column or 4000 bytes, including a document or JSON value, or a binary
-value over 2000 bytes, fails the materialization with an error naming the
-field.
+collection key fails the materialization. So does a key that is longer than its
+column.
 
 When a number field changes to a string, its existing values are converted to
 text as JSON writes them, so `0.1` stays `0.1`.
@@ -168,6 +163,16 @@ text as JSON writes them, so `0.1` stays `0.1`.
 Oracle has no year 0, so dates in year 0 are stored as `0001-01-01`. Date-times
 are stored in UTC between the years 1 and 9999, so one that falls outside them
 in UTC is stored as the first or last moment of that range.
+
+### Long strings
+
+A string that isn't part of the key is a `VARCHAR2` of 4000 bytes, or of 32767
+bytes when the database's `MAX_STRING_SIZE` is `EXTENDED`, so that it can be
+filtered, grouped and compared like any other text. When a value
+doesn't fit, the connector rolls back the transaction, converts the column to a
+`CLOB`, and fails with an error that names the column. The materialization then
+restarts and retries the transaction. The conversion rewrites the column in
+every row of the table. A column that is a `CLOB` stays one.
 
 ## Transactions
 

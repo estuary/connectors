@@ -9,7 +9,6 @@ import (
 	"strings"
 	"text/template"
 	"time"
-	"unicode/utf8"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -17,12 +16,9 @@ import (
 )
 
 const (
-	// VARCHAR2 and RAW hold at most 4000 and 2000 bytes with
-	// MAX_STRING_SIZE=STANDARD. Keys have at most 1000 characters, which fit
-	// in 4000 bytes at the up to 4 bytes of an AL32UTF8 character.
-	maxVarcharBytes = 4000
-	maxRawBytes     = 2000
-	maxKeyChars     = 1000
+	// Keys are a VARCHAR2 of at most this many characters, which always fits
+	// in 4000 bytes, at up to 4 bytes per AL32UTF8 character.
+	maxVarcharChars = 1000
 
 	timestampFormat   = `YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM`
 	goTimestampFormat = "2006-01-02T15:04:05.000000000-07:00"
@@ -104,9 +100,6 @@ var floatConverter sql.ElementConverter = func(te tuple.TupleElement) (any, erro
 		case "-Infinity":
 			return "-Inf", nil
 		}
-		if _, err := strconv.ParseFloat(v, 64); err != nil {
-			return nil, fmt.Errorf("could not convert %q to a number: %w", v, err)
-		}
 		return v, nil
 	default:
 		return nil, fmt.Errorf("could not convert %#v (%T) to a number", te, te)
@@ -130,27 +123,28 @@ var timestampConverter sql.ElementConverter = sql.StringCastConverter(func(str s
 	return parsed.Format(goTimestampFormat), nil
 })
 
-func newOracleDialect(defaultSchema string) sql.Dialect {
-	jsonMapping := mapText(sql.ToJsonString)
+func newOracleDialect(defaultSchema string, maxStringBytes int) sql.Dialect {
+	jsonMapping := sql.MapStatic("CLOB", sql.UsingConverter(sql.ToJsonString))
+	floatMapping := sql.MapStatic("BINARY_DOUBLE", sql.UsingConverter(floatConverter))
 
-	stringKey := mapVarchar(maxKeyChars)
-	stringValue := sql.MapPrimaryKey(stringKey, mapText(nil))
+	stringKey := mapVarchar(maxVarcharChars)
+	stringValue := sql.MapPrimaryKey(stringKey, mapText(maxStringBytes, nil))
+	numberAsText := mapText(maxStringBytes, sql.ToStr)
 
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.INTEGER:  mapInteger,
-			sql.NUMBER:   sql.MapStatic("BINARY_DOUBLE", sql.UsingConverter(floatConverter)),
+			sql.INTEGER:  sql.MapSignedInt64(mapNumber, numberAsText),
+			sql.NUMBER:   floatMapping,
 			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
 			sql.OBJECT:   jsonMapping,
 			sql.ARRAY:    jsonMapping,
 			sql.MULTIPLE: jsonMapping,
-			sql.BINARY:   sql.MapStatic("RAW(2000)", sql.AlsoCompatibleWith("RAW"), sql.UsingConverter(rawConverter)),
-			sql.STRING_INTEGER: sql.MapStringMaxLen(
-				mapNumber,
-				mapText(sql.ToStr),
-				maxNumberDigits,
+			sql.BINARY: sql.MapPrimaryKey(
+				sql.MapStatic("RAW(2000)", sql.AlsoCompatibleWith("RAW"), sql.UsingConverter(sql.Base64Decoder)),
+				sql.MapStatic("BLOB", sql.UsingConverter(sql.Base64Decoder)),
 			),
-			sql.STRING_NUMBER: sql.MapStatic("BINARY_DOUBLE", sql.UsingConverter(floatConverter)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(mapNumber, numberAsText, maxNumberDigits),
+			sql.STRING_NUMBER:  floatMapping,
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: stringValue,
 				// Checkpoints outgrow a VARCHAR2
@@ -160,7 +154,6 @@ func newOracleDialect(defaultSchema string) sql.Dialect {
 				WithFormat: map[string]sql.MapProjectionFn{
 					"date":      sql.MapPrimaryKey(stringKey, sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))),
 					"date-time": sql.MapPrimaryKey(stringKey, sql.MapStatic(timestampDDL, sql.UsingConverter(timestampConverter))),
-					"time":      stringKey,
 				},
 			}),
 		},
@@ -174,20 +167,30 @@ func newOracleDialect(defaultSchema string) sql.Dialect {
 		}),
 	)
 
-	var directCast = sql.WithDirectCast()
+	// Keys aren't migrated, so a migrated VARCHAR2 is always maxStringBytes
+	var text = (&varcharColumn{Chars: maxStringBytes}).DDL()
+
+	// toText migrates a column to a VARCHAR2 or a CLOB, converting it with format.
+	var toText = func(format string) []sql.MigrationSpec {
+		return []sql.MigrationSpec{
+			sql.NewMigrationSpec([]string{text}, sql.WithCastSQL(castTo(format))),
+			sql.NewMigrationSpec([]string{"CLOB"}, sql.WithCastSQL(castTo("TO_CLOB("+format+")"))),
+		}
+	}
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"number(38,0)": {
-				sql.NewMigrationSpec([]string{"BINARY_DOUBLE"}, sql.WithCastSQL(castTo("TO_BINARY_DOUBLE(%s)"))),
-				sql.NewMigrationSpecTarget(anyVarchar{}, sql.WithCastSQL(castTo("TO_CHAR(%s)"))),
+			"number(38,0)": append(toText("TO_CHAR(%s)"),
+				sql.NewMigrationSpec([]string{"BINARY_DOUBLE"}, sql.WithCastSQL(castTo("TO_BINARY_DOUBLE(%s)")))),
+			"binary_double":               toText(binaryDoubleToText),
+			"boolean":                     toText("LOWER(TO_CHAR(%s))"),
+			"date":                        toText("TO_CHAR(%s, 'YYYY-MM-DD')"),
+			"timestamp(9) with time zone": toText(`TO_CHAR(SYS_EXTRACT_UTC(%s), 'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')`),
+			"varchar2": {
+				// Oracle widens a VARCHAR2 in place, without rewriting the table.
+				sql.NewMigrationSpec([]string{text}, sql.WithDirectCast()),
+				sql.NewMigrationSpec([]string{"CLOB"}, sql.WithCastSQL(castTo("TO_CLOB(%s)"))),
 			},
-			"binary_double": {sql.NewMigrationSpecTarget(anyVarchar{}, sql.WithCastSQL(castTo(binaryDoubleToText)))},
-			"boolean":       {sql.NewMigrationSpecTarget(anyVarchar{}, sql.WithCastSQL(castTo("LOWER(TO_CHAR(%s))")))},
-			"date":          {sql.NewMigrationSpecTarget(anyVarchar{}, sql.WithCastSQL(castTo("TO_CHAR(%s, 'YYYY-MM-DD')")))},
-			"timestamp(9) with time zone": {sql.NewMigrationSpecTarget(anyVarchar{},
-				sql.WithCastSQL(castTo(`TO_CHAR(SYS_EXTRACT_UTC(%s), 'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')`)))},
-			"varchar2": {sql.NewMigrationSpecTarget(&varcharWidening{}, directCast)},
 		},
 		DirectCastSQL: sql.DirectCastPerColumn(func(table sql.Table, m sql.ColumnTypeMigration) string {
 			return fmt.Sprintf("ALTER TABLE %s MODIFY (%s %s)", table.Identifier, m.Identifier, m.BareDDL)
@@ -230,7 +233,7 @@ func castTo(format string) sql.CastSQLFunc {
 }
 
 func storesEmptyAsNull(ddl string) bool {
-	return strings.HasPrefix(ddl, "VARCHAR2") || strings.HasPrefix(ddl, "RAW") || ddl == "CLOB"
+	return strings.HasPrefix(ddl, "VARCHAR2") || strings.HasPrefix(ddl, "RAW") || ddl == "CLOB" || ddl == "BLOB"
 }
 
 // maxNumberDigits is the precision of NUMBER(38,0).
@@ -240,29 +243,14 @@ const maxNumberDigits = 38
 // INTEGER column.
 var mapNumber = sql.MapStatic("NUMBER(38,0)", sql.AlsoCompatibleWith("NUMBER(*,0)"), sql.UsingConverter(numberConverter))
 
-// mapInteger maps to NUMBER(38,0) unless the schema's range needs more
-// digits, in which case the integer is stored as text.
-func mapInteger(p *sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
-	var digits = 0
-	if n := p.Inference.Numeric; n != nil {
-		for _, bound := range []float64{n.Minimum, n.Maximum} {
-			digits = max(digits, len(strconv.FormatFloat(math.Abs(bound), 'f', 0, 64)))
-		}
-	}
-	if digits <= maxNumberDigits {
-		return mapNumber(p)
-	}
-	return varcharMapping(min(digits+1, maxVarcharBytes), sql.ToStr)
-}
-
-// mapText sizes a VARCHAR2 from the schema's maxLength, up to 4000
-// characters, after applying toText if set.
-func mapText(toText sql.ElementConverter) sql.MapProjectionFn {
-	return func(p *sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
-		if s := p.Inference.String_; s != nil && s.MaxLength > 0 && s.MaxLength <= maxVarcharBytes {
-			return varcharMapping(int(s.MaxLength), toText)
-		}
-		return varcharMapping(maxVarcharBytes, toText)
+// mapText is a VARCHAR2 of the most it holds, which Store converts to a CLOB
+// once a value doesn't fit (see widenToCLOB), so an existing CLOB is also
+// compatible.
+func mapText(maxStringBytes int, toText sql.ElementConverter) sql.MapProjectionFn {
+	var col = &varcharColumn{Chars: maxStringBytes}
+	var compatible = sql.CompatibleColumnTypes{col, &sql.CompatibleStringEqualFold{Inner: "CLOB"}}
+	return func(*sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
+		return col, compatible, toText
 	}
 }
 
@@ -274,46 +262,9 @@ func mapVarchar(maxChars int) sql.MapProjectionFn {
 		if s := p.Inference.String_; s != nil && s.MaxLength > 0 && int(s.MaxLength) < n {
 			n = int(s.MaxLength)
 		}
-		return varcharMapping(n, nil)
+		var col = &varcharColumn{Chars: n}
+		return col, sql.CompatibleColumnTypes{col}, nil
 	}
-}
-
-// varcharMapping is a VARCHAR2 of n characters.
-func varcharMapping(n int, toText sql.ElementConverter) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
-	var col = &varcharColumn{Chars: n}
-	return col, sql.CompatibleColumnTypes{col}, func(te tuple.TupleElement) (any, error) {
-		var v any = te
-		if toText != nil {
-			var err error
-			if v, err = toText(te); err != nil {
-				return nil, err
-			}
-		}
-		if s, ok := v.(string); ok && utf8.RuneCountInString(s) > n {
-			return nil, fmt.Errorf("a value of %d characters is longer than the column's %s", utf8.RuneCountInString(s), col.DDL())
-		} else if ok && len(s) > maxVarcharBytes {
-			return nil, fmt.Errorf("a value of %d bytes is longer than the %d bytes of a VARCHAR2", len(s), maxVarcharBytes)
-		}
-		return v, nil
-	}
-}
-
-// rawConverter decodes base64 for a RAW(2000), and fails on a value longer
-// than the column like varcharMapping does.
-func rawConverter(te tuple.TupleElement) (any, error) {
-	v, err := sql.Base64Decoder(te)
-	if b, ok := v.([]byte); ok && err == nil && len(b) > maxRawBytes {
-		return nil, fmt.Errorf("a value of %d bytes is longer than the column's RAW(%d)", len(b), maxRawBytes)
-	}
-	return v, err
-}
-
-// anyVarchar is a migration target of any VARCHAR2 size.
-type anyVarchar struct{}
-
-func (anyVarchar) CanMigrate(_ boilerplate.ExistingField, desired sql.MappedType) bool {
-	_, ok := desired.TargetType.(*varcharColumn)
-	return ok
 }
 
 // varcharColumn is a VARCHAR2 with character length semantics. An existing
@@ -326,15 +277,6 @@ func (v *varcharColumn) DDL() string { return fmt.Sprintf("VARCHAR2(%d CHAR)", v
 
 func (v *varcharColumn) Compatible(existing boilerplate.ExistingField) bool {
 	return strings.EqualFold(existing.Type, "VARCHAR2") && existing.CharacterMaxLength >= v.Chars
-}
-
-// varcharWidening grows a VARCHAR2 in place, which Oracle does without
-// rewriting the table.
-type varcharWidening struct{}
-
-func (*varcharWidening) CanMigrate(existing boilerplate.ExistingField, desired sql.MappedType) bool {
-	target, ok := desired.TargetType.(*varcharColumn)
-	return ok && strings.EqualFold(existing.Type, "VARCHAR2") && target.Chars >= existing.CharacterMaxLength
 }
 
 // bindExpr is the bind at position index, wrapped so the database parses the
@@ -353,19 +295,6 @@ func bindExpr(c sql.Column, index int) string {
 	default:
 		return placeholder
 	}
-}
-
-// updateOrder maps each UPDATE bind position to its column's index in
-// Table.Columns: the values to set, and then the keys.
-func updateOrder(t *sql.Table) []int {
-	var order []int
-	for i := len(t.Keys); i < len(t.Columns()); i++ {
-		order = append(order, i)
-	}
-	for i := range t.Keys {
-		order = append(order, i)
-	}
-	return order
 }
 
 // loadTableName names the private temporary table that holds a binding's Load

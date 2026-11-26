@@ -1,6 +1,7 @@
 package connector
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -62,4 +63,10 @@ func TestAddTruncation(t *testing.T) {
 	b = &binding{target: withOp}
 	require.EqualError(t, addTruncation(b, column(sql.FieldConfig{CastToString_: true}), true), "column flow_published_at is not a TIMESTAMP")
 	require.Empty(t, b.truncateSQL)
+}
+
+func TestLongColumns(t *testing.T) {
+	var row = []any{"1", strings.Repeat("x", 4001), nil, []byte("small"), strings.Repeat("y", 4000)}
+	require.Equal(t, ".L...", longColumns(row, 4000))
+	require.Equal(t, ".....", longColumns(row, 32767))
 }

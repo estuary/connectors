@@ -1,7 +1,6 @@
 package connector
 
 import (
-	"encoding/base64"
 	"math"
 	"strings"
 	"testing"
@@ -14,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = newOracleDialect("FLOW")
+var testDialect = newOracleDialect("FLOW", 4000)
 var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
@@ -87,20 +86,46 @@ func TestConverters(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, tc.want, got, "%v", tc.in)
 	}
-
-	_, err := floatConverter("abc")
-	require.Error(t, err)
 }
 
-func TestBinaryColumns(t *testing.T) {
-	// Oracle stores an empty binary value as NULL, so even a required one is
-	// nullable.
-	var binary = testDialect.MapType(&sql.Projection{Projection: pf.Projection{Inference: pf.Inference{
-		Types:   []string{"string"},
-		String_: &pf.Inference_String{ContentEncoding: "base64"},
-		Exists:  pf.Inference_MUST,
-	}}}, sql.FieldConfig{})
-	require.Equal(t, "RAW(2000)", binary.DDL)
+func TestStringAndBinaryColumns(t *testing.T) {
+	var mapType = func(inference pf.Inference) sql.MappedType {
+		inference.Exists = pf.Inference_MUST
+		return testDialect.MapType(&sql.Projection{Projection: pf.Projection{Inference: inference}}, sql.FieldConfig{})
+	}
+
+	// Oracle stores an empty BLOB as NULL, so even a required one is nullable.
+	var binary = mapType(pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{ContentEncoding: "base64"}})
+	require.Equal(t, "BLOB", binary.DDL)
+
+	// Only a key's VARCHAR2 is sized by its maxLength.
+	var short = pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{MaxLength: 10}}
+	require.Equal(t, "VARCHAR2(4000 CHAR)", mapType(short).DDL)
+	var key = testDialect.MapType(&sql.Projection{Projection: pf.Projection{Inference: short, IsPrimaryKey: true}}, sql.FieldConfig{})
+	require.Equal(t, "VARCHAR2(10 CHAR)", key.BareDDL)
+
+	// A string's VARCHAR2 also accepts an existing CLOB.
+	var unbounded = mapType(pf.Inference{Types: []string{"string"}, String_: &pf.Inference_String{}})
+	require.Equal(t, "VARCHAR2(4000 CHAR)", unbounded.DDL)
+	require.True(t, unbounded.Compatible(boilerplate.ExistingField{Type: "CLOB"}))
+	require.False(t, unbounded.Compatible(boilerplate.ExistingField{Type: "VARCHAR2", CharacterMaxLength: 100}))
+}
+
+func TestOverflowingColumns(t *testing.T) {
+	// The first column isn't a VARCHAR2, the second holds 10 characters and
+	// the third 4000, which is also the most bytes a VARCHAR2 holds.
+	var b = &binding{varcharChars: []int{0, 10, 4000}}
+	for _, tc := range []struct {
+		row  []any
+		want []int
+	}{
+		{[]any{strings.Repeat("x", 5000), strings.Repeat("é", 10), strings.Repeat("x", 4000)}, nil},
+		{[]any{nil, strings.Repeat("x", 11), strings.Repeat("x", 4001)}, []int{1, 2}},
+		{[]any{nil, nil, strings.Repeat("é", 2001)}, []int{2}},
+		{[]any{int64(1), "", ""}, nil},
+	} {
+		require.Equal(t, tc.want, b.overflowingColumns(tc.row, 4000))
+	}
 }
 
 func TestIntegerCompatibility(t *testing.T) {
@@ -117,43 +142,4 @@ func TestIntegerCompatibility(t *testing.T) {
 	} {
 		require.Equal(t, want, integer.Compatible(boilerplate.ExistingField{Type: existing}), existing)
 	}
-}
-
-func TestVarcharLength(t *testing.T) {
-	_, _, conv := varcharMapping(3, nil)
-
-	got, err := conv("ab𐀀")
-	require.NoError(t, err)
-	require.Equal(t, "ab𐀀", got)
-
-	got, err = conv(nil)
-	require.NoError(t, err)
-	require.Nil(t, got)
-
-	_, err = conv("abcd")
-	require.EqualError(t, err, "a value of 4 characters is longer than the column's VARCHAR2(3 CHAR)")
-
-	_, _, conv = varcharMapping(2, sql.ToStr)
-	_, err = conv(int64(123))
-	require.Error(t, err)
-
-	// A VARCHAR2 holds at most 4000 bytes, whatever its length in characters.
-	_, _, conv = varcharMapping(maxVarcharBytes, nil)
-	_, err = conv(strings.Repeat("x", 4000))
-	require.NoError(t, err)
-	_, err = conv(strings.Repeat("é", 2001))
-	require.EqualError(t, err, "a value of 4002 bytes is longer than the 4000 bytes of a VARCHAR2")
-}
-
-func TestRawLength(t *testing.T) {
-	got, err := rawConverter(base64.StdEncoding.EncodeToString(make([]byte, maxRawBytes)))
-	require.NoError(t, err)
-	require.Len(t, got, maxRawBytes)
-
-	_, err = rawConverter(base64.StdEncoding.EncodeToString(make([]byte, maxRawBytes+1)))
-	require.EqualError(t, err, "a value of 2001 bytes is longer than the column's RAW(2000)")
-
-	got, err = rawConverter(nil)
-	require.NoError(t, err)
-	require.Nil(t, got)
 }

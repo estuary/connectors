@@ -118,15 +118,15 @@ Big Schema Changed Types Constraints:
 {"Field":"stringUuidField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This location is part of the current materialization"}
 
 Big Schema Materialized Resource Schema With All Fields Required:
-{"Name":"ARRAYFIELD","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"ARRAYFIELD","Nullable":true,"Type":"CLOB"}
 {"Name":"BOOLFIELD","Nullable":false,"Type":"BOOLEAN"}
-{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"CLOB"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP(9) WITH TIME ZONE"}
 {"Name":"INTFIELD","Nullable":false,"Type":"NUMBER(38,0)"}
 {"Name":"KEY","Nullable":false,"Type":"VARCHAR2"}
-{"Name":"MULTIPLEFIELD","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"MULTIPLEFIELD","Nullable":true,"Type":"CLOB"}
 {"Name":"NUMFIELD","Nullable":false,"Type":"BINARY_DOUBLE"}
-{"Name":"OBJFIELD","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"OBJFIELD","Nullable":true,"Type":"CLOB"}
 {"Name":"STRINGDATEFIELD","Nullable":false,"Type":"DATE"}
 {"Name":"STRINGDATETIMEFIELD","Nullable":false,"Type":"TIMESTAMP(9) WITH TIME ZONE"}
 {"Name":"STRINGDURATIONFIELD","Nullable":true,"Type":"VARCHAR2"}
@@ -156,15 +156,15 @@ Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
 Big Schema Materialized Resource Schema With No Fields Required:
-{"Name":"ARRAYFIELD","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"ARRAYFIELD","Nullable":true,"Type":"CLOB"}
 {"Name":"BOOLFIELD","Nullable":true,"Type":"BOOLEAN"}
-{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"CLOB"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP(9) WITH TIME ZONE"}
 {"Name":"INTFIELD","Nullable":true,"Type":"NUMBER(38,0)"}
 {"Name":"KEY","Nullable":false,"Type":"VARCHAR2"}
-{"Name":"MULTIPLEFIELD","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"MULTIPLEFIELD","Nullable":true,"Type":"CLOB"}
 {"Name":"NUMFIELD","Nullable":true,"Type":"BINARY_DOUBLE"}
-{"Name":"OBJFIELD","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"OBJFIELD","Nullable":true,"Type":"CLOB"}
 {"Name":"STRINGDATEFIELD","Nullable":true,"Type":"DATE"}
 {"Name":"STRINGDATETIMEFIELD","Nullable":true,"Type":"TIMESTAMP(9) WITH TIME ZONE"}
 {"Name":"STRINGDURATIONFIELD","Nullable":true,"Type":"VARCHAR2"}
@@ -233,14 +233,14 @@ Big Schema Changed Types With Backfill Constraints:
 {"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 
 Big Schema Materialized Resource Schema Changed Types With Backfill:
-{"Name":"ARRAYFIELD","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"ARRAYFIELD","Nullable":true,"Type":"CLOB"}
 {"Name":"BOOLFIELD","Nullable":false,"Type":"NUMBER(38,0)"}
-{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"CLOB"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP(9) WITH TIME ZONE"}
 {"Name":"INTFIELD","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"KEY","Nullable":false,"Type":"VARCHAR2"}
-{"Name":"MULTIPLEFIELD","Nullable":true,"Type":"VARCHAR2"}
-{"Name":"NULLFIELD","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"MULTIPLEFIELD","Nullable":true,"Type":"CLOB"}
+{"Name":"NULLFIELD","Nullable":true,"Type":"CLOB"}
 {"Name":"NUMFIELD","Nullable":false,"Type":"BOOLEAN"}
 {"Name":"OBJFIELD","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"STRINGDATEFIELD","Nullable":true,"Type":"VARCHAR2"}
@@ -273,60 +273,60 @@ Big Schema Materialized Resource Schema Changed Types With Backfill:
 
 add a single field:
 {"Name":"ADDEDOPTIONALSTRING","Nullable":true,"Type":"VARCHAR2"}
-{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"CLOB"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP(9) WITH TIME ZONE"}
 {"Name":"KEY","Nullable":false,"Type":"VARCHAR2"}
 {"Name":"OPTIONALBOOLEAN","Nullable":true,"Type":"BOOLEAN"}
 {"Name":"OPTIONALINTEGER","Nullable":true,"Type":"NUMBER(38,0)"}
-{"Name":"OPTIONALOBJECT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"OPTIONALOBJECT","Nullable":true,"Type":"CLOB"}
 {"Name":"OPTIONALSTRING","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"REQUIREDBOOLEAN","Nullable":false,"Type":"BOOLEAN"}
 {"Name":"REQUIREDINTEGER","Nullable":false,"Type":"NUMBER(38,0)"}
-{"Name":"REQUIREDOBJECT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"REQUIREDOBJECT","Nullable":true,"Type":"CLOB"}
 {"Name":"REQUIREDSTRING","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
 remove a single optional field:
-{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"CLOB"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP(9) WITH TIME ZONE"}
 {"Name":"KEY","Nullable":false,"Type":"VARCHAR2"}
 {"Name":"OPTIONALBOOLEAN","Nullable":true,"Type":"BOOLEAN"}
 {"Name":"OPTIONALINTEGER","Nullable":true,"Type":"NUMBER(38,0)"}
-{"Name":"OPTIONALOBJECT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"OPTIONALOBJECT","Nullable":true,"Type":"CLOB"}
 {"Name":"OPTIONALSTRING","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"REQUIREDBOOLEAN","Nullable":false,"Type":"BOOLEAN"}
 {"Name":"REQUIREDINTEGER","Nullable":false,"Type":"NUMBER(38,0)"}
-{"Name":"REQUIREDOBJECT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"REQUIREDOBJECT","Nullable":true,"Type":"CLOB"}
 {"Name":"REQUIREDSTRING","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
 remove a single required field:
-{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"CLOB"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP(9) WITH TIME ZONE"}
 {"Name":"KEY","Nullable":false,"Type":"VARCHAR2"}
 {"Name":"OPTIONALBOOLEAN","Nullable":true,"Type":"BOOLEAN"}
 {"Name":"OPTIONALINTEGER","Nullable":true,"Type":"NUMBER(38,0)"}
-{"Name":"OPTIONALOBJECT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"OPTIONALOBJECT","Nullable":true,"Type":"CLOB"}
 {"Name":"OPTIONALSTRING","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"REQUIREDBOOLEAN","Nullable":false,"Type":"BOOLEAN"}
 {"Name":"REQUIREDINTEGER","Nullable":false,"Type":"NUMBER(38,0)"}
-{"Name":"REQUIREDOBJECT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"REQUIREDOBJECT","Nullable":true,"Type":"CLOB"}
 {"Name":"REQUIREDSTRING","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
 add and remove many fields:
 {"Name":"ADDEDOPTIONALSTRING","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"ADDEDREQUIREDSTRING","Nullable":true,"Type":"VARCHAR2"}
-{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"CLOB"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP(9) WITH TIME ZONE"}
 {"Name":"KEY","Nullable":false,"Type":"VARCHAR2"}
 {"Name":"OPTIONALBOOLEAN","Nullable":true,"Type":"BOOLEAN"}
 {"Name":"OPTIONALINTEGER","Nullable":true,"Type":"NUMBER(38,0)"}
-{"Name":"OPTIONALOBJECT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"OPTIONALOBJECT","Nullable":true,"Type":"CLOB"}
 {"Name":"OPTIONALSTRING","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"REQUIREDBOOLEAN","Nullable":false,"Type":"BOOLEAN"}
 {"Name":"REQUIREDINTEGER","Nullable":false,"Type":"NUMBER(38,0)"}
-{"Name":"REQUIREDOBJECT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"REQUIREDOBJECT","Nullable":true,"Type":"CLOB"}
 {"Name":"REQUIREDSTRING","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
@@ -336,7 +336,7 @@ Challenging Field Names Materialized Columns:
 {"Name":"$dollar$signs","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"123","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"123startsWithDigits","Nullable":true,"Type":"VARCHAR2"}
-{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"VARCHAR2"}
+{"Name":"FLOW_DOCUMENT","Nullable":true,"Type":"CLOB"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP(9) WITH TIME ZONE"}
 {"Name":"VALUE_WITH_SEPARATED_WORDS","Nullable":true,"Type":"VARCHAR2"}
 {"Name":"_id","Nullable":false,"Type":"VARCHAR2"}

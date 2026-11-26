@@ -15,13 +15,10 @@ materializations:
       fields:
         recommended: true
         include:
-          # Materialize the object field, which becomes a string (objects are
-          # FIELD_OPTIONAL and skipped by recommended selection).
+          # Materialize the object field so it exercises the JSON->text migration
+          # (objects are FIELD_OPTIONAL and skipped by recommended selection).
           objectToString: {}
         exclude:
-          # The fixture's documents are larger than a VARCHAR2 holds. The test
-          # runs the binding as delta updates, which can leave them out.
-          - flow_document
           # int128 and wider integers are stored as VARCHAR2 because they don't
           # fit in Oracle's NUMBER type, so converting that VARCHAR2 back into a
           # numeric type is not possible.
@@ -40,7 +37,9 @@ materializations:
           - intStr256ToNumStr
           - intStr257ToNum
           - intStr257ToNumStr
-          # Binary fields are RAW, which has no migration to or from text.
+          # Binary fields are BLOB and strings are CLOB. Oracle's base64 encode
+          # and decode functions support up to 32 KB, so not all values can be
+          # converted safely between the two types.
           - binaryToMulti
           - binaryToString
           - stringToBinary
