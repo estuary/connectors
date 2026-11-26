@@ -1,0 +1,45 @@
+info:
+  name: oldest after parent
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/conversations.replies?channel={{channel_id}}&ts={{thread_ts}}&oldest={{first_reply_ts}}&limit=999"
+  params:
+    - name: channel
+      value: "{{channel_id}}"
+      type: query
+    - name: ts
+      value: "{{thread_ts}}"
+      type: query
+    - name: oldest
+      value: "{{first_reply_ts}}"
+      type: query
+    - name: limit
+      value: "999"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('first_reply_ts')) throw new Error('first_reply_ts not set — run `Replies / bare` first in this session');
+
+settings:
+  encodeUrl: true
+  timeout: 30000
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  **REFERENCE:** [conversations.replies](https://docs.slack.dev/reference/methods/conversations.replies)
+
+  **WHY:** whether the parent is still returned when `oldest` is past it (the
+  docs don't say), and whether `oldest` is exclusive here too. The incremental
+  and lookback thread reads pass `oldest` equal to the window start, so the
+  connector must drop the parent by `ts` rather than "first item". Expect
+  `first_reply_ts` to be absent.
+
+  **PENDING:** run once credentials are in place.
