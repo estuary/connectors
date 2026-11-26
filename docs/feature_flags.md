@@ -55,6 +55,28 @@ if db.featureFlags["do_something"] {
 If this is the first feature flag added to the connector, you may need to add the
 typical boilerplate as well.
 
+### Aliases
+
+A `common.FlagDefault` can accept other names for the flag, for example to keep a
+flag's old name working after a rename:
+
+```go
+var featureFlagDefaults = map[string]common.FlagDefault{
+  // A short (one or two line) description of what this flag does when set/unset.
+  "do_something": common.FlagDisabled.WithAlias("do_the_thing"),
+}
+```
+
+`WithAlias` adds one alias; chain calls to add more.
+
+Each alias works everywhere the flag's name does, including with the `no_` prefix, so
+`do_the_thing` enables `do_something` and `no_do_the_thing` disables it. The resolved
+flags are keyed only by the flag's own name, so code always reads
+`featureFlags["do_something"]`. When a config mentions both names, the later entry
+wins, as with any repeated flag. Aliases require `common.FlagDefault` defaults resolved
+with `common.ResolveFlags`; `common.ParseFeatureFlags` with a `map[string]bool` does
+not support them.
+
 ## Experimental Features
 
 For an experimental feature, just add a feature flag controlling the new behavior.
