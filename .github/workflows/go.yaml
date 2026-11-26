@@ -475,12 +475,6 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-      - name: Install duckdb
-        if: matrix.connector.name == 'materialize-motherduck'
-        uses: opt-nc/setup-duckdb-action@v1.2.9
-        with:
-          version: v1.3.1
-
       - name: Materialization connector ${{ matrix.connector.name }} integration tests
         if: startsWith(matrix.connector.name, 'materialize-')
 
