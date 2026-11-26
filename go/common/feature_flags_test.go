@@ -179,3 +179,71 @@ func TestResolveFlags(t *testing.T) {
 		})
 	}
 }
+
+func TestFlagAliases(t *testing.T) {
+	defaults := map[string]FlagDefault{
+		"renamed":       FlagDisabled.WithAlias("old_name").WithAlias("older_name"),
+		"gated_renamed": gatedFlag.WithAlias("old_gated"),
+	}
+	before := mustCreatedAt(t, "2026-01-01")
+
+	for _, tt := range []struct {
+		raw         string
+		wantRenamed bool
+		wantGated   bool
+	}{
+		{"", false, false},
+		{"renamed", true, false},
+		{"old_name", true, false},
+		{"older_name", true, false},
+		{"old_gated", false, true},
+		{"old_name,no_renamed", false, false},
+		{"no_renamed,old_name", true, false},
+		{"renamed,no_older_name", false, false},
+	} {
+		t.Run(tt.raw, func(t *testing.T) {
+			flags := ResolveFlags(tt.raw, defaults, before)
+			require.Equal(t, map[string]bool{"renamed": tt.wantRenamed, "gated_renamed": tt.wantGated}, flags)
+		})
+	}
+
+	t.Run("no_ alias disables a flag that defaults on", func(t *testing.T) {
+		flags := ResolveFlags("no_old_gated", defaults, mustCreatedAt(t, "2026-07-01"))
+		require.False(t, flags["gated_renamed"])
+	})
+
+	t.Run("a gated flag mentioned by alias is not pinned", func(t *testing.T) {
+		require.Equal(t, map[string]bool{"gated_renamed": false}, PendingFlagPins("", defaults, before))
+		require.Empty(t, PendingFlagPins("old_gated", defaults, before))
+		require.Empty(t, PendingFlagPins("no_old_gated", defaults, before))
+	})
+
+	t.Run("ParseFeatureFlags has no aliases", func(t *testing.T) {
+		require.Equal(t, map[string]bool{"renamed": false, "old_name": true},
+			ParseFeatureFlags("old_name", map[string]bool{"renamed": false}))
+	})
+
+	t.Run("WithAlias does not modify the receiver", func(t *testing.T) {
+		base := FlagEnabled.WithAlias("a")
+		_ = base.WithAlias("b")
+		require.Equal(t, []string{"a"}, base.aliases)
+		require.Empty(t, FlagEnabled.aliases)
+	})
+}
+
+func TestFlagAliasesRejectInvalid(t *testing.T) {
+	require.Panics(t, func() { FlagEnabled.WithAlias("") })
+	require.Panics(t, func() { FlagEnabled.WithAlias("no_thing") })
+	require.Panics(t, func() {
+		ResolveFlags("", map[string]FlagDefault{
+			"one": FlagEnabled.WithAlias("two"),
+			"two": FlagEnabled,
+		}, CreatedAt{})
+	})
+	require.Panics(t, func() {
+		ResolveFlags("", map[string]FlagDefault{
+			"one": FlagEnabled.WithAlias("shared"),
+			"two": FlagEnabled.WithAlias("shared"),
+		}, CreatedAt{})
+	})
+}

@@ -54,6 +54,24 @@ type FlagDefault struct {
 	// the flag defaults to true for tasks created on or after it, and false for
 	// tasks created before it.
 	enabledFrom string
+	// aliases are other names the flag can be set by in the feature flags
+	// string, with or without the 'no_' prefix. Resolved flags are keyed only
+	// by the flag's own name.
+	aliases []string
+}
+
+// WithAlias returns a copy of the default which also accepts name in place of
+// the flag's own name, including with the 'no_' prefix. Chain calls to add
+// more than one alias.
+//
+// Panics if name is empty or starts with 'no_', which is a connector
+// programming error.
+func (d FlagDefault) WithAlias(name string) FlagDefault {
+	if name == "" || strings.HasPrefix(name, "no_") {
+		panic(fmt.Sprintf("invalid feature flag alias %q", name))
+	}
+	d.aliases = append(append([]string(nil), d.aliases...), name)
+	return d
 }
 
 // FlagEnabled is a flag that defaults to true for all tasks.
@@ -126,7 +144,26 @@ func ResolveFlagDefaults(defaults map[string]FlagDefault, createdAt CreatedAt) m
 // createdAt. An explicit entry in the raw config string always wins over the
 // resolved default.
 func ResolveFlags(raw string, defaults map[string]FlagDefault, createdAt CreatedAt) map[string]bool {
-	return ParseFeatureFlags(raw, ResolveFlagDefaults(defaults, createdAt))
+	return parseFeatureFlags(raw, ResolveFlagDefaults(defaults, createdAt), flagAliases(defaults))
+}
+
+// flagAliases creates a map from the alias name to the flags canonical name.
+//
+// Panics if an alias is also the name of a flag, or is declared by more than
+// one flag, which is a connector programming error.
+func flagAliases(defaults map[string]FlagDefault) map[string]string {
+	aliases := make(map[string]string)
+	for flag, d := range defaults {
+		for _, alias := range d.aliases {
+			if _, ok := defaults[alias]; ok {
+				panic(fmt.Sprintf("feature flag alias %q of %q is also a feature flag", alias, flag))
+			} else if other, ok := aliases[alias]; ok && other != flag {
+				panic(fmt.Sprintf("feature flag alias %q is declared by both %q and %q", alias, other, flag))
+			}
+			aliases[alias] = flag
+		}
+	}
+	return aliases
 }
 
 // PendingFlagPins returns the cutoff-gated flags that are not yet explicitly
@@ -140,7 +177,7 @@ func ResolveFlags(raw string, defaults map[string]FlagDefault, createdAt Created
 // record. That is what makes it safe to apply it lazily, out of band: a task
 // behaves identically before and after its config catches up.
 func PendingFlagPins(raw string, defaults map[string]FlagDefault, createdAt CreatedAt) map[string]bool {
-	mentioned := mentionedFlags(raw)
+	mentioned := mentionedFlags(raw, flagAliases(defaults))
 	pins := map[string]bool{}
 	for flag, d := range defaults {
 		if d.enabledFrom == "" || mentioned[flag] {
@@ -176,11 +213,12 @@ func PinnedFlagsString(raw string, toPin map[string]bool) string {
 }
 
 // mentionedFlags returns the set of flag names mentioned in a raw feature flags
-// string, with any 'no_' prefix stripped.
-func mentionedFlags(raw string) map[string]bool {
+// string, with any 'no_' prefix stripped and aliases replaced by the name of
+// their flag.
+func mentionedFlags(raw string, aliases map[string]string) map[string]bool {
 	mentioned := make(map[string]bool)
 	for _, flagName := range strings.Split(raw, ",") {
-		flagName = strings.TrimPrefix(strings.TrimSpace(flagName), "no_")
+		flagName = replaceAlias(strings.TrimPrefix(strings.TrimSpace(flagName), "no_"), aliases)
 		if flagName != "" {
 			mentioned[flagName] = true
 		}
@@ -188,11 +226,26 @@ func mentionedFlags(raw string) map[string]bool {
 	return mentioned
 }
 
+// replaceAlias returns the name of the flag that name is an alias of, or name
+// itself if it isn't an alias.
+func replaceAlias(name string, aliases map[string]string) string {
+	if flag, ok := aliases[name]; ok {
+		return flag
+	}
+	return name
+}
+
 // ParseFeatureFlags parses a comma-separated list of flag names and combines that with a
 // map describing default flag settings in the absence of any flags. A flag name can be
 // prefixed with 'no_' to explicitly set it to a false value, in case the default is (or
 // might soon become) true.
 func ParseFeatureFlags(flags string, defaults map[string]bool) map[string]bool {
+	return parseFeatureFlags(flags, defaults, nil)
+}
+
+// parseFeatureFlags is ParseFeatureFlags, additionally replacing each name
+// found in aliases with the name of its flag.
+func parseFeatureFlags(flags string, defaults map[string]bool, aliases map[string]string) map[string]bool {
 	var settings = make(map[string]bool)
 	for k, v := range defaults {
 		settings[k] = v
@@ -204,6 +257,7 @@ func ParseFeatureFlags(flags string, defaults map[string]bool) map[string]bool {
 			flagName = strings.TrimPrefix(flagName, "no_")
 			flagValue = false
 		}
+		flagName = replaceAlias(flagName, aliases)
 		if flagName != "" {
 			settings[flagName] = flagValue
 		}
