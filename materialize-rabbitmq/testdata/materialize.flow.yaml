@@ -1,0 +1,32 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-rabbitmq:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config:
+          host: localhost
+          port: 5674
+          virtualHost: /
+          username: test
+          password: test-password
+    bindings:
+      - resource:
+          exchange: simple
+          exchangeType: topic
+          routingKey: fallback
+          routingKeyField: /id
+        source: tests/simple
+        fields:
+          recommended: true
+      - resource:
+          exchange: data-types
+          exchangeType: topic
+          routingKey: fallback
+          routingKeyField: /id
+        source: tests/data-types
+        fields:
+          recommended: true

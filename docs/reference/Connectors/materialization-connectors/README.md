@@ -75,6 +75,7 @@ of Estuary's [Dekaf connectors](#dekaf-connectors).
 * [Google Cloud Pub/Sub](./google-pubsub.md)
 * [HTTP Webhook](./http-webhook.md)
 * [OpenSearch](./Elasticsearch/opensearch.md)
+* [RabbitMQ](./rabbitmq.md)
 
 ### SaaS/reverse ETL connectors
 

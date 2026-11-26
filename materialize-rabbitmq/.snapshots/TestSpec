@@ -1,0 +1,99 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-rabbitmq/config",
+    "properties": {
+      "host": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Host",
+        "description": "Hostname or IP address of your RabbitMQ server without a scheme or port."
+      },
+      "port": {
+        "type": "integer",
+        "maximum": 65535,
+        "minimum": 1,
+        "title": "Port",
+        "description": "AMQP port of your RabbitMQ server. For TLS use the server's TLS port (typically 5671).",
+        "default": 5672
+      },
+      "virtualHost": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Virtual Host",
+        "description": "RabbitMQ virtual host containing your exchanges.",
+        "default": "/"
+      },
+      "username": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Username",
+        "description": "Username for authenticating with your RabbitMQ server."
+      },
+      "password": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Password",
+        "description": "Password for authenticating with your RabbitMQ server.",
+        "secret": true
+      },
+      "tls": {
+        "type": "boolean",
+        "title": "Use TLS",
+        "description": "Connect to your RabbitMQ server using TLS and system CA certificates. Does not change the port; typically set port to 5671.",
+        "default": false
+      }
+    },
+    "type": "object",
+    "required": [
+      "host",
+      "username",
+      "password"
+    ],
+    "title": "Materialize RabbitMQ Spec"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-rabbitmq/resource",
+    "properties": {
+      "exchange": {
+        "type": "string",
+        "maxLength": 255,
+        "minLength": 1,
+        "title": "Exchange",
+        "description": "Name of an existing exchange to publish your documents to. Declare the exchange and bind queues before publishing the materialization.",
+        "x-collection-name": true
+      },
+      "exchangeType": {
+        "type": "string",
+        "enum": [
+          "direct",
+          "fanout",
+          "topic"
+        ],
+        "title": "Exchange Type",
+        "description": "Expected exchange type. Passive checks only verify existence; the connector does not create or change exchanges.",
+        "default": "topic"
+      },
+      "routingKey": {
+        "type": "string",
+        "maxLength": 255,
+        "title": "Routing Key",
+        "description": "Routing key used when no scalar value is found at the routing key field.",
+        "default": ""
+      },
+      "routingKeyField": {
+        "type": "string",
+        "format": "json-pointer",
+        "title": "Routing Key Field",
+        "description": "Optional JSON pointer to a collection projection whose string or number or boolean value becomes the routing key."
+      }
+    },
+    "type": "object",
+    "required": [
+      "exchange"
+    ],
+    "title": "RabbitMQ Exchange"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-rabbitmq"
+}

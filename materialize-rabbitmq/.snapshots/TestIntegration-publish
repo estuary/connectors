@@ -1,0 +1,151 @@
+[
+  {
+    "queue": "publish.orders.readback",
+    "exchange": "publish.orders",
+    "routing_key": "new",
+    "body": {
+      "id": 1,
+      "status": "new",
+      "canary": "o1",
+      "_meta": {
+        "uuid": "13814000-1dd2-11b2-8000-071353030311",
+        "op": "c"
+      }
+    },
+    "properties": {
+      "content_type": "application/json",
+      "delivery_mode": 2,
+      "message_id": "e3b2388866528c644c4b2a3f198323fbd249ff7b8729997dcca427c401efd54d"
+    }
+  },
+  {
+    "queue": "publish.orders.readback",
+    "exchange": "publish.orders",
+    "routing_key": "paid",
+    "body": {
+      "id": 2,
+      "status": "paid",
+      "canary": "o2",
+      "_meta": {
+        "uuid": "13814000-1dd2-11b2-8000-071353030311",
+        "op": "c"
+      }
+    },
+    "properties": {
+      "content_type": "application/json",
+      "delivery_mode": 2,
+      "message_id": "925af22abbe455f2116e4952d6c386fd39e275a31a97371a5da56160ed6fe034"
+    }
+  },
+  {
+    "queue": "publish.orders.readback",
+    "exchange": "publish.orders",
+    "routing_key": "new",
+    "body": {
+      "id": 3,
+      "status": "new",
+      "canary": "o3",
+      "_meta": {
+        "uuid": "13814000-1dd2-11b2-8000-071353030311",
+        "op": "c"
+      }
+    },
+    "properties": {
+      "content_type": "application/json",
+      "delivery_mode": 2,
+      "message_id": "28558de1c9d972a47e2f60cec71e2a732bb367f9e6506b0ce40fbadb75f0ebdd"
+    }
+  },
+  {
+    "queue": "publish.orders.readback",
+    "exchange": "publish.orders",
+    "routing_key": "shipped",
+    "body": {
+      "id": 2,
+      "status": "shipped",
+      "canary": "o2-v2",
+      "_meta": {
+        "uuid": "13814001-1dd2-11b2-8000-071353030311",
+        "op": "u"
+      }
+    },
+    "properties": {
+      "content_type": "application/json",
+      "delivery_mode": 2,
+      "message_id": "dcbab74d06cc8e54781dc001738723cb1ed32d7c5ce3581ba78791050677b302"
+    }
+  },
+  {
+    "queue": "publish.orders.readback",
+    "exchange": "publish.orders",
+    "routing_key": "orders",
+    "body": {
+      "id": 3,
+      "_meta": {
+        "uuid": "13814001-1dd2-11b2-8000-071353030311",
+        "op": "d"
+      }
+    },
+    "properties": {
+      "content_type": "application/json",
+      "delivery_mode": 2,
+      "message_id": "2c9151482ee03c16c0ac229798750fdc19b54af7c5b911d890189cb7bc1aced3"
+    }
+  },
+  {
+    "queue": "publish.orders.readback",
+    "exchange": "publish.orders",
+    "routing_key": "new",
+    "body": {
+      "id": 4,
+      "status": "new",
+      "canary": "o4",
+      "_meta": {
+        "uuid": "13814001-1dd2-11b2-8000-071353030311",
+        "op": "c"
+      }
+    },
+    "properties": {
+      "content_type": "application/json",
+      "delivery_mode": 2,
+      "message_id": "5814e622e84caf97d0d1b5e9f003d46539490852bc8e2007fe48758ca5a55a56"
+    }
+  },
+  {
+    "queue": "publish.events.readback",
+    "exchange": "publish.events",
+    "routing_key": "events",
+    "body": {
+      "region": "us",
+      "seq": 7,
+      "canary": "e7",
+      "_meta": {
+        "uuid": "13814000-1dd2-11b2-8000-071353030311",
+        "op": "c"
+      }
+    },
+    "properties": {
+      "content_type": "application/json",
+      "delivery_mode": 2,
+      "message_id": "f5fe03a663402cdc65bcfe9f093e286f58a77028712480832d7aa5c9d73fab26"
+    }
+  },
+  {
+    "queue": "publish.audit.readback",
+    "exchange": "publish.audit",
+    "routing_key": "",
+    "body": {
+      "id": "a1",
+      "canary": "a1",
+      "_meta": {
+        "uuid": "13814000-1dd2-11b2-8000-071353030311",
+        "op": "c"
+      }
+    },
+    "properties": {
+      "content_type": "application/json",
+      "delivery_mode": 2,
+      "message_id": "541ebbc65ed63364df48e20692e50d17b492eb53e30569227531f5ad61e7c358"
+    }
+  }
+]

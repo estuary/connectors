@@ -1,0 +1,40 @@
+{
+  "exchanges": [
+    {
+      "name": "apply.orders",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "apply.events",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "apply.audit",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "apply.existing",
+      "type": "fanout",
+      "durable": false,
+      "auto_delete": true,
+      "internal": true,
+      "arguments": {
+        "alternate-exchange": "apply.audit"
+      }
+    }
+  ],
+  "first_apply": "",
+  "second_apply": ""
+}
