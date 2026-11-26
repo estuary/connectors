@@ -1,0 +1,5 @@
+["tests/source-smb/data",{"_meta":{"file":"/inbox/a.csv","offset":0,"uuid":"DocUUIDPlaceholder-329Bb50aa48EAa9ef"},"canary":"a1","id":"1"}]
+["tests/source-smb/data",{"_meta":{"file":"/inbox/a.csv","offset":1,"uuid":"DocUUIDPlaceholder-329Bb50aa48EAa9ef"},"canary":"a2","id":"2"}]
+["tests/source-smb/data",{"_meta":{"file":"/inbox/a.csv","offset":2,"uuid":"DocUUIDPlaceholder-329Bb50aa48EAa9ef"},"canary":"a3","id":"3"}]
+["tests/source-smb/data",{"_meta":{"file":"/inbox/sub/b.csv","offset":0,"uuid":"DocUUIDPlaceholder-329Bb50aa48EAa9ef"},"canary":"b4","id":"4"}]
+["tests/source-smb/data",{"_meta":{"file":"/inbox/sub/b.csv","offset":1,"uuid":"DocUUIDPlaceholder-329Bb50aa48EAa9ef"},"canary":"b5","id":"5"}]

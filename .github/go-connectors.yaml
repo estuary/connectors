@@ -24,6 +24,7 @@
 - name: source-s3
 - name: source-sftp
 - name: source-sharepoint
+- name: source-smb
 - name: source-snowflake
 - name: source-sqlserver
 - name: source-sqlserver-batch

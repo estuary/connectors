@@ -1,0 +1,32 @@
+services:
+  # Not really a db, but calling it that makes it easier to incorporate into our CI system.
+  db:
+    image: dperson/samba:latest
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        mkdir -p /share/inbox
+        chmod a+rX /share /share/inbox
+        exec /usr/bin/samba.sh "$$@"
+      - --
+    command: ["-u", "test;test", "-s", "data;/share;yes;yes;no;test"]
+    ports:
+      - 1445:445
+    networks:
+      - flow-test
+    volumes:
+      - data:/share
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 445"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  data:
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true

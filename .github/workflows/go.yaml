@@ -260,6 +260,7 @@ jobs:
             "source-postgres",
             "source-postgres-batch",
             "source-sftp",
+            "source-smb",
             "source-sqlserver",
             "source-sqlserver-batch",
             "source-sqlserver-ct",
@@ -431,6 +432,7 @@ jobs:
             "source-postgres",
             "source-s3",
             "source-sftp",
+            "source-smb",
             "source-sqlserver"
             ]'), matrix.connector.name)
         run: VERSION=local ./tests/smoke.sh;
@@ -441,7 +443,8 @@ jobs:
             "source-gcs",
             "source-kinesis",
             "source-s3",
-            "source-sftp"
+            "source-sftp",
+            "source-smb"
             ]'), matrix.connector.name)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
@@ -464,7 +467,8 @@ jobs:
             "source-gcs",
             "source-kinesis",
             "source-s3",
-            "source-sftp"
+            "source-sftp",
+            "source-smb"
             ]'), matrix.connector.name)
         uses: actions/upload-artifact@v4
         with:
