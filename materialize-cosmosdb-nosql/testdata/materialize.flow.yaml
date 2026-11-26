@@ -1,0 +1,28 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-cosmosdb-nosql:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+      - resource:
+          container: simple_standard
+        source: tests/simple
+      - resource:
+          container: simple_delta
+          delta_updates: true
+        source: tests/simple
+      - resource:
+          container: not_simple
+          partition_key: /_id
+        source: tests/not-simple
+      - resource:
+          container: data_types
+        source: tests/data-types
+      - resource:
+          container: merge_renamed
+        source: tests/merge-renamed

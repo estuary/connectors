@@ -37,6 +37,7 @@
 - name: materialize-bigquery
 - name: materialize-bigtable
 - name: materialize-clickhouse
+- name: materialize-cosmosdb-nosql
 - name: materialize-databricks
 - name: materialize-dynamodb
 - name: materialize-elasticsearch

@@ -1,0 +1,6 @@
+["tests/orders", {"id": 2, "status": "shipped", "canary": "o2-v2"}]
+["tests/orders", {"id": 3, "_meta": {"op": "d"}}]
+["tests/orders", {"id": 4, "status": "new", "canary": "o4"}]
+["tests/orders", {"id": 99, "_meta": {"op": "\u0064"}}]
+["tests/events", {"region": "us", "seq": 7, "canary": "e7-v2"}]
+{"commit": true}

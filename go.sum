@@ -105,6 +105,8 @@ github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.0 h1:CU4+EJeJi3TKYWEcYuSd
 github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.0/go.mod h1:q0+UTSRvShwUCrR/s5HtyInYphN7Wvxb7snFM3u+SLA=
 github.com/Azure/azure-sdk-for-go/sdk/azidentity/cache v0.4.0 h1:xFaZZ+IubdftrDHnGGwZ6QvQ3KHTtWl2MCK+GMt2vxs=
 github.com/Azure/azure-sdk-for-go/sdk/azidentity/cache v0.4.0/go.mod h1:mCBhUhlMjLLJKr5aqw2TNS/VqJOie8MzWq3DAMJeKso=
+github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos v1.5.0 h1:wtCn7MemMD9eo4/NdpJ6S/MFD2BV2CDwoEfvl5th2vM=
+github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos v1.5.0/go.mod h1:MIyTWizpwnsX4LS9/tW1II9JL+D25Ypzj6URaT9NcgQ=
 github.com/Azure/azure-sdk-for-go/sdk/internal v1.12.0 h1:fhqpLE3UEXi9lPaBRpQ6XuRW0nU7hgg4zlmZZa+a9q4=
 github.com/Azure/azure-sdk-for-go/sdk/internal v1.12.0/go.mod h1:7dCRMLwisfRH3dBupKeNCioWYUZ4SS09Z14H+7i8ZoY=
 github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.8.1 h1:/Zt+cDPnpC3OVDm/JKLOs7M2DKmLRIIp3XIx9pHHiig=

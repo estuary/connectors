@@ -1,0 +1,46 @@
+collections:
+  tests/orders:
+    schema:
+      type: object
+      reduce: {strategy: merge}
+      required: [id]
+      properties:
+        id: {type: integer}
+        status: {type: string}
+        canary: {type: string}
+        note: {type: string}
+    key: [/id]
+  tests/events:
+    schema:
+      type: object
+      required: [region, seq]
+      properties:
+        region: {type: string}
+        seq: {type: integer}
+        canary: {type: string}
+    key: [/region, /seq]
+
+materializations:
+  acmeCo/tests/materialize-cosmosdb-nosql:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+      - resource:
+          container: orders
+        source: tests/orders
+      - resource:
+          container: events
+          partition_key: /seq
+        source: tests/events
+      - resource:
+          container: orders_delta
+          delta_updates: true
+        source: tests/orders
+      - resource:
+          container: events_delta
+          partition_key: /seq
+          delta_updates: true
+        source: tests/events
