@@ -1,0 +1,38 @@
+info:
+  name: download
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{report_document_url}}"
+  auth: none
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar('report_document_url')) {
+          throw new Error('report_document_url is not set: run `Reports / document` first in the same run');
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://developer-docs.amazon.com/sp-api/docs/reports-api-v2021-06-30-retrieve-a-report
+
+    **WHY:** the document download itself (`client.download`). The URL carries
+    its own authorization, so no access token is sent. Its `Content-Type`
+    decides how the connector decodes the file: with the charset it names,
+    or as strict UTF-8 when it names none. A saved example of a real
+    document holds seller data, so save headers and a projection only.
+
+    **PENDING:** whether every document's `Content-Type` names a charset, and
+    which charsets appear per region; and that a settlement or order report
+    is tab-separated with one header row and no quoting.
+  type: text/markdown

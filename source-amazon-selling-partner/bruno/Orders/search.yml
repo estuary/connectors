@@ -1,0 +1,59 @@
+info:
+  name: search
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/orders/2026-01-01/orders?marketplaceIds={{marketplace_id}}&lastUpdatedAfter=2026-10-01T00:00:00Z&lastUpdatedBefore=2026-10-02T00:00:00Z&includedData=PROCEEDS,EXPENSE,PROMOTION,CANCELLATION,FULFILLMENT,PACKAGES,TAX,PAYMENT&maxResultsPerPage=100"
+  params:
+    - name: marketplaceIds
+      value: "{{marketplace_id}}"
+      type: query
+    - name: lastUpdatedAfter
+      value: "2026-10-01T00:00:00Z"
+      type: query
+    - name: lastUpdatedBefore
+      value: "2026-10-02T00:00:00Z"
+      type: query
+    - name: includedData
+      value: PROCEEDS,EXPENSE,PROMOTION,CANCELLATION,FULFILLMENT,PACKAGES,TAX,PAYMENT
+      type: query
+    - name: maxResultsPerPage
+      value: "100"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs:
+  content: |-
+    **REFERENCE:** https://developer-docs.amazon.com/sp-api/reference/searchorders
+
+    **WHY:** the `orders` stream's incremental request (`fetch_orders`): one
+    window of `lastUpdatedAfter`..`lastUpdatedBefore` with the data sections
+    `Order.INCLUDED_DATA` asks for. The backfill sends `createdAfter` and
+    `createdBefore` instead. BUYER and RECIPIENT are left out: they carry
+    buyer personal data, which Amazon releases only to applications with the
+    matching restricted role. FULFILLMENT_ORDERS is not requested, for no
+    recorded reason; Amazon's model says it holds only fulfillment order ids,
+    for Easy Ship and Seller Flex orders.
+
+    **DOCUMENTED (2026-11-10):** orders are under `orders`; a further page is
+    requested with `paginationToken` from `pagination.nextToken`; the
+    response echoes `lastUpdatedBefore` or `createdBefore`.
+    `lastUpdatedAfter` and `createdAfter` are "at or after";
+    `lastUpdatedBefore` and `createdBefore` are "at or before".
+
+    **LIMITATION (DOCUMENTED 2026-11-10):** `lastUpdatedBefore` and
+    `createdBefore` must be at least two minutes before the request, and a
+    pagination token expires 24 hours after the window's first page.
+
+    **PENDING:** whether orders become searchable after their
+    `lastUpdatedTime` (the connector's overlap exists for it); and the
+    response's top-level keys.
+  type: text/markdown
