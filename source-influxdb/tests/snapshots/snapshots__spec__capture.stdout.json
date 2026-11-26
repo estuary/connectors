@@ -1,0 +1,183 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "lag_seconds": {
+              "default": 60,
+              "description": "Delay capture by this many seconds to allow points to arrive before their timestamps are read.",
+              "minimum": 0,
+              "title": "Lag Seconds",
+              "type": "integer"
+            },
+            "lookback_hours": {
+              "default": 0,
+              "description": "Re-read this many hours before the newest captured point to capture late points and field updates. Zero disables re-reading.",
+              "minimum": 0,
+              "title": "Lookback Hours",
+              "type": "integer"
+            },
+            "ssl_ca_certificate": {
+              "default": "",
+              "description": "PEM-encoded CA certificate or certificate bundle to trust in addition to public certificate authorities.",
+              "multiline": true,
+              "title": "SSL CA Certificate",
+              "type": "string"
+            },
+            "ssl_skip_verify": {
+              "default": false,
+              "description": "Skip certificate and hostname verification for HTTPS connections. Use only for trusted networks with self-signed certificates; prefer an SSL CA Certificate.",
+              "title": "Skip SSL Verification",
+              "type": "boolean"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "ApiToken": {
+          "properties": {
+            "credentials_title": {
+              "const": "API Token",
+              "default": "API Token",
+              "title": "Authentication Method",
+              "type": "string"
+            },
+            "access_token": {
+              "description": "Your InfluxDB API token with read access to the buckets you want to capture.",
+              "minLength": 1,
+              "secret": true,
+              "title": "API Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "API Token",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "url": {
+          "description": "The URL of your InfluxDB 2.x instance, including the scheme and port if needed.",
+          "examples": [
+            "https://us-east-1-1.aws.cloud2.influxdata.com",
+            "http://host:8086"
+          ],
+          "title": "URL",
+          "type": "string"
+        },
+        "credentials": {
+          "description": "Authenticate using an InfluxDB API token.",
+          "discriminator": {
+            "mapping": {
+              "API Token": "#/$defs/ApiToken"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ApiToken"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "org": {
+          "description": "The name of your InfluxDB organization.",
+          "minLength": 1,
+          "title": "Organization",
+          "type": "string"
+        },
+        "start_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Capture points on or after this date, with nanosecond precision. Defaults to 30 days before the first run.",
+          "format": "date-time",
+          "title": "Start Date"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "default": {
+            "lag_seconds": 60,
+            "lookback_hours": 0,
+            "ssl_ca_certificate": "",
+            "ssl_skip_verify": false
+          },
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "url",
+        "credentials",
+        "org"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT5M",
+          "description": "Interval between updates for this resource.",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Interval",
+          "type": "string"
+        },
+        "bucket": {
+          "description": "Your InfluxDB bucket name, including any dots.",
+          "minLength": 1,
+          "title": "Bucket",
+          "type": "string"
+        },
+        "measurement": {
+          "description": "Your InfluxDB measurement name, including any dots.",
+          "minLength": 1,
+          "title": "Measurement",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "bucket",
+        "measurement"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-influxdb",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

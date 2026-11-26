@@ -1,0 +1,15 @@
+#group,false,false,true,true,false,false,true,true,true,true
+#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,boolean,string,string,string,string
+#default,_result,,,,,,,,,
+,result,table,_start,_stop,_time,_value,_field,_measurement,host,region
+,,0,2020-01-01T00:00:00Z,2026-11-10T14:59:00Z,2026-11-10T12:00:00Z,true,ok,readings,a,west
+,,0,2020-01-01T00:00:00Z,2026-11-10T14:59:00Z,2026-11-10T12:01:00Z,true,ok,readings,a,west
+,,0,2020-01-01T00:00:00Z,2026-11-10T14:59:00Z,2026-11-10T12:02:00Z,false,ok,readings,a,west
+
+#group,false,false,true,true,false,false,true,true,true,true
+#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,double,string,string,string,string
+#default,_result,,,,,,,,,
+,result,table,_start,_stop,_time,_value,_field,_measurement,host,region
+,,1,2020-01-01T00:00:00Z,2026-11-10T14:59:00Z,2026-11-10T12:00:00Z,1,value,readings,a,west
+,,1,2020-01-01T00:00:00Z,2026-11-10T14:59:00Z,2026-11-10T12:01:00Z,2,value,readings,a,west
+,,1,2020-01-01T00:00:00Z,2026-11-10T14:59:00Z,2026-11-10T12:02:00Z,3,value,readings,a,west

@@ -36,6 +36,7 @@ connectors for batch and NoSQL databases.
 - [Azure Cosmos DB](./MongoDB/azure-cosmosdb.md)
 - [Google Firestore](./google-firestore.md)
 - [IBM Db2 Batch](./db2-batch.md)
+- [InfluxDB](./influxdb.md)
 - [Microsoft SQL Server Batch](./SQLServer/sqlserver-batch.md)
 - [MongoDB](./MongoDB/mongodb.md)
 - [MySQL Batch](./MySQL/mysql-batch.md)
