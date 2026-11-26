@@ -1,0 +1,638 @@
+{
+  "bindings": [
+    {
+      "recommended_name": "amq.gen-persistent",
+      "resource_config_json": {
+        "queue": "amq.gen-persistent",
+        "queueType": "classic"
+      },
+      "document_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "queue",
+              "id",
+              "exchange",
+              "routingKey",
+              "redelivered"
+            ],
+            "properties": {
+              "appId": {
+                "type": "string",
+                "title": "Application ID provided by the producer"
+              },
+              "contentEncoding": {
+                "type": "string",
+                "title": "Content encoding provided by the producer"
+              },
+              "contentType": {
+                "type": "string",
+                "title": "Content type provided by the producer"
+              },
+              "correlationId": {
+                "type": "string",
+                "title": "Correlation ID provided by the producer"
+              },
+              "deliveryMode": {
+                "type": "integer",
+                "title": "Message delivery mode"
+              },
+              "exchange": {
+                "type": "string",
+                "title": "Exchange the message was published to"
+              },
+              "expiration": {
+                "type": "string",
+                "title": "Message expiration in milliseconds provided by the producer"
+              },
+              "headers": {
+                "type": "object",
+                "title": "Headers attached by the producer"
+              },
+              "id": {
+                "type": "string",
+                "title": "Unique ID of the message"
+              },
+              "messageId": {
+                "type": "string",
+                "title": "Message ID provided by the producer"
+              },
+              "priority": {
+                "type": "integer",
+                "title": "Message priority"
+              },
+              "queue": {
+                "type": "string",
+                "title": "Queue the message was received from"
+              },
+              "redelivered": {
+                "type": "boolean",
+                "title": "Whether the message was redelivered"
+              },
+              "replyTo": {
+                "type": "string",
+                "title": "Reply destination provided by the producer"
+              },
+              "routingKey": {
+                "type": "string",
+                "title": "Routing key of the message"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Timestamp provided by the producer"
+              },
+              "type": {
+                "type": "string",
+                "title": "Message type provided by the producer"
+              },
+              "userId": {
+                "type": "string",
+                "title": "User ID provided by the producer"
+              }
+            }
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/_meta/id"
+      ]
+    },
+    {
+      "recommended_name": "events",
+      "resource_config_json": {
+        "queue": "events",
+        "queueType": "stream"
+      },
+      "document_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "queue",
+              "id",
+              "exchange",
+              "routingKey",
+              "redelivered",
+              "offset"
+            ],
+            "properties": {
+              "appId": {
+                "type": "string",
+                "title": "Application ID provided by the producer"
+              },
+              "contentEncoding": {
+                "type": "string",
+                "title": "Content encoding provided by the producer"
+              },
+              "contentType": {
+                "type": "string",
+                "title": "Content type provided by the producer"
+              },
+              "correlationId": {
+                "type": "string",
+                "title": "Correlation ID provided by the producer"
+              },
+              "deliveryMode": {
+                "type": "integer",
+                "title": "Message delivery mode"
+              },
+              "exchange": {
+                "type": "string",
+                "title": "Exchange the message was published to"
+              },
+              "expiration": {
+                "type": "string",
+                "title": "Message expiration in milliseconds provided by the producer"
+              },
+              "headers": {
+                "type": "object",
+                "title": "Headers attached by the producer"
+              },
+              "id": {
+                "type": "string",
+                "title": "Unique ID of the message"
+              },
+              "messageId": {
+                "type": "string",
+                "title": "Message ID provided by the producer"
+              },
+              "offset": {
+                "type": "integer",
+                "title": "Offset of the message in the stream"
+              },
+              "priority": {
+                "type": "integer",
+                "title": "Message priority"
+              },
+              "queue": {
+                "type": "string",
+                "title": "Queue the message was received from"
+              },
+              "redelivered": {
+                "type": "boolean",
+                "title": "Whether the message was redelivered"
+              },
+              "replyTo": {
+                "type": "string",
+                "title": "Reply destination provided by the producer"
+              },
+              "routingKey": {
+                "type": "string",
+                "title": "Routing key of the message"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Timestamp provided by the producer"
+              },
+              "type": {
+                "type": "string",
+                "title": "Message type provided by the producer"
+              },
+              "userId": {
+                "type": "string",
+                "title": "User ID provided by the producer"
+              }
+            }
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/_meta/id"
+      ]
+    },
+    {
+      "recommended_name": "named-transient",
+      "resource_config_json": {
+        "queue": "named-transient",
+        "queueType": "classic"
+      },
+      "document_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "queue",
+              "id",
+              "exchange",
+              "routingKey",
+              "redelivered"
+            ],
+            "properties": {
+              "appId": {
+                "type": "string",
+                "title": "Application ID provided by the producer"
+              },
+              "contentEncoding": {
+                "type": "string",
+                "title": "Content encoding provided by the producer"
+              },
+              "contentType": {
+                "type": "string",
+                "title": "Content type provided by the producer"
+              },
+              "correlationId": {
+                "type": "string",
+                "title": "Correlation ID provided by the producer"
+              },
+              "deliveryMode": {
+                "type": "integer",
+                "title": "Message delivery mode"
+              },
+              "exchange": {
+                "type": "string",
+                "title": "Exchange the message was published to"
+              },
+              "expiration": {
+                "type": "string",
+                "title": "Message expiration in milliseconds provided by the producer"
+              },
+              "headers": {
+                "type": "object",
+                "title": "Headers attached by the producer"
+              },
+              "id": {
+                "type": "string",
+                "title": "Unique ID of the message"
+              },
+              "messageId": {
+                "type": "string",
+                "title": "Message ID provided by the producer"
+              },
+              "priority": {
+                "type": "integer",
+                "title": "Message priority"
+              },
+              "queue": {
+                "type": "string",
+                "title": "Queue the message was received from"
+              },
+              "redelivered": {
+                "type": "boolean",
+                "title": "Whether the message was redelivered"
+              },
+              "replyTo": {
+                "type": "string",
+                "title": "Reply destination provided by the producer"
+              },
+              "routingKey": {
+                "type": "string",
+                "title": "Routing key of the message"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Timestamp provided by the producer"
+              },
+              "type": {
+                "type": "string",
+                "title": "Message type provided by the producer"
+              },
+              "userId": {
+                "type": "string",
+                "title": "User ID provided by the producer"
+              }
+            }
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/_meta/id"
+      ]
+    },
+    {
+      "recommended_name": "orders",
+      "resource_config_json": {
+        "queue": "orders",
+        "queueType": "classic"
+      },
+      "document_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "queue",
+              "id",
+              "exchange",
+              "routingKey",
+              "redelivered"
+            ],
+            "properties": {
+              "appId": {
+                "type": "string",
+                "title": "Application ID provided by the producer"
+              },
+              "contentEncoding": {
+                "type": "string",
+                "title": "Content encoding provided by the producer"
+              },
+              "contentType": {
+                "type": "string",
+                "title": "Content type provided by the producer"
+              },
+              "correlationId": {
+                "type": "string",
+                "title": "Correlation ID provided by the producer"
+              },
+              "deliveryMode": {
+                "type": "integer",
+                "title": "Message delivery mode"
+              },
+              "exchange": {
+                "type": "string",
+                "title": "Exchange the message was published to"
+              },
+              "expiration": {
+                "type": "string",
+                "title": "Message expiration in milliseconds provided by the producer"
+              },
+              "headers": {
+                "type": "object",
+                "title": "Headers attached by the producer"
+              },
+              "id": {
+                "type": "string",
+                "title": "Unique ID of the message"
+              },
+              "messageId": {
+                "type": "string",
+                "title": "Message ID provided by the producer"
+              },
+              "priority": {
+                "type": "integer",
+                "title": "Message priority"
+              },
+              "queue": {
+                "type": "string",
+                "title": "Queue the message was received from"
+              },
+              "redelivered": {
+                "type": "boolean",
+                "title": "Whether the message was redelivered"
+              },
+              "replyTo": {
+                "type": "string",
+                "title": "Reply destination provided by the producer"
+              },
+              "routingKey": {
+                "type": "string",
+                "title": "Routing key of the message"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Timestamp provided by the producer"
+              },
+              "type": {
+                "type": "string",
+                "title": "Message type provided by the producer"
+              },
+              "userId": {
+                "type": "string",
+                "title": "User ID provided by the producer"
+              }
+            }
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/_meta/id"
+      ]
+    },
+    {
+      "recommended_name": "quorum",
+      "resource_config_json": {
+        "queue": "quorum",
+        "queueType": "quorum"
+      },
+      "document_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "queue",
+              "id",
+              "exchange",
+              "routingKey",
+              "redelivered"
+            ],
+            "properties": {
+              "appId": {
+                "type": "string",
+                "title": "Application ID provided by the producer"
+              },
+              "contentEncoding": {
+                "type": "string",
+                "title": "Content encoding provided by the producer"
+              },
+              "contentType": {
+                "type": "string",
+                "title": "Content type provided by the producer"
+              },
+              "correlationId": {
+                "type": "string",
+                "title": "Correlation ID provided by the producer"
+              },
+              "deliveryMode": {
+                "type": "integer",
+                "title": "Message delivery mode"
+              },
+              "exchange": {
+                "type": "string",
+                "title": "Exchange the message was published to"
+              },
+              "expiration": {
+                "type": "string",
+                "title": "Message expiration in milliseconds provided by the producer"
+              },
+              "headers": {
+                "type": "object",
+                "title": "Headers attached by the producer"
+              },
+              "id": {
+                "type": "string",
+                "title": "Unique ID of the message"
+              },
+              "messageId": {
+                "type": "string",
+                "title": "Message ID provided by the producer"
+              },
+              "priority": {
+                "type": "integer",
+                "title": "Message priority"
+              },
+              "queue": {
+                "type": "string",
+                "title": "Queue the message was received from"
+              },
+              "redelivered": {
+                "type": "boolean",
+                "title": "Whether the message was redelivered"
+              },
+              "replyTo": {
+                "type": "string",
+                "title": "Reply destination provided by the producer"
+              },
+              "routingKey": {
+                "type": "string",
+                "title": "Routing key of the message"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Timestamp provided by the producer"
+              },
+              "type": {
+                "type": "string",
+                "title": "Message type provided by the producer"
+              },
+              "userId": {
+                "type": "string",
+                "title": "User ID provided by the producer"
+              }
+            }
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/_meta/id"
+      ]
+    },
+    {
+      "recommended_name": "stream-default",
+      "resource_config_json": {
+        "queue": "stream-default",
+        "queueType": "stream"
+      },
+      "document_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "queue",
+              "id",
+              "exchange",
+              "routingKey",
+              "redelivered",
+              "offset"
+            ],
+            "properties": {
+              "appId": {
+                "type": "string",
+                "title": "Application ID provided by the producer"
+              },
+              "contentEncoding": {
+                "type": "string",
+                "title": "Content encoding provided by the producer"
+              },
+              "contentType": {
+                "type": "string",
+                "title": "Content type provided by the producer"
+              },
+              "correlationId": {
+                "type": "string",
+                "title": "Correlation ID provided by the producer"
+              },
+              "deliveryMode": {
+                "type": "integer",
+                "title": "Message delivery mode"
+              },
+              "exchange": {
+                "type": "string",
+                "title": "Exchange the message was published to"
+              },
+              "expiration": {
+                "type": "string",
+                "title": "Message expiration in milliseconds provided by the producer"
+              },
+              "headers": {
+                "type": "object",
+                "title": "Headers attached by the producer"
+              },
+              "id": {
+                "type": "string",
+                "title": "Unique ID of the message"
+              },
+              "messageId": {
+                "type": "string",
+                "title": "Message ID provided by the producer"
+              },
+              "offset": {
+                "type": "integer",
+                "title": "Offset of the message in the stream"
+              },
+              "priority": {
+                "type": "integer",
+                "title": "Message priority"
+              },
+              "queue": {
+                "type": "string",
+                "title": "Queue the message was received from"
+              },
+              "redelivered": {
+                "type": "boolean",
+                "title": "Whether the message was redelivered"
+              },
+              "replyTo": {
+                "type": "string",
+                "title": "Reply destination provided by the producer"
+              },
+              "routingKey": {
+                "type": "string",
+                "title": "Routing key of the message"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Timestamp provided by the producer"
+              },
+              "type": {
+                "type": "string",
+                "title": "Message type provided by the producer"
+              },
+              "userId": {
+                "type": "string",
+                "title": "User ID provided by the producer"
+              }
+            }
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/_meta/id"
+      ]
+    }
+  ]
+}

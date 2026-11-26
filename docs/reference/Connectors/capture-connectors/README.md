@@ -77,6 +77,7 @@ Integrations with streaming systems, queue services, and webhooks.
 - [HTTP ingest (webhook)](./http-ingest/http-ingest.md)
 - [Intercom ingest (webhook)](./http-ingest/intercom-ingest.md)
 - [Jira ingest (webhook)](./http-ingest/jira-ingest.md)
+- [RabbitMQ](./rabbitmq.md)
 - [Twilio ingest (webhook)](./http-ingest/twilio-ingest.md)
 
 ### SaaS connectors
