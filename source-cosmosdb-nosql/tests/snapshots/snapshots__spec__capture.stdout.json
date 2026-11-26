@@ -1,0 +1,256 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AccountKeyCredentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "Account Key",
+              "default": "Account Key",
+              "description": "Authenticate with an account key.",
+              "order": 0,
+              "title": "Authentication Method",
+              "type": "string"
+            },
+            "key": {
+              "description": "Your Cosmos DB account key. A read-only key is sufficient.",
+              "minLength": 1,
+              "secret": true,
+              "title": "Account Key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "key"
+          ],
+          "title": "AccountKeyCredentials",
+          "type": "object"
+        },
+        "Advanced": {
+          "properties": {
+            "disable_endpoint_discovery": {
+              "default": false,
+              "description": "Connect only to the configured endpoint, for example when using the emulator or a private endpoint.",
+              "title": "Disable Endpoint Discovery",
+              "type": "boolean"
+            },
+            "priority": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "High",
+                    "Low"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Priority for change feed and partition key sampling requests. Low priority requests are throttled first. Enable priority-based execution on your account before setting this.",
+              "title": "Request Priority"
+            },
+            "throughput_bucket": {
+              "anyOf": [
+                {
+                  "maximum": 5,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Throughput bucket ID (1\u20135) assigned to connector requests. Configure the bucket's throughput allocation on your Cosmos DB account first.",
+              "title": "Throughput Bucket"
+            },
+            "max_item_count": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Maximum number of items requested per change feed page. The service may return fewer items. Leave unset to use the SDK default.",
+              "title": "Page Size Hint"
+            },
+            "start_time": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "Beginning",
+                    "Now"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              ],
+              "default": "Beginning",
+              "description": "Where a new capture starts: Beginning, Now, or an RFC 3339 timestamp with a timezone. Saved continuations take precedence; changing this does not reset an existing capture.",
+              "title": "Start Position"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "ServicePrincipalCredentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "Service Principal",
+              "default": "Service Principal",
+              "description": "Authenticate with a Microsoft Entra service principal.",
+              "order": 0,
+              "title": "Authentication Method",
+              "type": "string"
+            },
+            "tenant_id": {
+              "description": "Your Microsoft Entra tenant ID.",
+              "minLength": 1,
+              "title": "Tenant ID",
+              "type": "string"
+            },
+            "client_id": {
+              "description": "Your application's client ID.",
+              "minLength": 1,
+              "title": "Client ID",
+              "type": "string"
+            },
+            "client_secret": {
+              "description": "Your application's client secret.",
+              "minLength": 1,
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tenant_id",
+            "client_id",
+            "client_secret"
+          ],
+          "title": "ServicePrincipalCredentials",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "endpoint": {
+          "description": "Your Cosmos DB account URI, for example https://myaccount.documents.azure.com:443/.",
+          "minLength": 1,
+          "order": 0,
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "credentials": {
+          "description": "An account key, or Microsoft Entra authentication with a service principal. Assign Cosmos DB Built-in Data Reader to the service principal for the databases you capture.",
+          "discriminator": {
+            "mapping": {
+              "Account Key": "#/$defs/AccountKeyCredentials",
+              "Service Principal": "#/$defs/ServicePrincipalCredentials"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AccountKeyCredentials"
+            },
+            {
+              "$ref": "#/$defs/ServicePrincipalCredentials"
+            }
+          ],
+          "order": 1,
+          "title": "Authentication"
+        },
+        "databases": {
+          "default": [],
+          "description": "The Cosmos DB databases to capture. Leave empty to discover all databases in your account, which requires permission to list databases.",
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "order": 2,
+          "title": "Databases",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "default": {
+            "disable_endpoint_discovery": false,
+            "priority": null,
+            "throughput_bucket": null,
+            "max_item_count": null,
+            "start_time": "Beginning"
+          },
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "endpoint",
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "container": {
+          "description": "The Cosmos DB container to capture.",
+          "minLength": 1,
+          "title": "Container",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT1M",
+          "description": "Interval between change feed polls for this container.",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Polling Interval",
+          "type": "string"
+        },
+        "database": {
+          "description": "The container's database.",
+          "minLength": 1,
+          "title": "Database",
+          "type": "string"
+        }
+      },
+      "required": [
+        "container",
+        "database"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-cosmosdb-nosql",
+    "resourcePathPointers": [
+      "/database",
+      "/container"
+    ]
+  }
+]

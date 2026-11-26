@@ -1,0 +1,20 @@
+[project]
+name = "source-cosmosdb-nosql"
+version = "0.1.0"
+description = "Capture Azure Cosmos DB for NoSQL containers."
+requires-python = ">=3.14"
+dependencies = [
+    "estuary-cdk",
+    "pydantic>=2,<3",
+    "azure-cosmos[aio]>=4.17.1,<5",
+    "azure-identity>=1.19.0,<2",
+]
+
+# The dependency is declared in [project.dependencies] above; this is where
+# uv finds it.
+[tool.uv.sources]
+estuary-cdk = { workspace = true }
+
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"

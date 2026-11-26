@@ -33,7 +33,8 @@ connectors for batch and NoSQL databases.
 
 - [Amazon DocumentDB](./MongoDB/amazon-documentdb.md)
 - [Amazon Dynamodb](./amazon-dynamodb.md)
-- [Azure Cosmos DB](./MongoDB/azure-cosmosdb.md)
+- [Azure Cosmos DB for MongoDB](./MongoDB/azure-cosmosdb.md)
+- [Azure Cosmos DB for NoSQL](./azure-cosmosdb-nosql.md)
 - [Google Firestore](./google-firestore.md)
 - [IBM Db2 Batch](./db2-batch.md)
 - [Microsoft SQL Server Batch](./SQLServer/sqlserver-batch.md)
