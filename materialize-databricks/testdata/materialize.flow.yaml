@@ -34,3 +34,8 @@ materializations:
         include:
           renamed_string: {}
           renamed_total: {}
+    - resource:
+        table: merge_nested
+      source: tests/merge-nested
+      fields:
+        recommended: 1

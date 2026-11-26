@@ -102,4 +102,15 @@ Table Data:
 {"flow_published_at":"1970-01-01T03:00:14Z","id":1,"renamed_string":"first","renamed_total":3}
 {"flow_published_at":"1970-01-01T03:00:15Z","id":2,"renamed_string":"second","renamed_total":5}
 
+Resource: some-schema.merge_nested
+
+{"Name":"arr","Nullable":true,"Type":"STRING"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP"}
+{"Name":"id","Nullable":false,"Type":"LONG"}
+{"Name":"obj","Nullable":true,"Type":"STRING"}
+
+Table Data:
+{"arr":[1,2],"flow_published_at":"1970-01-01T03:00:16Z","id":1,"obj":{"label":"first","total":3}}
+{"arr":[5],"flow_published_at":"1970-01-01T03:00:17Z","id":2,"obj":{"label":"second","total":5}}
+
 

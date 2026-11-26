@@ -327,9 +327,14 @@ FROM {{ $.Table.Identifier }}{{ if $.Version }} VERSION AS OF {{ $.Version }} AS
 {{- end -}}
 {{- end }}
 
+-- Arrays, objects and multi-type fields are STRING columns of JSON text, which
+-- a rebuilt document must nest as a value. Text that isn't JSON is a string
+-- stored before its field's type widened, and stays one.
 {{ define "uncast" -}}
 {{ $ident := printf "%s.%s" $.Alias $.Identifier }}
-{{- if eq $.AsFlatType "string_integer" -}}
+{{- if or (eq $.AsFlatType "array") (eq $.AsFlatType "object") (eq $.AsFlatType "multiple") -}}
+	coalesce(try_parse_json({{ $ident }}), CAST({{ $ident }} AS VARIANT))
+{{- else if eq $.AsFlatType "string_integer" -}}
 	CAST({{ $ident }} AS STRING)
 {{- else if eq $.AsFlatType "string_number" -}}
 	CAST({{ $ident }} AS STRING)

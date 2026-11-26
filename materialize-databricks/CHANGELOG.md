@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-26
+### Fixed
+- With Exclude Flow Document enabled, object, array and multi-type fields now
+  load as nested values instead of text, so a task no longer fails during a
+  backfill or when its collection reduces those fields.
+
 ## 2026-11-07
 ### Added
 - The first slow query of each table in a run also logs, on its query
