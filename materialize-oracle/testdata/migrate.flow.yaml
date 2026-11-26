@@ -1,0 +1,34 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.migrate-base.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-oracle:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        # Select compatible changes that keep the same Oracle column type.
+        recommended: false
+        include:
+          int000ToInt064: {}
+          int064ToIntStr064: {}
+          numToNumStr: {}
+          numStrToNum: {}
+          binaryToString: {}
+          stringToBinary: {}
+          dateToString: {}
+          timeToString: {}
+          durationToString: {}
+          uuidToString: {}
+          stringToEnum: {}
+          enumToString: {}
+          enumToExtendedEnum: {}
+        exclude:
+          # NUMBER(38) to CLOB requires a binding backfill.
+          - uint064ToString
