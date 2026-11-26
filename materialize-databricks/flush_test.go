@@ -1,10 +1,12 @@
 package connector
 
 import (
+	"math"
 	"testing"
 	"time"
 
 	"github.com/estuary/connectors/go/common"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +26,7 @@ func TestFlushFeatureFlags(t *testing.T) {
 			var flags = common.ResolveFlags(tc.flags, featureFlagDefaults, common.CreatedAt{})
 			var d = &transactor{
 				bindings:              []*binding{{target: sql.Table{}, truncateSQL: "DELETE"}},
-				primary:               true,
+				state:                 boilerplate.NewShardedState[*checkpointItem](0, math.MaxUint32, nil),
 				truncateAfterBackfill: sql.TruncateAfterBackfill(flags),
 			}
 			require.NoError(t, d.Flush(t.Context(), map[int]time.Time{0: boundary}))
@@ -36,7 +38,7 @@ func TestFlushFeatureFlags(t *testing.T) {
 func TestFlushNonPrimary(t *testing.T) {
 	var d = &transactor{
 		bindings:              []*binding{{target: sql.Table{}, truncateSQL: "DELETE"}},
-		primary:               false,
+		state:                 boilerplate.NewShardedState[*checkpointItem](1, math.MaxUint32, nil),
 		truncateAfterBackfill: true,
 	}
 	require.NoError(t, d.Flush(t.Context(), map[int]time.Time{0: time.Now()}))
@@ -46,7 +48,7 @@ func TestFlushNonPrimary(t *testing.T) {
 func TestFlushDeltaUpdatesExempt(t *testing.T) {
 	var d = &transactor{
 		bindings:              []*binding{{target: sql.Table{TableShape: sql.TableShape{DeltaUpdates: true}}, truncateSQL: "DELETE"}},
-		primary:               true,
+		state:                 boilerplate.NewShardedState[*checkpointItem](0, math.MaxUint32, nil),
 		truncateAfterBackfill: true,
 	}
 	require.NoError(t, d.Flush(t.Context(), map[int]time.Time{0: time.Now()}))
@@ -56,7 +58,7 @@ func TestFlushDeltaUpdatesExempt(t *testing.T) {
 func TestFlushNoPublishedAtColumn(t *testing.T) {
 	var d = &transactor{
 		bindings:              []*binding{{target: sql.Table{}, truncateSQL: ""}},
-		primary:               true,
+		state:                 boilerplate.NewShardedState[*checkpointItem](0, math.MaxUint32, nil),
 		truncateAfterBackfill: true,
 	}
 	require.NoError(t, d.Flush(t.Context(), map[int]time.Time{0: time.Now()}))

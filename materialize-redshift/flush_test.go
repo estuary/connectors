@@ -1,10 +1,12 @@
 package connector
 
 import (
+	"math"
 	"testing"
 	"time"
 
 	"github.com/estuary/connectors/go/common"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +26,7 @@ func TestFlushFeatureFlags(t *testing.T) {
 			var flags = common.ResolveFlags(tc.flags, featureFlagDefaults, common.CreatedAt{})
 			var d = &transactor{
 				bindings:              []*binding{{target: sql.Table{}, truncateSQL: "DELETE"}},
-				primary:               true,
+				state:                 boilerplate.NewShardedState[*stateItem](0, math.MaxUint32, nil),
 				truncateAfterBackfill: sql.TruncateAfterBackfill(flags),
 			}
 			require.NoError(t, d.Flush(t.Context(), map[int]time.Time{0: boundary}))
