@@ -45,6 +45,7 @@ connectors for batch and NoSQL databases.
 ### Data warehouse connectors
 
 - [Amazon Redshift](./redshift-batch.md)
+- [Apache Iceberg](./apache-iceberg.md)
 - [BigQuery](./bigquery-batch.md)
 - [Snowflake](./snowflake.md)
 

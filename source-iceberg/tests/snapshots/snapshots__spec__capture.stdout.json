@@ -1,0 +1,408 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AWSIAMConfig": {
+          "properties": {
+            "auth_type": {
+              "const": "AWSIAM",
+              "default": "AWSIAM",
+              "description": "Sign catalog requests with an IAM role that Estuary assumes.",
+              "title": "Authentication Type",
+              "type": "string"
+            },
+            "aws_region": {
+              "description": "AWS region of your resource.",
+              "minLength": 1,
+              "title": "AWS Region",
+              "type": "string"
+            },
+            "aws_role_arn": {
+              "description": "AWS role with access to your resource, which Estuary will assume.",
+              "minLength": 1,
+              "title": "AWS Role ARN",
+              "type": "string"
+            },
+            "signing_name": {
+              "default": "glue",
+              "description": "AWS service to sign requests for: glue for Glue Data Catalog or s3tables for S3 Tables.",
+              "minLength": 1,
+              "title": "Signing Name",
+              "type": "string"
+            }
+          },
+          "required": [
+            "auth_type",
+            "aws_region",
+            "aws_role_arn"
+          ],
+          "title": "AWS IAM Role",
+          "type": "object"
+        },
+        "CatalogStorageConfig": {
+          "properties": {
+            "auth_type": {
+              "const": "None",
+              "default": "None",
+              "description": "Read storage with the settings and credentials returned by your catalog.",
+              "title": "Authentication Type",
+              "type": "string"
+            }
+          },
+          "required": [
+            "auth_type"
+          ],
+          "title": "Catalog Storage Credentials",
+          "type": "object"
+        },
+        "IAMConfig": {
+          "properties": {
+            "auth_type": {
+              "const": "AWSIAM",
+              "default": "AWSIAM",
+              "description": "Use the catalog's IAM role configured under Credentials.",
+              "title": "Authentication Type",
+              "type": "string"
+            }
+          },
+          "required": [
+            "auth_type"
+          ],
+          "title": "Use Catalog IAM Role",
+          "type": "object"
+        },
+        "NoAuthConfig": {
+          "properties": {
+            "auth_type": {
+              "const": "None",
+              "default": "None",
+              "description": "Connect to your catalog without authentication.",
+              "title": "Authentication Type",
+              "type": "string"
+            }
+          },
+          "required": [
+            "auth_type"
+          ],
+          "title": "No Authentication",
+          "type": "object"
+        },
+        "OAuthConfig": {
+          "properties": {
+            "auth_type": {
+              "const": "OAuth2",
+              "default": "OAuth2",
+              "description": "Authenticate to your catalog with OAuth2 client credentials.",
+              "title": "Authentication Type",
+              "type": "string"
+            },
+            "credential": {
+              "description": "OAuth2 client credential for your catalog, in id:secret format.",
+              "minLength": 1,
+              "secret": true,
+              "title": "Client Credential",
+              "type": "string"
+            },
+            "token": {
+              "default": "",
+              "description": "Optional initial bearer token. Your client credential is used when it expires.",
+              "secret": true,
+              "title": "Bearer Token",
+              "type": "string"
+            },
+            "scope": {
+              "default": "",
+              "description": "OAuth2 authorization scope for your catalog, such as PRINCIPAL_ROLE:your_principal. Leave blank to use catalog.",
+              "title": "Scope",
+              "type": "string"
+            },
+            "oauth2_server_uri": {
+              "default": "",
+              "description": "Token endpoint URL or path relative to your catalog URL. Leave blank to use v1/oauth/tokens.",
+              "title": "OAuth 2.0 Server URI",
+              "type": "string"
+            }
+          },
+          "required": [
+            "auth_type",
+            "credential"
+          ],
+          "title": "OAuth 2.0 Client Credentials",
+          "type": "object"
+        },
+        "S3Config": {
+          "properties": {
+            "auth_type": {
+              "const": "AWSAccessKey",
+              "default": "AWSAccessKey",
+              "description": "Read storage using your AWS credentials.",
+              "title": "Authentication Type",
+              "type": "string"
+            },
+            "endpoint": {
+              "default": "",
+              "description": "Endpoint URL for your S3-compatible storage. Leave blank to use the catalog's endpoint.",
+              "title": "S3 Endpoint",
+              "type": "string"
+            },
+            "region": {
+              "default": "us-east-1",
+              "description": "Region of your S3 bucket.",
+              "minLength": 1,
+              "title": "S3 Region",
+              "type": "string"
+            },
+            "access_key_id": {
+              "description": "Access key ID for your S3 storage.",
+              "minLength": 1,
+              "title": "Access Key ID",
+              "type": "string"
+            },
+            "secret_access_key": {
+              "description": "Secret access key for your S3 storage.",
+              "minLength": 1,
+              "secret": true,
+              "title": "Secret Access Key",
+              "type": "string"
+            },
+            "session_token": {
+              "default": "",
+              "description": "Session token when you use temporary AWS credentials for S3.",
+              "secret": true,
+              "title": "Session Token",
+              "type": "string"
+            },
+            "path_style_access": {
+              "default": false,
+              "description": "Use path-style addressing for your S3-compatible storage.",
+              "title": "Path Style Access",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "auth_type",
+            "access_key_id",
+            "secret_access_key"
+          ],
+          "title": "S3 Access Keys",
+          "type": "object"
+        },
+        "SigV4Config": {
+          "properties": {
+            "auth_type": {
+              "const": "AWS SigV4",
+              "default": "AWS SigV4",
+              "description": "Sign catalog requests with your AWS credentials.",
+              "title": "Authentication Type",
+              "type": "string"
+            },
+            "aws_region": {
+              "default": "us-east-1",
+              "description": "AWS region of your catalog.",
+              "minLength": 1,
+              "title": "AWS Region",
+              "type": "string"
+            },
+            "signing_name": {
+              "default": "glue",
+              "description": "AWS service to sign requests for: glue for Glue Data Catalog or s3tables for S3 Tables.",
+              "minLength": 1,
+              "title": "Signing Name",
+              "type": "string"
+            },
+            "aws_access_key_id": {
+              "description": "Access key ID for your catalog.",
+              "minLength": 1,
+              "title": "AWS Access Key ID",
+              "type": "string"
+            },
+            "aws_secret_access_key": {
+              "description": "Secret access key for your catalog.",
+              "minLength": 1,
+              "secret": true,
+              "title": "AWS Secret Access Key",
+              "type": "string"
+            },
+            "aws_session_token": {
+              "default": "",
+              "description": "Session token when you use temporary AWS credentials.",
+              "secret": true,
+              "title": "AWS Session Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "auth_type",
+            "aws_access_key_id",
+            "aws_secret_access_key"
+          ],
+          "title": "AWS SigV4 Access Keys",
+          "type": "object"
+        },
+        "TokenConfig": {
+          "properties": {
+            "auth_type": {
+              "const": "Bearer Token",
+              "default": "Bearer Token",
+              "description": "Authenticate to your catalog with a bearer token.",
+              "title": "Authentication Type",
+              "type": "string"
+            },
+            "token": {
+              "description": "Bearer token for your catalog.",
+              "minLength": 1,
+              "secret": true,
+              "title": "Bearer Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "auth_type",
+            "token"
+          ],
+          "title": "Bearer Token",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "catalog_uri": {
+          "description": "URL of your Iceberg REST catalog.",
+          "minLength": 1,
+          "title": "Catalog URI",
+          "type": "string"
+        },
+        "warehouse": {
+          "default": "",
+          "description": "Warehouse name or location passed to your catalog. Leave blank to use its default.",
+          "title": "Warehouse",
+          "type": "string"
+        },
+        "credentials": {
+          "default": {
+            "auth_type": "None"
+          },
+          "description": "Authentication method for your Iceberg REST catalog.",
+          "discriminator": {
+            "mapping": {
+              "AWS SigV4": "#/$defs/SigV4Config",
+              "AWSIAM": "#/$defs/AWSIAMConfig",
+              "Bearer Token": "#/$defs/TokenConfig",
+              "None": "#/$defs/NoAuthConfig",
+              "OAuth2": "#/$defs/OAuthConfig"
+            },
+            "propertyName": "auth_type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/NoAuthConfig"
+            },
+            {
+              "$ref": "#/$defs/OAuthConfig"
+            },
+            {
+              "$ref": "#/$defs/TokenConfig"
+            },
+            {
+              "$ref": "#/$defs/SigV4Config"
+            },
+            {
+              "$ref": "#/$defs/AWSIAMConfig"
+            }
+          ],
+          "title": "Credentials",
+          "x-iam-auth": true
+        },
+        "namespaces": {
+          "default": [],
+          "description": "Discover only these namespaces. Use dots between nested namespace levels. Leave empty to discover all namespaces.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Namespaces",
+          "type": "array"
+        },
+        "s3": {
+          "default": {
+            "auth_type": "None"
+          },
+          "description": "Storage settings that override or augment the FileIO properties returned by your catalog.",
+          "discriminator": {
+            "mapping": {
+              "AWSAccessKey": "#/$defs/S3Config",
+              "AWSIAM": "#/$defs/IAMConfig",
+              "None": "#/$defs/CatalogStorageConfig"
+            },
+            "propertyName": "auth_type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CatalogStorageConfig"
+            },
+            {
+              "$ref": "#/$defs/S3Config"
+            },
+            {
+              "$ref": "#/$defs/IAMConfig"
+            }
+          ],
+          "title": "S3 Configuration"
+        }
+      },
+      "required": [
+        "catalog_uri"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "namespace": {
+          "description": "Namespace containing your Iceberg table.",
+          "minLength": 1,
+          "title": "Namespace",
+          "type": "string"
+        },
+        "table": {
+          "description": "Name of your Iceberg table.",
+          "minLength": 1,
+          "title": "Table",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT5M",
+          "description": "Interval between checks for new snapshots of this table.",
+          "format": "duration",
+          "nonsensitive": true,
+          "title": "Polling Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "namespace",
+        "table"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-iceberg",
+    "resourcePathPointers": [
+      "/namespace",
+      "/table"
+    ]
+  }
+]

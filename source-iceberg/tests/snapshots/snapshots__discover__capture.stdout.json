@@ -1,0 +1,75 @@
+[
+  {
+    "recommendedName": "test_orders",
+    "resourceConfig": {
+      "namespace": "test",
+      "table": "orders"
+    },
+    "documentSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "canary": {
+          "type": "string"
+        },
+        "at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "amount": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "number"
+        },
+        "payload": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "contentEncoding": "base64"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "snapshot_id": {
+              "type": "integer"
+            },
+            "file": {
+              "type": "string"
+            },
+            "row": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "snapshot_id",
+            "file",
+            "row"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "canary",
+        "_meta"
+      ]
+    },
+    "key": [
+      "/_meta/snapshot_id",
+      "/_meta/file",
+      "/_meta/row"
+    ],
+    "resourcePath": [
+      "test",
+      "orders"
+    ],
+    "isFallbackKey": true
+  }
+]
