@@ -387,7 +387,7 @@ COPY INTO {{ $.Table.Identifier }} (
 	{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else if eq $key.BareDDL "BINARY" }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
 	{{- end }}
 	FROM {{ $.File }}
-);
+){{ if $.Pattern }} PATTERN = '{{ $.Pattern }}'{{ end }};
 {{ end }}
 
 
@@ -484,6 +484,31 @@ func renderTablePipeTemplate(table sql.Table, pipeName string, tpl *template.Tem
 type tableAndFile struct {
 	Table sql.Table
 	File  string
+	// Pattern, when set, restricts a COPY INTO to the files of File it matches.
+	Pattern string
+}
+
+// stagedDirsPattern matches the files of every staged dir in dirs, each a
+// path of the flow_v1 stage.
+func stagedDirsPattern(dirs []string) string {
+	var names = make([]string, len(dirs))
+	for i, d := range dirs {
+		names[i] = regexp.QuoteMeta(strings.TrimPrefix(d, "@flow_v1/"))
+	}
+	return ".*(" + strings.Join(names, "|") + ")/.*"
+}
+
+// stagedDirsPath is the longest path of the flow_v1 stage that leads every
+// staged dir in dirs. Snowflake lists the files under a query's stage path
+// before it applies the query's pattern.
+func stagedDirsPath(dirs []string) string {
+	var p = dirs[0]
+	for _, d := range dirs[1:] {
+		for !strings.HasPrefix(d, p) {
+			p = p[:len(p)-1]
+		}
+	}
+	return p
 }
 
 func renderTableAndFileTemplate(table sql.Table, file string, tpl *template.Template) (string, error) {

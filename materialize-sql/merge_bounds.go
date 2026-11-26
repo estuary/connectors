@@ -7,6 +7,7 @@ import (
 	"math/bits"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -259,6 +260,50 @@ func maxKey(k1 any, k2 any) any {
 	default:
 		panic(fmt.Sprintf("maxKey unhandled key type %T (value: %v)", k1, k1))
 	}
+}
+
+// UnionStringRanges is the union of ranges over string keys that order byte by
+// byte, as at most maxBoundRanges disjoint ranges split at its widest gaps.
+// unquote recovers the key that a literal renders. The union is nil if it is
+// a single range, or if unquote fails for a literal.
+func UnionStringRanges(ranges []MergeRange, unquote func(literal string) (string, bool)) []MergeRange {
+	var scale = new(byteAlphabet)
+	var spans = make([]keySpan, 0, len(ranges))
+	for _, r := range ranges {
+		var lo, okLo = unquote(r.LiteralLower)
+		var hi, okHi = unquote(r.LiteralUpper)
+		if !okLo || !okHi {
+			return nil
+		}
+		scale.observe(lo)
+		scale.observe(hi)
+		spans = append(spans, keySpan{lo: lo, hi: hi, loKey: r.LiteralLower, hiKey: r.LiteralUpper})
+	}
+	slices.SortFunc(spans, func(a, b keySpan) int { return strings.Compare(a.lo, b.lo) })
+
+	var union []keySpan
+	for _, s := range spans {
+		if last := len(union) - 1; last < 0 || s.lo > union[last].hi {
+			union = append(union, s)
+		} else if s.hi > union[last].hi {
+			union[last].hi, union[last].hiKey = s.hi, s.hiKey
+		}
+	}
+	for i := 0; i+1 < len(union); i++ {
+		union[i].gap, _ = scale.distance(union[i].hi, union[i+1].lo)
+	}
+	for len(union) > maxBoundRanges {
+		union = mergeNarrowestGap(union)
+	}
+	if len(union) < 2 {
+		return nil
+	}
+
+	var out = make([]MergeRange, len(union))
+	for i, s := range union {
+		out[i] = MergeRange{LiteralLower: s.loKey.(string), LiteralUpper: s.hiKey.(string)}
+	}
+	return out
 }
 
 // Build outputs the computed merge conditions for this transaction and resets
