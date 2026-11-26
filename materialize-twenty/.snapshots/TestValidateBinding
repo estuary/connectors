@@ -1,0 +1,19 @@
+accountCode: FIELD_OPTIONAL: This field can be written to the Twenty field accountCode
+address/addressCity: FIELD_OPTIONAL: This field can be written to the Twenty field address.addressCity
+address/addressCountry: FIELD_OPTIONAL: This field can be written to the Twenty field address.addressCountry
+annualRevenue: FIELD_OPTIONAL: This field can be written to the Twenty field annualRevenue
+domainName: FIELD_OPTIONAL: This field can be written to the Twenty field domainName
+employees: FIELD_OPTIONAL: This field can be written to the Twenty field employees
+externalId: FIELD_FORBIDDEN: The connector writes the field "externalId" itself
+flow_document: LOCATION_REQUIRED: The connector reads the document to tell a missing field from a null one
+flow_published_at: FIELD_FORBIDDEN: "flow_published_at" isn't a Twenty field's API name. To write this location, give the collection a projection named after the field, like "domainName" or "name/firstName"
+id: LOCATION_REQUIRED: The connector writes the collection key to the ID Field "externalId"
+idealCustomerProfile: FIELD_OPTIONAL: This field can be written to the Twenty field idealCustomerProfile
+lastOrderAt: FIELD_OPTIONAL: This field can be written to the Twenty field lastOrderAt
+linkedinLink: FIELD_OPTIONAL: This field can be written to the Twenty field linkedinLink
+name: FIELD_OPTIONAL: This field can be written to the Twenty field name
+nope: FIELD_FORBIDDEN: The Twenty object "companies" has no field "nope"
+position: FIELD_FORBIDDEN: Twenty manages the field "position"
+score: FIELD_FORBIDDEN: The connector can't check the unique NUMBER field "score" against other records yet
+tags: FIELD_OPTIONAL: This field can be written to the Twenty field tags
+
