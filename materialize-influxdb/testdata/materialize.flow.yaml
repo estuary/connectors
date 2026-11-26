@@ -1,0 +1,60 @@
+collections:
+  tests/readings:
+    schema:
+      type: object
+      required: [sensor, ts]
+      properties:
+        sensor: {type: string}
+        ts: {type: string, format: date-time}
+        temp: {type: number}
+        ok: {type: boolean}
+        count: {type: integer}
+        note: {type: string}
+        meta: {type: object}
+        _meta:
+          type: object
+          properties:
+            op: {type: string}
+    key: [/sensor, /ts]
+    projections:
+      operation: /_meta/op
+
+  tests/orders:
+    schema:
+      type: object
+      required: [id]
+      properties:
+        id: {type: integer}
+        status: {type: string}
+        amount: {type: number}
+        _meta:
+          type: object
+          properties:
+            op: {type: string}
+    key: [/id]
+    projections:
+      operation: /_meta/op
+
+materializations:
+  tests/materialize-influxdb:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+      - resource:
+          measurement: readings
+          timestampField: ts
+        source: tests/readings
+        fields:
+          recommended: true
+          require: {_meta: {}}
+          exclude: [flow_document, flow_published_at]
+      - resource:
+          measurement: orders
+        source: tests/orders
+        fields:
+          recommended: true
+          require: {_meta: {}}
+          exclude: [flow_document]

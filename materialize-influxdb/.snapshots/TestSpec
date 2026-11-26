@@ -1,0 +1,145 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-influxdb/config",
+    "properties": {
+      "url": {
+        "type": "string",
+        "minLength": 1,
+        "title": "URL",
+        "description": "The URL of your InfluxDB 2.x instance including the scheme and port if needed.",
+        "order": 1
+      },
+      "credentials": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/materialize-influxdb/api-token",
+            "properties": {
+              "credentials_title": {
+                "type": "string",
+                "const": "API Token",
+                "title": "Authentication Method",
+                "default": "API Token",
+                "nonsensitive": true,
+                "order": 0
+              },
+              "access_token": {
+                "type": "string",
+                "minLength": 1,
+                "title": "API Token",
+                "description": "Your InfluxDB API token with read and write access to the bucket you want to materialize.",
+                "secret": true
+              }
+            },
+            "type": "object",
+            "required": [
+              "access_token"
+            ],
+            "title": "API Token"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
+        "description": "Authenticate using an InfluxDB API token.",
+        "default": {
+          "credentials_title": "API Token"
+        },
+        "discriminator": {
+          "propertyName": "credentials_title"
+        },
+        "order": 2
+      },
+      "org": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Organization",
+        "description": "The name of your InfluxDB organization.",
+        "order": 3
+      },
+      "bucket": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Bucket",
+        "description": "Name of the existing bucket to write points to.",
+        "order": 4
+      },
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "Delete points when documents are deleted in your source. Otherwise deletion documents are written as points. Hard deletes are unverified on InfluxDB Cloud.",
+        "default": false,
+        "order": 5
+      },
+      "advanced": {
+        "properties": {
+          "ssl_ca_certificate": {
+            "type": "string",
+            "title": "SSL CA Certificate",
+            "description": "PEM-encoded CA certificate or certificate bundle to trust in addition to public certificate authorities.",
+            "default": "",
+            "multiline": true
+          },
+          "ssl_skip_verify": {
+            "type": "boolean",
+            "title": "Skip SSL Verification",
+            "description": "Skip certificate and hostname verification for HTTPS connections. Use only for trusted networks with self-signed certificates; prefer an SSL CA Certificate.",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Config",
+        "description": "Advanced settings for the connector.",
+        "advanced": true,
+        "order": 6
+      }
+    },
+    "type": "object",
+    "required": [
+      "url",
+      "credentials",
+      "org",
+      "bucket"
+    ],
+    "title": "Materialize InfluxDB Spec"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-influxdb/resource",
+    "properties": {
+      "measurement": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Measurement",
+        "description": "Name of the measurement to write points to.",
+        "order": 1,
+        "x-collection-name": true
+      },
+      "timestampField": {
+        "type": "string",
+        "minLength": 1,
+        "title": "Timestamp Field",
+        "description": "Projection field containing each point's time as an always-present date-time string.",
+        "default": "flow_published_at",
+        "order": 2
+      },
+      "tagFields": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array",
+        "uniqueItems": true,
+        "title": "Tag Fields",
+        "description": "Projection fields to write as tags. Defaults to the collection key fields other than the timestamp field.",
+        "order": 3
+      }
+    },
+    "type": "object",
+    "required": [
+      "measurement"
+    ],
+    "title": "InfluxDB Measurement"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-influxdb"
+}

@@ -1,0 +1,8 @@
+materializations:
+  tests/materialize-influxdb-shared:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings: []

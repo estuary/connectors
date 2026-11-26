@@ -1,0 +1,24 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  tests/materialize-influxdb-shared:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+      - resource:
+          measurement: simple
+        source: tests/simple
+        fields:
+          recommended: true
+          exclude: [flow_document, _meta]
+      - resource:
+          measurement: data-types
+        source: tests/data-types
+        fields:
+          recommended: true
+          # InfluxDB requires a consistent type for each field in a measurement.
+          exclude: [flow_document, multipleField, stringAndNumberField, stringAndIntegerField]

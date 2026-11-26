@@ -1,0 +1,7 @@
+url: http://localhost:8088
+credentials:
+  credentials_title: API Token
+  access_token: made-up-influxdb-test-token
+org: estuary
+bucket: sensors
+hardDelete: true
