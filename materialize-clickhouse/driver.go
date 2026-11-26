@@ -282,6 +282,7 @@ type transactor struct {
 	}
 	bindings []*binding
 	be       *m.BindingEvents
+	profiler *boilerplate.QueryProfiler
 	_range   *pf.RangeSpec
 
 	// recovery is set when the Open request carried prior connector state,
@@ -410,6 +411,7 @@ func newTransactor(
 			return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 		}
 	}
+	t.profiler = newQueryProfiler(t.store.conn, t.bindings)
 
 	if err = t.requireSortingKeysMatchBindings(ctx); err != nil {
 		return nil, err
@@ -635,6 +637,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	activeBindings := make(map[int]int64, len(t.bindings))
 	batch := make([]batchItem, 0, maxBatchSize)
 	batchBytes := 0
+	var profile = t.profiler.NewProfile()
 
 	flushBindings := func() error {
 		if len(batch) == 0 {
@@ -657,8 +660,14 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// PrepareBatch fails before any rows have been sent, so retrying a
 			// transient connection drop is a clean no-op on the ClickHouse side.
 			var chBatch chdriver.Batch
+			var trace *boilerplate.QueryTrace
 			if err := idempotentRetry.Do(ctx, "preparing load batch", func(ctx context.Context) (err error) {
-				chBatch, err = t.load.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
+				var queryCtx context.Context
+				queryCtx, trace = t.profiler.Trace(ctx, lastBinding, "loadKeys")
+				trace.Set("rows", len(items))
+				if chBatch, err = t.load.conn.PrepareBatch(queryCtx, t.bindings[lastBinding].load.insertSQL); err != nil {
+					trace.Finish(err)
+				}
 				return err
 			}); err != nil {
 				return fmt.Errorf("preparing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
@@ -671,7 +680,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				}
 			}
 
-			if err = chBatch.Send(); err != nil {
+			err = chBatch.Send()
+			trace.Finish(err)
+			if err != nil {
 				chBatch.Close()
 				return fmt.Errorf("flushing load batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
 			}
@@ -704,7 +715,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				continue
 			}
 			if err = idempotentRetry.Do(ctx, "truncating load table after load", func(ctx context.Context) error {
-				return t.load.conn.Exec(ctx, b.load.truncateSQL)
+				return t.execTraced(ctx, t.load.conn, b, b.load.truncateSQL)
 			}); err != nil {
 				err = fmt.Errorf("truncating load table for %s after load: %w", b.target.Identifier, err)
 			}
@@ -718,7 +729,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// clears any keys left over from a previous round. TRUNCATE is
 			// idempotent, so a transient connection drop is simply retried.
 			if err = idempotentRetry.Do(ctx, "truncating load stage table", func(ctx context.Context) error {
-				return t.load.conn.Exec(ctx, b.load.truncateSQL)
+				return t.execTraced(ctx, t.load.conn, b, b.load.truncateSQL)
 			}); err != nil {
 				return fmt.Errorf("truncating load stage table for %s: %w", b.target.Identifier, err)
 			}
@@ -733,6 +744,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		batch = append(batch, batchItem{Binding: it.Binding, Record: converted})
 		batchBytes += len(it.PackedKey)
 		activeBindings[it.Binding]++
+		profile.AddKeys(it.Binding, 1)
 
 		if len(batch) >= maxBatchSize || batchBytes >= batchBytesLimit {
 			if err = flushBindings(); err != nil {
@@ -758,7 +770,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	for i, inserted := range activeBindings {
 		b := t.bindings[i]
 		var counted uint64
-		if err = t.load.conn.QueryRow(ctx, b.load.countKeysSQL).Scan(&counted); err != nil {
+		var queryCtx, trace = profile.Trace(ctx, i, "countKeys")
+		err = t.load.conn.QueryRow(queryCtx, b.load.countKeysSQL).Scan(&counted)
+		trace.Finish(err)
+		if err != nil {
 			return fmt.Errorf("counting load table keys for %s: %w", b.target.Identifier, err)
 		}
 		if int64(counted) != inserted {
@@ -785,8 +800,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return classify(err)
 		}
 		return policy.Do(ctx, "querying Load documents",
-			func(ctx context.Context) error {
-				rows, err := t.load.conn.Query(ctx, b.load.querySQL)
+			func(ctx context.Context) (err error) {
+				var queryCtx, trace = profile.Trace(ctx, i, "load")
+				defer func() { trace.Finish(err) }()
+
+				rows, err := t.load.conn.Query(queryCtx, b.load.querySQL)
+				trace.Executed()
 				if err != nil {
 					return fmt.Errorf("querying Load documents for %s: %w", b.target.Identifier, err)
 				}
@@ -797,6 +816,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 					if err = rows.Scan(&doc); err != nil {
 						return fmt.Errorf("scanning Load document for %s: %w", b.target.Identifier, err)
 					}
+					trace.AddDocument(len(doc))
 					if len(b.nullFieldsToStrip) > 0 {
 						if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 							return fmt.Errorf("stripping null fields for %s: %w", b.target.Identifier, err)
@@ -842,8 +862,14 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// As with the load batch, PrepareBatch fails before any rows have been
 		// sent and is safe to retry.
 		var chBatch chdriver.Batch
+		var trace *boilerplate.QueryTrace
 		if err := idempotentRetry.Do(ctx, "preparing store batch", func(ctx context.Context) (err error) {
-			chBatch, err = t.store.conn.PrepareBatch(ctx, t.bindings[lastBinding].store.insertSQL)
+			var queryCtx context.Context
+			queryCtx, trace = t.profiler.Trace(ctx, lastBinding, "insert")
+			trace.Set("rows", len(batch))
+			if chBatch, err = t.store.conn.PrepareBatch(queryCtx, t.bindings[lastBinding].store.insertSQL); err != nil {
+				trace.Finish(err)
+			}
 			return err
 		}); err != nil {
 			return fmt.Errorf("preparing store batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
@@ -856,7 +882,9 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 		batch = batch[:0]
 		batchBytes = 0
-		if err = chBatch.Send(); err != nil {
+		err = chBatch.Send()
+		trace.Finish(err)
+		if err != nil {
 			return fmt.Errorf("flushing store batch for %s: %w", t.bindings[lastBinding].target.Identifier, err)
 		}
 		return nil
@@ -1130,7 +1158,9 @@ func (t *transactor) queryStoreParts(ctx context.Context, b *binding) (parts []s
 	err = idempotentRetry.Do(ctx, "querying store table partitions", func(ctx context.Context) error {
 		parts, totalRows = nil, 0
 
-		rows, err := t.store.conn.Query(ctx, b.store.queryPartsSQL)
+		var queryCtx, trace = t.profiler.Trace(ctx, b.target.Binding, "storeParts")
+		rows, err := t.store.conn.Query(queryCtx, b.store.queryPartsSQL)
+		trace.Finish(err)
 		if err != nil {
 			return fmt.Errorf("querying store table partitions: %w", err)
 		}
@@ -1258,7 +1288,11 @@ func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding
 		// empty-stage check below still catch any genuinely stuck or partial
 		// move as a hard error.
 		if err = idempotentRetry.Do(ctx, "moving store table partition", func(ctx context.Context) error {
-			return t.store.conn.Exec(ctx, b.store.movePartitionSQL, partitionID)
+			var queryCtx, trace = t.profiler.Trace(ctx, b.target.Binding, "movePartition")
+			trace.Set("partition", partitionID)
+			var err = t.store.conn.Exec(queryCtx, b.store.movePartitionSQL, partitionID)
+			trace.Finish(err)
+			return err
 		}); err != nil {
 			// Never truncate or drop here: unmoved staged rows must survive
 			// for a retry (or operator intervention, e.g. if the stage table
@@ -1323,10 +1357,13 @@ func (t *transactor) truncateTarget(ctx context.Context, b *binding, boundary ti
 	// second count.
 	var count uint64
 	if err := idempotentRetry.Do(ctx, "truncating target table", func(ctx context.Context) error {
-		if err := t.store.conn.QueryRow(ctx, b.truncate.countSQL, before).Scan(&count); err != nil {
+		var queryCtx, trace = t.profiler.Trace(ctx, b.target.Binding, "deleteCount")
+		var err = t.store.conn.QueryRow(queryCtx, b.truncate.countSQL, before).Scan(&count)
+		trace.Finish(err)
+		if err != nil {
 			return fmt.Errorf("counting rows to truncate: %w", err)
 		}
-		return t.store.conn.Exec(ctx, b.truncate.deleteSQL, before)
+		return t.execTraced(ctx, t.store.conn, b, b.truncate.deleteSQL, before)
 	}); err != nil {
 		return nil, fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
 	}
@@ -1463,7 +1500,7 @@ func (t *transactor) ensureTempTables(ctx context.Context, b *binding) error {
 
 // ensureTempTable is one pass of ensureTempTables for a single temp table.
 func (t *transactor) ensureTempTable(ctx context.Context, b *binding, createSQL, truncateSQL, dropSQL string, tableName string) error {
-	if err := t.store.conn.Exec(ctx, createSQL); err != nil {
+	if err := t.execTraced(ctx, t.store.conn, b, createSQL); err != nil {
 		return fmt.Errorf("creating temp table: %w", err)
 	}
 	matches, err := t.tempTableMatchesTarget(ctx, tableName, b)
@@ -1471,15 +1508,15 @@ func (t *transactor) ensureTempTable(ctx context.Context, b *binding, createSQL,
 		return err
 	}
 	if !matches {
-		if err := t.store.conn.Exec(ctx, dropSQL); err != nil {
+		if err := t.execTraced(ctx, t.store.conn, b, dropSQL); err != nil {
 			return fmt.Errorf("dropping schema-drifted temp table: %w", err)
 		}
-		if err := t.store.conn.Exec(ctx, createSQL); err != nil {
+		if err := t.execTraced(ctx, t.store.conn, b, createSQL); err != nil {
 			return fmt.Errorf("re-creating temp table: %w", err)
 		}
 		return nil
 	}
-	if err := t.store.conn.Exec(ctx, truncateSQL); err != nil {
+	if err := t.execTraced(ctx, t.store.conn, b, truncateSQL); err != nil {
 		return fmt.Errorf("truncating temp table: %w", err)
 	}
 	return nil
@@ -1619,6 +1656,7 @@ func (t *transactor) Destroy() {
 	// data. Load tables are dropped the same way for symmetry: both kinds are
 	// persistent, and are dropped + re-created only by the ensure pass when
 	// their schema has drifted from the target's.
+	t.profiler.Stop()
 	_ = t.store.conn.Close()
 	_ = t.load.conn.Close()
 }

@@ -1,5 +1,17 @@
 # materialize-bigquery
 
+## 2026-11-24
+
+### Added
+- Load, commit and truncation queries that run for at least five seconds are
+  logged with the statistics BigQuery records of their jobs: time spent queued
+  and executing, slot time, bytes processed and billed, rows read and changed,
+  shuffled and spilled bytes, and any performance insights such as slot
+  contention. A load also logs the keys it looked up in each table and the
+  key bounds it was restricted to, and a merge its key bounds. The first slow
+  query of each table in a run also logs the table's size, partitioning,
+  clustering and streaming buffer.
+
 ## 2026-11-23
 
 ### Changed

@@ -412,11 +412,11 @@ def run_with_status(
             input = json.loads(body.read().decode("utf-8"))
         s3.delete_object(Bucket=input_bucket_name, Key=input_file_path)
 
-        fn(input)
+        result = fn(input)
         s3.put_object(
             Bucket=output_bucket_name,
             Key=output_file_path,
-            Body=json.dumps({"success": True}),
+            Body=json.dumps({"success": True, **(result or {})}),
         )
     except Exception as e:
         s3.put_object(

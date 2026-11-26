@@ -343,7 +343,7 @@ func (h *partitionHarness) merge(ctx context.Context, mb partitionBinding, rows 
 	if err != nil {
 		return err
 	}
-	return h.mat.compute.runJob(ctx, computeJob{
+	_, err = h.mat.compute.runJob(ctx, computeJob{
 		Input: python.MergeInput{Bindings: []python.MergeBinding{{
 			Binding:          0,
 			Query:            q.String(),
@@ -356,6 +356,7 @@ func (h *partitionHarness) merge(ctx context.Context, mb partitionBinding, rows 
 		Name:             "merge",
 		WorkingPrefix:    path.Join(h.cfg.Compute.BucketPath, uuid.NewString()),
 	})
+	return err
 }
 
 // loadQuery renders the connector's load query for the given keys, with
@@ -385,7 +386,7 @@ func (h *partitionHarness) loadQuery(ctx context.Context, mb partitionBinding, i
 // EXPLAIN of one.
 func (h *partitionHarness) runLoad(ctx context.Context, query string, lb python.LoadBinding) ([]string, error) {
 	outputPrefix := path.Join(h.cfg.Compute.BucketPath, uuid.NewString())
-	if err := h.mat.compute.runJob(ctx, computeJob{
+	if _, err := h.mat.compute.runJob(ctx, computeJob{
 		Input: python.LoadInput{
 			Query:          query,
 			Bindings:       []python.LoadBinding{lb},

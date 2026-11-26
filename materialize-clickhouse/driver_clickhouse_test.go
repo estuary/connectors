@@ -373,7 +373,7 @@ func TestDestroy(t *testing.T) {
 	ensureDockerUp(t)
 
 	var cfg = testConfig()
-	var tr = &transactor{ensured: make(chan struct{})}
+	var tr = &transactor{ensured: make(chan struct{}), profiler: testProfiler()}
 	var err error
 	tr.store.conn, err = clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
@@ -411,7 +411,7 @@ func TestAddBinding(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{}), profiler: testProfiler()}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -521,7 +521,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	})
 
 	// Build the binding to get rendered SQL.
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{}), profiler: testProfiler()}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -798,7 +798,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{}), profiler: testProfiler()}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -843,7 +843,7 @@ func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Diale
 		_, _ = cleanDB.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{}), profiler: testProfiler()}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -1131,7 +1131,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	})
 
 	// Build transactor with 2 bindings.
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{}), profiler: testProfiler()}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -1225,7 +1225,7 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{})}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}, ensured: make(chan struct{}), profiler: testProfiler()}
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.store.conn = storeConn
@@ -1295,6 +1295,7 @@ func newTestTransactor(t *testing.T, ctx context.Context, tableName string) (*tr
 		_range:    &pf.RangeSpec{},
 		ensured:   make(chan struct{}),
 		state:     make(connectorState),
+		profiler:  testProfiler(),
 	}
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
@@ -1533,6 +1534,7 @@ func TestRecoveryCompletesPartialMove(t *testing.T) {
 		_range:    &pf.RangeSpec{},
 		ensured:   make(chan struct{}),
 		state:     make(connectorState),
+		profiler:  testProfiler(),
 	}
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
@@ -1622,6 +1624,7 @@ func TestRecoveryRefusesTruncatedCommit(t *testing.T) {
 		_range:    &pf.RangeSpec{},
 		ensured:   make(chan struct{}),
 		state:     make(connectorState),
+		profiler:  testProfiler(),
 	}
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)

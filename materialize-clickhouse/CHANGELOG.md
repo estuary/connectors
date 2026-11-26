@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-11-24
+
+### Added
+- Load, store and commit queries that run for at least five seconds are
+  logged with the metrics ClickHouse records of them in its query log: their
+  duration, the rows and bytes they read, wrote and returned, their memory
+  and CPU time, time spent waiting for CPU, IO, locks and Keeper, the parts
+  and marks they read out of those of their tables, time and bytes read from
+  and written to disk and object storage, and the delays of inserts into a
+  table with too many parts. A load also logs the keys it looked up. The
+  first slow query of each table in a run also logs the table's engine,
+  sorting and partition keys, rows, size, partitions, parts and pending
+  mutations, and the server's version, memory and replicas. The metrics are
+  read in the background, without holding up the transaction. Where the user
+  may not read `system.query_log`, slow queries are logged without them.
+
 ## 2026-11-23
 
 ### Fixed

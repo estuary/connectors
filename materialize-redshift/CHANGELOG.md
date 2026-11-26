@@ -1,5 +1,19 @@
 # materialize-redshift
 
+## 2026-11-24
+
+### Added
+- Load, commit and truncation queries that run for at least five seconds are
+  logged with the metrics Redshift records of them in its system views: time
+  spent queued, waiting on locks, planning, compiling and executing, the rows
+  and blocks they scanned, the blocks they spilled to disk, any planner
+  alerts, and the rows, bytes and files a COPY loaded. A load also logs the
+  keys it looked up in each table. The first slow query of each table in a
+  run also logs the table's distribution style, sort key, size, and how much
+  of it is unsorted or lacks statistics, where the user may read
+  `SVV_TABLE_INFO`, and the warehouse's version and capacity. The metrics are
+  read in the background, without holding up the transaction.
+
 ## 2026-11-23
 
 ### Added

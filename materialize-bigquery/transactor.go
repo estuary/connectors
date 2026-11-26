@@ -145,6 +145,7 @@ type transactor struct {
 
 	bindings []*binding
 	be       *m.BindingEvents
+	profiler *boilerplate.QueryProfiler
 	// cp holds this shard's entries under its own range key. The primary
 	// shard also holds, and alone executes, the pending entries of other
 	// shards and of sessions predating range-scoping (legacyRangeKey).
@@ -246,6 +247,7 @@ func prepareNewTransactor(
 				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 			}
 		}
+		t.profiler = newQueryProfiler(client, t.bindings)
 
 		return t, nil
 	}
@@ -427,11 +429,13 @@ func allRangeKeys(nested map[string]*checkpointItem) bool {
 	return true
 }
 
-func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (returnErr error) {
 	var ctx = it.Context()
 
+	var profile = t.profiler.NewProfile()
 	for it.Next() {
 		var b = t.bindings[it.Binding]
+		profile.AddKeys(it.Binding, 1)
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting load key: %w", err)
@@ -467,7 +471,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				loadTemplate = t.templates.loadQueryNoFlowDocument
 			}
 
-			subqueries = append(subqueries, loadSubquery{table: b.target, tpl: loadTemplate, bounds: b.loadMergeBounds.Build()})
+			var bounds = b.loadMergeBounds.Build()
+			profile.SetBounds(idx, bounds)
+			subqueries = append(subqueries, loadSubquery{table: b.target, tpl: loadTemplate, bounds: bounds})
 			edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
 			externalData[b.tempTableName] = uris
 		}
@@ -497,11 +503,15 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	query.WriteDisposition = bigquery.WriteTruncate
 
 	t.be.StartedEvaluatingLoads()
+	var _, trace = profile.TraceAll(ctx, "load")
+	defer func() { trace.Finish(returnErr) }()
 	job, err := t.client.runQuery(ctx, query)
 	if err != nil {
 		ll.WithError(err).Error("client runQuery failed")
 		return fmt.Errorf("load query: %w", err)
 	}
+	traceJob(trace, job.ID(), job.LastStatus())
+	trace.Executed()
 
 	bqit, err := job.Read(ctx)
 	if err != nil {
@@ -527,6 +537,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 
 		doc := bd.Document
+		trace.AddDocument(len(doc))
 		if b := t.bindings[bd.Binding]; len(b.nullFieldsToStrip) > 0 {
 			var err error
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
@@ -749,6 +760,7 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 
 		group.Go(func() error {
 			t.be.StartedResourceCommit(b.target.Path)
+			var profile = t.profiler.NewProfile()
 
 			// Entries still using the deprecated Query field were already
 			// fully rendered when staged, so they run individually. The rest
@@ -775,7 +787,7 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 					}
 					continue
 				}
-				stat, err := t.client.queryIdempotent(groupCtx, b.storeSchema, e.item.Query, e.item.JobPrefix, e.item.SourceURIs, e.item.TempTableName)
+				stat, err := t.commitQuery(groupCtx, profile, b, b.storeSchema, e.item.Query, e.item.JobPrefix, e.item.SourceURIs, e.item.TempTableName)
 				if err != nil {
 					return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
 				}
@@ -793,12 +805,13 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 				if needsMerge {
 					var err error
 					bounds := combineBounds(b.target.Keys, coalesce)
+					profile.SetBounds(b.target.Binding, sql.MergeBounds(bounds))
 					query, err = renderQueryTemplate(b.target, t.templates.storeUpdate, bounds, t.objAndArrayAsJson)
 					if err != nil {
 						return fmt.Errorf("rendering merge query template: %w", err)
 					}
 				}
-				stat, err := t.client.queryIdempotent(groupCtx, b.storeSchema, query, coalesce[0].JobPrefix, coalescedURIs, b.tempTableName)
+				stat, err := t.commitQuery(groupCtx, profile, b, b.storeSchema, query, coalesce[0].JobPrefix, coalescedURIs, b.tempTableName)
 				if err != nil {
 					return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
 				}
@@ -820,7 +833,7 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 					"boundary": *truncateBefore,
 					"reason":   reason.Error(),
 				}).Warn("skipping staged truncation because the binding no longer supports it")
-			} else if stat, err := t.client.queryIdempotent(groupCtx, nil, fmt.Sprintf(b.truncateSQL, timestampLiteral(*truncateBefore)), truncateJobPrefix+"-truncate", nil, ""); err != nil {
+			} else if stat, err := t.commitQuery(groupCtx, t.profiler.NewProfile(), b, nil, fmt.Sprintf(b.truncateSQL, timestampLiteral(*truncateBefore)), truncateJobPrefix+"-truncate", nil, ""); err != nil {
 				return fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
 			} else {
 				var n = dmlRowStats(stat).Deleted
@@ -886,6 +899,16 @@ func (t *transactor) acknowledgeApply(ctx context.Context, shouldProcess func(st
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
+// commitQuery runs a commit query of the binding as queryIdempotent does,
+// profiled as the binding's.
+func (t *transactor) commitQuery(ctx context.Context, profile *boilerplate.QueryProfile, b *binding, schema bigquery.Schema, query, jobPrefix string, sourceURIs []string, tempTableName string) (*bigquery.JobStatus, error) {
+	var _, trace = profile.Trace(ctx, b.target.Binding, boilerplate.StatementKind(query))
+	id, stat, err := t.client.queryIdempotent(ctx, schema, query, jobPrefix, sourceURIs, tempTableName)
+	traceJob(trace, id, stat)
+	trace.Finish(err)
+	return stat, err
+}
+
 // timestampLiteral renders a TIMESTAMP literal floored to microseconds, the
 // precision of the column it is compared against.
 func timestampLiteral(ts time.Time) string {
@@ -893,6 +916,7 @@ func timestampLiteral(ts time.Time) string {
 }
 
 func (t *transactor) Destroy() {
+	t.profiler.Stop()
 	_ = t.client.bigqueryClient.Close()
 }
 

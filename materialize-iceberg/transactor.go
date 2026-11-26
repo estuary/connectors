@@ -64,6 +64,9 @@ type pendingMerge struct {
 	python.MergeBinding
 	Round int   `json:"round"`
 	Rows  int64 `json:"rows"`
+	// bounds are the key bounds of the merge, for its profile. A recovered
+	// merge has none.
+	bounds mergeBounds
 }
 
 type transactor struct {
@@ -71,10 +74,11 @@ type transactor struct {
 	recovery            bool
 	materializationName string
 
-	be      *m.BindingEvents
-	cfg     config
-	bucket  blob.Bucket
-	compute computeRunner
+	be       *m.BindingEvents
+	cfg      config
+	bucket   blob.Bucket
+	compute  computeRunner
+	profiler *boilerplate.QueryProfiler
 
 	templates  templates
 	bindings   []binding
@@ -105,12 +109,14 @@ func (t *transactor) UnmarshalState(raw json.RawMessage) error {
 	return nil
 }
 
-func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.RawMessage) error) error {
+func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.RawMessage) error) (returnErr error) {
 	ctx := it.Context()
 
 	hadLoads := false
+	profile := t.profiler.NewProfile()
 	for it.Next() {
 		hadLoads = true
+		profile.AddKeys(it.Binding, 1)
 		b := t.bindings[it.Binding]
 
 		if converted, err := b.Mapped.ConvertKey(it.Key); err != nil {
@@ -149,10 +155,13 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 			Files:   files,
 		})
 
+		bounds := b.load.mergeBounds.build()
+		profile.SetBounds(b.Idx, mergeBounds(bounds))
+
 		var subQuery strings.Builder
 		if err := t.templates.loadQuery.Execute(&subQuery, templateInput{
 			binding: b,
-			Bounds:  b.load.mergeBounds.build(),
+			Bounds:  bounds,
 		}); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		}
@@ -172,21 +181,30 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 	defer cleanupResults()
 
 	t.be.StartedEvaluatingLoads()
-	if err := t.compute.runJob(ctx, computeJob{
+	_, trace := profile.TraceAll(ctx, "load")
+	defer func() { trace.Finish(returnErr) }()
+	res, err := t.compute.runJob(ctx, computeJob{
 		Input:              loadInput,
 		EntryPointURI:      t.pyFiles.load,
 		PyFilesCommonURI:   t.pyFiles.common,
 		Name:               fmt.Sprintf("load for: %s", t.materializationName),
 		WorkingPrefix:      outputPrefix,
 		SparkJobProperties: t.cfg.Compute.SparkJobProperties,
-	}); err != nil {
+	})
+	traceJob(trace, res)
+	if err != nil {
 		return fmt.Errorf("load job failed: %w", err)
 	} else if err := t.loadFiles.CleanupCurrentTransaction(ctx); err != nil {
 		return fmt.Errorf("cleaning up load files: %w", err)
 	}
+	trace.Executed()
 	t.be.FinishedEvaluatingLoads()
 
-	if err := t.readLoadResults(ctx, outputPrefix, loaded); err != nil {
+	// readLoadResults serializes its calls of loaded.
+	if err := t.readLoadResults(ctx, outputPrefix, func(binding int, doc json.RawMessage) error {
+		trace.AddDocument(len(doc))
+		return loaded(binding, doc)
+	}); err != nil {
 		return fmt.Errorf("reading load results: %w", err)
 	} else if err := cleanupResults(); err != nil {
 		return fmt.Errorf("cleaning up generated load result files: %w", err)
@@ -237,16 +255,18 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				IdempotencyToken: uuid.NewString(),
 			}
 
+			var bounds mergeBounds
 			if t.storeFiles.Started(idx) {
 				files, err := t.storeFiles.Flush(idx)
 				if err != nil {
 					return nil, m.FinishedOperation(fmt.Errorf("flushing store files: %w", err))
 				}
 
+				bounds = b.store.mergeBounds.build()
 				var mergeQuery strings.Builder
 				if err := t.templates.mergeQuery.Execute(&mergeQuery, templateInput{
 					binding: b,
-					Bounds:  b.store.mergeBounds.build(),
+					Bounds:  bounds,
 				}); err != nil {
 					return nil, m.FinishedOperation(fmt.Errorf("rendering mergeQuery template: %w", err))
 				}
@@ -272,6 +292,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				MergeBinding: mb,
 				Round:        round,
 				Rows:         rows[idx],
+				bounds:       bounds,
 			}
 		}
 
@@ -313,10 +334,7 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	checkpointClear := make(map[string]*pendingMerge)
 	var mergeInput python.MergeInput
 	var allFileUris []string
-	var merged []struct {
-		path []string
-		*pendingMerge
-	}
+	var merged []mergedBinding
 
 	shouldProcess := m.StateKeyFilter(stateKeys)
 
@@ -358,12 +376,11 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 				}
 			}
 
-			mergeInput.Bindings = append(mergeInput.Bindings, pyMergeBinding.MergeBinding)
+			mergeBinding := pyMergeBinding.MergeBinding
+			mergeBinding.Table = tableFQN(b.Mapped.ResourcePath)
+			mergeInput.Bindings = append(mergeInput.Bindings, mergeBinding)
 			allFileUris = append(allFileUris, pyMergeBinding.Files...)
-			merged = append(merged, struct {
-				path []string
-				*pendingMerge
-			}{b.Mapped.ResourcePath, pyMergeBinding})
+			merged = append(merged, mergedBinding{b.Idx, b.Mapped.ResourcePath, pyMergeBinding})
 		}
 	}
 
@@ -376,7 +393,9 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 		cleanupStatus := cleanPrefixOnceFn(ctx, t.bucket, outputPrefix)
 		defer cleanupStatus()
 
-		if err := t.compute.runJob(ctx, computeJob{
+		profile := t.profiler.NewProfile()
+		_, trace := profile.TraceAll(ctx, "merge")
+		res, err := t.compute.runJob(ctx, computeJob{
 			Input:              mergeInput,
 			EntryPointURI:      t.pyFiles.merge,
 			PyFilesCommonURI:   t.pyFiles.common,
@@ -384,7 +403,11 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 			WorkingPrefix:      outputPrefix,
 			IdempotencyToken:   token,
 			SparkJobProperties: t.cfg.Compute.SparkJobProperties,
-		}); err != nil {
+		})
+		traceJob(trace, res)
+		profileMerges(profile, trace, merged, res.stats.Bindings)
+		trace.Finish(err)
+		if err != nil {
 			return nil, fmt.Errorf("store merge job failed: %w", err)
 		}
 
@@ -419,7 +442,9 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return stateUpdate, nil
 }
 
-func (t *transactor) Destroy() {}
+func (t *transactor) Destroy() {
+	t.profiler.Stop()
+}
 
 func (t *transactor) readLoadResults(ctx context.Context, prefix string, loaded func(binding int, doc json.RawMessage) error) error {
 	var mu sync.Mutex

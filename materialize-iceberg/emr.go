@@ -185,7 +185,7 @@ func (e *emrClient) startJobRun(ctx context.Context, startInput *emr.StartJobRun
 	return start, err
 }
 
-func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
+func (e *emrClient) runJob(ctx context.Context, job computeJob) (jobResult, error) {
 	/***
 	Available arguments to the pyspark script:
 	| --input-uri              | Input for the program, as an s3 URI, to be parsed by the script                      | Required |
@@ -213,9 +213,9 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 
 	inputKey := path.Join(job.WorkingPrefix, "input.json")
 	if inputBytes, err := encodeInput(job.Input); err != nil {
-		return fmt.Errorf("encoding input: %w", err)
+		return jobResult{}, fmt.Errorf("encoding input: %w", err)
 	} else if err := e.bucket.Upload(ctx, inputKey, bytes.NewReader(inputBytes)); err != nil {
-		return fmt.Errorf("putting input file object: %w", err)
+		return jobResult{}, fmt.Errorf("putting input file object: %w", err)
 	}
 
 	args := []string{
@@ -238,7 +238,7 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 	} else if e.catalogAuth.AuthType == catalogAuthTypeSigV4 || e.catalogAuth.AuthType == catalogAuthTypeAWSIAM {
 		signingName, err := SigningName(e.catalogURL)
 		if err != nil {
-			return err
+			return jobResult{}, err
 		}
 		args = append(args, "--signing-name", signingName)
 	}
@@ -277,7 +277,7 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 	// Start the Job or adopt a existing run with the clientToken.
 	start, err := e.startJobRun(ctx, startInput)
 	if err != nil {
-		return err
+		return jobResult{}, err
 	}
 	// If the job is immediately failed or cancelled, restart it.  This
 	// prevents a succesfully adopted job that that previously failed or was
@@ -293,20 +293,21 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 		JobRunId:      start.JobRunId,
 	})
 	if err != nil {
-		return err
+		return jobResult{}, err
 	}
 	switch jobRun.JobRun.State {
 	case emrTypes.JobRunStateFailed, emrTypes.JobRunStateCancelling, emrTypes.JobRunStateCancelled:
 		startInput.ClientToken = aws.String(uuid.NewString())
 		start, err = e.startJobRun(ctx, startInput)
 		if err != nil {
-			return err
+			return jobResult{}, err
 		}
 	}
 
 	jobCtx, cancelJobCtx := context.WithTimeout(ctx, maxJobRunDuration)
 	defer cancelJobCtx()
 
+	var res = jobResult{id: aws.ToString(start.JobRunId)}
 	var runDetails string
 	for {
 		gotRun, err := e.c.GetJobRun(ctx, &emr.GetJobRunInput{
@@ -314,25 +315,29 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 			JobRunId:      start.JobRunId,
 		})
 		if err != nil {
-			return err
+			return res, err
 		}
 		runDetails = *gotRun.JobRun.StateDetails
 
 		switch gotRun.JobRun.State {
 		case emrTypes.JobRunStateSuccess:
-			if status, err := getStatus(); err != nil {
-				return fmt.Errorf("job succeeded but could not get final status: %w", err)
+			res.fields = jobRunFields(gotRun.JobRun)
+			status, err := getStatus()
+			if err != nil {
+				return res, fmt.Errorf("job succeeded but could not get final status: %w", err)
 			} else if !status.Success {
-				return fmt.Errorf("job failed ran successfully but had error: %s", status.Error)
+				return res, fmt.Errorf("job failed ran successfully but had error: %s", status.Error)
 			}
+			res.stats = status.Stats
 
-			return nil
+			return res, nil
 		case emrTypes.JobRunStateFailed, emrTypes.JobRunStateCancelling, emrTypes.JobRunStateCancelled:
+			res.fields = jobRunFields(gotRun.JobRun)
 			if status, err := getStatus(); err != nil {
-				return fmt.Errorf("job failed with no status output: %s", runDetails)
+				return res, fmt.Errorf("job failed with no status output: %s", runDetails)
 			} else {
 				log.WithField("runDetails", runDetails).Error("emr job failed")
-				return fmt.Errorf("job failed: %s", status.Error)
+				return res, fmt.Errorf("job failed: %s", status.Error)
 			}
 		default:
 			select {
@@ -350,9 +355,9 @@ func (e *emrClient) runJob(ctx context.Context, job computeJob) error {
 				// If the parent context was cancelled we are stopping the job
 				// due to that, not due to the total job runtime limit.
 				if err := ctx.Err(); err != nil {
-					return err
+					return res, err
 				}
-				return fmt.Errorf("job %s exceeded the maximum allowed duration of %s and was cancelled", *start.JobRunId, maxJobRunDuration)
+				return res, fmt.Errorf("job %s exceeded the maximum allowed duration of %s and was cancelled", *start.JobRunId, maxJobRunDuration)
 			case <-time.After(5 * time.Second):
 				continue
 			}

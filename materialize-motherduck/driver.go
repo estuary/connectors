@@ -76,6 +76,7 @@ type transactor struct {
 	bindings   []*binding
 	be         *m.BindingEvents
 	templates  *templates
+	profiler   *boilerplate.QueryProfiler
 
 	// truncateAfterBackfill permits deleting the rows published before a
 	// completed backfill.
@@ -155,6 +156,7 @@ func newTransactor(
 		}
 		t.bindings = append(t.bindings, b)
 	}
+	t.profiler = newQueryProfiler(db, ep.Dialect.Literal(cfg.Database), t.bindings)
 
 	return t, nil
 }
@@ -225,11 +227,13 @@ func (t *transactor) Acknowledge(ctx context.Context, statePatches []json.RawMes
 	return nil, nil
 }
 
-func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (returnErr error) {
 	var ctx = it.Context()
 
+	var profile = d.profiler.NewProfile()
 	for it.Next() {
 		b := d.bindings[it.Binding]
+		profile.AddKeys(it.Binding, 1)
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
@@ -260,9 +264,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				loadTemplate = d.templates.loadQueryNoFlowDocument
 			}
 
+			var bounds = b.loadMergeBounds.Build()
+			profile.SetBounds(idx, bounds)
 			if err := loadTemplate.Execute(&loadQuery, &queryParams{
 				Table:  b.target,
-				Bounds: b.loadMergeBounds.Build(),
+				Bounds: bounds,
 				Files:  uris,
 			}); err != nil {
 				return fmt.Errorf("rendering load query: %w", err)
@@ -304,8 +310,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// timeout.
 	queryCtx, cancel := context.WithTimeout(ctx, 4*time.Hour)
 	defer cancel()
+	var _, trace = profile.TraceAll(queryCtx, "load")
+	defer func() { trace.Finish(returnErr) }()
 	rows, err := d.conn.QueryContext(queryCtx, fmt.Sprintf("COPY (%s) to '%s';", loadAllSql, loadResURI))
 	if err != nil {
+		setQueryID(ctx, d.conn, trace)
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
 	defer rows.Close()
@@ -320,6 +329,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("querying Loads: %w", err)
 	}
+	trace.Executed()
+	setQueryID(ctx, d.conn, trace)
 
 	// Now read these results back from the s3 file.
 	//
@@ -351,6 +362,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("scanning loaded document from file: %w", err)
 		}
 		loadDoc := doc.Doc
+		trace.AddDocument(len(loadDoc))
 		if b := d.bindings[doc.Binding]; len(b.nullFieldsToStrip) > 0 {
 			var err error
 			if loadDoc, err = sql.StripNullFields(loadDoc, b.nullFieldsToStrip); err != nil {
@@ -431,6 +443,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 }
 
 type bindingCommit struct {
+	binding int
 	path    []string
 	queries []string
 	// expectedInserts is the number of rows we expect the final query
@@ -447,9 +460,10 @@ type bindingCommit struct {
 func (d *transactor) commit(ctx context.Context, fenceUpdate string, round int, truncations map[int]time.Time) error {
 	defer d.storeFiles.CleanupCurrentTransaction(ctx)
 
+	var profile = d.profiler.NewProfile()
 	var commits []bindingCommit
 	for idx, b := range d.bindings {
-		var commit = bindingCommit{path: b.target.Path}
+		var commit = bindingCommit{binding: idx, path: b.target.Path}
 		if boundary, ok := truncations[idx]; ok {
 			// The boundary is floored to microsecond precision to match
 			// DuckDB type TIMESTAMP WITH TIME ZONE.
@@ -469,9 +483,11 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, round int, 
 		}
 
 		var queries []string
-		params := &queryParams{Table: b.target, Files: uris, Bounds: b.storeMergeBounds.Build()}
+		var bounds = b.storeMergeBounds.Build()
+		params := &queryParams{Table: b.target, Files: uris, Bounds: bounds}
 
 		if b.mustMerge {
+			profile.SetBounds(idx, bounds)
 			// In-place updates are accomplished by deleting the
 			// existing row and inserting the updated row.
 			var storeDeleteQuery strings.Builder
@@ -497,7 +513,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, round int, 
 	}
 
 	if err := commitRetry.Do(ctx, "store commit", func(ctx context.Context) error {
-		return d.commitBindings(ctx, commits, fenceUpdate, round)
+		return d.commitBindings(ctx, profile, commits, fenceUpdate, round)
 	}); err != nil {
 		return err
 	}
@@ -509,7 +525,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, round int, 
 	return nil
 }
 
-func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommit, fenceUpdate string, round int) error {
+func (d *transactor) commitBindings(ctx context.Context, profile *boilerplate.QueryProfile, bindings []bindingCommit, fenceUpdate string, round int) error {
 	// TODO(whb): Motherduck has occasional issues where queries hang forever,
 	// never completing but also never erroring out. A 4 hour timeout is quite
 	// generous but should allow the connector to restart rather than getting
@@ -532,7 +548,7 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 	for idx, b := range bindings {
 		d.be.StartedResourceCommit(b.path)
 		for i, query := range b.queries {
-			res, err := txn.ExecContext(txnCtx, query)
+			res, err := execTraced(txnCtx, txn, profile, b.binding, query)
 			if err != nil {
 				return fmt.Errorf("executing store query for %s: %w", b.path, err)
 			}
@@ -559,7 +575,7 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 		// The truncation follows the binding's stores, so it removes only the
 		// rows they did not rewrite.
 		if b.truncateSQL != "" {
-			if res, err := txn.ExecContext(txnCtx, b.truncateSQL, b.truncateBefore); err != nil {
+			if res, err := execTraced(txnCtx, txn, d.profiler.NewProfile(), b.binding, b.truncateSQL, b.truncateBefore); err != nil {
 				return fmt.Errorf("truncating %s after backfill: %w", b.path, err)
 			} else if truncated[idx], err = res.RowsAffected(); err != nil {
 				return fmt.Errorf("truncating %s after backfill (rows affected): %w", b.path, err)
@@ -574,7 +590,7 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 		return fmt.Errorf("getting fence update rows affected: %w", err)
 	} else if rows != 1 {
 		return fmt.Errorf("this instance was fenced off by another")
-	} else if err := txn.Commit(); err != nil {
+	} else if err := commitTraced(txnCtx, txn, d.profiler); err != nil {
 		return fmt.Errorf("committing store transaction: %w", &commitError{err})
 	}
 
@@ -596,4 +612,6 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 	return nil
 }
 
-func (d *transactor) Destroy() {}
+func (d *transactor) Destroy() {
+	d.profiler.Stop()
+}

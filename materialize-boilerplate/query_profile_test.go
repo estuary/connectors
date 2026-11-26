@@ -105,16 +105,59 @@ func TestQueryTrace(t *testing.T) {
 		require.Equal(t, log.Fields{"query": "delete", "queryId": "q1", "resourcePath": []string{"a", "b"}}, q.fields)
 	})
 
-	t.Run("skips quick queries and queries without an id", func(t *testing.T) {
+	t.Run("skips quick queries", func(t *testing.T) {
 		var p, _ = testProfiler(nil, time.Hour)
 		var _, trace = p.Trace(withID("q1"), 0, "merge")
+		require.False(t, trace.Slow())
 		trace.Finish(nil)
-
-		p.minDuration = 0
-		_, trace = p.Trace(context.Background(), 0, "merge")
-		trace.Finish(nil)
-
 		require.Empty(t, p.queue)
+	})
+
+	t.Run("queues a query without an id, with the fields set on it", func(t *testing.T) {
+		var p, _ = testProfiler(nil, 0)
+		var _, trace = p.Trace(context.Background(), 0, "merge")
+		require.True(t, trace.Slow())
+		trace.Set("slotMs", 12)
+		trace.Finish(nil)
+
+		var q = <-p.queue
+		require.Empty(t, q.id)
+		delete(q.fields, "took")
+		require.Equal(t, log.Fields{"query": "merge", "resourcePath": []string{"a", "b"}, "slotMs": 12}, q.fields)
+	})
+
+	t.Run("logs the bindings of a query over all of them, most keys first", func(t *testing.T) {
+		var p, _ = testProfiler(nil, 0)
+		var profile = p.NewProfile()
+		profile.AddKeys(0, 1)
+		profile.AddKeys(1, 4)
+		profile.SetBounds(1, fakeBounds{"id": nil})
+
+		var _, trace = profile.TraceAll(withID("q1"), "load")
+		trace.Finish(nil)
+
+		var q = <-p.queue
+		delete(q.fields, "took")
+		require.Equal(t, log.Fields{"query": "load", "queryId": "q1", "bindings": []log.Fields{
+			{"resourcePath": []string{"c", "d"}, "keys": 4, "bounds": map[string]any{"id": nil}},
+			{"resourcePath": []string{"a", "b"}, "keys": 1},
+		}}, q.fields)
+	})
+
+	t.Run("leaves out the bindings of a query over too many", func(t *testing.T) {
+		var p, _ = testProfiler(nil, 0)
+		var profile = p.NewProfile()
+		for binding := range queryProfileMaxBindings + 2 {
+			profile.AddKeys(binding, binding+1)
+		}
+
+		var _, trace = profile.TraceAll(withID("q1"), "load")
+		trace.Finish(nil)
+
+		var q = <-p.queue
+		require.Len(t, q.fields["bindings"], queryProfileMaxBindings)
+		require.Equal(t, 2, q.fields["bindingsOmitted"])
+		require.Equal(t, queryProfileMaxBindings+1, q.tables[0].binding)
 	})
 
 	t.Run("drops queries when the queue is full", func(t *testing.T) {
@@ -197,6 +240,15 @@ func TestQueryProfilerFetch(t *testing.T) {
 		require.Nil(t, p.history)
 		require.Equal(t, []log.Fields{{"queryId": "q1"}}, *emitted)
 	})
+
+	t.Run("logs a query without an id right away", func(t *testing.T) {
+		var history = &fakeHistory{}
+		var p, emitted = testProfiler(history, 0)
+		var queries = append(awaiting(now, "q1"), &profiledQuery{fields: log.Fields{"query": "load"}, finished: now})
+		require.Equal(t, []string{"q1"}, ids(p.fetch(context.Background(), queries, now)))
+		require.Equal(t, [][]string{{"q1"}}, history.requests)
+		require.Equal(t, []log.Fields{{"query": "load"}}, *emitted)
+	})
 }
 
 func TestStatementKind(t *testing.T) {
@@ -208,7 +260,8 @@ func TestStatementKind(t *testing.T) {
 func TestQueryProfilerTableContext(t *testing.T) {
 	var now = time.Now()
 	var slow = func(binding int) []*profiledQuery {
-		return []*profiledQuery{{id: "q", binding: binding, fields: log.Fields{"query": "merge"}, finished: now}}
+		var fields = log.Fields{"query": "merge"}
+		return []*profiledQuery{{id: "q", fields: fields, tables: []profiledTable{{binding: binding, fields: fields}}, finished: now}}
 	}
 	var withContext = func(fields log.Fields, err error) (*QueryProfiler, *[]log.Fields, *[]int) {
 		var p, emitted = testProfiler(nil, 0)
@@ -253,9 +306,34 @@ func TestQueryProfilerTableContext(t *testing.T) {
 		require.Equal(t, []log.Fields{{"query": "merge"}}, *plainEmitted)
 		require.Len(t, *emitted, 2)
 	})
+
+	t.Run("adds each table's context to a query over several bindings", func(t *testing.T) {
+		var p, emitted, calls = withContext(log.Fields{"table": "x", "warehouse": "w"}, nil)
+		var first, second = log.Fields{"keys": 1}, log.Fields{"keys": 2}
+		var q = &profiledQuery{
+			fields:   log.Fields{"bindings": []log.Fields{first, second}},
+			tables:   []profiledTable{{binding: 1, fields: first}, {binding: 0, fields: second}},
+			finished: now,
+		}
+		p.fetch(context.Background(), []*profiledQuery{q}, now)
+		require.Equal(t, []int{1, 0}, *calls)
+		require.Equal(t, []log.Fields{{"warehouse": "w", "bindings": []log.Fields{
+			{"keys": 1, "table": "x"}, {"keys": 2, "table": "x"},
+		}}}, *emitted)
+	})
 }
 
 func TestQueryProfilerStop(t *testing.T) {
-	var p = NewQueryProfiler(nil, time.Hour, nil, nil, nil)
+	var p = NewQueryProfiler(&fakeHistory{}, time.Hour, fakeReportIDs, [][]string{{"a"}}, nil)
+	var emitted []log.Fields
+	p.emit = func(fields log.Fields) { emitted = append(emitted, fields) }
+	p.minDuration = 0
+
+	var _, trace = p.Trace(withID("q1"), 0, "merge")
+	trace.Finish(errors.New("boom"))
 	p.Stop()
+
+	require.Len(t, emitted, 1)
+	require.Equal(t, "q1", emitted[0]["queryId"])
+	require.Equal(t, true, emitted[0]["failed"])
 }

@@ -1,5 +1,20 @@
 # materialize-motherduck
 
+## 2026-11-24
+
+### Added
+- Load, commit and truncation queries that run for at least five seconds are
+  logged with how long they took and the ID MotherDuck gave them. A load also
+  logs the keys it looked up in each table, the key bounds it was restricted
+  to, and the documents it returned, and a merge its key bounds. Where the
+  token's user may view query history, a query is also logged with the
+  metrics MotherDuck records of it: time spent waiting on resources and
+  executing, the bytes uploaded and downloaded, the bytes spilled to disk and
+  the duckling size. The first slow query of each table in a run also logs
+  the table's estimated rows, columns and indexes, the data and delete files
+  of a DuckLake table, and the duckling's size and version. The metrics are
+  read in the background, without holding up the transaction.
+
 ## 2026-11-23
 
 ### Changed

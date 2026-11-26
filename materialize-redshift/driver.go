@@ -304,6 +304,7 @@ type transactor struct {
 	templates                      templates
 	bindings                       []*binding
 	be                             *m.BindingEvents
+	profiler                       *boilerplate.QueryProfiler
 	cfg                            config
 	store                          *s3Store
 	caseSensitiveIdentifierEnabled bool
@@ -399,6 +400,7 @@ func prepareNewTransactor(
 				return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 			}
 		}
+		d.profiler = newQueryProfiler(cfg, d.bindings)
 
 		// The crossover decision below needs the state before the runtime
 		// hands it over separately.
@@ -602,9 +604,10 @@ func (t *transactor) mergePeerStatePatches(patches []json.RawMessage) error {
 	return nil
 }
 
-func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (returnErr error) {
 	var ctx = it.Context()
 	gotLoads := false
+	var profile = d.profiler.NewProfile()
 
 	// Keep track of the maximum length of any string values encountered so the temporary load table
 	// can be created with long enough string columns.
@@ -612,6 +615,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	for it.Next() {
 		gotLoads = true
+		profile.AddKeys(it.Binding, 1)
 
 		var b = d.bindings[it.Binding]
 		b.loadFile.start()
@@ -700,7 +704,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d", b.target.Binding), manifest, false); err != nil {
 			return err
-		} else if _, err := txn.Exec(ctx, copySQL); err != nil {
+		} else if _, err := d.execTraced(ctx, txn, idx, copySQL); err != nil {
 			return handleCopyIntoErr(ctx, txn, d.dialect, d.cfg.Bucket, files, b.target.Identifier, err)
 		}
 	}
@@ -709,6 +713,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// and send results to the |loaded| callback.
 	loadAllSQL := strings.Join(subqueries, "\nUNION ALL\n") + ";"
 	d.be.StartedEvaluatingLoads()
+	var _, trace = profile.TraceAll(ctx, "load")
+	defer func() { trace.Finish(returnErr) }()
 	rows, err := txn.Query(ctx, loadAllSQL)
 	if err != nil {
 		return fmt.Errorf("querying load documents: %w", err)
@@ -717,6 +723,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	d.be.FinishedEvaluatingLoads()
 
 	for rows.Next() {
+		trace.Executed()
 		var binding int
 		var document json.RawMessage
 
@@ -725,6 +732,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 
 		doc := json.RawMessage(document)
+		trace.AddDocument(len(doc))
 		if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
 			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
 				return fmt.Errorf("stripping null fields: %w", err)
@@ -737,6 +745,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("querying Loads: %w", err)
 	}
+	trace.Executed()
+	setQueryID(ctx, txn, trace)
 
 	if err := txn.Commit(ctx); err != nil {
 		return fmt.Errorf("committing load transaction: %w", err)
@@ -1190,9 +1200,9 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 
 			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d_deleted", b.target.Binding), g.deleteManifest, false); err != nil {
 				return nil, err
-			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
+			} else if _, err := d.execTraced(ctx, txn, b.target.Binding, copySQL); err != nil {
 				return nil, handleCopyIntoErr(ctx, txn, d.dialect, d.cfg.Bucket, g.merged.DeleteFiles, b.target.Identifier, err)
-			} else if tag, err := txn.Exec(ctx, b.deleteQuerySQL); err != nil {
+			} else if tag, err := d.execTraced(ctx, txn, b.target.Binding, b.deleteQuerySQL); err != nil {
 				return nil, fmt.Errorf("deleting from table '%s': %w", b.target.Identifier, err)
 			} else {
 				affected[g] += tag.RowsAffected()
@@ -1217,11 +1227,11 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 
 			if copySQL, err := d.copyFromS3(fmt.Sprintf("flow_temp_table_%d", b.target.Binding), g.storeManifest, true); err != nil {
 				return nil, err
-			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
+			} else if _, err := d.execTraced(ctx, txn, b.target.Binding, copySQL); err != nil {
 				return nil, handleCopyIntoErr(ctx, txn, d.dialect, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
 			} else if n, err := lastCopyCount(ctx, txn); err != nil {
 				return nil, fmt.Errorf("reading rows staged for table '%s': %w", b.target.Identifier, err)
-			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
+			} else if _, err := d.execTraced(ctx, txn, b.target.Binding, b.mergeIntoSQL); err != nil {
 				return nil, fmt.Errorf("merging to table '%s': %w", b.target.Identifier, err)
 			} else {
 				// MERGE's command tag counts only the rows it inserted, so
@@ -1233,7 +1243,7 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 			// Can copy directly into the target table since all values are new.
 			if copySQL, err := d.copyFromS3(b.target.Identifier, g.storeManifest, true); err != nil {
 				return nil, err
-			} else if _, err := txn.Exec(ctx, copySQL); err != nil {
+			} else if _, err := d.execTraced(ctx, txn, b.target.Binding, copySQL); err != nil {
 				return nil, handleCopyIntoErr(ctx, txn, d.dialect, d.cfg.Bucket, g.merged.StoreFiles, b.target.Identifier, err)
 			} else if n, err := lastCopyCount(ctx, txn); err != nil {
 				return nil, fmt.Errorf("reading rows loaded into table '%s': %w", b.target.Identifier, err)
@@ -1250,7 +1260,7 @@ func (d *transactor) applyStaged(ctx context.Context, conn *pgx.Conn, groups []*
 			var _, reason = b.target.PublishedAtColumn()
 			return nil, fmt.Errorf("unable to apply truncation boundary %s for table %s: %w",
 				g.merged.TruncateBefore.Format(time.RFC3339), b.target.Identifier, reason)
-		} else if tag, err := txn.Exec(ctx, b.truncateSQL, *g.merged.TruncateBefore); err != nil {
+		} else if tag, err := d.execTraced(ctx, txn, b.target.Binding, b.truncateSQL, *g.merged.TruncateBefore); err != nil {
 			return nil, fmt.Errorf("truncating %s after backfill: %w", b.target.Identifier, err)
 		} else {
 			var n = tag.RowsAffected()
@@ -1374,4 +1384,6 @@ func handleCopyIntoErr(ctx context.Context, txn pgx.Tx, dialect sql.Dialect, buc
 	}
 }
 
-func (d *transactor) Destroy() {}
+func (d *transactor) Destroy() {
+	d.profiler.Stop()
+}
