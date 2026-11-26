@@ -123,3 +123,24 @@ collections:
     projections:
       renamed_string: /renamedString
       renamed_total: /renamedTotal
+
+  # Merges nested values into the previously loaded ones. A load that rebuilds
+  # the document must return objects and arrays as JSON values, not as text.
+  tests/merge-nested:
+    schema:
+      properties:
+        id: {type: integer}
+        obj:
+          type: object
+          properties:
+            total: {type: integer, reduce: {strategy: sum}}
+            label: {type: string}
+          reduce: {strategy: merge}
+        arr:
+          type: array
+          items: {type: integer}
+          reduce: {strategy: append}
+      required: [id]
+      type: object
+      reduce: {strategy: merge}
+    key: [/id]
