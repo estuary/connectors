@@ -1,0 +1,74 @@
+info:
+  name: search offset 9801 probe
+  type: http
+  seq: 16
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v3/objects/contacts/search"
+  body:
+    type: json
+    data: |-
+      {
+        "filters": [
+          {
+            "propertyName": "lastmodifieddate",
+            "operator": "BETWEEN",
+            "value": "2024-10-28T16:40:18.000000Z",
+            "highValue": "2026-10-20T00:00:00.000000Z"
+          }
+        ],
+        "sorts": [{"propertyName": "lastmodifieddate", "direction": "ASCENDING"}],
+        "limit": 200,
+        "after": 9801
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "400 - offset 9801 rejected past the 10,000 cap"
+    request:
+      url: "{{base_url}}/crm/v3/objects/contacts/search"
+      method: POST
+    response:
+      status: 400
+      statusText: Bad Request
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "error",
+            "message": "There was a problem with the request.",
+            "correlationId": "01a15b8e-9a10-7896-b91c-fd4c511e5e3a"
+          }
+
+docs: |-
+  **REFERENCE:** [Search for contacts](https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/search/search-contacts)
+
+  **WHY:** one past the peek offset. The connector raises `_CapReached` rather than
+  request a page with `after + 200 > 10,000`. This shows whether HubSpot enforces the
+  cap at exactly that point, without needing 10,000 records.
+
+  **VERIFIED (2026-10-20):** `400` whose body says only "There was a problem with the request.",
+  with no `category` or `context`. With `_crm-objects / search peek offset 9800`, this
+  pins the boundary: at `limit: 200`, offset 9,800 is the last accepted, so a page may
+  not reach past result 10,000. HubSpot enforces this even when `total` is 2. The
+  connector's guard matches exactly.
+
+  **LIMITATION (VERIFIED 2026-10-20):** the 10,000-result cap is a hard `400` with a generic
+  message that can't be told apart from other bad requests. The connector must never
+  page past it, and it doesn't.
+
+  **UNOBSERVABLE:** whether a query that matches more than 10,000 records truncates the
+  tail of the sort order rather than dropping rows from the middle. Seeing that needs
+  more than 10,000 records, and this collection doesn't seed data. The connector
+  doesn't rely on it: it splits a window by time until each chunk's `total` fits under
+  the cap, then reads every chunk completely.

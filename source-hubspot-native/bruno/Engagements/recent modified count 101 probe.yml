@@ -1,0 +1,54 @@
+info:
+  name: recent modified count 101 probe
+  type: http
+  seq: 3
+
+http:
+  method: GET
+  url: "{{base_url}}/engagements/v1/engagements/recent/modified?count=101"
+  params:
+    - name: count
+      value: "101"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - count 101 accepted, empty list"
+    request:
+      url: "{{base_url}}/engagements/v1/engagements/recent/modified?count=101"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "results": [],
+            "hasMore": false,
+            "offset": 0,
+            "total": 0
+          }
+
+docs: |-
+  **REFERENCE:** [Get recent engagements (v1, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/crm/activities/engagements/get-engagements-v1-engagements-recent-modified)
+
+  **WHY:** the connector pages the realtime endpoint with `count=100`, which is the
+  documented maximum. One past it shows how HubSpot enforces the maximum: by rejecting
+  the request or by clamping it.
+
+  **VERIFIED (2026-10-20):** `count=101` is **accepted**: `200` with the same empty
+  envelope as `Engagements / recent modified bare`, not a `400`.
+
+  **UNOBSERVABLE:** whether HubSpot clamps to 100, serves 101, or truncates. The account
+  has no engagements, and bulk-seeding over 100 is out of scope. The connector never
+  sends more than 100 and pages on `hasMore`/`offset`, so either answer is safe for it.

@@ -1,0 +1,106 @@
+info:
+  name: sorted page
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/marketing/v3/campaigns?limit=100&sort=-updatedAt&properties=hs_start_date,hs_end_date,hs_color_hex,hs_notes,hs_audience,hs_goal,hs_owner,hs_currency_code,hs_created_by_user_id,hs_campaign_status,hs_object_id,hs_name,hs_utm,hs_budget_items_sum_amount,hs_spend_items_sum_amount"
+  params:
+    - name: limit
+      value: "100"
+      type: query
+    - name: sort
+      value: -updatedAt
+      type: query
+    - name: properties
+      value: hs_start_date,hs_end_date,hs_color_hex,hs_notes,hs_audience,hs_goal,hs_owner,hs_currency_code,hs_created_by_user_id,hs_campaign_status,hs_object_id,hs_name,hs_utm,hs_budget_items_sum_amount,hs_spend_items_sum_amount
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "403 - missing marketing.campaigns.read scope"
+    request:
+      url: "{{base_url}}/marketing/v3/campaigns?limit=100&sort=-updatedAt&properties=hs_start_date,hs_end_date,hs_color_hex,hs_notes,hs_audience,hs_goal,hs_owner,hs_currency_code,hs_created_by_user_id,hs_campaign_status,hs_object_id,hs_name,hs_utm,hs_budget_items_sum_amount,hs_spend_items_sum_amount"
+      method: GET
+    response:
+      status: 403
+      statusText: Forbidden
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "status": "error",
+            "message": "This app hasn't been granted all required scopes to make this call. Read more about required scopes here: https://developers.hubspot.com/scopes.",
+            "correlationId": "01a15b8b-8729-7d9b-943e-bc6bbf3d418b",
+            "errors": [
+              {
+                "message": "One or more of the following scopes are required.",
+                "context": {
+                  "requiredGranularScopes": [
+                    "marketing.campaigns.read"
+                  ]
+                }
+              }
+            ],
+            "links": {
+              "scopes": "https://developers.hubspot.com/scopes"
+            },
+            "category": "MISSING_SCOPES"
+          }
+
+docs: |-
+  **REFERENCE:** [Get campaigns (v3, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/marketing/campaigns/get-campaigns)
+
+  **WHY:** the call `_request_campaigns_in_time_range` (`api/campaigns.py`) makes for
+  both the backfill and the incremental task: `limit=100`, `sort=-updatedAt`, and
+  `properties` set to every campaign property `_is_readable_campaign_property` allows.
+  Here `properties` is the 15 names in `CAMPAIGN_READABLE_PROPERTIES`; the connector
+  also adds any custom (non-`hs_`) property listed by `/crm/v3/properties/campaign`. The
+  loop returns at the first campaign with `updatedAt < start`, so it depends on the
+  descending sort being honored.
+
+  **DOCUMENTED (2026-10-20):** from the
+  [guide](https://developers.hubspot.com/docs/api-reference/legacy/marketing/campaigns/guide):
+  - `limit`: "The allowed values range from 1 to 100. If no limit is specified, it will
+    be set to 50 campaigns by default." The connector uses the maximum.
+  - `sort`: "Allowed values are `hs_name`, `createdAt`, `updatedAt`. An optional hyphen
+    (`-`) before the property name will denote descending order. ... If this is not
+    specified, the list of campaigns will be sorted in alphabetical order by campaign
+    name." (Its own example, `-CREATED_AT`, uses a spelling the allowed list doesn't
+    have.)
+  - "If your request includes read-only or non-existent properties, you will encounter a
+    `400 error`." The guide lists 8 usable properties (`hs_name`, `hs_start_date`,
+    `hs_end_date`, `hs_notes`, `hs_audience`, `hs_currency_code`, `hs_campaign_status`,
+    `hs_utm`). The connector sends 7 more: `hs_color_hex`, `hs_goal`, `hs_owner`,
+    `hs_created_by_user_id`, `hs_object_id`, `hs_budget_items_sum_amount` and
+    `hs_spend_items_sum_amount`.
+
+  **LIMITATION (DOCUMENTED 2026-10-20):** `properties` rejects read-only or unknown
+  properties with a 400, so the connector can't pass the whole property list. It filters
+  the list through `CAMPAIGN_READABLE_PROPERTIES` and the `hs_`/`hubspot_` prefix rule.
+
+  **VERIFIED (2026-10-20):** `403`, the same `MISSING_SCOPES` body as
+  `Campaigns / access check`. Nothing about sorting or properties can be seen until the
+  scope is granted.
+
+  **UNOBSERVABLE:** three things this call is meant to settle, all blocked by the
+  missing `marketing.campaigns.read` scope (`Campaigns / access check`):
+  - Whether `sort=-updatedAt` really returns newest first. If it doesn't, the early
+    `return` on the first old campaign would skip newer campaigns further on.
+  - Whether the 7 properties outside the guide's list are accepted or get the documented
+    400. The connector's code comment says the allow-list exists because forbidden
+    properties return 400, which suggests it was checked live once, but no evidence of
+    that is recorded here.
+  - How `limit=101` is enforced; a `+1` probe would only return the same 403. Fallback:
+    re-run this request, and add a `limit 101` probe, after re-authorizing with the
+    scope.

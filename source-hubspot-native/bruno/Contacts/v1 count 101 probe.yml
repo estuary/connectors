@@ -1,0 +1,59 @@
+info:
+  name: v1 count 101 probe
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/contacts/v1/lists/recently_updated/contacts/recent?count=101"
+  params:
+    - name: count
+      value: "101"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - count 101 accepted, empty list"
+    request:
+      url: "{{base_url}}/contacts/v1/lists/recently_updated/contacts/recent?count=101"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "contacts": [],
+            "has-more": false,
+            "vid-offset": 0,
+            "time-offset": 0
+          }
+
+docs: |-
+  **REFERENCE:** none live. The legacy reference URL checked,
+  https://developers.hubspot.com/docs/api-reference/legacy/crm/objects/contacts/v1/get-recently-updated-contacts,
+  returns 404, so the endpoint's `count` maximum can't be read from HubSpot today.
+
+  **WHY:** the connector pages this endpoint with `count=100`. One past that shows
+  whether the endpoint still validates its parameters at all, which is the only way
+  to tell a live endpoint from a stub when `Contacts / v1 recently updated bare` has
+  no contacts to return.
+
+  **VERIFIED (2026-10-20):** `count=101` is accepted: `200` with the same empty
+  envelope as `Contacts / v1 recently updated bare`, not a `400`. That fits a silent
+  clamp or no ceiling at all, and also fits a stub that ignores its parameters, so it
+  doesn't tell a live endpoint from a stub.
+
+  **UNOBSERVABLE:** clamp vs. no limit. Both look the same with no contacts in the
+  30-day lookback. That doesn't affect correctness: the connector never asks for more
+  than 100 and pages on `has-more` / `time-offset`.

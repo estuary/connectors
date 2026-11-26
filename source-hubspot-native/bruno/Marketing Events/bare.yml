@@ -1,0 +1,102 @@
+info:
+  name: bare
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/marketing/v3/marketing-events?limit=100"
+  params:
+    - name: limit
+      value: "100"
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // Chain the first event's internal id (`objectId`, the id the connector
+        // passes to the participations breakdown) into
+        // `Marketing Events / participations breakdown`. Runtime var only.
+        const first = res.getBody()?.results?.[0];
+        if (res.getStatus() === 200 && first?.objectId) {
+          bru.setVar('marketing_event_id', String(first.objectId));
+        }
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - one event, no paging"
+    request:
+      url: "{{base_url}}/marketing/v3/marketing-events?limit=100"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "results": [
+              {
+                "eventName": "Test Marketing Event",
+                "eventType": "Test Event",
+                "startDateTime": "2026-05-29T14:27:26.867Z",
+                "endDateTime": "2026-06-02T16:00:00Z",
+                "eventOrganizer": "Nicolas Lazo",
+                "eventDescription": "My description",
+                "eventUrl": null,
+                "eventCancelled": false,
+                "eventCompleted": false,
+                "customProperties": [],
+                "objectId": "559722810694",
+                "externalEventId": null,
+                "eventStatus": "PAST",
+                "eventStatusV2": "completed",
+                "appInfo": null,
+                "registrants": null,
+                "attendees": 1,
+                "cancellations": null,
+                "noShows": -1,
+                "createdAt": "2026-05-29T14:27:36.562Z",
+                "updatedAt": "2026-06-02T17:32:48.609Z"
+              }
+            ]
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve all events (v3, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/marketing/marketing-events/get-marketing-events)
+
+  **WHY:** the call `fetch_marketing_events` (`api/marketing_events.py`) makes:
+  `limit=100`, following `paging.next.after`. It backs the `marketing_events` snapshot
+  binding and its discovery access check, and it is the first step of
+  `fetch_marketing_event_participants`, which takes each event's `objectId` as the
+  participations path id. The after-response script chains the first `objectId` into
+  `Marketing Events / participations breakdown`.
+
+  **DOCUMENTED (2026-10-20):** the page shows the path as
+  `GET /marketing/marketing-events/v3`, not the `/marketing/v3/marketing-events` path
+  the connector uses. It lists `after` and `limit` (default 10, no maximum stated) and
+  the scope `crm.objects.marketing_events.read`. `objectId` is "The internal ID of the
+  marketing event in HubSpot".
+
+  **VERIFIED (2026-10-20):** the connector's path works: `200` with one event
+  (`objectId: "559722810694"`, the same event the capture snapshot holds) and no
+  `paging` or `total`. `createdAt`, `updatedAt` and `startDateTime` are ISO strings with
+  milliseconds. A past event is returned (`eventStatus: "PAST"`,
+  `eventStatusV2: "completed"`), so finished events aren't filtered out by default, even
+  though `eventCompleted` reads `false`. The endpoint has no filter parameters, so there
+  is no default partition to audit.
+
+  **UNOBSERVABLE:** how events are ordered and paged once there are more than 100, and
+  whether cancelled events are listed (none exist). Creating events would change the
+  capture snapshot. Being a snapshot binding, `marketing_events` re-reads every page on
+  each run, so ordering doesn't matter to it.

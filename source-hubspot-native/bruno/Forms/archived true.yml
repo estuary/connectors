@@ -1,0 +1,65 @@
+info:
+  name: archived true
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{base_url}}/marketing/v3/forms?limit=500&formTypes=all&archived=true"
+  params:
+    - name: limit
+      value: "500"
+      type: query
+    - name: formTypes
+      value: all
+      type: query
+    - name: archived
+      value: "true"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "200 - empty, no archived forms"
+    request:
+      url: "{{base_url}}/marketing/v3/forms?limit=500&formTypes=all&archived=true"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "results": []
+          }
+
+docs: |-
+  **REFERENCE:** [Get a list of forms (v3, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/marketing/forms/get-forms)
+
+  **WHY:** silent-data-loss audit. The connector never sends `archived`. If HubSpot's
+  default leaves archived forms out, the `forms` snapshot never contains them, and a
+  form archived after it was captured simply disappears from later snapshots. This is
+  the connector's call plus `archived=true`.
+
+  **DOCUMENTED (2026-10-20):** `archived` is listed as a boolean with no description and
+  no default.
+
+  **VERIFIED (2026-10-20):** `200`, `{"results": []}`. The parameter is accepted with
+  `formTypes=all`, and the account has no archived forms.
+
+  **UNOBSERVABLE:** whether the default excludes archived forms, and whether
+  `archived=true` returns only archived ones. That would need an archived form, and
+  archiving one would change the test account. On the marketing emails endpoint,
+  HubSpot's 2026-09 docs define `archived` as "only results that have been archived"
+  (`Marketing Emails / archived true`). If forms behave the same way, the `forms`
+  binding misses archived forms. Fallback: a second sweep with `archived=true`, the way
+  `marketing_emails` already does it.

@@ -1,0 +1,87 @@
+info:
+  name: scope probe id 0 without carts scope
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v4/associations/engagements/carts/batch/read"
+  body:
+    type: json
+    data: |-
+      {
+        "inputs": [{"id": "0"}]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "207 - NO_ASSOCIATIONS_FOUND, not 403, despite missing carts scope"
+    request:
+      url: "{{base_url}}/crm/v4/associations/engagements/carts/batch/read"
+      method: POST
+    response:
+      status: 207
+      statusText: Multi-Status
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "completedAt": "2026-10-20T23:04:43.674Z",
+            "status": "COMPLETE",
+            "startedAt": "2026-10-20T23:04:43.654Z",
+            "results": [],
+            "errors": [
+              {
+                "status": "error",
+                "category": "OBJECT_NOT_FOUND",
+                "subCategory": "crm.associations.NO_ASSOCIATIONS_FOUND",
+                "message": "No cart is associated with engagement 0.",
+                "context": {
+                  "fromObjectId": [
+                    "0"
+                  ],
+                  "fromObjectType": [
+                    "engagement"
+                  ],
+                  "toObjectType": [
+                    "cart"
+                  ]
+                }
+              }
+            ],
+            "numErrors": 1
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve associations (v4, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/crm/associations/associate-records/batch/get-associations)
+
+  **WHY:** exactly the call `probe_associations` (`api/object_with_associations.py`)
+  makes for the `engagements` binding's `carts` entity: `{"inputs": [{"id": "0"}]}`.
+  Its comment says the made-up ID lets the probe "reach HubSpot's scope check". A
+  missing-scope `403` drops the entity from the document; any other answer keeps it.
+  The token lacks the carts scope (`Associations / carts objects scope check`), so a
+  working probe should get a `403`.
+
+  **VERIFIED (2026-10-20):** **not** a `403`. HubSpot answers `207` with `status:
+  "COMPLETE"`, `results: []`, and one error: `category: "OBJECT_NOT_FOUND"`,
+  `subCategory: "crm.associations.NO_ASSOCIATIONS_FOUND"`, "No cart is associated with
+  engagement 0.". The CDK treats any `2xx` as success, so the probe keeps `carts` as
+  readable. The body matches the connector's `BatchResult.Error` model (`status:
+  "error"`, `category: "OBJECT_NOT_FOUND"`).
+
+  **LIMITATION (VERIFIED 2026-10-20):** the ID-`0` probe can't detect a missing scope
+  for associated objects. The v4 batch read answers `207 NO_ASSOCIATIONS_FOUND` without
+  a scope check, also for a real record
+  (`Associations / scope probe real id without carts scope`). `probe_associations`
+  therefore never prunes entities like `carts`. The only guard is the `403` handling
+  in `fetch_association`, and it fires only if HubSpot returns a `403` once real
+  associations exist.

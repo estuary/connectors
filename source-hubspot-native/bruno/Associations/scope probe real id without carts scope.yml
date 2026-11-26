@@ -1,0 +1,82 @@
+info:
+  name: scope probe real id without carts scope
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/crm/v4/associations/contacts/carts/batch/read"
+  body:
+    type: json
+    data: |-
+      {
+        "inputs": [{"id": "72810357568"}]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: "207 - NO_ASSOCIATIONS_FOUND for a real contact, no scope check"
+    request:
+      url: "{{base_url}}/crm/v4/associations/contacts/carts/batch/read"
+      method: POST
+    response:
+      status: 207
+      statusText: Multi-Status
+      headers:
+        - name: content-type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "completedAt": "2026-10-20T23:05:22.692Z",
+            "status": "COMPLETE",
+            "startedAt": "2026-10-20T23:05:22.673Z",
+            "results": [],
+            "errors": [
+              {
+                "status": "error",
+                "category": "OBJECT_NOT_FOUND",
+                "subCategory": "crm.associations.NO_ASSOCIATIONS_FOUND",
+                "message": "No cart is associated with contact 72810357568.",
+                "context": {
+                  "fromObjectId": [
+                    "72810357568"
+                  ],
+                  "fromObjectType": [
+                    "contact"
+                  ],
+                  "toObjectType": [
+                    "cart"
+                  ]
+                }
+              }
+            ],
+            "numErrors": 1
+          }
+
+docs: |-
+  **REFERENCE:** [Retrieve associations (v4, legacy)](https://developers.hubspot.com/docs/api-reference/legacy/crm/associations/associate-records/batch/get-associations)
+
+  **WHY:** rules out the made-up ID as the reason
+  `Associations / scope probe id 0 without carts scope` got no `403`. This sends the
+  same scope-blocked target with a real record. The account has no engagements, so it
+  uses contact `72810357568`; contacts → carts is not one of
+  `Contact.ASSOCIATED_ENTITIES`.
+
+  **VERIFIED (2026-10-20):** again `207` `NO_ASSOCIATIONS_FOUND` ("No cart is associated
+  with contact 72810357568."), not a `403`. For a record without carts, HubSpot doesn't
+  check the associated object's scope at all.
+
+  **UNOBSERVABLE:** what HubSpot returns when a record does have cart associations and
+  the token lacks the carts scope: the cart IDs, or a `403`. Finding out needs a cart in
+  the test account (a mutation) and a token without the scope. If HubSpot returns the
+  IDs, engagement documents carry `carts` IDs the token can't otherwise read, which is
+  harmless. If it returns `403`, `fetch_association` drops `carts` for the rest of the
+  run. Either way the capture doesn't fail.
