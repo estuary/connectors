@@ -1,0 +1,4 @@
+["events/raw",{"canary":"e7","region":"us","seq":"7"}]
+["orders",{"canary":"o1","id":"1","status":"new"}]
+["orders",{"canary":"o2, \"quoted\"","id":"2","status":"paid"}]
+["orders",{"canary":"o3","id":"3","status":"new"}]

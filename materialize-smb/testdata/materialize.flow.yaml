@@ -1,0 +1,62 @@
+collections:
+  tests/orders:
+    schema:
+      type: object
+      required: [id]
+      properties:
+        id: {type: integer}
+        status: {type: string}
+        canary: {type: string}
+        _meta:
+          type: object
+          properties:
+            op: {type: string}
+      if:
+        required: [_meta]
+        properties:
+          _meta:
+            required: [op]
+            properties:
+              op: {const: d}
+      then:
+        reduce: {strategy: lastWriteWins, delete: true}
+    key: [/id]
+  tests/events:
+    schema:
+      type: object
+      required: [region, seq]
+      properties:
+        region: {type: string}
+        seq: {type: integer}
+        canary: {type: string}
+    key: [/region, /seq]
+
+materializations:
+  acmeCo/tests/materialize-smb:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config:
+          host: localhost
+          port: 1446
+          share: data
+          username: test
+          password: testpassword
+          directory: exports/flow
+          uploadInterval: 5m
+    bindings:
+      - resource:
+          path: orders
+        source: tests/orders
+        fields:
+          recommended: false
+          include: {id: {}, canary: {}, status: {}}
+          exclude: [flow_document]
+      - resource:
+          path: events/raw
+        source: tests/events
+        fields:
+          recommended: false
+          include: {region: {}, seq: {}, canary: {}}
+          exclude: [flow_document]
