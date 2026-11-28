@@ -203,6 +203,9 @@ class HogQLEntity[T: PostHogPrimaryKey](
 
     table_name: ClassVar[str]
     cursor_columns: ClassVar[list[str]]
+    # Breaks ties between rows that share a cursor value, so a query can page
+    # through them in a total order. Unique per row within a project.
+    tiebreak_column: ClassVar[str]
 
     @classmethod
     def get_api_endpoint_url(cls, base_url: str, project_id: int) -> str:
@@ -303,6 +306,7 @@ class Event(HogQLEntity[str]):
     resource_name: ClassVar[str] = "Events"
     table_name: ClassVar[str] = "events"
     cursor_columns: ClassVar[list[str]] = ["timestamp"]
+    tiebreak_column: ClassVar[str] = "uuid"
 
     id: str = Field(alias="uuid")
     timestamp: AwareDatetime
@@ -318,6 +322,7 @@ class Person(HogQLEntity[str]):
     resource_name: ClassVar[str] = "Persons"
     table_name: ClassVar[str] = "persons"
     cursor_columns: ClassVar[list[str]] = ["last_seen_at", "created_at"]
+    tiebreak_column: ClassVar[str] = "id"
 
     created_at: AwareDatetime
     last_seen_at: AwareDatetime | None

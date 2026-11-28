@@ -17,6 +17,7 @@ from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
 from .api import (
+    EVENTS_EVENTUAL_CONSISTENCY_HORIZON,
     SESSIONS_CURSOR_TICK,
     SESSIONS_LOOKBACK_LAG,
     SESSIONS_REALTIME_LAG,
@@ -53,11 +54,6 @@ TOMBSTONE = BaseDocument(_meta=BaseDocument.Meta(op="d"))
 
 REALTIME = "realtime"
 LOOKBACK = "lookback"
-
-# PostHog events eventual consistency horizon.
-# Events may be delayed in appearing in query results due to ClickHouse replication
-# and Kafka processing. The lookback stream trails behind to capture delayed events.
-EVENTS_EVENTUAL_CONSISTENCY_HORIZON = timedelta(hours=1)
 
 RESOURCE_REQUIRED_SCOPES: dict[str, str] = {
     "Cohorts": "cohort:read",
@@ -323,25 +319,28 @@ async def events(
     cutoff = datetime.now(tz=UTC)
     lookback_cutoff = cutoff - EVENTS_EVENTUAL_CONSISTENCY_HORIZON
 
-    # Incremental fetchers (for fetch_changes) - called with (log, cursor)
-    incremental_fetchers = {
-        **{
-            f"{project_id}_{REALTIME}": functools.partial(
-                fetch_project_events, http, config, project_id, None
-            )
-            for project_id in project_ids
-        },
-        **{
-            f"{project_id}_{LOOKBACK}": functools.partial(
-                fetch_project_events,
-                http,
-                config,
-                project_id,
-                EVENTS_EVENTUAL_CONSISTENCY_HORIZON,
-            )
-            for project_id in project_ids
-        },
-    }
+    # Incremental fetchers (for fetch_changes) - called with (log, cursor).
+    # Built in `open`, which has the binding's interval.
+    def incremental_fetchers(interval: timedelta):
+        return {
+            **{
+                f"{project_id}_{REALTIME}": functools.partial(
+                    fetch_project_events, http, config, project_id, None, interval
+                )
+                for project_id in project_ids
+            },
+            **{
+                f"{project_id}_{LOOKBACK}": functools.partial(
+                    fetch_project_events,
+                    http,
+                    config,
+                    project_id,
+                    EVENTS_EVENTUAL_CONSISTENCY_HORIZON,
+                    interval,
+                )
+                for project_id in project_ids
+            },
+        }
 
     # Backfill fetchers (for fetch_page) - called with (log, page, cutoff)
     # See `_generate_delayed_stream_resource_state` for the `_{REALTIME}` key.
@@ -391,7 +390,7 @@ async def events(
             binding_index,
             state,
             task,
-            fetch_changes=incremental_fetchers,
+            fetch_changes=incremental_fetchers(binding.resourceConfig.interval),
             fetch_page=backfill_fetchers,
         )
 
@@ -523,34 +522,37 @@ async def sessions(
     cutoff = datetime.now(tz=UTC)
     lookback_cutoff = cutoff - SESSIONS_LOOKBACK_LAG
 
-    # The trailing boolean is `should_evict_emitted_changes`: only the lookback
-    # stage may evict, since the realtime one runs ahead of entries it still
-    # needs. It has to be bound positionally — the CDK appends `log` and
-    # `cursor`.
-    incremental_fetchers = {
-        **{
-            f"{project_id}_{REALTIME}": functools.partial(
-                fetch_sessions,
-                http,
-                base_url,
-                project_id,
-                SESSIONS_REALTIME_LAG,
-                False,
-            )
-            for project_id in project_ids
-        },
-        **{
-            f"{project_id}_{LOOKBACK}": functools.partial(
-                fetch_sessions,
-                http,
-                base_url,
-                project_id,
-                SESSIONS_LOOKBACK_LAG,
-                True,
-            )
-            for project_id in project_ids
-        },
-    }
+    # The boolean is `should_evict_emitted_changes`: only the lookback stage
+    # may evict, since the realtime one runs ahead of entries it still needs.
+    # Arguments are bound positionally — the CDK appends `log` and `cursor`.
+    # Built in `open`, which has the binding's interval.
+    def incremental_fetchers(interval: timedelta):
+        return {
+            **{
+                f"{project_id}_{REALTIME}": functools.partial(
+                    fetch_sessions,
+                    http,
+                    base_url,
+                    project_id,
+                    SESSIONS_REALTIME_LAG,
+                    False,
+                    interval,
+                )
+                for project_id in project_ids
+            },
+            **{
+                f"{project_id}_{LOOKBACK}": functools.partial(
+                    fetch_sessions,
+                    http,
+                    base_url,
+                    project_id,
+                    SESSIONS_LOOKBACK_LAG,
+                    True,
+                    interval,
+                )
+                for project_id in project_ids
+            },
+        }
 
     backfill_fetchers = {
         # The shared state helpers key backfills by `_{REALTIME}`. Existing
@@ -583,7 +585,7 @@ async def sessions(
             binding_index,
             state,
             task,
-            fetch_changes=incremental_fetchers,
+            fetch_changes=incremental_fetchers(binding.resourceConfig.interval),
             fetch_page=backfill_fetchers,
         )
 

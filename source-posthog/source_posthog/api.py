@@ -37,6 +37,23 @@ P = ParamSpec("P")
 HOGQL_PAGE_SIZE = 50_000
 BACKFILL_TIMEOUT_PERIOD = timedelta(minutes=5)
 
+# PostHog stops each query after 10 seconds
+# (https://posthog.com/docs/api/queries). A query over the whole backfill range
+# reads too much data to finish in that time, so the backfill reads one window
+# at a time.
+EVENTS_BACKFILL_WINDOW = timedelta(days=1)
+
+# PostHog events eventual consistency horizon.
+# Events may be delayed in appearing in query results due to ClickHouse replication
+# and Kafka processing. The lookback stream trails behind to capture delayed events.
+EVENTS_EVENTUAL_CONSISTENCY_HORIZON = timedelta(hours=1)
+
+# How far before the start of the cursor's hour each Persons poll reads again.
+# PostHog rounds `last_seen_at` down to the hour, so the cursor's own hour has
+# to be read again in any case. The extra hour catches persons that PostHog
+# writes late. Persons written more than about an hour late are still missed.
+PERSONS_REREAD = timedelta(hours=1)
+
 # How far a session's ingestion (`max_inserted_at`) may trail its last event
 # (`$end_timestamp`) and still be captured. The query bounds `$end_timestamp`
 # by it so PostHog's backend can skip old data, which the computed cursor can't
@@ -54,6 +71,12 @@ SESSIONS_LOOKBACK_LAG = timedelta(hours=1)
 
 # Cache for project IDs per organization (avoids re-fetching on retry).
 _project_ids_cache = None
+
+# Columns of each HogQL table, by (table, project), for the life of the
+# process. The Events backfill sends one query for each day of history, and a
+# lookup before each one would double its requests against PostHog's hourly
+# limit. A column that PostHog adds is picked up at the next restart.
+_hogql_columns_cache: dict[tuple[str, int], list[str]] = {}
 
 
 async def fetch_project_ids(
@@ -171,45 +194,67 @@ async def _get_hogql_columns(
     return HogQLResponseMeta.model_validate_json(response).columns
 
 
+def _hogql_datetime(when: datetime) -> str:
+    """Write `when` as a HogQL UTC timestamp with microsecond precision."""
+    serialized = when.astimezone(UTC).replace(tzinfo=None).isoformat()
+    return f"toDateTime64('{serialized}', 6, 'UTC')"
+
+
+def _hogql_cursor(model: type[HogQLEntity[str]] | type[HogQLEntity[int]]) -> str:
+    # A bare column lets PostHog use it to skip data, which PostHog's docs
+    # recommend for paging `events` by `timestamp`.
+    if len(model.cursor_columns) == 1:
+        return model.cursor_columns[0]
+    return f"COALESCE({', '.join(model.cursor_columns)})"
+
+
 async def _query_hogql[T: HogQLEntity[str] | HogQLEntity[int]](
     model: type[T],
-    start_date: datetime,
-    end_date: datetime | None,
+    column_names: list[str],
+    start: datetime,
+    inclusive_start: bool,
+    after_id: str | int | None,
+    end: datetime | None,
     base_url: str,
     project_id: int,
     http: HTTPSession,
     log: Logger,
 ) -> AsyncGenerator[T]:
+    """Yield one page of rows ordered by (cursor, id), up to `end` inclusive.
+
+    Without `after_id`, the page opens at `start`. With it, the page opens
+    after the row (`start`, `after_id`), the last row of the previous page.
+    """
     log.debug(
         "Querying HogQL",
         {
             "table": model.table_name,
             "project_id": project_id,
-            "start": start_date,
-            "end": end_date,
+            "start": start,
+            "after_id": after_id,
+            "end": end,
         },
     )
 
     url = model.get_api_endpoint_url(base_url, project_id)
-    column_names = await _get_hogql_columns(model, base_url, project_id, http, log)
+    cursor = _hogql_cursor(model)
+    # Compare as strings: the ORDER BY uses the same expression, so the
+    # comparison and the sort always agree, whatever the column's type.
+    tiebreak = f"toString({model.tiebreak_column})"
 
-    coalesced_cursor_fields = f'COALESCE({",".join(model.cursor_columns)})'
+    if after_id is not None:
+        lower_bound = (
+            f"({cursor} > {_hogql_datetime(start)} OR "
+            + f"({cursor} = {_hogql_datetime(start)} "
+            + f"AND {tiebreak} > {_hogql_string(str(after_id))}))"
+        )
+    elif inclusive_start:
+        lower_bound = f"{cursor} >= {_hogql_datetime(start)}"
+    else:
+        lower_bound = f"{cursor} > {_hogql_datetime(start)}"
 
-    serialized_start_date = start_date.astimezone(UTC).replace(tzinfo=None).isoformat()
-    serialized_end_date = (
-        end_date.astimezone(UTC).replace(tzinfo=None).isoformat()
-        if end_date is not None
-        else None
-    )
-
-    start_date_clause = (
-        f"WHERE {coalesced_cursor_fields} > "
-        + f"toDateTime64('{serialized_start_date}', 6, 'UTC') "
-    )
-    end_date_clause = (
-        f"AND {coalesced_cursor_fields} <= toDateTime64('{serialized_end_date}', 6, 'UTC') "
-        if end_date is not None
-        else ""
+    upper_bound = (
+        f"AND {cursor} <= {_hogql_datetime(end)} " if end is not None else ""
     )
 
     payload = {
@@ -217,9 +262,9 @@ async def _query_hogql[T: HogQLEntity[str] | HogQLEntity[int]](
             "kind": "HogQLQuery",
             "query": f"SELECT {", ".join(column_names)} "
             + f"FROM {model.table_name} "
-            + start_date_clause
-            + end_date_clause
-            + f"ORDER BY {coalesced_cursor_fields} ASC "
+            + f"WHERE {lower_bound} "
+            + upper_bound
+            + f"ORDER BY {cursor} ASC, {tiebreak} ASC "
             + f"LIMIT {HOGQL_PAGE_SIZE}",
         },
     }
@@ -237,6 +282,67 @@ async def _query_hogql[T: HogQLEntity[str] | HogQLEntity[int]](
             dict(zip(column_names, row.root, strict=True)),
             context=ProjectIdValidationContext(project_id),
         )
+
+
+async def _fetch_hogql_between[T: HogQLEntity[str] | HogQLEntity[int]](
+    model: type[T],
+    start: datetime,
+    end: datetime | None,
+    base_url: str,
+    project_id: int,
+    http: HTTPSession,
+    log: Logger,
+    inclusive_start: bool = False,
+) -> AsyncGenerator[T]:
+    """Yield every row with a cursor after `start` and at or before `end`.
+
+    With `inclusive_start`, rows at `start` are included too. A missing `end`
+    means no upper bound. Rows come in (cursor, id) order, and each row comes
+    once, even when many rows share one cursor value.
+    """
+    cache_key = (model.table_name, project_id)
+    column_names = _hogql_columns_cache.get(cache_key)
+    if column_names is None:
+        column_names = await _get_hogql_columns(
+            model, base_url, project_id, http, log
+        )
+        _hogql_columns_cache[cache_key] = column_names
+
+    reached = start
+    after_id: str | int | None = None
+
+    while True:
+        batch_count = 0
+        page_start = (reached, after_id)
+
+        async for item in _query_hogql(
+            model,
+            column_names,
+            reached,
+            inclusive_start,
+            after_id,
+            end,
+            base_url,
+            project_id,
+            http,
+            log,
+        ):
+            batch_count += 1
+            # Both halves of the position come from the same row, the last one
+            # the server sent, so the next page opens exactly where this ended.
+            reached = item.get_cursor()
+            after_id = item.id
+            yield item
+
+        if batch_count < HOGQL_PAGE_SIZE:
+            break
+
+        # A full page that does not move the position would repeat forever.
+        if (reached, after_id) == page_start:
+            raise RuntimeError(
+                f"HogQL paging on {model.table_name} did not advance past "
+                + f"({reached.isoformat()}, {after_id}) in project {project_id}"
+            )
 
 
 async def backfill_feature_flags(
@@ -510,6 +616,7 @@ async def fetch_sessions(
     project_id: int,
     lag: timedelta,
     should_evict_emitted_changes: bool,
+    interval: timedelta,
     log: Logger,
     cursor: LogCursor,
 ) -> AsyncGenerator[Session | LogCursor, None]:
@@ -532,11 +639,18 @@ async def fetch_sessions(
     the realtime subtask, SESSIONS_LOOKBACK_LAG for the one that re-walks the
     same span later to pick up rows that were not yet queryable. Only the
     trailing subtask sets `should_evict_emitted_changes`.
+
+    A poll whose window would be shorter than `interval` returns without
+    reading, so the CDK waits a full interval before the next one.
     """
     assert isinstance(cursor, datetime)
 
     horizon = datetime.now(tz=UTC).replace(microsecond=0) - lag
-    if horizon <= cursor:
+    # Both subtasks' cursors trail the present by at least `lag`. The CDK polls
+    # again at once after a checkpoint when the cursor is more than `interval`
+    # behind, so without this each poll would read only the few seconds since
+    # the last one, back to back.
+    if horizon <= cursor or horizon - cursor < interval:
         return
 
     # Namespaced per project so one project's pruning cannot evict another's
@@ -627,9 +741,14 @@ async def backfill_sessions(
 
         # The lookback subtask opens an hour before this cutoff, so the tail of
         # the backfill's range is walked by both.
-        if cache.should_yield(cache_name, item.id, item_cursor):
-            doc_count += 1
-            yield item
+        if cache.has_as_recent_as(cache_name, item.id, item_cursor):
+            continue
+
+        doc_count += 1
+        yield item
+        # Added only after the yield: when the timeout wrapper drops a session
+        # and returns, this line never runs, so the next call still emits it.
+        cache.add_recent(cache_name, item.id, item_cursor)
 
     log.info(f"Backfilled {doc_count} sessions from project {project_id}")
 
@@ -646,6 +765,11 @@ async def backfill_project_events(
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Event | PageCursor, None]:
+    """Emit the events in one window after the page cursor, up to the cutoff.
+
+    Each call reads at most EVENTS_BACKFILL_WINDOW and checkpoints the window's
+    end, so a long backfill resumes from the last window it finished.
+    """
     assert isinstance(page, str | None)
     assert isinstance(cutoff, datetime)
 
@@ -654,37 +778,40 @@ async def backfill_project_events(
     if start_date >= cutoff:
         return
 
+    window_end = min(start_date + EVENTS_BACKFILL_WINDOW, cutoff)
     base_url = config.advanced.base_url
-    new_cursor = start_date
+    cache_name = f"events/{project_id}"
+    # The lookback incremental starts this far before the cutoff, so only
+    # events after this instant can be read by both. Caching only those keeps
+    # the cache small: a full history would not fit in memory.
+    overlap_start = cutoff - EVENTS_EVENTUAL_CONSISTENCY_HORIZON
     doc_count = 0
 
-    while True:
-        batch_count = 0
+    async for item in _fetch_hogql_between(
+        Event, start_date, window_end, base_url, project_id, http, log
+    ):
+        item_cursor = item.get_cursor()
 
-        async for item in _query_hogql(
-            Event,
-            new_cursor,
-            cutoff,
-            base_url,
-            project_id,
-            http,
-            log,
-        ):
-            item_cursor = item.get_cursor()
-            batch_count += 1
-            new_cursor = max(new_cursor, item_cursor)
+        in_overlap = item_cursor > overlap_start
+        if in_overlap and cache.has_as_recent_as(cache_name, item.id, item_cursor):
+            continue
 
-            if cache.should_yield("events", f"{project_id}/{item.id}", item_cursor):
-                doc_count += 1
-                yield item
+        doc_count += 1
+        yield item
+        # Added only after the yield: when the timeout wrapper drops an event
+        # and returns, this line never runs, so the next call still emits it.
+        if in_overlap:
+            cache.add_recent(cache_name, item.id, item_cursor)
 
-        if batch_count < HOGQL_PAGE_SIZE:
-            break
+    log.info(
+        f"Backfilled {doc_count} events from project {project_id}",
+        {"window_start": start_date, "window_end": window_end},
+    )
 
-    log.info(f"Backfilled {doc_count} events from project {project_id}")
-
-    if new_cursor > start_date:
-        yield new_cursor.isoformat()
+    # The last window ends at the cutoff. Returning without a cursor ends the
+    # backfill.
+    if window_end < cutoff:
+        yield window_end.isoformat()
 
 
 async def fetch_project_events(
@@ -692,6 +819,7 @@ async def fetch_project_events(
     config: EndpointConfig,
     project_id: int,
     horizon: timedelta | None,
+    interval: timedelta,
     log: Logger,
     cursor: LogCursor,
 ) -> AsyncGenerator[Event | LogCursor, None]:
@@ -699,34 +827,39 @@ async def fetch_project_events(
 
     base_url = config.advanced.base_url
     now = datetime.now(tz=UTC)
-    upper_bound = now - horizon if horizon else None
+    # PostHog accepts events up to about a day in the future. Without a bound
+    # at the present, one such event moves the realtime cursor ahead, and the
+    # realtime subtask stops reading until that time arrives.
+    upper_bound = now - horizon if horizon else now
 
+    # The lookback cursor trails the present by about `horizon`. The CDK polls
+    # again at once after a checkpoint when the cursor is more than `interval`
+    # behind, so without this each lookback poll would read only the few
+    # seconds since the last one, back to back.
+    if upper_bound - cursor < interval:
+        return
+
+    # One cache per project, so one project's cleanup cannot remove another
+    # project's entries.
+    cache_name = f"events/{project_id}"
     new_cursor = cursor
     doc_count = 0
 
-    while True:
-        batch_count = 0
+    async for item in _fetch_hogql_between(
+        Event, cursor, upper_bound, base_url, project_id, http, log
+    ):
+        item_cursor = item.get_cursor()
+        new_cursor = max(new_cursor, item_cursor)
 
-        async for item in _query_hogql(
-            Event,
-            new_cursor,
-            upper_bound,
-            base_url,
-            project_id,
-            http,
-            log,
-        ):
-            item_cursor = item.get_cursor()
-            batch_count += 1
+        if cache.should_yield(cache_name, item.id, item_cursor):
+            doc_count += 1
+            yield item
 
-            new_cursor = max(new_cursor, item_cursor)
-
-            if cache.should_yield("events", f"{project_id}/{item.id}", item_cursor):
-                doc_count += 1
-                yield item
-
-        if batch_count < HOGQL_PAGE_SIZE:
-            break
+    if horizon is not None:
+        # Only the lookback subtask (the one with a horizon) cleans up. It
+        # trails the realtime subtask, so no subtask reads at or before its
+        # starting cursor again.
+        cache.cleanup(cache_name, cursor)
 
     log.info(f"Fetched {doc_count} events from project {project_id}")
 
@@ -755,27 +888,12 @@ async def backfill_persons(
     new_cursor = start_date
     doc_count = 0
 
-    while True:
-        batch_count = 0
-
-        async for item in _query_hogql(
-            Person,
-            new_cursor,
-            cutoff,
-            base_url,
-            project_id,
-            http,
-            log,
-        ):
-            batch_count += 1
-            doc_count += 1
-
-            new_cursor = max(new_cursor, item.get_cursor())
-
-            yield item
-
-        if batch_count < HOGQL_PAGE_SIZE:
-            break
+    async for item in _fetch_hogql_between(
+        Person, start_date, cutoff, base_url, project_id, http, log
+    ):
+        doc_count += 1
+        new_cursor = max(new_cursor, item.get_cursor())
+        yield item
 
     log.info(f"Backfilled {doc_count} persons from project {project_id}")
 
@@ -790,35 +908,38 @@ async def fetch_persons(
     log: Logger,
     cursor: LogCursor,
 ) -> AsyncGenerator[Person | LogCursor, None]:
+    """Emit every person seen from the hour before the cursor's hour to now.
+
+    PostHog writes `last_seen_at` as the start of the hour, so it does not
+    change when a person changes again later in the same hour. Each poll
+    therefore emits every person in its window, including ones an earlier poll
+    already emitted; they replace themselves in the collection. The window
+    also catches persons written up to an hour late. Persons with a cursor
+    value in the future wait until that time arrives.
+    """
     assert isinstance(cursor, datetime)
 
     base_url = config.advanced.base_url
-    new_cursor = cursor
+    start = cursor.replace(minute=0, second=0, microsecond=0) - PERSONS_REREAD
+    # PostHog accepts events up to about a day in the future, and
+    # `last_seen_at` follows them. The query stops at the present so those
+    # persons wait for their time instead of being read early.
+    end = datetime.now(tz=UTC)
+    if end <= cursor:
+        return
+
     doc_count = 0
 
-    while True:
-        batch_count = 0
-
-        async for item in _query_hogql(
-            Person,
-            new_cursor,
-            None,
-            base_url,
-            project_id,
-            http,
-            log,
-        ):
-            batch_count += 1
-            doc_count += 1
-            item_cursor = item.get_cursor()
-            new_cursor = max(new_cursor, item_cursor)
-
-            yield item
-
-        if batch_count < HOGQL_PAGE_SIZE:
-            break
+    async for item in _fetch_hogql_between(
+        Person, start, end, base_url, project_id, http, log, inclusive_start=True
+    ):
+        doc_count += 1
+        yield item
 
     log.info(f"Fetched {doc_count} persons from project {project_id}")
 
-    if new_cursor > cursor:
-        yield new_cursor
+    # The cursor is this poll's start time, not the newest `last_seen_at`. The
+    # newest value sits at the top of the hour for a whole hour, so the CDK
+    # would see the cursor more than an interval behind and poll again at once.
+    if doc_count > 0:
+        yield end
