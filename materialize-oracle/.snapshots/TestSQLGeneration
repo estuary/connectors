@@ -1,0 +1,125 @@
+--- Begin key_value createTargetTable ---
+CREATE TABLE IF NOT EXISTS key_value (
+	key1 NUMBER(38,0) NOT NULL,
+	key2 BOOLEAN NOT NULL,
+	"key!binary" RAW(2000),
+	array CLOB,
+	binary BLOB,
+	boolean BOOLEAN,
+	field_with_projection VARCHAR2(4000 CHAR),
+	flow_published_at TIMESTAMP(9) WITH TIME ZONE NOT NULL,
+	"integer" NUMBER(38,0),
+	integerGt128Bit VARCHAR2(4000 CHAR),
+	integerGt256Bit VARCHAR2(4000 CHAR),
+	integerGt64Bit VARCHAR2(4000 CHAR),
+	integerWithUserDDL DECIMAL(20),
+	multiple CLOB,
+	"nonAsciiκόσμε" VARCHAR2(4000 CHAR),
+	"number" BINARY_DOUBLE,
+	numberCastToString VARCHAR2(4000 CHAR),
+	object CLOB,
+	string VARCHAR2(4000 CHAR),
+	stringInteger NUMBER(38,0),
+	stringInteger18Chars NUMBER(38,0),
+	stringInteger38Chars NUMBER(38,0),
+	stringInteger39Chars VARCHAR2(4000 CHAR),
+	stringInteger66Chars VARCHAR2(4000 CHAR),
+	stringInteger77Chars VARCHAR2(4000 CHAR),
+	stringNumber BINARY_DOUBLE,
+	flow_document CLOB,
+	PRIMARY KEY (key1, key2, "key!binary")
+)--- End key_value createTargetTable ---
+
+--- Begin delta_updates createTargetTable ---
+CREATE TABLE IF NOT EXISTS delta_updates (
+	theKey VARCHAR2(1000 CHAR),
+	aValue NUMBER(38,0),
+	flow_published_at TIMESTAMP(9) WITH TIME ZONE NOT NULL
+)--- End delta_updates createTargetTable ---
+
+--- Begin key_value createLoadTable ---
+
+CREATE PRIVATE TEMPORARY TABLE ORA$PTT_FLOW_LOAD_0 (key1 NUMBER(38,0), key2 BOOLEAN, "key!binary" RAW(2000)) ON COMMIT PRESERVE DEFINITION
+--- End key_value createLoadTable ---
+
+--- Begin delta_updates createLoadTable ---
+
+CREATE PRIVATE TEMPORARY TABLE ORA$PTT_FLOW_LOAD_1 (theKey VARCHAR2(1000 CHAR)) ON COMMIT PRESERVE DEFINITION
+--- End delta_updates createLoadTable ---
+
+--- Begin key_value loadInsert ---
+
+INSERT INTO ORA$PTT_FLOW_LOAD_0 (key1, key2, "key!binary") VALUES (TO_NUMBER(:1), :2, :3)
+--- End key_value loadInsert ---
+
+--- Begin delta_updates loadInsert ---
+
+INSERT INTO ORA$PTT_FLOW_LOAD_1 (theKey) VALUES (:1)
+--- End delta_updates loadInsert ---
+
+--- Begin key_value loadQuery ---
+
+SELECT /*+ LEADING(l r) USE_NL(r) INDEX(r) */ r.flow_document
+FROM ORA$PTT_FLOW_LOAD_0 l
+JOIN key_value r ON r.key1 = l.key1 AND r.key2 = l.key2 AND r."key!binary" = l."key!binary"
+--- End key_value loadQuery ---
+
+--- Begin delta_updates loadQuery ---
+
+--- End delta_updates loadQuery ---
+
+--- Begin key_value storeInsert ---
+
+INSERT INTO key_value (key1, key2, "key!binary", array, binary, boolean, field_with_projection, flow_published_at, "integer", integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, "nonAsciiκόσμε", "number", numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document) VALUES (TO_NUMBER(:1), :2, :3, :4, :5, :6, :7, TO_TIMESTAMP_TZ(:8, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM'), TO_NUMBER(:9), :10, :11, :12, :13, :14, :15, TO_BINARY_DOUBLE(:16), :17, :18, :19, TO_NUMBER(:20), TO_NUMBER(:21), TO_NUMBER(:22), :23, :24, :25, TO_BINARY_DOUBLE(:26), :27)
+--- End key_value storeInsert ---
+
+--- Begin delta_updates storeInsert ---
+
+INSERT INTO delta_updates (theKey, aValue, flow_published_at) VALUES (:1, TO_NUMBER(:2), TO_TIMESTAMP_TZ(:3, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM'))
+--- End delta_updates storeInsert ---
+
+--- Begin key_value storeUpdate ---
+
+UPDATE key_value SET array = :1, binary = :2, boolean = :3, field_with_projection = :4, flow_published_at = TO_TIMESTAMP_TZ(:5, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM'), "integer" = TO_NUMBER(:6), integerGt128Bit = :7, integerGt256Bit = :8, integerGt64Bit = :9, integerWithUserDDL = :10, multiple = :11, "nonAsciiκόσμε" = :12, "number" = TO_BINARY_DOUBLE(:13), numberCastToString = :14, object = :15, string = :16, stringInteger = TO_NUMBER(:17), stringInteger18Chars = TO_NUMBER(:18), stringInteger38Chars = TO_NUMBER(:19), stringInteger39Chars = :20, stringInteger66Chars = :21, stringInteger77Chars = :22, stringNumber = TO_BINARY_DOUBLE(:23), flow_document = :24 WHERE key1 = TO_NUMBER(:25) AND key2 = :26 AND "key!binary" = :27
+--- End key_value storeUpdate ---
+
+--- Begin delta_updates storeUpdate ---
+
+UPDATE delta_updates SET aValue = TO_NUMBER(:1), flow_published_at = TO_TIMESTAMP_TZ(:2, 'YYYY-MM-DD"T"HH24:MI:SS.FF9TZH:TZM') WHERE theKey = :3
+--- End delta_updates storeUpdate ---
+
+--- Begin key_value deleteQuery ---
+
+DELETE FROM key_value WHERE key1 = TO_NUMBER(:1) AND key2 = :2 AND "key!binary" = :3
+--- End key_value deleteQuery ---
+
+--- Begin delta_updates deleteQuery ---
+
+DELETE FROM delta_updates WHERE theKey = :1
+--- End delta_updates deleteQuery ---
+
+--- Begin alter table add columns and drop not nulls ---
+
+ALTER TABLE key_value ADD (first_new_column STRING, second_new_column BOOL) MODIFY (first_required_column NULL, second_required_column NULL)
+--- End alter table add columns and drop not nulls ---
+
+--- Begin alter table add columns ---
+
+ALTER TABLE key_value ADD (first_new_column STRING, second_new_column BOOL)
+--- End alter table add columns ---
+
+--- Begin alter table drop not nulls ---
+
+ALTER TABLE key_value MODIFY (first_required_column NULL, second_required_column NULL)
+--- End alter table drop not nulls ---
+
+--- Begin Fence Update ---
+UPDATE path."to".checkpoints
+	SET   checkpoint = :1
+	WHERE materialization = 'some/Materialization'
+	AND   key_begin = 1122867
+	AND   key_end = 4293844428
+	AND   fence = 123
+--- End Fence Update ---
+
+

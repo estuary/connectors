@@ -49,8 +49,12 @@ type MaterializeCfg struct {
 
 	// MaxFieldLength is used to produce "forbidden" constraints on field names
 	// that are too long. If maxFieldLength is 0, no constraints are enforced.
-	// The length of a field name is in terms of characters, not bytes.
+	// The length of a field name is in terms of characters, not bytes, unless
+	// FieldLengthInBytes is set.
 	MaxFieldLength int
+	// FieldLengthInBytes measures field names against MaxFieldLength in UTF-8
+	// bytes rather than characters.
+	FieldLengthInBytes bool
 
 	// CaseInsensitiveFields indicates if fields that differ only in
 	// capitalization will conflict in the materialized resource. This value
@@ -405,6 +409,7 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 	}
 
 	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, parsedFlags)
+	validator.fieldLengthInBytes = mCfg.FieldLengthInBytes
 	var out []*pm.Response_Validated_Binding
 	for idx, b := range req.Bindings {
 		path := paths[idx]
@@ -576,6 +581,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	}
 
 	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, parsedFlags)
+	validator.fieldLengthInBytes = mCfg.FieldLengthInBytes
 	for _, bindingIdx := range updates.backfillBindings {
 		mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
 		if err != nil {

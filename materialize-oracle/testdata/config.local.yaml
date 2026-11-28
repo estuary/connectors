@@ -1,0 +1,10 @@
+address: localhost:1522
+user: flow
+credentials:
+  auth_type: UserPassword
+  password: flowpassword
+database: FREEPDB1
+sslmode: disable
+hardDelete: true
+advanced:
+  feature_flags: allow_existing_tables_for_new_bindings

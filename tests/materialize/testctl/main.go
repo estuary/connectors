@@ -53,6 +53,7 @@ import (
 	mongodb "github.com/estuary/connectors/materialize-mongodb"
 	motherduck "github.com/estuary/connectors/materialize-motherduck"
 	mysql "github.com/estuary/connectors/materialize-mysql"
+	oracle "github.com/estuary/connectors/materialize-oracle"
 	postgres "github.com/estuary/connectors/materialize-postgres"
 	redshift "github.com/estuary/connectors/materialize-redshift"
 	s3iceberg "github.com/estuary/connectors/materialize-s3-iceberg"
@@ -96,6 +97,7 @@ var connectors = map[string]opener{
 	"materialize-mongodb":                fromMaterializer(mongodb.NewMaterializer),
 	"materialize-motherduck":             fromSQLDriver(motherduck.NewDriver),
 	"materialize-mysql":                  fromSQLDriver(mysql.NewDriver),
+	"materialize-oracle":                 fromSQLDriver(oracle.NewDriver),
 	"materialize-postgres":               fromSQLDriver(postgres.NewDriver),
 	"materialize-redshift":               fromSQLDriver(redshift.NewDriver),
 	"materialize-s3-iceberg":             fromMaterializer(s3iceberg.NewMaterializer),

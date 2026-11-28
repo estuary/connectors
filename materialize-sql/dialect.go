@@ -19,6 +19,9 @@ type Dialect struct {
 
 	// MaxFieldCharLength is provided as the "maxFieldLength" parameter to boilerplate.NewValidator.
 	MaxColumnCharLength int
+	// ColumnLengthInBytes measures column names against MaxColumnCharLength in
+	// UTF-8 bytes rather than characters.
+	ColumnLengthInBytes bool
 	// MaxColumns is the most columns a table may have. If 0, there is no limit.
 	MaxColumns int
 	// CaseInsensitiveColumns is provided as the "caseInsensitiveFields" parameter to boilerplate.NewValidator.

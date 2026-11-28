@@ -1,0 +1,63 @@
+collections:
+  tests/truncate:
+    schema:
+      properties:
+        id: {type: integer}
+        _meta:
+          type: object
+          properties:
+            op: {type: string}
+          required: [op]
+      required: [id, _meta]
+      type: object
+    key: [/id]
+
+materializations:
+  acmeCo/tests/materialize-oracle-truncate:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+    - resource:
+        table: truncate_standard
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_delta
+        delta_updates: true
+      source: tests/truncate
+      fields:
+        recommended: true
+    - resource:
+        table: truncate_no_published_at
+      source: tests/truncate
+      fields:
+        recommended: true
+        exclude: [flow_published_at]
+
+  # With soft deletes, the rows published before the backfill are marked
+  # deleted instead.
+  acmeCo/tests/materialize-oracle-truncate-soft:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config:
+          address: localhost:1522
+          user: flow
+          credentials:
+            auth_type: UserPassword
+            password: flowpassword
+          database: FREEPDB1
+          sslmode: disable
+          advanced:
+            feature_flags: allow_existing_tables_for_new_bindings
+    bindings:
+    - resource:
+        table: truncate_soft
+      source: tests/truncate
+      fields:
+        recommended: true

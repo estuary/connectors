@@ -355,6 +355,35 @@ func TestValidate(t *testing.T) {
 		require.ErrorContains(t, err, "at least one field from location '/key' is required to be materialized, but all projections exceed the maximum length allowable by the destination")
 	})
 
+	t.Run("field length can be in bytes", func(t *testing.T) {
+		proposed := loadValidateSpec(t, "long-fields.flow.proto")
+
+		// 13 characters, 23 bytes, and still sorted between its neighbours.
+		require.Equal(t, "key", proposed.Bindings[0].Collection.Projections[3].Field)
+		proposed.Bindings[0].Collection.Projections[3].Field = "key" + strings.Repeat("é", 10)
+
+		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
+		featureFlags := map[string]bool{"flow_document": true, "retain_existing_data_on_backfill": false}
+		for _, inBytes := range []bool{false, true} {
+			validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 20, true, nil)
+			validator.fieldLengthInBytes = inBytes
+
+			_, err := validator.ValidateBinding(
+				[]string{"key_value"},
+				false,
+				proposed.Bindings[0].Backfill,
+				proposed.Bindings[0].Collection,
+				proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+				nil,
+			)
+			if inBytes {
+				require.ErrorContains(t, err, "all projections exceed the maximum length allowable by the destination of 20")
+			} else {
+				require.NoError(t, err)
+			}
+		}
+	})
+
 	t.Run("a required field cannot be too long", func(t *testing.T) {
 		proposed := loadValidateSpec(t, "long-fields.flow.proto")
 

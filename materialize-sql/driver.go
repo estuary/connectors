@@ -138,6 +138,7 @@ func (s *sqlMaterialization[EC, RC]) Config() boilerplate.MaterializeCfg {
 		TranslateNamespace:       s.endpoint.SchemaLocator,
 		TranslateField:           s.endpoint.ColumnLocator,
 		MaxFieldLength:           s.endpoint.Dialect.MaxColumnCharLength,
+		FieldLengthInBytes:       s.endpoint.Dialect.ColumnLengthInBytes,
 		CaseInsensitiveFields:    s.endpoint.Dialect.CaseInsensitiveColumns,
 		CaseInsensitiveResources: s.endpoint.Dialect.CaseInsensitiveResources,
 		ConcurrentApply:          s.endpoint.ConcurrentApply,
